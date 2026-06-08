@@ -106,3 +106,13 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
 - Dep: `typer ^0.15` (initially added `^0.12` which had a hard incompatibility with `click >= 8.2`; bumped to 0.15 — Poetry downgraded `click` 8.4.1 → 8.1.8 as part of the resolution).
 - Module entrypoint: `if __name__ == "__main__": app()` in `cli.py` enables `python -m app.cli ...`.
 - Gate: `poetry run pytest tests/test_cli.py` → 9 passed; full suite → 40 passed in 3.06s. `python -m app.cli --help` lists `create-token`, `list-tokens`, `revoke-token`.
+
+## 2026-06-08 — C1 FastAPI skeleton + GET /health
+
+- `backend/app/main.py` — `create_app()` builds the `FastAPI` instance (`title="heerr backend"`, `version="0.1.0"`) with the OpenAPI URL relocated to `/api/v1/openapi.json` and Swagger UI at `/api/v1/docs` (ReDoc disabled). Module-level `app = create_app()` so `uvicorn app.main:app` works.
+- `backend/app/api/v1/__init__.py`, `backend/app/api/v1/router.py` — `api_v1` `APIRouter(prefix="/api/v1")` that other sub-routers will be hung off in C+/D+/E.
+- `backend/app/api/v1/health.py` — `GET /health` returns `{"status": "ok"}` (no auth dependency; PLAN: every endpoint except `GET /health` requires Bearer).
+- `backend/tests/test_health.py` — 4 tests via `httpx.AsyncClient(ASGITransport)`: 200 + body; ignores Authorization header; OpenAPI at `/api/v1/openapi.json` (legacy `/openapi.json` → 404); module-level `app` callable also serves `/health`.
+- New runtime dep: `uvicorn[standard] ^0.32` (pulled httptools, uvloop, watchfiles, websockets, pyyaml).
+- Gate: `poetry run pytest tests/test_health.py` → 4 passed. Done-when smoke: `poetry run uvicorn app.main:app --port 8765` boots; `curl http://127.0.0.1:8765/api/v1/health` → `200 {"status":"ok"}`; `/api/v1/openapi.json` serves the schema with `info.title = "heerr backend"`.
+- Full suite: 44 passed in 3.45s.
