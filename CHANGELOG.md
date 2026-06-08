@@ -159,3 +159,20 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
   - Finders: active job found; cleared after `done`; download lookup hit + miss.
 - New fixtures (in `tests/test_jobs_service.py`): `token_id` (creates a Token via `app_sm`, returns its UUID, deletes on teardown); `cleanup_jobs` (function-scoped DELETE on `downloads` then `jobs`).
 - Gate: `poetry run pytest tests/test_jobs_service.py` → 16 passed; full suite → 84 passed in 4.42s.
+
+## 2026-06-08 — D2 POST /download with idempotent dispatch
+
+- `backend/app/schemas/download.py` — `DownloadRequest` (Pydantic v2, `extra="forbid"`, `spotify_uri` validated against `^spotify:(track|album|playlist):[A-Za-z0-9_-]+$` and exposing `parsed_type()`); `DownloadResponse` (`job_id`, `state`, `deduped`).
+- `backend/app/services/workers.py` — `JobEnqueuer` callable that schedules a `BackgroundTasks` job. The stub work is `asyncio.sleep(0.05)` (F2 replaces with the spotDL subprocess). On exception, the job is marked `failed` with the message. `get_enqueuer()` is the FastAPI provider wired to `_sessionmaker()`.
+- `backend/app/api/v1/download.py` — `POST /download` returns **202**, gated by `require_scope("download")`. Behavior, in order:
+  1. Track on disk (`find_download_for_track`) → synthetic `{state:"done", deduped:true}` with the existing `Download.job_id`. No worker enqueued.
+  2. Otherwise `create_job_idempotent(spotify_uri, parsed_type, token.id)`. If `deduped=True` → return existing. If `deduped=False` → call the enqueuer.
+- `backend/app/api/v1/router.py` — mounts the new download sub-router.
+- `backend/tests/test_download.py` — 14 tests:
+  - **Auth**: missing bearer → 401; `read`-only scope → 403.
+  - **URI validation** (parametrized, 6 cases): empty / non-URI / `spotify:podcast:…` / trailing-empty / open.spotify.com URL / malformed `spotify::abc` → 422. Unknown body field → 422.
+  - **New-URI dispatch**: track creates `queued` job, `deduped=false`, worker enqueued exactly once; album dispatch records `spotify_type="album"`; playlist dispatch records `"playlist"`.
+  - **Active-job dedupe**: second call returns the same `job_id` with `deduped=true`; worker is enqueued only once.
+  - **On-disk dedupe**: seeded `Job(state="done")` + `Download` row → response `state:"done"`, `deduped:true`, no worker enqueued.
+- Test scaffolding: `RecordingEnqueuer` overrides `get_enqueuer` and collects scheduled `job_id`s; `download_app` fixture mounts `api_v1` with `get_session` + `get_enqueuer` overrides; `cleanup` DELETEs downloads then jobs.
+- Gate: `poetry run pytest tests/test_download.py` → 14 passed; full suite → 98 passed in 5.73s.
