@@ -186,3 +186,20 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
 - `backend/tests/test_status.py` — 9 tests: missing-bearer → 401; `download`-only scope → 403; unknown id → 404; bad UUID → 422; queued job has full contract field set + all-null timestamps + `progress=null`; running job has `started_at`; done track with seeded `Download` has `output_path`; done album has `output_path=null`; failed job has `error` populated.
 - `backend/tests/test_queue.py` — 8 tests: 401/403 auth gates; empty queue → `{active:[], recent:[]}`; queued+running → `active`, done+failed → `recent`; `active` ordered oldest-first; `recent` ordered newest-first; recent capped at 20 across 25 seeds; track in `recent` with download row picks up `output_path`.
 - Gate: `poetry run pytest tests/test_status.py tests/test_queue.py` → 17 passed; full suite → 115 passed in 5.87s.
+
+## 2026-06-08 — E1 admin endpoints (token CRUD + job retry)
+
+- `backend/app/schemas/token.py` — `CreateTokenRequest` (`extra="forbid"`, `owner_label` min_length=1, `scopes: list[Literal["read","download"]]` with `min_length=1` and dedup-sort validator, `is_admin: bool = False`), `CreateTokenResponse` (includes `raw_token` — emitted once), `TokenView` (no `token_hash`, no `raw_token`).
+- `backend/app/api/v1/admin.py` — `APIRouter(prefix="/admin")`, all routes gated by `require_admin`:
+  - `POST /admin/tokens` (201) — generates `secrets.token_urlsafe(32)`, persists `sha256(raw)`, returns `raw_token` in the response body.
+  - `GET /admin/tokens` — lists `TokenView` rows ordered by `created_at ASC`. No hash, no raw.
+  - `POST /admin/tokens/{id}/revoke` (204) — 404 unknown, 409 already-revoked, else sets `revoked_at = now()`.
+  - `POST /admin/jobs/{id}/retry` — 404 unknown, **409 if `state != "failed"`**, 409 if another active job exists for the same URI (would violate the partial unique index on enqueue). Resets state to `queued`, clears `error_msg` / `started_at` / `finished_at`, bumps `attempt_count`, enqueues the worker via `JobEnqueuer`.
+- `backend/app/api/v1/router.py` — mounts the admin sub-router.
+- `backend/tests/test_admin.py` — 15 tests covering the gate matrix:
+  - All four admin endpoints → 401 when no bearer; → 403 with a non-admin token.
+  - `POST /admin/tokens` returns 201 + persisted hash; raw token never leaks into the DB; `GET /admin/tokens` body contains neither raw nor hash; invalid scope → 422; empty `scopes` → 422.
+  - Revoke: happy path sets `revoked_at`; unknown id → 404; double-revoke → 409.
+  - Retry: failed job → 200 + `state="queued"` + `attempt_count` incremented + `RecordingEnqueuer` recorded the call; parametrized states `queued`/`running`/`done` → 409; unknown job → 404; another active job for the same URI → 409.
+- Test scaffolding (in `tests/test_admin.py`): `RecordingEnqueuer` overrides `get_enqueuer`; `admin_app` mounts `api_v1` with `get_session` + `get_enqueuer` overrides; `cleanup` deletes downloads/jobs and only admin-created tokens (those owned by `admin-test-*`); admin tokens used in tests are minted via `make_token(is_admin=True)` so their teardown is owned by `make_token`'s own cleanup.
+- Gate: `poetry run pytest tests/test_admin.py` → 15 passed; full suite → 130 passed in 6.47s.
