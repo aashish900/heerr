@@ -116,3 +116,15 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
 - New runtime dep: `uvicorn[standard] ^0.32` (pulled httptools, uvloop, watchfiles, websockets, pyyaml).
 - Gate: `poetry run pytest tests/test_health.py` → 4 passed. Done-when smoke: `poetry run uvicorn app.main:app --port 8765` boots; `curl http://127.0.0.1:8765/api/v1/health` → `200 {"status":"ok"}`; `/api/v1/openapi.json` serves the schema with `info.title = "heerr backend"`.
 - Full suite: 44 passed in 3.45s.
+
+## 2026-06-08 — C2 Spotify client-credentials service
+
+- `backend/app/services/__init__.py`, `backend/app/services/spotify.py`.
+- `SpotifyClient(client_id, client_secret, *, transport=None)` — async, httpx-based. Token-cached client-credentials flow: POSTs to `https://accounts.spotify.com/api/token` with HTTP Basic auth; caches `access_token` until `expires_in - 60s` (monotonic clock). `search_tracks` / `search_albums` / `search_playlists` GET `https://api.spotify.com/v1/search` with the bearer token; return `list[SpotifyResult]` (frozen dataclass: `spotify_uri`, `spotify_url`, `title`, `artist`, `album`, `duration_ms`, `cover_url`). Per-type parsers map Spotify payloads to the unified shape (album/playlist fill `artist` from `artists[0].name` / `owner.display_name`; both leave `album` and `duration_ms` null). `None` items in playlist results (a known Spotify quirk) are filtered.
+- Error mapping: `429` → `SpotifyRateLimited(retry_after=<Retry-After header>)`; `5xx` → `SpotifyError(...)`. PLAN's `429 → 503` translation happens at the endpoint layer (C3), not here.
+- `get_spotify_client()` provider (lru_cached) constructs the client from `Settings.spotify_client_id` + `spotify_client_secret.get_secret_value()` — wired into FastAPI as a `Depends` in C3.
+- `backend/tests/test_spotify_service.py` — 10 tests via `httpx.MockTransport` (no respx). Covers: track / album / playlist happy paths with full field assertions; token cached across requests; token refreshed when `_expires_at` is forced to 0; 429 → `SpotifyRateLimited` with `retry_after`; 5xx → `SpotifyError`; null playlist item filtered; `q` / `type` / `limit` query params propagate; `Authorization: Bearer <token>` header is sent on the search call.
+- **ROADMAP drift logged.** ROADMAP C2 prescribed `spotipy` + respx; both were dropped:
+  - `spotipy` is sync (built on `requests`) — would require `run_in_executor` wrappers everywhere in our async stack; replaced by ~50 lines of direct httpx (token cache + 3 search methods + result parsers).
+  - `respx ^0.21` has a hard incompatibility with `httpx 0.28` ([respx#277](https://github.com/lundberg/respx/issues/277): `AllMockedAssertionError` on every mocked call); replaced by `httpx.MockTransport` (the alternative the ROADMAP itself listed). Net: zero new deps for C2 (only a transient `respx` install that was then removed).
+- Gate: `poetry run pytest tests/test_spotify_service.py` → 10 passed; full suite → 54 passed in 3.27s.
