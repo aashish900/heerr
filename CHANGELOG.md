@@ -138,3 +138,24 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
 - `backend/tests/test_search.py` — 14 tests. Auth: missing-bearer → 401; `download`-only token → 403. Validation: invalid type / limit > 50 / empty query / unknown field → 422. Contract: track response has the full PLAN field set. Hints: track `already_downloaded` set from seeded `downloads` row; track `active_job_id` set when a `queued` job exists; `done` job does NOT populate `active_job_id`; album `active_job_id` populates (running) but `already_downloaded` stays False (per "track-level only" rule); playlist results returned. Rate limit: `SpotifyRateLimited(7)` from a `FakeSpotify` translates to `503` with `Retry-After: 7`. Plumbing: `query` and `limit` propagate to the Spotify client.
 - Test fixtures (`tests/test_search.py`): `FakeSpotify` injectable via `app.dependency_overrides[get_spotify_client]`; `_seed_download` (inserts a `Job(state="done")` + `Download` pair); `_seed_active_job` (queued or running job); `cleanup` (function-scoped DELETE on `downloads` then `jobs`).
 - Gate: `poetry run pytest tests/test_search.py` → 14 passed; full suite → 68 passed in 3.80s.
+
+## 2026-06-08 — D1 jobs state-machine service
+
+- `backend/app/services/jobs.py` — pure async functions taking an `AsyncSession`. Service does **not** commit; callers (the FastAPI endpoint via `get_session`) commit.
+  - `create_job_idempotent(session, *, spotify_uri, spotify_type, token_id) -> tuple[Job, bool]` — checks for an existing active job; if absent, INSERTs a new `queued` row via `async with session.begin_nested(): await session.flush()` so an `IntegrityError` (caused by the partial unique index `jobs_active_uri_idx` losing a race with a concurrent insert) only rolls back the SAVEPOINT, not the outer transaction. On `IntegrityError`, re-fetches and returns the winner with `deduped=True`.
+  - `mark_running(job_id)` — UPDATE … WHERE state='queued'; raises `InvalidStateTransition` on `rowcount=0`. Sets `started_at=now()`.
+  - `mark_done(job_id)` — UPDATE … WHERE state='running'; sets `finished_at=now()`.
+  - `mark_failed(job_id, error_msg)` — UPDATE … WHERE state IN ('queued','running'); sets `finished_at`, `error_msg`.
+  - `bump_attempt(job_id)` — `attempt_count = attempt_count + 1` (no transition check; retry path uses it).
+  - `find_active_for_uri(spotify_uri) -> Job | None` — partial-index-backed lookup.
+  - `find_download_for_track(spotify_track_uri) -> Download | None`.
+- `InvalidStateTransition` exception class for illegal transitions.
+- `backend/tests/test_jobs_service.py` — 16 tests:
+  - create: fresh insert (`deduped=False`); active-exists dedupe; re-queue allowed after `done`; **concurrent inserts via `asyncio.gather`** end with one row and exactly one `deduped=True` — proves the DB-level race protection.
+  - `mark_running` from queued ✓; rejects already-running.
+  - `mark_done` from running ✓; rejects from queued.
+  - `mark_failed` from queued ✓; from running ✓; rejects from done.
+  - `bump_attempt` increments by N over N calls.
+  - Finders: active job found; cleared after `done`; download lookup hit + miss.
+- New fixtures (in `tests/test_jobs_service.py`): `token_id` (creates a Token via `app_sm`, returns its UUID, deletes on teardown); `cleanup_jobs` (function-scoped DELETE on `downloads` then `jobs`).
+- Gate: `poetry run pytest tests/test_jobs_service.py` → 16 passed; full suite → 84 passed in 4.42s.
