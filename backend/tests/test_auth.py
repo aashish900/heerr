@@ -1,28 +1,9 @@
-import hashlib
-import uuid
-from datetime import datetime, timezone
-
 import pytest
 from fastapi import Depends, FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.api.deps import bearer_token, require_admin, require_scope
 from app.db import get_session
-from app.models import Token
-
-
-@pytest.fixture
-async def app_engine(pg_async_url):
-    engine = create_async_engine(pg_async_url, pool_pre_ping=True)
-    yield engine
-    await engine.dispose()
-
-
-@pytest.fixture
-async def app_sm(app_engine):
-    return async_sessionmaker(app_engine, expire_on_commit=False)
 
 
 @pytest.fixture
@@ -64,42 +45,6 @@ async def client(auth_app):
     transport = ASGITransport(app=auth_app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
-
-
-@pytest.fixture
-async def make_token(app_sm):
-    inserted_hashes: list[str] = []
-
-    async def _make(
-        owner: str = "test",
-        scopes: tuple[str, ...] = ("read", "download"),
-        is_admin: bool = False,
-        revoked: bool = False,
-    ) -> str:
-        raw = f"raw-{uuid.uuid4().hex}"
-        h = hashlib.sha256(raw.encode()).hexdigest()
-        async with app_sm() as s:
-            s.add(
-                Token(
-                    token_hash=h,
-                    owner_label=owner,
-                    scopes=list(scopes),
-                    is_admin=is_admin,
-                    revoked_at=datetime.now(timezone.utc) if revoked else None,
-                )
-            )
-            await s.commit()
-        inserted_hashes.append(h)
-        return raw
-
-    yield _make
-
-    async with app_sm() as s:
-        for h in inserted_hashes:
-            await s.execute(
-                text("DELETE FROM tokens WHERE token_hash = :h"), {"h": h}
-            )
-        await s.commit()
 
 
 # ---- missing / malformed / unknown / revoked -> 401 -----------------------
