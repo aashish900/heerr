@@ -83,3 +83,14 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
 - `backend/pyproject.toml` — added runtime deps (`pydantic-settings ^2.5`, `asyncpg ^0.30`, `greenlet ^3` — SQLAlchemy async needs greenlet at runtime); dev dep (`pytest-asyncio ^0.24`); `[tool.pytest.ini_options]` gained `asyncio_mode = "auto"`.
 - Side effect: Poetry created an in-project `backend/.venv` (overriding the prior cache-dir venv). Root `.gitignore` already excludes `.venv/` so nothing leaks.
 - Gate: `poetry run pytest` → 19 passed in 2.23s (config 6 / db_session 3 / migration 9 / models 1).
+
+## 2026-06-08 — B2 auth dependency
+
+- `backend/app/api/__init__.py`, `backend/app/api/deps.py`.
+- `bearer_token` (FastAPI dep): reads `Authorization: Bearer …` via `HTTPBearer(auto_error=False)`; rejects missing/wrong-scheme/unknown/revoked with `401` + `WWW-Authenticate: Bearer` header; looks up by `sha256(raw)` hash; returns the `Token` ORM row.
+- `require_scope(*scopes)` (factory): `403` when the required scopes aren't a subset of `tok.scopes`; otherwise returns the token.
+- `require_admin` (dep): `403` unless `tok.is_admin`; chains on `bearer_token` so unauthenticated admin calls still surface `401`.
+- `backend/tests/test_auth.py` — 12 tests across the full state machine: no-header / wrong-scheme / unknown / revoked → 401; happy path returns owner+scopes; single-scope missing → 403; single-scope present → 200; multi-scope partial → 403, full → 200; non-admin on admin → 403; admin on admin → 200; admin route with no auth → 401.
+- Test fixtures (in `test_auth.py`): `app_engine` / `app_sm` (function-scoped, derived from `pg_async_url`); `auth_app` (FastAPI test app with `get_session` overridden + three sample routes); `client` (`httpx.AsyncClient` over `ASGITransport`); `make_token` (factory yielding raw tokens and cleaning up rows on teardown).
+- New deps: `fastapi ^0.115` (runtime); dev: `httpx ^0.28`.
+- Gate: `poetry run pytest tests/test_auth.py` → 12 passed; full suite → 31 passed in 2.56s.
