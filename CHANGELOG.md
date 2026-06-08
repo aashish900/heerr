@@ -94,3 +94,15 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
 - Test fixtures (in `test_auth.py`): `app_engine` / `app_sm` (function-scoped, derived from `pg_async_url`); `auth_app` (FastAPI test app with `get_session` overridden + three sample routes); `client` (`httpx.AsyncClient` over `ASGITransport`); `make_token` (factory yielding raw tokens and cleaning up rows on teardown).
 - New deps: `fastapi ^0.115` (runtime); dev: `httpx ^0.28`.
 - Gate: `poetry run pytest tests/test_auth.py` → 12 passed; full suite → 31 passed in 2.56s.
+
+## 2026-06-08 — B3 token CLI
+
+- `backend/app/cli.py` — Typer app with three commands:
+  - `create-token --owner <label> --scopes <csv> [--admin]` — generates `secrets.token_urlsafe(32)`, stores only `sha256(raw)`, prints the raw token once on stdout. Invalid scope strings (e.g. `bogus`) are rejected by the DB CHECK constraint and surface as a non-zero exit.
+  - `list-tokens` — prints `id owner scopes admin state created_at`. Never includes raw token or hash.
+  - `revoke-token <id>` — sets `revoked_at = now()`. Exits non-zero on unknown id, already-revoked, or invalid UUID.
+- `backend/tests/test_cli.py` — 9 tests via `typer.testing.CliRunner`: create persists hash + prints raw + hides raw from DB; `--admin` flag; invalid scope rejected; `list-tokens` prints rows; `list-tokens` does NOT leak raw or hash; revoke sets `revoked_at`; revoke unknown-id / already-revoked / invalid-UUID all non-zero exit.
+- `cli_env` fixture sets the four required env vars, clears `get_settings` lru_cache, and DELETEs all tokens via psycopg on teardown.
+- Dep: `typer ^0.15` (initially added `^0.12` which had a hard incompatibility with `click >= 8.2`; bumped to 0.15 — Poetry downgraded `click` 8.4.1 → 8.1.8 as part of the resolution).
+- Module entrypoint: `if __name__ == "__main__": app()` in `cli.py` enables `python -m app.cli ...`.
+- Gate: `poetry run pytest tests/test_cli.py` → 9 passed; full suite → 40 passed in 3.06s. `python -m app.cli --help` lists `create-token`, `list-tokens`, `revoke-token`.

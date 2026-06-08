@@ -13,6 +13,7 @@ pydantic-settings = "^2.5"
 asyncpg = "^0.30"
 greenlet = "^3"
 fastapi = "^0.115"
+typer = "^0.15"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3"
