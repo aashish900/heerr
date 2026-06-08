@@ -176,3 +176,13 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
   - **On-disk dedupe**: seeded `Job(state="done")` + `Download` row → response `state:"done"`, `deduped:true`, no worker enqueued.
 - Test scaffolding: `RecordingEnqueuer` overrides `get_enqueuer` and collects scheduled `job_id`s; `download_app` fixture mounts `api_v1` with `get_session` + `get_enqueuer` overrides; `cleanup` DELETEs downloads then jobs.
 - Gate: `poetry run pytest tests/test_download.py` → 14 passed; full suite → 98 passed in 5.73s.
+
+## 2026-06-08 — D3 GET /status/{job_id} + GET /queue
+
+- `backend/app/schemas/job.py` — `JobView` (Pydantic v2) matching the PLAN status contract: `job_id`, `spotify_uri`, `spotify_type`, `state` (Literal), `progress` (always `None` in v1), `error`, `output_path`, `created_at`, `started_at`, `finished_at`. `QueueResponse` wraps `active` + `recent` lists of `JobView`.
+- `backend/app/api/v1/status.py` — `GET /status/{job_id}` gated by `require_scope("read")`. 404 on unknown id; 422 on non-UUID. For tracks, populates `output_path` from `find_download_for_track`; non-track types always get `output_path: null`. Exports `to_view()` for reuse.
+- `backend/app/api/v1/queue.py` — `GET /queue` gated by `require_scope("read")`. Two queries: `active` = `state IN ('queued','running') ORDER BY created_at ASC`; `recent` = `state IN ('done','failed') ORDER BY finished_at DESC NULLS LAST, created_at DESC LIMIT 20`. Track output paths are batch-loaded in a single `IN` query and stitched onto the views.
+- `backend/app/api/v1/router.py` — mounts the status and queue sub-routers.
+- `backend/tests/test_status.py` — 9 tests: missing-bearer → 401; `download`-only scope → 403; unknown id → 404; bad UUID → 422; queued job has full contract field set + all-null timestamps + `progress=null`; running job has `started_at`; done track with seeded `Download` has `output_path`; done album has `output_path=null`; failed job has `error` populated.
+- `backend/tests/test_queue.py` — 8 tests: 401/403 auth gates; empty queue → `{active:[], recent:[]}`; queued+running → `active`, done+failed → `recent`; `active` ordered oldest-first; `recent` ordered newest-first; recent capped at 20 across 25 seeds; track in `recent` with download row picks up `output_path`.
+- Gate: `poetry run pytest tests/test_status.py tests/test_queue.py` → 17 passed; full suite → 115 passed in 5.87s.
