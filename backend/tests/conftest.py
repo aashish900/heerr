@@ -13,6 +13,13 @@ ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
 
 
 @pytest.fixture(scope="session")
+def pg_async_url(pg_libpq_url):
+    return pg_libpq_url.replace(
+        "postgresql://", "postgresql+asyncpg://", 1
+    )
+
+
+@pytest.fixture(scope="session")
 def pg_libpq_url():
     with PostgresContainer("pgvector/pgvector:pg17") as pg:
         host = pg.get_container_host_ip()

@@ -72,3 +72,14 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
 - `backend/tests/test_models_match_schema.py` — uses `alembic.autogenerate.compare_metadata` against the testcontainer; filters out `alembic_version` via `include_object`.
 - `backend/pyproject.toml` — added `[tool.pytest.ini_options] pythonpath = ["."]` so tests can import `app.models`.
 - Gate: full suite `poetry run pytest` → 10 passed in ~2s (pgvector image now cached locally; container start ~1.9s on arm64-native vz). compare_metadata diff = `[]` (no ORM/schema drift).
+
+## 2026-06-08 — B1 config + async DB session
+
+- `backend/app/config.py` — `Settings` (`pydantic-settings.BaseSettings`) with four required fields: `database_url`, `spotify_client_id`, `spotify_client_secret` (`SecretStr`), `music_output_dir`. `extra="ignore"` allows benign env noise. `get_settings()` is `lru_cache`d.
+- `backend/app/db.py` — `build_engine(url)` returns `AsyncEngine` (`create_async_engine` + `pool_pre_ping`); `build_sessionmaker(engine)` returns `async_sessionmaker[AsyncSession]` with `expire_on_commit=False`. Module-level `_engine()` / `_sessionmaker()` are `lru_cache`d to defer construction until first request. `get_session()` is the FastAPI-style async generator dependency — yields a session, commits on normal exit, rolls back + re-raises on exception.
+- `backend/tests/test_config.py` — env-load + parametrized "missing required field" tests (one per field) + `SecretStr` redaction in `repr`. `monkeypatch.chdir(tmp_path)` isolates each test from any project `.env`.
+- `backend/tests/test_db_session.py` — three async tests: factory `SELECT 1` round-trip; `get_session` happy path (yields, commits, closes); `get_session` failure path (rolls back via `athrow`).
+- `backend/tests/conftest.py` — added `pg_async_url` session fixture deriving the asyncpg URL from `pg_libpq_url`.
+- `backend/pyproject.toml` — added runtime deps (`pydantic-settings ^2.5`, `asyncpg ^0.30`, `greenlet ^3` — SQLAlchemy async needs greenlet at runtime); dev dep (`pytest-asyncio ^0.24`); `[tool.pytest.ini_options]` gained `asyncio_mode = "auto"`.
+- Side effect: Poetry created an in-project `backend/.venv` (overriding the prior cache-dir venv). Root `.gitignore` already excludes `.venv/` so nothing leaks.
+- Gate: `poetry run pytest` → 19 passed in 2.23s (config 6 / db_session 3 / migration 9 / models 1).
