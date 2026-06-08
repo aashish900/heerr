@@ -55,3 +55,11 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
 - Edited `alembic.ini`: commented out the placeholder `sqlalchemy.url`; URL now sourced from `DATABASE_URL` env var in `env.py`.
 - Edited `alembic/env.py`: reads `DATABASE_URL` from env, defaults to `sqlite:///:memory:` for the A1 smoke. `target_metadata = None` (wired to ORM Base in A3).
 - Gate: `poetry run alembic current` exits 0 (silent — no migrations yet). `poetry install` exits 0.
+
+## 2026-06-08 — A2 schema v1 migration
+
+- `backend/alembic/versions/0001_init.py` — creates `pgcrypto` + `vector` extensions, then `tokens`, `jobs`, `downloads` tables per PLAN.md § "Schema v1 (locked)". UUID PKs via `gen_random_uuid()`; CHECKs on `tokens.scopes`, `jobs.state`, `jobs.spotify_type`; FKs RESTRICT; indexes `jobs_active_uri_idx` (partial unique on `state IN (queued,running)`), `jobs_state_created_idx`, `jobs_token_idx`, `downloads_job_idx`.
+- `backend/tests/__init__.py`, `backend/tests/conftest.py` — session-scoped `pgvector/pgvector:pg17` testcontainer with `alembic upgrade head` applied once; function-scoped psycopg connection that rolls back on teardown; `seed_token` helper fixture.
+- `backend/tests/test_migration_0001.py` — 9 tests: extensions present, tables present, scopes-CHECK, state-CHECK, type-CHECK, **partial-unique blocks duplicate active** (the done-when invariant), partial-unique allows after `done`, downloads URI uniqueness, FK RESTRICT on token delete.
+- New dev deps: `pytest ^8.3`, `testcontainers[postgres] ^4.8`, `psycopg[binary] ^3.2`.
+- Gate: `poetry run pytest tests/test_migration_0001.py` → 9 passed in 37.5s. Required colima to be running (testcontainers needs a live Docker daemon).
