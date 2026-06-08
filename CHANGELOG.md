@@ -63,3 +63,12 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
 - `backend/tests/test_migration_0001.py` — 9 tests: extensions present, tables present, scopes-CHECK, state-CHECK, type-CHECK, **partial-unique blocks duplicate active** (the done-when invariant), partial-unique allows after `done`, downloads URI uniqueness, FK RESTRICT on token delete.
 - New dev deps: `pytest ^8.3`, `testcontainers[postgres] ^4.8`, `psycopg[binary] ^3.2`.
 - Gate: `poetry run pytest tests/test_migration_0001.py` → 9 passed in 37.5s. Required colima to be running (testcontainers needs a live Docker daemon).
+
+## 2026-06-08 — A3 SQLAlchemy ORM models
+
+- `backend/app/__init__.py`, `backend/app/models/__init__.py` (exports `Base`, `Token`, `Job`, `Download`).
+- `backend/app/models/base.py` — SQLAlchemy 2.x `DeclarativeBase`.
+- `backend/app/models/{token,job,download}.py` — modern `Mapped[T] + mapped_column` typing. Mirror migration 0001 exactly: same columns, types, server-side defaults (`gen_random_uuid()`, `now()`, `false`, `0`), CHECKs, FKs (ON DELETE RESTRICT), and indexes including the partial unique `jobs_active_uri_idx` and the `(state, created_at DESC)` composite.
+- `backend/tests/test_models_match_schema.py` — uses `alembic.autogenerate.compare_metadata` against the testcontainer; filters out `alembic_version` via `include_object`.
+- `backend/pyproject.toml` — added `[tool.pytest.ini_options] pythonpath = ["."]` so tests can import `app.models`.
+- Gate: full suite `poetry run pytest` → 10 passed in ~2s (pgvector image now cached locally; container start ~1.9s on arm64-native vz). compare_metadata diff = `[]` (no ORM/schema drift).
