@@ -391,3 +391,26 @@ Tags pushed during this task: `v0.1.0` (failed, broken trivy-action ref), `v0.1.
   - `backend/README.md` (deployment section + example DOCKERHUB_USERNAME value).
 - **Left historical CHANGELOG entries untouched** (append-only convention, CLAUDE.md §1). The 2026-06-09 "H-4" and "H1 unblock" entries still reference the original `aashish900` name as written at the time; this entry is the historical correction record.
 - Also rotated `DOCKERHUB_TOKEN`: the previous token's plaintext value was inadvertently included in a screenshot during this task — user revoked at https://app.docker.com/settings/personal-access-tokens and minted a fresh one with Read & Write scope.
+
+## 2026-06-10 — H1 unblock: alembic psycopg fix + download.py race condition fix
+
+- **`backend/alembic/env.py`** — Alembic's `env.py` runs synchronously via `engine_from_config()`. The app's `DATABASE_URL` uses `postgresql+asyncpg://`; asyncpg exposes no sync DBAPI interface, causing `MissingGreenlet` crashes in `heerr-migrate`. Fix: replace `+asyncpg` with `+psycopg` before passing the URL to `config.set_main_option`.
+- **`backend/pyproject.toml`** — `psycopg[binary]` was only in `dev.dependencies`; not installed in the Docker image. Moved to main `[tool.poetry.dependencies]` so the migrate container has it.
+- **`backend/app/api/v1/download.py`** — FastAPI `BackgroundTasks` execute *before* the `get_session` dependency teardown commits. Worker's fresh session called `s.get(Job, job_id)` and found nothing (job row not yet committed), causing jobs to remain stuck in `queued` forever. Fix: explicit `await session.commit()` inserted between `create_job_idempotent` and `enqueue(bg, job.id)`.
+- **`docker-compose.snippet.yml`** — fixed network name from `arr-stack`/`arr-stack_default` to `arrnetwork` (matching the actual `name:` field in the arr-stack compose file).
+- Tag `v0.1.0` recreated as annotated tag at the fixed HEAD with full release message; Docker Hub publish (run 27228111260) succeeded — first ever successful publish.
+
+## 2026-06-10 — H1 smoke: all 8 steps pass
+
+End-to-end smoke executed against live home server (arr-stack, `172.39.0.51`):
+
+1. Token minted via `docker exec heerr-backend python -m app.cli create-token ...` — OK.
+2. `GET /api/v1/health` → `{"status":"ok"}` — OK.
+3. `POST /api/v1/search` → Spotify results returned — OK.
+4. `POST /api/v1/download` → `{"state":"queued","deduped":false}` — OK.
+5. Polled `/status/{job_id}` → `state: running` → `state: done`; `output_path: /data/media/music/sombr - back to friends (Live) Spotify Best New Artist.mp3` — OK.
+6. Navidrome indexes within ~1 min (verified by re-dispatch dedup in step 7).
+7. Re-dispatch same URI → `{"deduped":true,"state":"done"}` — OK.
+8. Missing token → 401; read-only token → 403 on `/download` — OK.
+
+Backend roadmap (A1–H1) complete.
