@@ -279,7 +279,7 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
 - `CLAUDE.md §1` rewritten with the new paths and a "Where the docs live" preamble so any future Claude instance bootstraps from `backend/docs/CONTEXT.md → DECISIONLOG.md → CHANGELOG.md`.
 - Inter-doc markdown links (e.g. `[ADR](DECISIONLOG.md)`) untouched — all five docs moved together, so sibling refs still resolve.
 - Historical mentions of "CLAUDE.md §N" inside the moved docs left as-is (textual references, not links).
-- Rationale: backend-scoped docs colocate with backend code; when Flutter lands, `flutter/docs/` becomes the parallel home. Discoverable both ways: top-down (CLAUDE.md at root points down) and bottom-up (anyone in `backend/` finds its docs immediately).
+- Rationale: backend-scoped docs colocate with backend code; when Flutter lands, `android/docs/` becomes the parallel home. Discoverable both ways: top-down (CLAUDE.md at root points down) and bottom-up (anyone in `backend/` finds its docs immediately).
 
 ## 2026-06-09 — `backend/README.md` added; CLAUDE.md Files section updated
 
@@ -300,7 +300,7 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
 - **Root `/CLAUDE.md` rewritten as app-agnostic.** Now covers only project-wide concerns: the docs convention (`<app>/README.md`, `<app>/CLAUDE.md`, `<app>/docs/{CONTEXT,DECISIONLOG,CHANGELOG,PLAN,ROADMAP}.md`), session discipline (bootstrap order, entry format, logging cadence, staleness rule), project-wide hard rules (Tailscale-only, never commit secrets, backend-first/Flutter-second scope, iOS out of scope, source-citation discipline), and the user-background hand-holding context.
 - **New `backend/CLAUDE.md`** carries every backend-specific rule that used to live in the root file: FastAPI-in-arr-stack architecture, `/data/media/music` + Navidrome target, Spotify client-credentials-only scope and feature set, BackgroundTasks-not-Redis job-queue choice, spotDL server-side / subprocess-only constraint, and TDD discipline scoped to FastAPI app code (not compose/Dockerfile/Alembic).
 - Bootstrap order from backend now reads: `/CLAUDE.md` → `backend/CLAUDE.md` → `backend/docs/CONTEXT.md` → `DECISIONLOG.md` → `CHANGELOG.md`. The root file explicitly tells Claude to look for `<app>/CLAUDE.md` before app-specific docs.
-- Rationale: when `flutter/` lands, a `flutter/CLAUDE.md` slots in the same way (Material/Dart/Android-specific rules) without touching the root file or backend's rules.
+- Rationale: when `android/` lands, a `android/CLAUDE.md` slots in the same way (Material/Dart/Android-specific rules) without touching the root file or backend's rules.
 - The root file's `§1 Files` entry for `backend/README.md` (added 2026-06-09 earlier) is superseded by the new `<app>/`-templated docs convention.
 
 ## 2026-06-09 — GitHub Actions: publish multi-arch image to Docker Hub on tag

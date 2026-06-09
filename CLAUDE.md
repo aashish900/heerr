@@ -2,7 +2,9 @@
 
 Project-wide rules for any Claude session in this repo. **App-specific rules and architecture facts live in each app's own `<app>/CLAUDE.md` / `<app>/docs/`** — this file is intentionally app-agnostic.
 
-Currently the repo has one app: `backend/`. A `flutter/` app will land later under the same convention.
+The repo currently contains two apps, both under the same convention:
+- `backend/` — FastAPI service. Phases A1–G2 shipped on `main`; H1 (home-server smoke) parked.
+- `android/` — Android client. Planning round complete (docs only); Dart code begins at milestone A1.
 
 ---
 
@@ -88,7 +90,7 @@ These apply regardless of which app you're working on.
 
 ### Scope discipline
 
-- **Backend first, Flutter second.** Don't propose Flutter work until the backend endpoint it depends on exists and is curl-testable.
+- **Backend first, Android client second.** Don't propose `android/` work until the backend endpoint it depends on exists and is curl-testable. (The Android client is built with Flutter; the dir is named `android/` to reflect the deployment target — there is no iOS port.)
 - **iOS is out of scope.** Don't suggest iOS-aware code, Cupertino widgets where Material works, or Xcode/CocoaPods steps.
 
 ### Source-citation discipline
