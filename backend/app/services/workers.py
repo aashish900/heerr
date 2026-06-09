@@ -1,52 +1,137 @@
-import asyncio
+import logging
+from collections.abc import Awaitable, Callable
 from uuid import UUID
 
 from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from app.config import get_settings
 from app.db import _sessionmaker
+from app.models import Download, Job
 from app.services.jobs import (
     InvalidStateTransition,
     mark_done,
     mark_failed,
     mark_running,
 )
+from app.services.spotdl_runner import DownloadedFile, run_spotdl
+
+logger = logging.getLogger(__name__)
+
+SpotdlRunner = Callable[[str, str], Awaitable[list[DownloadedFile]]]
+
+_ERROR_MSG_MAX = 2000
+
+
+async def run_job(
+    job_id: UUID,
+    *,
+    sm: async_sessionmaker,
+    runner: SpotdlRunner,
+    output_dir: str,
+) -> None:
+    """Drive a job through queued -> running -> (done | failed).
+
+    On success, writes a single Download row for track jobs only — see
+    CHANGELOG F2 for why album/playlist jobs don't get download rows in v1.
+    """
+    # Phase 1: load job + transition queued -> running
+    async with sm() as s:
+        job = await s.get(Job, job_id)
+        if job is None:
+            logger.warning("run_job: job %s missing", job_id)
+            return
+        spotify_uri = job.spotify_uri
+        spotify_type = job.spotify_type
+        try:
+            await mark_running(s, job_id)
+        except InvalidStateTransition:
+            logger.warning(
+                "run_job: job %s not in queued state; skipping", job_id
+            )
+            return
+        await s.commit()
+
+    # Phase 2: invoke spotDL
+    try:
+        files = await runner(spotify_uri, output_dir)
+    except Exception as e:  # noqa: BLE001 — bg-task boundary
+        msg = f"{type(e).__name__}: {e}"[-_ERROR_MSG_MAX:]
+        await _safe_mark_failed(sm, job_id, msg)
+        logger.exception("run_job: runner failed for %s", job_id)
+        return
+
+    # Phase 3: write Download row(s) + transition running -> done
+    try:
+        async with sm() as s:
+            if spotify_type == "track" and files:
+                # 1:1 mapping for track jobs: job.spotify_uri IS the track URI.
+                first = files[0]
+                s.add(
+                    Download(
+                        spotify_track_uri=spotify_uri,
+                        job_id=job_id,
+                        output_path=first.path,
+                        file_size_bytes=first.size_bytes,
+                    )
+                )
+                await s.flush()
+            await mark_done(s, job_id)
+            await s.commit()
+    except Exception as e:  # noqa: BLE001
+        msg = f"bookkeeping failed: {type(e).__name__}: {e}"[
+            -_ERROR_MSG_MAX:
+        ]
+        await _safe_mark_failed(sm, job_id, msg)
+        logger.exception(
+            "run_job: post-download bookkeeping failed for %s", job_id
+        )
+
+
+async def _safe_mark_failed(
+    sm: async_sessionmaker, job_id: UUID, msg: str
+) -> None:
+    try:
+        async with sm() as s:
+            await mark_failed(s, job_id, msg)
+            await s.commit()
+    except InvalidStateTransition:
+        logger.warning(
+            "_safe_mark_failed: job %s not in queued/running", job_id
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "_safe_mark_failed: could not mark job %s failed", job_id
+        )
 
 
 class JobEnqueuer:
-    """Schedules a background task that runs a job through the state machine.
+    """Schedules `run_job` to execute via FastAPI BackgroundTasks."""
 
-    F2 will replace `_simulate_work` with the real spotDL subprocess call.
-    For now it's a no-op sleep so the queued -> running -> done path is
-    exercised end-to-end via BackgroundTasks.
-    """
-
-    def __init__(self, sessionmaker: async_sessionmaker):
-        self._sm = sessionmaker
+    def __init__(
+        self,
+        sm: async_sessionmaker,
+        runner: SpotdlRunner,
+        output_dir: str,
+    ):
+        self._sm = sm
+        self._runner = runner
+        self._output_dir = output_dir
 
     def __call__(self, bg: BackgroundTasks, job_id: UUID) -> None:
-        bg.add_task(self._run, job_id)
-
-    async def _run(self, job_id: UUID) -> None:
-        try:
-            async with self._sm() as s:
-                await mark_running(s, job_id)
-                await s.commit()
-            await self._simulate_work()
-            async with self._sm() as s:
-                await mark_done(s, job_id)
-                await s.commit()
-        except Exception as e:  # noqa: BLE001
-            try:
-                async with self._sm() as s:
-                    await mark_failed(s, job_id, str(e))
-                    await s.commit()
-            except InvalidStateTransition:
-                pass
-
-    async def _simulate_work(self) -> None:
-        await asyncio.sleep(0.05)
+        bg.add_task(
+            run_job,
+            job_id,
+            sm=self._sm,
+            runner=self._runner,
+            output_dir=self._output_dir,
+        )
 
 
 def get_enqueuer() -> JobEnqueuer:
-    return JobEnqueuer(_sessionmaker())
+    settings = get_settings()
+    return JobEnqueuer(
+        sm=_sessionmaker(),
+        runner=run_spotdl,
+        output_dir=settings.music_output_dir,
+    )

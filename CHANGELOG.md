@@ -224,3 +224,17 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
   - Huge stderr is truncated to 4 KB on the exception.
 - No real `spotdl` invocation in any test; no network; no ffmpeg dependency at test time.
 - Gate: `poetry run pytest tests/test_spotdl_runner.py` → 11 passed in 30 ms; full suite → 141 passed in 6.87s.
+
+## 2026-06-08 — F2 worker integration (spotDL runner wired in)
+
+- `backend/app/services/workers.py` — significantly refactored:
+  - **New `run_job(job_id, *, sm, runner, output_dir)`** — module-level coroutine driving the full lifecycle. Phase 1: load job, transition queued → running, commit. Phase 2: invoke `runner(spotify_uri, output_dir)` (real `run_spotdl` in prod; fake in tests). Phase 3: write `Download` row + transition running → done. Errors at phase 2 or 3 funnel through `_safe_mark_failed`, which handles `InvalidStateTransition` quietly. The previous `_simulate_work` stub is gone.
+  - **`JobEnqueuer` now takes `(sm, runner, output_dir)`** and `bg.add_task(run_job, job_id, sm=…, runner=…, output_dir=…)`. Production `get_enqueuer()` wires `_sessionmaker()`, `run_spotdl`, and `Settings.music_output_dir`. Tests override `get_enqueuer` (D2's `RecordingEnqueuer` pattern still works — the override replaces the whole callable).
+  - Error message capped at 2 KB per the column (matches the 4 KB stderr tail spotDL already truncates to, leaving headroom for the type/name prefix).
+- **`downloads` row write strategy** — only **track jobs** write a row (1:1 mapping: `job.spotify_uri == Download.spotify_track_uri`). Album/playlist jobs successfully transition to `done` and produce files on disk but write no rows. Per-track URI resolution for multi-track jobs would require parsing spotDL's metadata sidecar, re-coupling us to its output format — which the 2026-06-08 "Implementation strategy" ADR explicitly rejected. Decision logged as a new ADR ([DECISIONLOG 2026-06-08 "downloads rows: track jobs only in v1"](DECISIONLOG.md)).
+- `backend/tests/test_worker.py` — 9 tests covering the full state machine:
+  - **Happy paths**: track happy path writes a `Download` row with correct `spotify_track_uri`, `output_path`, `file_size_bytes`; track with no produced files (skip case) still marks done; album produces files but writes zero `Download` rows; playlist same.
+  - **Failure paths**: `SpotdlError` → `state=failed`, `error_msg` includes `SpotdlError`, `started_at` set, `finished_at` set, no download row; generic `RuntimeError` → same path with `RuntimeError` in `error_msg`; 100 KB error tail truncated to ≤ 2 KB.
+  - **Edge cases**: missing job (deleted between dispatch and run) → no-op, runner never invoked; non-queued job (already running from a duplicate dispatch) → no-op, runner never invoked, state unchanged.
+- ROADMAP-vs-impl note: ROADMAP F2 listed `app/services/jobs.py` + `app/api/v1/download.py` as the files-to-modify. My implementation places `run_job` in `app/services/workers.py` (colocated with `JobEnqueuer` from D2). `jobs.py` (pure state-machine transitions) and `download.py` (endpoint) remain unchanged — they already had the right surface. The deviation reflects D2's earlier architectural choice and changes nothing observable.
+- Gate: `poetry run pytest tests/test_worker.py` → 9 passed; full suite → 150 passed in 6.92s.

@@ -129,3 +129,24 @@ Key invariants enforced at the DB level:
 **Why:** User has a clear visual preference; capturing it early avoids redesign churn. Recorded as a *direction*, not a locked contract — final colour palette + component picks land at Flutter planning.
 
 **Alternatives considered:** none yet; revisit at Flutter phase with concrete colour-token + component breakdown.
+
+---
+
+## 2026-06-08 — `downloads` rows: track jobs only in v1 (album/playlist deferred)
+
+**Context:** F2 wires the spotDL runner into the worker. The schema has `downloads.spotify_track_uri UNIQUE NOT NULL`. For a track job, the 1:1 mapping is clean (`job.spotify_uri == downloads.spotify_track_uri`). For album/playlist jobs, spotDL produces N audio files but each file's *per-track* Spotify URI is not derivable from the file path or filename alone.
+
+**Decision:** v1 writes `downloads` rows ONLY for track jobs. Album/playlist jobs successfully transition to `done`, produce files on disk (Navidrome indexes them), and write **no** rows in the `downloads` table.
+
+**Why:**
+- Per-file Spotify URI resolution requires parsing spotDL's `--save-file` JSON metadata sidecar — that re-couples us to spotDL's output schema, which DECISIONLOG 2026-06-08 "Implementation strategy" explicitly rejected ("subprocess invocation; no coupling to spotDL output format").
+- Inserting one synthetic row per file with a fake URI would corrupt the data model and break the partial-unique-index logic on retry.
+- Listening experience unaffected: files are on disk, Navidrome shows them.
+- Visible UX gap: `/search` of a track inside a previously-downloaded album returns `already_downloaded=false`, even though the file is on disk.
+
+**Alternatives considered:**
+- Parse `--save-file` JSON for per-track URIs — rejected: re-introduces the spotDL output-format coupling we rejected.
+- One synthetic `downloads` row per album/playlist file with a placeholder URI — rejected: violates schema semantics, corrupts dedup logic.
+- Drop the `spotify_track_uri UNIQUE` constraint — rejected: enables duplicate inserts on retry, which corrupts the table.
+
+**Revisit when:** users complain about missing track-level dedup hints after an album download (i.e., real evidence the gap matters). The fix is to add `--save-file metadata.json` to the spotDL invocation and parse the JSON.
