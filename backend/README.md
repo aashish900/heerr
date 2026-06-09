@@ -344,8 +344,9 @@ poetry run mypy app/                    # type-check (excludes tests/, alembic/v
 ```
 
 Lint + type-check configs live in `pyproject.toml` (`[tool.ruff]`, `[tool.mypy]`).
-The same three gates run in CI on every PR — keep them green locally before
-pushing.
+The same four gates (`ruff check`, `ruff format --check`, `mypy app/`,
+`pytest`) run in CI on every PR via [`.github/workflows/backend-ci.yml`](../.github/workflows/backend-ci.yml)
+— keep them green locally before pushing.
 
 **Architecture:**
 - Real Postgres via [`testcontainers-postgres`](https://testcontainers-python.readthedocs.io/) — session-scoped `pgvector/pgvector:pg17` container; the image is cached locally after the first run (~1.9s spin-up).

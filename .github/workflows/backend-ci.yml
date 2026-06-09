@@ -1,0 +1,84 @@
+# Backend CI: lint, type-check, and run the test suite on every PR + on
+# pushes to main. Mirrors the green-before/green-after gates documented in
+# backend/CLAUDE.md and backend/README.md.
+#
+# Triggers:
+#   - pull_request to main, filtered to backend/** and this workflow file —
+#     so unrelated frontend / docs PRs don't waste CI minutes here.
+#   - push to main, same path filter — guarantees the main-branch status
+#     badge is up to date even when a PR was merged via a path that
+#     skipped the PR run (e.g. an admin merge override).
+#
+# Runs on ubuntu-latest because the test suite needs a Docker daemon
+# (testcontainers-postgres spins up pgvector/pgvector:pg17); GitHub-hosted
+# ubuntu runners ship Docker preinstalled.
+
+name: backend CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+
+# Cancel an older run for the same PR when a new commit lands — saves
+# minutes on quick fixup pushes.
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    name: ruff + mypy + pytest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Poetry
+        run: pipx install poetry==2.4.1
+
+      - name: Cache Poetry virtualenv
+        uses: actions/cache@v4
+        with:
+          # Poetry creates the venv inside backend/.venv when virtualenvs.in-project is true.
+          path: backend/.venv
+          key: poetry-${{ runner.os }}-py3.13-${{ hashFiles('backend/poetry.lock') }}
+          restore-keys: |
+            poetry-${{ runner.os }}-py3.13-
+
+      - name: Configure Poetry (in-project venv)
+        run: poetry config virtualenvs.in-project true
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-ansi
+
+      - name: Ruff (lint)
+        run: poetry run ruff check .
+
+      - name: Ruff (format check)
+        run: poetry run ruff format --check .
+
+      - name: Mypy
+        run: poetry run mypy app/
+
+      - name: Pytest
+        run: poetry run pytest -q

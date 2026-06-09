@@ -348,3 +348,12 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
   - Negative: admin `POST /tokens` response carries a raw token; assertion that this raw token never appears in any captured log line.
 - **`README.md`** — new "Request ID & access log" subsection under API reference: shape of the JSON line, how `X-Request-ID` round-trips, what `owner_label` means and when it is `"-"`.
 - Verification: `poetry run pytest -q && poetry run ruff check . && poetry run ruff format --check . && poetry run mypy app/` — all green; 161 tests pass (10 new in `test_logging.py`).
+
+## 2026-06-09 — H-3: CI workflow for ruff + mypy + pytest
+
+- New `.github/workflows/backend-ci.yml` — runs `ruff check`, `ruff format --check`, `mypy app/`, and `poetry run pytest -q` on every PR to `main` and every push to `main`. Triggers are scoped to `backend/**` + the workflow file itself, so unrelated changes (future Flutter app, docs-only edits) won't burn CI minutes.
+- Runner: `ubuntu-latest` (GitHub-hosted ubuntu ships Docker preinstalled — required for `testcontainers-postgres` to spin up `pgvector/pgvector:pg17` for the test session).
+- Python 3.13 via `actions/setup-python@v5`; Poetry 2.4.1 via `pipx install`; venv cached at `backend/.venv` keyed on `poetry.lock` hash so subsequent runs skip the heavy install step.
+- `concurrency: group: backend-ci-${{ github.ref }}` with `cancel-in-progress: true` for PR runs — stale runs on a PR are cancelled when a new commit lands; main-branch runs are not cancelled so the badge stays accurate.
+- README: "Testing & lint" section updated to link the workflow file and call out that the same four gates run in CI.
+- Verification deferred to first PR — workflow validity confirmed by `yaml.safe_load`. The next PR that touches `backend/**` will exercise the workflow end-to-end.
