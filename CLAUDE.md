@@ -6,15 +6,20 @@ Strict rules for Claude in this project. Follow exactly.
 
 ## 1. Mandatory Logs & Session Discipline
 
+### Where the docs live
+All project docs except this file live in **`backend/docs/`** (backend-scoped; Flutter phase will get its own `flutter/docs/` later). This file (`CLAUDE.md`) stays at repo root because it applies to the whole project.
+
 ### Files
-- **CONTEXT.md** — project brief (architecture, constraints, env). Source of truth for *what and why*.
-- **DECISIONLOG.md** — ADR of design **decisions** (trade-offs / choices with alternatives considered).
-- **CHANGELOG.md** — append-only record of **changes** (code/file edits Claude makes).
+- **`backend/docs/CONTEXT.md`** — project brief (architecture, constraints, env). Source of truth for *what and why*.
+- **`backend/docs/DECISIONLOG.md`** — ADR of design **decisions** (trade-offs / choices with alternatives considered).
+- **`backend/docs/CHANGELOG.md`** — append-only record of **changes** (code/file edits Claude makes).
+- **`backend/docs/PLAN.md`** — frozen API contract v1 + schema v1 + implementation strategy.
+- **`backend/docs/ROADMAP.md`** — 17-milestone breakdown (A1 → H1) tracking backend build progress.
 
 Decision vs change: a decision is *"we chose X over Y because Z"*; a change is *"edited file F to do G"*. The same action can produce both entries.
 
 ### Session bootstrap
-At the start of every session, before answering non-trivial questions or proposing changes, read in order: `CONTEXT.md` → `DECISIONLOG.md` → `CHANGELOG.md`. Trivial one-liners (clarifications, definitions) may skip. Only read source code when these three are insufficient.
+At the start of every session, before answering non-trivial questions or proposing changes, read in order: `backend/docs/CONTEXT.md` → `backend/docs/DECISIONLOG.md` → `backend/docs/CHANGELOG.md`. Trivial one-liners (clarifications, definitions) may skip. Only read source code when these three are insufficient. Consult `backend/docs/PLAN.md` and `backend/docs/ROADMAP.md` when the question is about API contract, schema, or build sequence.
 
 ### Entry format
 - DECISIONLOG: `## YYYY-MM-DD — <title>` then 1–3 lines: context, decision, why. Append newest at the bottom.
@@ -25,15 +30,15 @@ At the start of every session, before answering non-trivial questions or proposi
 Flush entries **at the end of each task** (not end of session). A "task" = one user-approved unit of work. If a task spans many edits, batch them into one CHANGELOG entry on completion.
 
 ### Staleness rule
-Code is the source of truth. If DECISIONLOG or CONTEXT.md contradicts current code, the log is stale — update it in the same turn you discover the drift, and note the correction in CHANGELOG.
+Code is the source of truth. If `backend/docs/DECISIONLOG.md` or `backend/docs/CONTEXT.md` contradicts current code, the log is stale — update it in the same turn you discover the drift, and note the correction in `backend/docs/CHANGELOG.md`.
 
 ### CONTEXT.md vs DECISIONLOG.md
-- Update **CONTEXT.md** when standing facts change (architecture, env, constraints).
-- Append to **DECISIONLOG.md** when a *new* decision is made (even if it also updates CONTEXT.md).
+- Update **`backend/docs/CONTEXT.md`** when standing facts change (architecture, env, constraints).
+- Append to **`backend/docs/DECISIONLOG.md`** when a *new* decision is made (even if it also updates `CONTEXT.md`).
 
 ---
 
-## 2. Project Hard Rules (derived from CONTEXT.md — do not re-litigate)
+## 2. Project Hard Rules (derived from `backend/docs/CONTEXT.md` — do not re-litigate)
 
 ### Architecture
 - Flutter is a **thin client**. No download logic, no spotDL, no Spotify SDK on the device.

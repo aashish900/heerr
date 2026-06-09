@@ -271,3 +271,12 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
 - Validation: `docker-compose -f docker-compose.snippet.yml --env-file .env config` exits 0; all four services render; the depends_on chain enforces `postgres-init → postgres → migrate → backend`.
 - ROADMAP G2 done-when is exercised at H1 (real arr-stack deployment).
 - Side issues handled at G2: the user's local `.env` had legacy `CLIENT_ID`/`CLIENT_SECRET` variable names (vs. our `Settings`-expected `SPOTIFY_CLIENT_ID`/`SECRET`); user renamed in `.env` to match. The repo's `.gitignore` confirmed-blocks `.env` from being committed (line 19); `.env` was never tracked in git history.
+
+## 2026-06-09 — Docs reorganized into `backend/docs/`
+
+- `git mv` of `CONTEXT.md`, `DECISIONLOG.md`, `CHANGELOG.md`, `PLAN.md`, `ROADMAP.md` from repo root → `backend/docs/`. Git history is preserved (each rename shows up as `R` in `git status`).
+- `CLAUDE.md` stays at repo root (it's project-wide; Flutter phase will eventually share it).
+- `CLAUDE.md §1` rewritten with the new paths and a "Where the docs live" preamble so any future Claude instance bootstraps from `backend/docs/CONTEXT.md → DECISIONLOG.md → CHANGELOG.md`.
+- Inter-doc markdown links (e.g. `[ADR](DECISIONLOG.md)`) untouched — all five docs moved together, so sibling refs still resolve.
+- Historical mentions of "CLAUDE.md §N" inside the moved docs left as-is (textual references, not links).
+- Rationale: backend-scoped docs colocate with backend code; when Flutter lands, `flutter/docs/` becomes the parallel home. Discoverable both ways: top-down (CLAUDE.md at root points down) and bottom-up (anyone in `backend/` finds its docs immediately).
