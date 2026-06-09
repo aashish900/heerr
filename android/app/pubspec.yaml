@@ -47,5 +47,11 @@ dev_dependencies:
   # Test helpers — mocktail over mockito (no codegen, stronger types).
   mocktail: ^1.0.4
 
+  # Deterministic timer/microtask control for polling-provider tests
+  # (queue/job-detail at D2/D3). Already a transitive dep of flutter_test;
+  # listed explicitly so the import isn't a depend_on_referenced_packages
+  # warning.
+  fake_async: ^1.3.0
+
 flutter:
   uses-material-design: true

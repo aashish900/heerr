@@ -235,3 +235,39 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
 - ResultTile is now a `ConsumerWidget`, so the two existing unit tests at the bottom of `search_screen_test.dart` had to be wrapped in `ProviderScope` to provide the inherited container.
 - Codegen: `dart run build_runner build --delete-conflicting-outputs` regenerated `download.g.dart` (no other touch).
 - Verification: `flutter analyze` → no issues; `flutter test` → 74/74 pass (was 63; +5 download provider + +5 search-screen tap, +1 reused `_Body→ConsumerWidget` test stayed green).
+
+## 2026-06-09 — D2: Queue screen + polling provider
+
+- New `android/app/lib/widgets/status_pill.dart` — `StatusPill(JobState state)`. Small rounded chip with the PLAN.md §8 colour mapping (queued = blue, running = amber, done = green, failed = red). 0.15 alpha fill + 1px border in the same hue + 12-pt label.
+- New `android/app/lib/providers/queue.dart`:
+  - `queuePollIntervalProvider` (Riverpod, `keepAlive: true`) — `Duration`, default `3s`. Exposed so tests override to short durations.
+  - `Queue` (`@Riverpod(keepAlive: true) class … extends _$Queue`) — `AsyncNotifier<QueueResponse>`. `build()` does the initial fetch then `_scheduleNext()`. Owns a `Timer? _timer` cancelled in `ref.onDispose`. `_tick` re-runs `_fetch` via `AsyncValue.guard`, then `_scheduleNext()` regardless of success — transient errors don't stop the cycle. Mutators: `pause()` cancels the timer + sets a `_paused` flag; `resume()` clears the flag, fires `_tick` immediately, and the schedule resumes.
+  - Deviation from PLAN.md "Polling via `StreamProvider`+`Stream.periodic`": `StreamProvider` has no consumer-facing pause/resume. `AsyncNotifier` exposes mutators the screen can call from `WidgetsBindingObserver.didChangeAppLifecycleState`. PLAN §6 + §8 updated to match; DECISIONLOG entry appended this turn. The "no `Timer`s leaked from `StatefulWidget`s" intent is preserved — the `Timer` is owned by the provider, not by a screen widget.
+- Modified `android/app/lib/screens/queue_screen.dart` — replaces the A2 stub:
+  - `ConsumerStatefulWidget` with `WidgetsBindingObserver`. `addObserver` in `initState`, `removeObserver` in `dispose`.
+  - `didChangeAppLifecycleState` maps `paused / inactive / hidden` → `queueProvider.notifier.pause()` and `resumed` → `unawaited(resume())`. `detached` is a no-op.
+  - Body via `queueProvider.when(loading, error, data)`:
+    - loading → `CircularProgressIndicator`.
+    - error → centered `ApiError.message` (or `'Error: $e'`).
+    - data + both lists empty → "No jobs yet".
+    - data + non-empty → `RefreshIndicator` wrapping a `ListView` with two `_SectionHeader`s ("Active" / "Recent") and one `_JobTile` per `JobView`. Sections are only rendered when non-empty.
+  - `_JobTile`: monospace `spotifyUri` title (ellipsis), "job <8-char-id-prefix>" subtitle, trailing `StatusPill`. Tap-to-detail lands at D3.
+- New `android/app/test/providers/queue_test.dart` — 6 unit tests (fake_async based):
+  - Initial fetch fires `GET /queue` once; response parsed (real `await` outside fake_async).
+  - Periodic polling: 3 ticks observed at `t = 0 / 3s / 6s` against a `_CountingAdapter`.
+  - Polling respects `queuePollIntervalProvider` override (1s interval → 4 requests over 3s).
+  - Transient error doesn't stop the cycle: tick #2 returns 500 (state becomes `AsyncError`), tick #3 still fires and lands as `AsyncData` again.
+  - `pause()`: no requests fire even after 30 s of elapsed simulated time.
+  - `resume()` after `pause()`: immediate fetch + schedule resumes at the configured interval.
+  - Drain detail: `async.elapse(const Duration(microseconds: 1))` is used after each subscription / state change instead of `async.flushMicrotasks()`. dio's body-decoding chain doesn't fully drain through microtasks-only on the fake_async zone; advancing the clock by 1 µs forces a full drain without firing the 3 s periodic timer.
+- New `android/app/test/screens/queue_screen_test.dart` — 6 widget tests:
+  - Loading → `CircularProgressIndicator`.
+  - Empty (both lists empty) → "No jobs yet".
+  - Both sections populated → "Active" + "Recent" headers + 3 `StatusPill`s + the right state labels (running/done/failed) + the short-id subtitles.
+  - Active-only (recent empty) → "Active" rendered, "Recent" not rendered.
+  - Error state → `ApiError.message` ("cannot reach backend — check tailscale") rendered.
+  - `StatusPill` unit test: all four `JobState` labels render.
+- Test infra: `_StubQueue extends Queue` with `pause()`/`resume()` as no-ops, and a `build()` that returns the override's `AsyncValue` as a Future. Avoids touching dio or any real timer in widget tests.
+- `pubspec.yaml`: added `fake_async: ^1.3.0` as a direct dev dep (already transitive via `flutter_test`; listing explicitly silences `depend_on_referenced_packages`).
+- Codegen: `dart run build_runner build --delete-conflicting-outputs` regenerated `queue.g.dart`.
+- Verification: `flutter analyze` → no issues; `flutter test` → 86/86 pass (was 74; +6 queue provider + +6 queue screen).

@@ -92,7 +92,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** tapping a result against stubbed backend dispatches `/download` and shows the expected snackbar.
 **Commit:** `feat(flutter): dispatch download from search result`
 
-### [ ] D2. Queue screen + polling provider
+### [x] D2. Queue screen + polling provider
 **Files:** `android/app/lib/providers/queue.dart`, `android/app/lib/screens/queue_screen.dart`, `android/app/lib/widgets/status_pill.dart`, `android/app/test/screens/queue_screen_test.dart`, `android/app/test/providers/queue_test.dart`.
 **Deliverable:** `queueProvider` ticks `/queue` every 3s. Screen shows two sections (Active / Recent) of JobView tiles with status pills (queued = blue, running = amber, done = green, failed = red).
 **Test gate:** widget test (loading / both sections / empty); provider test using `fake_async` to verify the 3s cadence + lifecycle pause/resume.

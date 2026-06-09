@@ -105,3 +105,24 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **Move docs to `flutter-docs/` at repo root**: breaks the per-app convention in `/CLAUDE.md` §1.
 
 **Trade-off:** One extra `cd android/app` for any Flutter CLI command. The README front-loads this so it isn't surprising.
+
+---
+
+## 2026-06-09 — Queue polling: `AsyncNotifier` + internal `Timer`, not `StreamProvider`
+
+**Context:** PLAN.md §8 originally specified "Polling is implemented via Riverpod's `StreamProvider` + `Stream.periodic`. **Not** via raw `Timer`s leaked from `StatefulWidget`s." That was written before milestone D2 (queue polling) and was correct on the "no `Timer`s leaked from `StatefulWidget`" point but underestimated the awkwardness of `StreamProvider` for the **pause/resume on app lifecycle** half of the same PLAN §8 contract.
+
+**Decision:** Implement `queueProvider` as an `@Riverpod(keepAlive: true) class Queue extends _$Queue { Future<QueueResponse> build() … }` (`AsyncNotifier`) that owns a `Timer` internally. Expose `pause()` and `resume()` methods on the notifier; the `QueueScreen` (a `ConsumerStatefulWidget` with `WidgetsBindingObserver`) calls them from `didChangeAppLifecycleState`.
+
+**Why:**
+- `StreamProvider` exposes no imperative control surface to consumers — there's no way for the UI to tell the underlying stream "pause now, resume now". You'd have to put the lifecycle observer in the provider itself (couples the provider to `WidgetsBindingObserver`, hard to test) or wrap with a control stream + merge, which adds plumbing without changing semantics.
+- `AsyncNotifier` cleanly separates the polling mechanism from the lifecycle binding. The notifier owns the `Timer` (cancelled in `ref.onDispose`), and the screen owns the lifecycle observer.
+- The PLAN §8 "**Not** via raw `Timer`s leaked from `StatefulWidget`s" rule is still honoured — the `Timer` is owned by the provider, not by a `StatefulWidget`. The intent of that rule was "don't leak `Timer`s from screen widgets"; that's unchanged.
+- The same shape will be reused at D3 (`jobStatusProvider(jobId)`) — family `AsyncNotifier` polling every 2s while non-terminal, stopping on terminal state. `StreamProvider` would have the same lifecycle-control problem there.
+
+**Alternatives considered:**
+- **`StreamProvider` + internal control flag**: implementable but the consumer can't reach the flag. Would require a sibling `queueControlProvider` for pause/resume, adding indirection for no gain.
+- **`StreamProvider` + lifecycle observer inside the provider**: forces a `WidgetsBinding.instance.addObserver` call in provider code, which fights testability (now every provider test needs a `WidgetsBinding` ambient).
+- **Raw `Timer.periodic` in `QueueScreen`**: explicitly forbidden by PLAN §8.
+
+**Trade-off:** PLAN.md §6 + §8 wording was updated in the same task to match the implementation (CLAUDE.md staleness rule). The line "ticks every 3s + emits `QueueResponse`" still holds — the visible behaviour is the same; only the mechanism changed.

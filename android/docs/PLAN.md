@@ -229,8 +229,8 @@ One `Provider` per concern. Riverpod codegen via `@riverpod`:
 - `dioClientProvider` — depends on `settingsProvider`; builds a `Dio` instance with the Bearer interceptor + a 10s timeout. Auto-invalidates when settings change.
 - `searchQueryProvider` — current query string + type (mutable via the search bar).
 - `searchResultsProvider` — `FutureProvider` parameterised by `searchQueryProvider`; debounced 300ms.
-- `queueProvider` — `StreamProvider` that ticks every 3s + emits `QueueResponse`.
-- `jobStatusProvider(jobId)` — family provider; `StreamProvider` ticking every 2s while state is non-terminal.
+- `queueProvider` — `AsyncNotifier` that ticks every 3s + emits `QueueResponse`. Exposes `pause()` / `resume()` for the lifecycle binding in `QueueScreen`. (See DECISIONLOG 2026-06-09 — `AsyncNotifier` over `StreamProvider` because `StreamProvider` has no consumer-facing pause/resume.)
+- `jobStatusProvider(jobId)` — family `AsyncNotifier`; ticks every 2s while state is non-terminal, stops on terminal state.
 - `downloadDispatchProvider` — a function-style provider that exposes `dispatch(uri)` and returns a `Future<DownloadResponse>`.
 
 ---
@@ -258,7 +258,7 @@ A `theme.dart` file is the single source of truth. No per-screen theme overrides
 - **Job detail:** 2000 ms tick while state ∈ {`queued`, `running`}. Stops once `done` or `failed`. Resumes only on screen re-entry.
 - **Search:** no polling. Debounce 300ms on text input.
 
-Polling is implemented via Riverpod's `StreamProvider` + `Stream.periodic`. **Not** via raw `Timer`s leaked from `StatefulWidget`s.
+Polling is implemented via Riverpod `AsyncNotifier`s that own a `Timer` internally (cancelled in `ref.onDispose`). **Not** via raw `Timer`s leaked from `StatefulWidget`s — the lifecycle observer lives in the screen and calls `notifier.pause()` / `notifier.resume()`. (See DECISIONLOG 2026-06-09.)
 
 ---
 
