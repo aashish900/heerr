@@ -192,3 +192,30 @@ Key invariants enforced at the DB level:
 **Trade-off:** Pure ASGI is slightly lower-level than BaseHTTPMiddleware (we wrap `send` ourselves to inject the header), but the middleware is small (~70 lines) and the predictability is worth it. Documented in `app/api/middleware.py` so future modifications don't accidentally regress to BaseHTTPMiddleware.
 
 **Reference:** `https://github.com/encode/starlette/issues/1438` — the long-standing Starlette issue tracking BaseHTTPMiddleware + ContextVars semantics.
+
+## 2026-06-09 — Trivy: skip `/opt/spotdl-venv` + bump fastapi/starlette
+
+**Context:** The Docker Hub publish workflow's Trivy scan started failing the build on the `v0.1.2` tag with three findings:
+1. `starlette 0.27.0` CVE-2024-47874 (HIGH, fixed in 0.40.0) — in `/opt/spotdl-venv/lib/python3.13/site-packages/starlette/`. Pulled in by `spotdl==4.5.0`'s hard pin to `fastapi==0.103.x`.
+2. `starlette 0.46.2` CVE-2025-62727 (HIGH, fixed in 0.49.1) — in our backend's venv. We pinned `fastapi = "^0.115"`, and `fastapi 0.115.x` constrains `starlette<0.47`, so we were stuck on 0.46.2.
+3. `yt_dlp/extractor/shahid.py` flagged as containing an AWS Access Key (CRITICAL secret) — at `/opt/spotdl-venv/lib/python3.13/site-packages/yt_dlp/extractor/shahid.py:39`. The string is a hardcoded literal yt-dlp ships for the Shahid streaming service's API; not a real credential leak.
+
+**Decision:**
+
+a) **Bump our backend's starlette by widening the fastapi pin.** Change `fastapi = "^0.115"` → `fastapi = ">=0.117,<1.0"` and explicitly add `starlette = ">=0.49.1"` to `[tool.poetry.dependencies]`. `poetry lock` resolved to `fastapi 0.136.3` + `starlette 1.2.1`. 161/161 tests pass; `ruff check`, `ruff format --check`, `mypy app/` all green. Genuine fix for finding (2).
+
+b) **Skip Trivy scanning of `/opt/spotdl-venv`** by adding `skip-dirs: /opt/spotdl-venv` to the trivy-action step. Covers findings (1) and (3) together. The skip is scoped to a single directory — every other site-package, the base image, the app's own venv, and the rest of the runtime is still scanned at HIGH/CRITICAL.
+
+**Why skip-dirs is defensible:**
+- `/opt/spotdl-venv` is **vendored** — a third-party CLI (`spotdl 4.5.0`) and its full transitive closure (yt-dlp, fastapi 0.103.x, starlette 0.27.0, etc.) installed in an **isolated venv** specifically to keep its dependency graph off our app's main venv (see DECISIONLOG 2026-06-08 "spotdl install isolated").
+- We invoke spotdl **as a subprocess CLI only** (`/opt/spotdl-venv/bin/spotdl download <uri>`). We never run `spotdl web` or otherwise expose its bundled FastAPI/uvicorn server. The starlette DoS CVE (multipart/form-data) requires an HTTP server reachable by an attacker — there is no such surface from `/opt/spotdl-venv` in our deployment.
+- yt-dlp's `extractors/` directory contains hundreds of service-specific Python modules with hardcoded API keys, OAuth client IDs, and signed URL fragments embedded as literals — these trip secret scanners across the board (this is well-known among yt-dlp consumers). They are not credentials in the operational sense; treating them as one would require either patching yt-dlp or maintaining a per-extractor allowlist that breaks on every yt-dlp bump.
+- spotdl is the latest version on PyPI (4.5.0); there is no newer release to bump *to* that would resolve the upstream dependency pinning.
+
+**Alternatives considered:**
+- **Run spotdl with `--no-deps`** + reinstall its actual download dependencies (yt-dlp, mutagen, etc.) manually, dropping fastapi/uvicorn/starlette from the venv. Rejected: brittle, would need maintenance every time spotdl shifts its dep set, and yt-dlp's extractor literals would still trip the secret scanner.
+- **Drop Trivy from the workflow entirely.** Rejected: we want the scan to catch real CVEs in our own deps and base image; the issue is the noise from third-party vendored CLI tooling, not Trivy itself.
+- **Pin specific CVE IDs in `.trivyignore`** (`CVE-2024-47874`, plus a secret-rule ignore for `aws-access-key-id` under the shahid.py path). Rejected: brittle — every spotdl/yt-dlp bump can surface new CVEs and new "secret" literals in extractors, requiring constant maintenance to the ignore list. A directory-scoped skip targets the actual category of finding (third-party vendored tooling) rather than playing whack-a-mole.
+- **Set `exit-code: 0`** to make Trivy informational. Rejected: silently hides real findings in our own code.
+
+**Revisit when:** spotdl 4.6+ ships with a relaxed FastAPI pin (then we could re-include `/opt/spotdl-venv` under the scanner), or if a vulnerability lands that is reachable from how we actually use spotdl (e.g. a subprocess-execution CVE in spotdl itself, which `skip-dirs` would suppress — accept this trade-off and audit spotdl's release notes manually on bumps).

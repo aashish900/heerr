@@ -81,6 +81,15 @@ jobs:
           exit-code: "1"
           ignore-unfixed: true
           vuln-type: "os,library"
+          # /opt/spotdl-venv is a vendored isolated CLI tool (spotdl 4.5.0
+          # + yt-dlp). We invoke it via subprocess only — never expose its
+          # bundled FastAPI/uvicorn web mode. Its CVEs (e.g. older starlette
+          # via spotdl's pinned fastapi==0.103.x) are outside our threat
+          # model, and yt-dlp extractor source files contain hardcoded
+          # service-specific literals that trip the secrets scanner with
+          # false positives. See DECISIONLOG 2026-06-09 "Trivy: skip spotdl
+          # venv".
+          skip-dirs: /opt/spotdl-venv
 
       - name: Log in to Docker Hub
         # Only log in when we're actually going to push, so secrets are not

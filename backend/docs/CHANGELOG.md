@@ -371,3 +371,13 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
   - `docker` against `/backend` — bumps the `python:3.13-slim` base image in `backend/Dockerfile`.
   - All three on weekly cadence (Mondays 09:00 IST). `commit-message.prefix` chosen per ecosystem so commits land in Conventional-Commits-shaped messages.
 - Verification: YAML parses cleanly; full workflow exercise requires the next PR (PR builds will run trivy; tag pushes will run trivy → push).
+
+## 2026-06-09 — H1 unblock: fix Docker Hub publish pipeline
+
+Three pre-existing bugs were blocking `v0.1.0`/`v0.1.1`/`v0.1.2` tag pushes from publishing the `aashish900/heerr-backend` image. All three fixed in the same task because they were discovered serially:
+
+1. **`docker-publish.yml`** — `aquasecurity/trivy-action@0.28.0` does not exist (the repo's tag format is `v`-prefixed). First fix: `@v0.28.0`. Second fix: bumped to `@v0.36.0` because `@v0.28.0` internally pinned `aquasecurity/setup-trivy@v0.2.1` which also doesn't exist (minimum published `setup-trivy` tag is `v0.2.6`; `trivy-action@v0.36.0` pins it correctly).
+2. **`backend/pyproject.toml`** — bumped `fastapi = "^0.115"` → `fastapi = ">=0.117,<1.0"` and added `starlette = ">=0.49.1"` to fix HIGH CVE-2025-62727 (starlette DoS via Range header merging). `poetry lock` resolved to `fastapi 0.136.3` + `starlette 1.2.1`. 161/161 tests pass; `ruff check`, `ruff format --check`, `mypy app/` all green.
+3. **`docker-publish.yml`** — added `skip-dirs: /opt/spotdl-venv` to the trivy-action step. The vendored spotdl 4.5.0 venv contains an older starlette (CVE-2024-47874, unreachable in our subprocess-CLI invocation) and yt-dlp extractor source files with hardcoded literals that trip secret scanners (false positives). Decision logged in `DECISIONLOG.md` 2026-06-09 "Trivy: skip spotdl venv".
+
+Tags pushed during this task: `v0.1.0` (failed, broken trivy-action ref), `v0.1.1` (failed, same broken ref), `v0.1.2` (failed, blocked by HIGH/CRITICAL trivy findings), `v0.1.3` (this commit — expected green).
