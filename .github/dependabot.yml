@@ -1,0 +1,66 @@
+# Dependabot configuration. Opens auto-PRs for outdated dependencies.
+#
+# Three ecosystems covered:
+#   1. pip (backend/) → reads poetry.lock; native Poetry support.
+#   2. github-actions (/) → bumps action versions (actions/checkout, etc.).
+#   3. docker (backend/) → bumps the base image in backend/Dockerfile.
+#
+# All set to weekly cadence (Monday morning UTC). Python deps are grouped
+# into a single PR per week to avoid PR-flood; actions + docker stay
+# per-package so each bump is easy to evaluate.
+
+version: 2
+
+updates:
+  # ---- Python (Poetry) -----------------------------------------------------
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Kolkata"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      # One PR per week with all minor/patch bumps — cuts review overhead.
+      # Major bumps still open separately so they're not buried.
+      python-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ---- GitHub Actions ------------------------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Kolkata"
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "chore(ci)"
+      include: "scope"
+
+  # ---- Docker base image ---------------------------------------------------
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Kolkata"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "chore(docker)"
+      include: "scope"

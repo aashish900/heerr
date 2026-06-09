@@ -357,3 +357,17 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
 - `concurrency: group: backend-ci-${{ github.ref }}` with `cancel-in-progress: true` for PR runs — stale runs on a PR are cancelled when a new commit lands; main-branch runs are not cancelled so the badge stays accurate.
 - README: "Testing & lint" section updated to link the workflow file and call out that the same four gates run in CI.
 - Verification deferred to first PR — workflow validity confirmed by `yaml.safe_load`. The next PR that touches `backend/**` will exercise the workflow end-to-end.
+
+## 2026-06-09 — H-4: Trivy image scan + Dependabot
+
+- **Trivy scan in `docker-publish.yml`** — new pipeline shape:
+  1. Build single-arch (amd64) with `load: true` → image present in the runner's daemon as `heerr-backend:scan`.
+  2. `aquasecurity/trivy-action@0.28.0` scans the loaded image. Severity threshold `HIGH,CRITICAL`; `vuln-type: os,library` (catches both Debian base-image CVEs and Python deps); `ignore-unfixed: true` so the pipeline isn't held hostage by upstream-unfixed advisories; `exit-code: '1'` fails the workflow.
+  3. (Tag refs only) the original multi-arch build + push runs. BuildKit GHA cache means amd64 layers from step 1 are reused → minimal duplication.
+- Scan gates every PR build *and* every tag push — a vulnerable image can never reach Docker Hub.
+- **`.github/dependabot.yml`** — three ecosystems:
+  - `pip` against `/backend` (native Poetry support reads `poetry.lock`). Minor + patch bumps grouped into one weekly PR via the `python-minor-patch` group; major bumps still open separately so they don't get buried in a group.
+  - `github-actions` against `/` — keeps action versions current (security + new features).
+  - `docker` against `/backend` — bumps the `python:3.13-slim` base image in `backend/Dockerfile`.
+  - All three on weekly cadence (Mondays 09:00 IST). `commit-message.prefix` chosen per ecosystem so commits land in Conventional-Commits-shaped messages.
+- Verification: YAML parses cleanly; full workflow exercise requires the next PR (PR builds will run trivy; tag pushes will run trivy → push).
