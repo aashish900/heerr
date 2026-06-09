@@ -8,6 +8,7 @@ import '../models/search_response.dart';
 import '../models/search_result_item.dart';
 import '../providers/download.dart';
 import '../providers/search.dart';
+import '../widgets/error_snackbar.dart';
 import '../widgets/result_tile.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
@@ -41,6 +42,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final SearchQueryState query = ref.watch(searchQueryProvider);
     final AsyncValue<SearchResponse> resultsAsync =
         ref.watch(searchResultsProvider);
+
+    // Snackbar-route every search/Spotify error per PLAN §9. The dedup in
+    // reactToApiError prevents repeated snackbars when the same error class
+    // recurs across rapid retypes.
+    ref.listen<AsyncValue<SearchResponse>>(
+      searchResultsProvider,
+      (AsyncValue<SearchResponse>? prev, AsyncValue<SearchResponse> next) {
+        reactToApiError<SearchResponse>(context, prev, next, action: 'search');
+      },
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Search')),
@@ -144,9 +155,7 @@ Future<void> _dispatchDownload(
       );
   } on ApiError catch (e) {
     if (!context.mounted) return;
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(e.message)));
+    showApiError(context, e, action: 'download');
   }
 }
 

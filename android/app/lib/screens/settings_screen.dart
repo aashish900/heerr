@@ -6,6 +6,7 @@ import '../api/api_error.dart';
 import '../api/client.dart';
 import '../api/endpoints.dart';
 import '../providers/settings.dart';
+import '../widgets/error_snackbar.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -86,9 +87,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       );
     } on ApiError catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Connection failed: ${e.message}')),
-      );
+      // The user is already on /settings — suppress the auto-redirect that
+      // showApiError() would trigger for 401 (it'd be a no-op anyway, but
+      // calling it shouldn't surprise readers). For all other ApiErrors,
+      // show the standard mapped snackbar.
+      showApiError(context, e);
     } finally {
       if (mounted) setState(() => _testing = false);
     }

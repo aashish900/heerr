@@ -310,3 +310,30 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
 - `_jobJson` helper uses Dart 3 null-aware **value** elements (`'error': ?error,`) so optional fields are dropped from the wire payload when null. Lint `use_null_aware_elements` enforces this style.
 - Codegen: `dart run build_runner build --delete-conflicting-outputs` regenerated `job_status.g.dart`.
 - Verification: `flutter analyze` → no issues; `flutter test` → 99/99 pass (was 86; +7 job_status provider + +6 job_detail screen).
+
+## 2026-06-09 — E1: Error UX wiring per PLAN §9
+
+- New `android/app/lib/widgets/error_snackbar.dart`:
+  - `buildApiErrorSnackBar(ApiError, {action})` — pure function that returns a `SnackBar` with the **locked PLAN §9 copy** per variant. Sealed-class switch covers all six branches:
+    - 401 `UnauthorizedError` → "auth failed — re-paste your token"
+    - 403 `ForbiddenError` → "this token cannot {action}" when caller passed an `action` verb; falls back to `detail` or "insufficient scope" otherwise
+    - 422 `UnprocessableError` → backend `detail` (or "invalid request" fallback)
+    - 503 `RateLimitedError` → "Spotify rate-limited — retry in {Ns}", `SnackBar.duration` clamped to `[2, 10]s` so a long Retry-After doesn't pin the snackbar on screen
+    - `NetworkError` → "cannot reach backend — check Tailscale"
+    - `HttpStatusError` → "{code}: {detail}" (or "{code}: request failed")
+  - `showApiError(BuildContext, ApiError, {action})` — wraps the pure builder with `ScaffoldMessenger` side effects: hides any current snackbar, shows the new one, and for `UnauthorizedError` additionally posts a `Future.microtask` that calls `GoRouter.of(context).go(Routes.settings)`. The redirect is gated on `GoRouter.maybeOf(context) != null` so widget-level tests that mount a single screen without a router don't crash.
+  - `reactToApiError<T>(BuildContext, AsyncValue<T>? prev, AsyncValue<T> next, {action})` — `ref.listen` callback wrapper. Fires `showApiError` only when the next state is `AsyncError<T>` carrying an `ApiError`, **and** the previous error's runtime type doesn't match. Prevents polling providers (queue 3s, job status 2s) from spamming the user when the same error class persists across ticks.
+- Modified `android/app/lib/screens/search_screen.dart`:
+  - `build` now adds `ref.listen<AsyncValue<SearchResponse>>(searchResultsProvider, …)` → `reactToApiError<SearchResponse>(..., action: 'search')`.
+  - `_dispatchDownload` catch block: replaced the bespoke `SnackBar(content: Text(e.message))` with `showApiError(context, e, action: 'download')` — same routing as the polling path.
+  - Inline body error text is still rendered as a fallback (the screen isn't blank if the snackbar is missed).
+- Modified `android/app/lib/screens/queue_screen.dart` — `ref.listen` → `reactToApiError<QueueResponse>(...)` (no `action` since the queue is read-only).
+- Modified `android/app/lib/screens/job_detail_screen.dart` — `ref.listen` → `reactToApiError<JobView>(...)`.
+- Modified `android/app/lib/screens/settings_screen.dart` — `_testConnection` catch block now calls `showApiError(context, e)` instead of the bespoke "Connection failed: …" copy. Note: the auto-redirect on 401 is a no-op when the user is already on /settings.
+- New `android/app/test/widgets/error_snackbar_test.dart` — 10 widget tests:
+  - One per PLAN §9 row (8 cases including ForbiddenError-with-action, ForbiddenError-without-action, and the HttpStatusError detail/no-detail variants).
+  - `UnauthorizedError` redirects to `/settings` when a `GoRouter` ancestor exists. Verified by mounting a 2-route minimal router and asserting the post-tap location renders the "SETTINGS" placeholder.
+  - `UnauthorizedError` is a no-op for the redirect leg (no exception) when no `GoRouter` ancestor exists — the snackbar still fires.
+- Updated `android/app/test/screens/settings_screen_test.dart` "Test connection on 401 shows the mapped error" → asserts the locked PLAN copy "auth failed — re-paste your token" (was "Connection failed: bad token").
+- Updated `android/app/test/screens/search_screen_test.dart` D1 401 test → renamed to "ApiError on download → showApiError snackbar (E1 copy)"; asserts the same locked PLAN copy.
+- Verification: `flutter analyze` → no issues; `flutter test` → 109/109 pass (was 99; +10 error_snackbar).

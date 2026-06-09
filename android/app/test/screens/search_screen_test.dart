@@ -424,7 +424,7 @@ void main() {
       expect(find.text('Already downloaded'), findsOneWidget);
     });
 
-    testWidgets('ApiError → renders ApiError.message snackbar', (
+    testWidgets('ApiError on download → showApiError snackbar (E1 copy)', (
       WidgetTester tester,
     ) async {
       final _FakeAdapter adapter = _FakeAdapter(
@@ -445,7 +445,8 @@ void main() {
       });
       await tester.pump();
 
-      expect(find.text('token revoked'), findsOneWidget);
+      // PLAN §9 row 1: 401 → "auth failed — re-paste your token".
+      expect(find.text('auth failed — re-paste your token'), findsOneWidget);
     });
 
     testWidgets('mid-flight: tile shows a spinner; clears on completion', (

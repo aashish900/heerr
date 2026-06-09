@@ -282,9 +282,11 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Test connection'));
     await tester.pumpAndSettle();
 
-    // The snackbar text is "Connection failed: <ApiError.message>" — for
-    // UnauthorizedError that's the backend's detail string.
-    expect(find.textContaining('Connection failed'), findsOneWidget);
-    expect(find.textContaining('bad token'), findsOneWidget);
+    // E1: snackbar copy now goes through buildApiErrorSnackBar — the
+    // UnauthorizedError variant is the locked PLAN §9 copy.
+    expect(
+      find.text('auth failed — re-paste your token'),
+      findsOneWidget,
+    );
   });
 }

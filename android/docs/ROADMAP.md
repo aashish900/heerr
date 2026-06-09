@@ -110,7 +110,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 ## Phase E — Polish
 
-### [ ] E1. Error UX wiring across all screens
+### [x] E1. Error UX wiring across all screens
 **Files modified:** all screens; new `android/app/lib/widgets/error_snackbar.dart`.
 **Deliverable:** Every screen's error case routes through the typed `ApiError` → the right snackbar / banner / redirect per PLAN §9.
 **Test gate:** widget tests for each screen's error branches.

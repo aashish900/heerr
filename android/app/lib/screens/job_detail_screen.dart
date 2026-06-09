@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_error.dart';
 import '../models/job_view.dart';
 import '../providers/job_status.dart';
+import '../widgets/error_snackbar.dart';
 import '../widgets/status_pill.dart';
 
 /// One job's live view. Polls `GET /status/{jobId}` until the job reaches
@@ -18,6 +19,12 @@ class JobDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<JobView> jobAsync =
         ref.watch(jobStatusProvider(jobId));
+    ref.listen<AsyncValue<JobView>>(
+      jobStatusProvider(jobId),
+      (AsyncValue<JobView>? prev, AsyncValue<JobView> next) {
+        reactToApiError<JobView>(context, prev, next);
+      },
+    );
     return Scaffold(
       appBar: AppBar(title: Text('Job ${_short(jobId)}')),
       body: jobAsync.when(

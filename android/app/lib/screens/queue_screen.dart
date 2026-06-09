@@ -9,6 +9,7 @@ import '../models/job_view.dart';
 import '../models/queue_response.dart';
 import '../providers/queue.dart';
 import '../router.dart';
+import '../widgets/error_snackbar.dart';
 import '../widgets/status_pill.dart';
 
 /// Polled queue view. Two sections (Active / Recent), each a list of
@@ -55,6 +56,12 @@ class _QueueScreenState extends ConsumerState<QueueScreen>
   @override
   Widget build(BuildContext context) {
     final AsyncValue<QueueResponse> queueAsync = ref.watch(queueProvider);
+    ref.listen<AsyncValue<QueueResponse>>(
+      queueProvider,
+      (AsyncValue<QueueResponse>? prev, AsyncValue<QueueResponse> next) {
+        reactToApiError<QueueResponse>(context, prev, next);
+      },
+    );
     return Scaffold(
       appBar: AppBar(title: const Text('Queue')),
       body: queueAsync.when(
