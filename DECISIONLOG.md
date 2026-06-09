@@ -150,3 +150,25 @@ Key invariants enforced at the DB level:
 - Drop the `spotify_track_uri UNIQUE` constraint — rejected: enables duplicate inserts on retry, which corrupts the table.
 
 **Revisit when:** users complain about missing track-level dedup hints after an album download (i.e., real evidence the gap matters). The fix is to add `--save-file metadata.json` to the spotDL invocation and parse the JSON.
+
+---
+
+## 2026-06-08 — spotdl install isolated (own venv, not in Poetry)
+
+**Context:** G1 (the runtime Dockerfile) needs `spotdl` available. The obvious choice — `poetry add spotdl@^4.5` — fails: `spotdl 4.5.0` hard-pins `fastapi==0.103.x`, conflicting with our `fastapi ^0.115`.
+
+**Decision:** Do NOT add `spotdl` to `pyproject.toml`. Inside the Docker image, install `spotdl==4.5.0` into a separate venv at `/opt/spotdl-venv`. The runner invokes the resulting console script: `_spotdl_executable()` returns `os.environ.get("SPOTDL_EXECUTABLE", "spotdl")`. The image sets `SPOTDL_EXECUTABLE=/opt/spotdl-venv/bin/spotdl`; local dev relies on PATH (CONTEXT.md notes the user has `spotdl 4.5.0` system-installed).
+
+**Why:**
+- spotdl is a **CLI dependency, not a Python lib dependency** for us — F1's runner shells out via subprocess and never imports `spotdl`. There's no need for the Python interpreter that runs our app to have `spotdl` importable.
+- Keeping spotdl's transitive deps (yt-dlp, mutagen, syncedlyrics, ffmpy, etc., plus its own fastapi/spotipy pins) out of our resolution preserves freedom to bump our own deps without spotdl's constraints biting us.
+- Reverses the F1 implementation choice that used `[sys.executable, "-m", "spotdl", ...]` (which required spotdl to be importable from our interpreter). The new shape — `[<spotdl-bin>, "download", ...]` — is also the form spotdl's docs prescribe.
+
+**Alternatives considered:**
+- `poetry add spotdl` + downgrade `fastapi` to `^0.103` — rejected: significant code regression (Pydantic-v2 ergonomics, modern dependency API).
+- `poetry add spotdl --no-deps` (skip dependency resolution) — rejected: spotdl would fail at runtime without its own deps installed.
+- `pipx install spotdl` inside the image — initial attempt; failed because the apt-installed `pipx` couldn't reliably target the image's `python3.13` interpreter. Plain `venv` + `pip install spotdl` is simpler and has fewer moving parts.
+
+**Trade-off:** The Docker image is ~150 MB larger than a hypothetical world where spotdl wasn't shipped, and image rebuilds re-resolve spotdl's deps unless layer-cached. For our home-server, single-container use case, this is invisible.
+
+**Revisit when:** spotdl drops the `fastapi==0.103` pin (track via [spotdl releases](https://github.com/spotDL/spotify-downloader/releases)). Then we could fold spotdl back into our main Poetry resolution if there's any reason to.

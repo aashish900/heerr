@@ -238,3 +238,21 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
   - **Edge cases**: missing job (deleted between dispatch and run) → no-op, runner never invoked; non-queued job (already running from a duplicate dispatch) → no-op, runner never invoked, state unchanged.
 - ROADMAP-vs-impl note: ROADMAP F2 listed `app/services/jobs.py` + `app/api/v1/download.py` as the files-to-modify. My implementation places `run_job` in `app/services/workers.py` (colocated with `JobEnqueuer` from D2). `jobs.py` (pure state-machine transitions) and `download.py` (endpoint) remain unchanged — they already had the right surface. The deviation reflects D2's earlier architectural choice and changes nothing observable.
 - Gate: `poetry run pytest tests/test_worker.py` → 9 passed; full suite → 150 passed in 6.92s.
+
+## 2026-06-08 — G1 backend Dockerfile
+
+- `backend/Dockerfile` — multi-stage build, defaults `PYTHON_VERSION=3.13` and `POETRY_VERSION=2.4.1` (matches the local pipx-installed Poetry):
+  - **builder stage** — `python:3.13-slim`, installs Poetry, then `poetry install --no-root --only main` against `pyproject.toml` + `poetry.lock` (layer-cached independently of app code). Produces an in-project `/app/.venv`.
+  - **runtime stage** — `python:3.13-slim` + `ffmpeg`. Builds an isolated spotdl venv at `/opt/spotdl-venv` via `python3 -m venv` + `pip install spotdl==4.5.0`. Copies our app venv from the builder via `COPY --from=builder /app/.venv /app/.venv`, then `app/`, `alembic/`, `alembic.ini`, `pyproject.toml`. Runs as a non-root `app:1000:1000` user. `EXPOSE 8000`. `CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]`. `SPOTDL_EXECUTABLE=/opt/spotdl-venv/bin/spotdl` env baked in.
+- `backend/.dockerignore` — excludes `.venv/`, caches, secrets (`.env*`), tests, IDE/OS noise, `.git/`, `Dockerfile`.
+- `backend/app/services/spotdl_runner.py` — refactored from `[sys.executable, "-m", "spotdl", ...]` to `[_spotdl_executable(), "download", ...]`, where `_spotdl_executable()` reads `SPOTDL_EXECUTABLE` env (default `"spotdl"`). Reason: the isolated spotdl install lives in a venv whose Python is NOT our app's Python.
+- `backend/tests/test_spotdl_runner.py` — `test_command_invokes_python_module_spotdl` renamed to `test_command_invokes_spotdl_executable` and a new `test_spotdl_executable_env_override` covers the env-var path. 12 tests for the runner (was 11).
+- `backend/pyproject.toml` — promoted `httpx ^0.28` from `[group.dev]` to runtime. It's imported by `app/services/spotify.py`; the previous declaration was a bug uncovered the first time the image actually booted.
+- `backend/poetry.lock` — regenerated (`poetry lock`) after the httpx promotion. No version drift, just shifted group membership.
+- New DECISIONLOG ADR ([2026-06-08 "spotdl install isolated"](DECISIONLOG.md)): why spotdl is NOT in `pyproject.toml` — it pins `fastapi==0.103.x`, conflicting with our `^0.115`. Installed via a separate venv in the image; the runner shells out to its console script.
+- Gate (ROADMAP G1 done-when):
+  - `docker build -t heerr-backend:dev backend/` ✓
+  - `docker run --rm … heerr-backend:dev python -m app.cli --help` ✓ (lists `create-token` / `list-tokens` / `revoke-token`).
+  - Bonus smoke: `docker run -d -p 18000:8000 … heerr-backend:dev` boots uvicorn; `curl /api/v1/health` → `200 {"status":"ok"}`; `/api/v1/openapi.json` serves with the right title.
+- Image size: 1.28 GB (`python:3.13-slim` + ffmpeg + spotdl venv + our venv + code).
+- Full suite (after refactor + httpx promotion): `poetry run pytest` → 151 passed in 7.02s.

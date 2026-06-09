@@ -1,10 +1,22 @@
 import asyncio
-import sys
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
 _AUDIO_SUFFIXES = {".mp3", ".m4a", ".opus", ".flac", ".ogg", ".wav"}
 _STDERR_TAIL_BYTES = 4000
+
+
+def _spotdl_executable() -> str:
+    """Resolve the spotdl binary.
+
+    spotdl is installed in its own isolated venv (via pipx in the Docker
+    image) because its dependency closure conflicts with ours (it pins
+    fastapi==0.103.x). It's NOT in pyproject.toml — we invoke its console
+    script, not its Python API. See DECISIONLOG 2026-06-08 "spotdl install
+    isolated" for the why.
+    """
+    return os.environ.get("SPOTDL_EXECUTABLE", "spotdl")
 
 
 @dataclass(frozen=True)
@@ -41,10 +53,12 @@ def _scan_audio_files(output_dir: Path) -> set[Path]:
 async def run_spotdl(
     spotify_uri: str, output_dir: str | Path
 ) -> list[DownloadedFile]:
-    """Invoke `python -m spotdl download <uri> --output <dir>` as a subprocess.
+    """Invoke `spotdl download <uri> --output <dir>` as a subprocess.
 
     Returns the list of new audio files produced (dir-diff before vs after).
     Raises `SpotdlError(exit_code, stderr_tail)` on non-zero exit.
+    Executable is resolved via `_spotdl_executable()` (env `SPOTDL_EXECUTABLE`
+    or PATH).
     """
     out_path = Path(output_dir).resolve()
     out_path.mkdir(parents=True, exist_ok=True)
@@ -52,9 +66,7 @@ async def run_spotdl(
     before = _scan_audio_files(out_path)
 
     cmd = [
-        sys.executable,
-        "-m",
-        "spotdl",
+        _spotdl_executable(),
         "download",
         spotify_uri,
         "--output",

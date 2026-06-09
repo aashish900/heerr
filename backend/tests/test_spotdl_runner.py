@@ -46,7 +46,7 @@ async def test_happy_path_returns_new_files(tmp_path, monkeypatch):
     assert results[0].size_bytes == len(b"audio-bytes")
 
 
-async def test_command_invokes_python_module_spotdl(tmp_path, monkeypatch):
+async def test_command_invokes_spotdl_executable(tmp_path, monkeypatch):
     captured: dict[str, list[str]] = {}
 
     async def fake_spawn(cmd):
@@ -59,12 +59,28 @@ async def test_command_invokes_python_module_spotdl(tmp_path, monkeypatch):
 
     await run_spotdl("spotify:album:x", tmp_path)
     cmd = captured["cmd"]
-    assert cmd[1:3] == ["-m", "spotdl"]
-    assert cmd[3] == "download"
+    assert cmd[0] == "spotdl"
+    assert cmd[1] == "download"
     assert "spotify:album:x" in cmd
     assert "--output" in cmd
     out_idx = cmd.index("--output")
     assert Path(cmd[out_idx + 1]).resolve() == tmp_path.resolve()
+
+
+async def test_spotdl_executable_env_override(tmp_path, monkeypatch):
+    captured: dict[str, list[str]] = {}
+
+    async def fake_spawn(cmd):
+        captured["cmd"] = list(cmd)
+        return FakeProc(returncode=0)
+
+    monkeypatch.setenv("SPOTDL_EXECUTABLE", "/opt/spotdl/bin/spotdl")
+    monkeypatch.setattr(
+        "app.services.spotdl_runner._spawn", fake_spawn
+    )
+
+    await run_spotdl("spotify:track:abc", tmp_path)
+    assert captured["cmd"][0] == "/opt/spotdl/bin/spotdl"
 
 
 async def test_multiple_files_produced(tmp_path, monkeypatch):
