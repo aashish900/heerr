@@ -1,0 +1,36 @@
+# Static analysis config for the heerr Android client.
+# `flutter analyze` reads this file. Same rules run in CI (added at a
+# future Flutter-CI milestone post-G1).
+
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    # Lints that should be hard errors, not warnings.
+    invalid_annotation_target: ignore  # noisy false positive on freezed
+    missing_required_param: error
+    missing_return: error
+    todo: ignore
+  exclude:
+    # Generated files by build_runner — `flutter analyze` should skip them.
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+
+linter:
+  rules:
+    # Extras on top of flutter_lints.
+    - prefer_const_constructors
+    - prefer_const_constructors_in_immutables
+    - prefer_const_literals_to_create_immutables
+    - prefer_final_locals
+    - prefer_final_in_for_each
+    - require_trailing_commas
+    - avoid_print  # use debugPrint / dart:developer log
+    - avoid_returning_null_for_future
+    - cancel_subscriptions
+    - close_sinks
+    - unawaited_futures

@@ -1,0 +1,51 @@
+name: heerr
+description: heerr Android client — thin REST client for the heerr FastAPI backend.
+publish_to: 'none'
+
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management — locked per docs/DECISIONLOG.md 2026-06-09 "Stack".
+  flutter_riverpod: ^2.6.0
+  riverpod_annotation: ^2.6.0
+
+  # HTTP
+  dio: ^5.7.0
+
+  # JSON / models (annotations only at runtime; codegen happens via dev_deps)
+  freezed_annotation: ^2.4.0
+  json_annotation: ^4.9.0
+
+  # Persistence
+  flutter_secure_storage: ^9.2.0
+
+  # Navigation
+  go_router: ^14.6.0
+
+  # Material Icons font is enabled in the `flutter:` section below; no extra
+  # font deps needed for the dark M3 theme.
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # Lint config — see analysis_options.yaml for the active rules.
+  flutter_lints: ^6.0.0
+
+  # Codegen
+  build_runner: ^2.4.0
+  freezed: ^2.5.0
+  json_serializable: ^6.8.0
+  riverpod_generator: ^2.6.0
+
+  # Test helpers — mocktail over mockito (no codegen, stronger types).
+  mocktail: ^1.0.4
+
+flutter:
+  uses-material-design: true

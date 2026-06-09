@@ -17,7 +17,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 ## Phase A — Foundation
 
-### [ ] A1. Scaffold: `flutter create` + pinned deps + lint
+### [x] A1. Scaffold: `flutter create` + pinned deps + lint
 **Files:** `android/app/pubspec.yaml`, `android/app/analysis_options.yaml`, `android/app/lib/main.dart`, `android/app/.gitignore`, `android/app/android/app/build.gradle` (applicationId).
 **Deliverable:** `cd android/app && flutter pub get && flutter analyze` exit 0; default counter app removed; bare `main.dart` boots a black `MaterialApp` saying "heerr".
 **Test gate:** none (out of TDD scope).
