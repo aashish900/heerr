@@ -7,9 +7,13 @@ from alembic import context
 
 config = context.config
 
-# Source the URL from env. Sync driver (psycopg or sqlite) for Alembic;
-# the app uses an async driver elsewhere.
+# The app uses `postgresql+asyncpg://` for the async engine, but Alembic's
+# env.py runs synchronously. Replace the async driver with the sync psycopg2
+# driver so `engine_from_config` can open a plain synchronous connection.
+# `asyncpg` does not expose a synchronous DBAPI interface — using it here
+# causes `MissingGreenlet` errors.
 database_url = os.environ.get("DATABASE_URL", "sqlite:///:memory:")
+database_url = database_url.replace("postgresql+asyncpg://", "postgresql+psycopg://")
 config.set_main_option("sqlalchemy.url", database_url)
 
 if config.config_file_name is not None:
