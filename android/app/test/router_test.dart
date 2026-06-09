@@ -2,11 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/router.dart';
 import 'package:heerr/theme.dart';
 
+// In-memory fake for `flutter_secure_storage`. Needed because the real
+// SettingsScreen (B3) reads `settingsProvider` at build time → which hits
+// the platform channel; widget tests don't have one and hang in
+// `pumpAndSettle`.
+class _NoopStorage implements SecureStorage {
+  @override
+  Future<String?> read(String key) async => null;
+  @override
+  Future<void> write(String key, String value) async {}
+  @override
+  Future<void> delete(String key) async {}
+}
+
 Widget _bootApp() {
   return ProviderScope(
+    overrides: <Override>[
+      secureStorageProvider.overrideWith((Ref<SecureStorage> _) => _NoopStorage()),
+    ],
     child: MaterialApp.router(
       theme: heerrDarkTheme(),
       routerConfig: buildHeerrRouter(),

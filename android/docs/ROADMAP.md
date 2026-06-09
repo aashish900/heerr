@@ -56,7 +56,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** typed `ApiError` for each status; happy path returns the expected payload.
 **Commit:** `feat(flutter): dio client + bearer interceptor + typed errors`
 
-### [ ] B3. Settings screen UI
+### [x] B3. Settings screen UI
 **Files:** `android/app/lib/screens/settings_screen.dart`, `android/app/test/screens/settings_screen_test.dart`.
 **Deliverable:** Form with two fields (URL, Token) + Save + "Test connection". Save calls `settingsProvider.update`; Test connection calls `GET /health` via dio and shows a snackbar.
 **Test gate:** widget test for Save happy path + "Test connection" success/failure.
