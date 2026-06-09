@@ -42,7 +42,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 ## Phase B — Plumbing
 
-### [ ] B1. Secure storage + settings provider
+### [x] B1. Secure storage + settings provider
 **Files:** `android/app/lib/providers/settings.dart`, `android/app/test/providers/settings_test.dart`.
 **Deliverable:** `settingsProvider` reads/writes `backend_base_url` and `bearer_token` from `flutter_secure_storage`. Exposes `update(...)` mutators that invalidate dependents.
 **Test gate:** unit test against `flutter_secure_storage`'s test backend; assert read-after-write parity.
