@@ -74,7 +74,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** typing into the query state and waiting > 300ms emits results from a mocked dio.
 **Commit:** `feat(flutter): search providers`
 
-### [ ] C2. Search screen UI
+### [x] C2. Search screen UI
 **Files:** `android/app/lib/screens/search_screen.dart`, `android/app/lib/widgets/result_tile.dart`, `android/app/test/screens/search_screen_test.dart`.
 **Deliverable:** Query bar at top; type toggle (track / album / playlist) below; results list of ResultTile (thumbnail, name, artist, dim if `alreadyDownloaded`).
 **Test gate:** widget test renders loading / empty / results / error states; tapping the type toggle re-fires the query.

@@ -178,3 +178,26 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
 - Test infra: reuses the hand-rolled fake adapter pattern from B2/B3, parameterised as `_CountingAdapter` to expose `requests`. `_container(...)` helper wires the dio override + a configurable debounce. Crucial detail: tests must `c.listen(searchResultsProvider, …)` before awaiting `.future`, otherwise autoDispose tears down the ref between the `read` and the `await` and the cancelToken fires inside dio's `post`, surfacing as `NetworkError`. Documented in the comment in the "POSTs /search" test.
 - Codegen: `dart run build_runner build` regenerated `search.g.dart`.
 - Verification: `flutter analyze` → no issues; `flutter test` → 53/53 pass (12 model + 7 settings + 13 api + 8 settings-screen + 8 search + 5 router).
+
+## 2026-06-09 — C2: Search screen UI
+
+- New `android/app/lib/widgets/result_tile.dart` — `ResultTile(SearchResultItem)`:
+  - 56×56 cover via private `_Cover` widget: `Image.network` with rounded corners; falls back to a M3-tinted `music_note` placeholder when `coverUrl` is null/empty or the network load errors. Placeholder colours pull from `Theme.of(context).colorScheme.surfaceContainerHighest` / `onSurfaceVariant` so the tile feels at home on the dark surface.
+  - `ListTile` body: title (1 line, ellipsis), subtitle (artist • album when present, just artist otherwise), trailing `Icons.download_done` only when `alreadyDownloaded == true`.
+  - `Opacity(0.5)` wrapper when `alreadyDownloaded` is true. Tap-to-download dispatch lands at D1; until then the trailing slot is information-only.
+- New `android/app/lib/screens/search_screen.dart` — replaces the A2 stub with a real `ConsumerStatefulWidget`:
+  - `TextField` with `controller: TextEditingController(text: ref.read(searchQueryProvider).query)` initialised once in `initState` — so the user's last query survives a Search → Queue → Search tab round-trip (paired with `keepAlive: true` on `searchQueryProvider`). `onChanged` forwards every keystroke to `setQuery`; debouncing lives in the provider per C1.
+  - `SegmentedButton<SpotifyType>` for the Tracks/Albums/Playlists toggle; `onSelectionChanged` calls `setType`. Single-select (`SegmentedButton.selected` is a `Set<SpotifyType>` of size 1).
+  - `Expanded` body driven by `searchResultsProvider.when(loading, error, data)`. Empty query → "Type to search Spotify" hint; empty results → "No results"; `ApiError` → its `message`; populated → `ListView.builder` of `ResultTile`s.
+- New `android/app/test/screens/search_screen_test.dart` — 10 widget tests:
+  1. Initial state (empty query) shows the "Type to search Spotify" hint and zero `ResultTile`s.
+  2. Loading state shows a `CircularProgressIndicator`.
+  3. Non-empty query + results renders a `ResultTile` per item, the right title/artist text, the `artist • album` subtitle when album is present, and the `download_done` badge on the `alreadyDownloaded` row.
+  4. Non-empty query with empty results shows "No results".
+  5. `ApiError` (RateLimitedError) state renders `e.message` ("upstream rate limited").
+  6. Tapping the Albums segment then Playlists segment updates `searchQueryProvider.type` in sequence.
+  7. Typing in the `TextField` updates `searchQueryProvider.query`.
+  8. The `TextField` seeds from existing provider state (proves the keepAlive round-trip works).
+  9. + 10. `ResultTile` unit tests: not-downloaded renders title/artist + placeholder icon, no badge; downloaded renders the badge + Opacity(0.5).
+- Test infra: `_resultsValue(AsyncValue)` helper installs a controllable `searchResultsProvider` override that returns a synchronous Future for data/error and a never-completing one for loading; widget tests reuse the pattern from earlier milestones. Loading-state test does NOT `pumpAndSettle` because the loading future is intentionally pending.
+- Verification: `flutter analyze` → no issues; `flutter test` → 63/63 pass (12 model + 7 settings + 13 api + 8 settings-screen + 8 search + 10 search-screen + 5 router).
