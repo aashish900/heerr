@@ -42,3 +42,25 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
 - Removed IDE noise the scaffold produced: `android/app/.idea/` and `android/app/heerr.iml` (covered by the default `.gitignore` but cleaner to delete from the working tree).
 - Verification: `cd android/app && flutter pub get` → 112 deps resolved (36 packages have newer majors blocked by our caret pins — Dependabot will surface those). `flutter analyze` → "No issues found! (ran in 0.2s)". `flutter test` → 1/1 passed.
 - **Manual verification deferred** to when the user is near the Pixel: `cd android/app && flutter run -d <pixel-device-id>` should show "heerr" centred on a dark green-tinted surface. (`flutter devices` lists connected devices.)
+
+## 2026-06-09 — A2: theme + go_router + bottom-nav shell
+
+- New: `android/app/lib/theme.dart` — single `heerrDarkTheme()` builder. M3 dark theme via `ColorScheme.fromSeed(0xFF1DB954, brightness: dark)`. Seed colour defined as a private const so it isn't hardcoded in every consumer.
+- New: `android/app/lib/router.dart`:
+  - `Routes` class with `search`/`queue`/`settings` constants + a `job(id)` builder. Keeps URL shape DRY between the router, link callers, and tests.
+  - `buildHeerrRouter()` returns the configured `GoRouter`. Pulled out of `main.dart` so widget tests reuse the exact production config (no parallel test-only router).
+  - `ShellRoute` wraps the three child routes with `_ShellScaffold`, which holds the M3 `NavigationBar` (Search · Queue · Settings). Tab tap calls `context.go(...)`. Selected index derived from the matched location.
+- New stub screens (all `StatelessWidget` returning a `Scaffold` with an AppBar + centred body label, populated later):
+  - `android/app/lib/screens/search_screen.dart` (filled at C2).
+  - `android/app/lib/screens/queue_screen.dart` (filled at D2).
+  - `android/app/lib/screens/settings_screen.dart` (filled at B3).
+- Updated `android/app/lib/main.dart`: switched from `MaterialApp` + inline `Scaffold` to `MaterialApp.router(routerConfig: ...)`. `ProviderScope` wraps `HeerrApp`.
+- Removed `android/app/test/widget_test.dart` (the A1 smoke test asserted the now-removed `heerr` centred text on the root) and replaced with new `android/app/test/router_test.dart` — five tests:
+  1. boots on `/` (Search) by default;
+  2. tapping the Queue tab renders the Queue screen;
+  3. tapping the Settings tab renders the Settings screen;
+  4. round-trip Settings → Search returns to Search;
+  5. theme: M3 + dark brightness.
+- Test helper `_activeTitle(tester)` reads the AppBar title widget directly (instead of `find.text(...)`) — each stub renders the same label twice (in the AppBar and the body), so a text-based finder would be ambiguous.
+- `analysis_options.yaml`: removed `avoid_returning_null_for_future` (removed from Dart 3.3+, surfaced as a `removed_lint` warning during the first `flutter analyze` of this milestone).
+- Verification: `flutter analyze` → no issues; `flutter test` → 5/5 passed.

@@ -24,7 +24,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** `flutter run -d <pixel>` shows the hello-world screen on the device.
 **Commit:** `chore(flutter): scaffold flutter create + pinned deps`
 
-### [ ] A2. Theme + app shell (router + bottom nav)
+### [x] A2. Theme + app shell (router + bottom nav)
 **Files:** `android/app/lib/theme.dart`, `android/app/lib/router.dart`, `android/app/lib/main.dart` (wire ProviderScope + MaterialApp.router), `android/app/test/router_test.dart`.
 **Deliverable:** M3 dark theme; go_router with three empty screens (Search / Queue / Settings) and a bottom nav switching between them.
 **Test gate:** widget test asserts each bottom-nav tap renders the corresponding scaffold title.

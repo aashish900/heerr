@@ -30,7 +30,6 @@ linter:
     - prefer_final_in_for_each
     - require_trailing_commas
     - avoid_print  # use debugPrint / dart:developer log
-    - avoid_returning_null_for_future
     - cancel_subscriptions
     - close_sinks
     - unawaited_futures
