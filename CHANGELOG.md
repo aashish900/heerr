@@ -203,3 +203,24 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
   - Retry: failed job → 200 + `state="queued"` + `attempt_count` incremented + `RecordingEnqueuer` recorded the call; parametrized states `queued`/`running`/`done` → 409; unknown job → 404; another active job for the same URI → 409.
 - Test scaffolding (in `tests/test_admin.py`): `RecordingEnqueuer` overrides `get_enqueuer`; `admin_app` mounts `api_v1` with `get_session` + `get_enqueuer` overrides; `cleanup` deletes downloads/jobs and only admin-created tokens (those owned by `admin-test-*`); admin tokens used in tests are minted via `make_token(is_admin=True)` so their teardown is owned by `make_token`'s own cleanup.
 - Gate: `poetry run pytest tests/test_admin.py` → 15 passed; full suite → 130 passed in 6.47s.
+
+## 2026-06-08 — F1 spotDL subprocess runner
+
+- `backend/app/services/spotdl_runner.py`:
+  - `DownloadedFile` (frozen dataclass: `path`, `size_bytes`).
+  - `SpotdlError(exit_code, stderr_tail)` exception (`stderr_tail` capped at 4 KB).
+  - `async run_spotdl(spotify_uri, output_dir) -> list[DownloadedFile]`. Builds `[sys.executable, "-m", "spotdl", "download", <uri>, "--output", <out>]` and runs it via `asyncio.create_subprocess_exec` (wrapped in a module-level `_spawn` so tests can monkeypatch without invoking real spotDL). Output dir is `mkdir(parents=True, exist_ok=True)`'d. Audio-suffix dir-diff (`.mp3 .m4a .opus .flac .ogg .wav`) before vs after determines which files this invocation produced. Non-zero exit → `SpotdlError` (no `downloads` returned; partially-written files are dropped on the floor by the diff-on-success contract).
+- `backend/tests/test_spotdl_runner.py` — 11 tests via `monkeypatch.setattr("…_spawn", fake_spawn)`:
+  - Happy path: produced file appears in the result.
+  - Command shape: `["…python", "-m", "spotdl", "download", <uri>, "--output", <dir>]`.
+  - Multi-file output (`.mp3` + `.flac`).
+  - Pre-existing files are excluded from the result.
+  - Non-audio sidecars (`.txt`, `.jpg`) are ignored.
+  - Nested files under `Artist/Album/` are picked up via `rglob`.
+  - `mkdir(parents=True)` runs when the output dir is missing.
+  - Exit 0 with no new files → empty list (already-on-disk skip path).
+  - Exit 1 → `SpotdlError` with the stderr tail.
+  - Exit 2 with a partial file written → raises and returns nothing.
+  - Huge stderr is truncated to 4 KB on the exception.
+- No real `spotdl` invocation in any test; no network; no ffmpeg dependency at test time.
+- Gate: `poetry run pytest tests/test_spotdl_runner.py` → 11 passed in 30 ms; full suite → 141 passed in 6.87s.
