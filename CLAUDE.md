@@ -10,6 +10,7 @@ Strict rules for Claude in this project. Follow exactly.
 All project docs except this file live in **`backend/docs/`** (backend-scoped; Flutter phase will get its own `flutter/docs/` later). This file (`CLAUDE.md`) stays at repo root because it applies to the whole project.
 
 ### Files
+- **`backend/README.md`** — backend entry point: how to install + run locally, full env-var list, CLI reference (`python -m app.cli`), API contract reference (every endpoint with request/response shapes + auth scopes + error codes), test architecture, project layout, deployment pointer. Read this when the question is "how do I run / call / test it".
 - **`backend/docs/CONTEXT.md`** — project brief (architecture, constraints, env). Source of truth for *what and why*.
 - **`backend/docs/DECISIONLOG.md`** — ADR of design **decisions** (trade-offs / choices with alternatives considered).
 - **`backend/docs/CHANGELOG.md`** — append-only record of **changes** (code/file edits Claude makes).

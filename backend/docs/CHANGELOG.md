@@ -280,3 +280,17 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
 - Inter-doc markdown links (e.g. `[ADR](DECISIONLOG.md)`) untouched — all five docs moved together, so sibling refs still resolve.
 - Historical mentions of "CLAUDE.md §N" inside the moved docs left as-is (textual references, not links).
 - Rationale: backend-scoped docs colocate with backend code; when Flutter lands, `flutter/docs/` becomes the parallel home. Discoverable both ways: top-down (CLAUDE.md at root points down) and bottom-up (anyone in `backend/` finds its docs immediately).
+
+## 2026-06-09 — `backend/README.md` added; CLAUDE.md Files section updated
+
+- `backend/README.md` — new comprehensive entry point. Sections:
+  - Quick start (local dev): prereqs (Python 3.13, Poetry 2.4, Docker, ffmpeg, spotdl), setup, `.env` configuration, alembic upgrade, uvicorn launch, first admin token via CLI.
+  - Environment variables: table covering `DATABASE_URL`, `SPOTIFY_CLIENT_ID/SECRET`, `MUSIC_OUTPUT_DIR`, optional `SPOTDL_EXECUTABLE`.
+  - CLI reference: every `python -m app.cli` subcommand (`create-token` / `list-tokens` / `revoke-token`) with flags, examples, exit codes.
+  - API reference: auth scheme + every endpoint (`/health`, `/search`, `/download`, `/status/{id}`, `/queue`, four `/admin/*`) with `curl` examples, request/response shapes, status codes, idempotency table for `/download`.
+  - Testing: how to run, what's faked at which boundary (Spotify via dependency_overrides, spotDL via monkeypatch on `_spawn`, Postgres via testcontainers).
+  - Project layout: annotated tree of `backend/`.
+  - Deployment to arr-stack: pointer to `../.env.example` + `../docker-compose.snippet.yml`.
+  - Further reading: cross-links to CLAUDE.md and every `docs/*.md`.
+- `CLAUDE.md §1 Files`: added `backend/README.md` as the first listed file with a one-line description of when to read it ("how do I run / call / test it"). Session-bootstrap order unchanged (CONTEXT → DECISIONLOG → CHANGELOG); README is for operational lookup, not session priming.
+- Rationale: a single entry point for a human developer (or fresh Claude) cloning the repo. The docs/ files remain the source of truth for *why* and *history*; README is the source of truth for *how*.
