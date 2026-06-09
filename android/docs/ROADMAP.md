@@ -49,7 +49,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** write a value in test, reload the provider, get the same value back.
 **Commit:** `feat(flutter): settings provider backed by secure storage`
 
-### [ ] B2. Dio client + Bearer interceptor + ApiError mapping
+### [x] B2. Dio client + Bearer interceptor + ApiError mapping
 **Files:** `android/app/lib/api/client.dart`, `android/app/lib/api/api_error.dart`, `android/app/lib/api/endpoints.dart`, `android/app/test/api/client_test.dart`.
 **Deliverable:** `dioClientProvider` builds a `Dio` with base URL from settings + interceptor that injects `Authorization: Bearer <token>`. Response/error interceptor maps statuses to a typed `ApiError` (PLAN §9 table).
 **Test gate:** unit tests using `DioAdapter` cover happy path + every error-class branch (401/403/422/503/network).
