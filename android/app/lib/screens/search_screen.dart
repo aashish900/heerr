@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_error.dart';
+import '../models/download_response.dart';
 import '../models/enums.dart';
 import '../models/search_response.dart';
+import '../models/search_result_item.dart';
+import '../providers/download.dart';
 import '../providers/search.dart';
 import '../widgets/result_tile.dart';
 
@@ -88,14 +91,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 }
 
-class _Body extends StatelessWidget {
+class _Body extends ConsumerWidget {
   const _Body({required this.query, required this.resultsAsync});
 
   final SearchQueryState query;
   final AsyncValue<SearchResponse> resultsAsync;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return resultsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (Object e, _) => _Centered(text: _errorMessage(e)),
@@ -108,11 +111,42 @@ class _Body extends StatelessWidget {
         }
         return ListView.builder(
           itemCount: r.results.length,
-          itemBuilder: (BuildContext _, int i) =>
-              ResultTile(item: r.results[i]),
+          itemBuilder: (BuildContext _, int i) {
+            final SearchResultItem item = r.results[i];
+            return ResultTile(
+              item: item,
+              onTap: () => _dispatchDownload(context, ref, item),
+            );
+          },
         );
       },
     );
+  }
+}
+
+Future<void> _dispatchDownload(
+  BuildContext context,
+  WidgetRef ref,
+  SearchResultItem item,
+) async {
+  final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+  try {
+    final DownloadResponse res = await ref
+        .read(downloadDispatcherProvider.notifier)
+        .dispatch(item.spotifyUri);
+    if (!context.mounted) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(res.deduped ? 'Already downloaded' : 'Queued'),
+        ),
+      );
+  } on ApiError catch (e) {
+    if (!context.mounted) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(e.message)));
   }
 }
 

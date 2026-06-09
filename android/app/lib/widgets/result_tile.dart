@@ -1,13 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/search_result_item.dart';
+import '../providers/download.dart';
 
 /// One row in the Search screen's results list. Dims when the backend hint
 /// says the track is already downloaded.
-class ResultTile extends StatelessWidget {
-  const ResultTile({required this.item, super.key});
+///
+/// The trailing slot has three states:
+///   * `inFlight` (a POST /download for this URI is mid-flight) → spinner.
+///   * `item.alreadyDownloaded` → check-mark badge.
+///   * otherwise → outline download icon to signal tap-to-queue.
+///
+/// `onTap` is invoked when the row is tapped. It's disabled (null) when the
+/// row is mid-flight or already downloaded — the parent screen owns the
+/// dispatch + snackbar; the tile is presentational.
+class ResultTile extends ConsumerWidget {
+  const ResultTile({required this.item, this.onTap, super.key});
 
   final SearchResultItem item;
+  final VoidCallback? onTap;
 
   String _subtitle() {
     final String? album = item.album;
@@ -18,7 +30,15 @@ class ResultTile extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bool inFlight = ref.watch(
+      downloadDispatcherProvider.select(
+        (Set<String> s) => s.contains(item.spotifyUri),
+      ),
+    );
+    final bool tappable =
+        onTap != null && !inFlight && !item.alreadyDownloaded;
+
     return Opacity(
       opacity: item.alreadyDownloaded ? 0.5 : 1.0,
       child: ListTile(
@@ -33,14 +53,35 @@ class ResultTile extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        // Download dispatch lives at milestone D1. Until then the trailing
-        // slot shows an icon only when the backend says we already have the
-        // track on disk.
-        trailing: item.alreadyDownloaded
-            ? const Icon(Icons.download_done)
-            : null,
+        trailing: _Trailing(
+          alreadyDownloaded: item.alreadyDownloaded,
+          inFlight: inFlight,
+        ),
+        onTap: tappable ? onTap : null,
       ),
     );
+  }
+}
+
+class _Trailing extends StatelessWidget {
+  const _Trailing({required this.alreadyDownloaded, required this.inFlight});
+
+  final bool alreadyDownloaded;
+  final bool inFlight;
+
+  @override
+  Widget build(BuildContext context) {
+    if (inFlight) {
+      return const SizedBox(
+        width: 24,
+        height: 24,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+    if (alreadyDownloaded) {
+      return const Icon(Icons.download_done);
+    }
+    return const Icon(Icons.download_outlined);
   }
 }
 

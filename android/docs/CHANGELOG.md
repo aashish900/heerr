@@ -201,3 +201,37 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
   9. + 10. `ResultTile` unit tests: not-downloaded renders title/artist + placeholder icon, no badge; downloaded renders the badge + Opacity(0.5).
 - Test infra: `_resultsValue(AsyncValue)` helper installs a controllable `searchResultsProvider` override that returns a synchronous Future for data/error and a never-completing one for loading; widget tests reuse the pattern from earlier milestones. Loading-state test does NOT `pumpAndSettle` because the loading future is intentionally pending.
 - Verification: `flutter analyze` → no issues; `flutter test` → 63/63 pass (12 model + 7 settings + 13 api + 8 settings-screen + 8 search + 10 search-screen + 5 router).
+
+## 2026-06-09 — D1: Download dispatch from result tile
+
+- New `android/app/lib/providers/download.dart` — `DownloadDispatcher` (`@Riverpod(keepAlive: true) class … extends _$DownloadDispatcher`). State is `Set<String>` (in-flight `spotify_uri`s). The single mutator `dispatch(String spotifyUri)`:
+  1. Adds the URI to `state` (so any widget watching `state.contains(uri)` sees a transition to `true`).
+  2. `await ref.read(dioClientProvider.future)` → `apiCall<DownloadResponse>(dio.post(/download, …))` reusing B2's typed-error pipeline.
+  3. `finally` removes the URI from `state` — guarantees the tile becomes responsive again whether dispatch succeeded or threw `ApiError`.
+  - `keepAlive: true` so the in-flight set survives screen rebuilds (typing in the search box rebuilds the result list; we don't want a tile spinner to flicker off mid-flight).
+- Modified `android/app/lib/widgets/result_tile.dart` — `ResultTile` is now a `ConsumerWidget`:
+  - Accepts optional `VoidCallback? onTap`.
+  - Watches `downloadDispatcherProvider.select(s => s.contains(item.spotifyUri))` so only its own URI's transitions cause a rebuild — not the whole list when any one tile flips.
+  - Trailing slot is now a 3-way `_Trailing`: spinner (`SizedBox(24×24, CircularProgressIndicator(strokeWidth: 2))`) when in-flight → `Icons.download_done` when `alreadyDownloaded` → `Icons.download_outlined` otherwise (replaces C2's "no trailing when not downloaded" — the outline icon advertises tap-to-queue affordance).
+  - `onTap` is wired to `ListTile.onTap` only when `onTap != null && !inFlight && !item.alreadyDownloaded` — prevents double-firing and matches the dimmed-disabled visual on already-downloaded rows.
+- Modified `android/app/lib/screens/search_screen.dart`:
+  - `_Body` upgraded from `StatelessWidget` to `ConsumerWidget` so the `ListView.builder` callback has a `WidgetRef`.
+  - Each tile gets `onTap: () => _dispatchDownload(context, ref, item)`.
+  - New top-level `_dispatchDownload(BuildContext, WidgetRef, SearchResultItem)` captures the `ScaffoldMessenger` before the await, awaits `dispatch(uri)`, then shows one of: `"Queued"` (deduped == false), `"Already downloaded"` (deduped == true), or `ApiError.message` on catch. `hideCurrentSnackBar()` runs before each show so rapid taps don't queue up snackbars.
+- New `android/app/test/providers/download_test.dart` — 5 unit tests:
+  - Initial state: in-flight set is empty.
+  - Happy path: dispatch POSTs `/download` with `{spotify_uri: …}` body; response parsed into `DownloadResponse{jobId, state, deduped}`.
+  - Deduped response is surfaced through `DownloadResponse.deduped`.
+  - In-flight set membership transitions empty → {uri} → empty across a gated dispatch; observed via `c.listen(downloadDispatcherProvider, …)` history list.
+  - 4xx response throws typed `UnauthorizedError`; finally-block still clears the URI from the in-flight set.
+  - Concurrent dispatches for two URIs are both tracked simultaneously and clear independently as each completes.
+- Search-screen widget tests extended — 5 new tests under `group('D1 — tap dispatches /download')`:
+  - non-deduped (HTTP 202, `deduped: false`) → asserts `POST /download` with `spotify_uri` body + "Queued" snackbar text rendered.
+  - deduped (`deduped: true`) → "Already downloaded" snackbar.
+  - 401 response → snackbar shows the mapped `ApiError.message` ("token revoked").
+  - Mid-flight (gated `Completer` response): tapping shows a `CircularProgressIndicator` on the row; completing the gate clears it.
+  - `alreadyDownloaded: true` tile is not tappable → tapping fires zero `POST /download` requests.
+- Test-infra detail: the snackbar-text assertions are wrapped in `tester.runAsync(() async { tap; await Future.delayed(100ms); })` followed by a `pump()`. `runAsync` escapes the fake-async zone so dio's internal stream-based body decoding actually resolves; without it, `pump()` alone can't drain the chain in time for the snackbar text to appear. (The mid-flight test stays in fake-async because it only cares about the synchronous state set on dispatch start.)
+- ResultTile is now a `ConsumerWidget`, so the two existing unit tests at the bottom of `search_screen_test.dart` had to be wrapped in `ProviderScope` to provide the inherited container.
+- Codegen: `dart run build_runner build --delete-conflicting-outputs` regenerated `download.g.dart` (no other touch).
+- Verification: `flutter analyze` → no issues; `flutter test` → 74/74 pass (was 63; +5 download provider + +5 search-screen tap, +1 reused `_Body→ConsumerWidget` test stayed green).

@@ -85,7 +85,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 ## Phase D — Write path
 
-### [ ] D1. Download dispatch from result tile
+### [x] D1. Download dispatch from result tile
 **Files modified:** `android/app/lib/screens/search_screen.dart`, `android/app/lib/widgets/result_tile.dart`. New: `android/app/lib/providers/download.dart`, `android/app/test/providers/download_test.dart`.
 **Deliverable:** Tap on result → POST `/download` → snackbar "queued" or "already downloaded" if `deduped`. ResultTile shows a small spinner while in-flight.
 **Test gate:** widget test: tap fires the provider; deduped vs new-job both render the right snackbar.

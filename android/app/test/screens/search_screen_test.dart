@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:heerr/api/api_error.dart';
+import 'package:heerr/api/client.dart';
 import 'package:heerr/models/enums.dart';
 import 'package:heerr/models/search_response.dart';
 import 'package:heerr/models/search_result_item.dart';
@@ -260,15 +264,17 @@ void main() {
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: ResultTile(
-              item: SearchResultItem(
-                spotifyUri: 'spotify:track:1',
-                spotifyUrl: 'https://open.spotify.com/track/1',
-                title: 'Hello',
-                artist: 'World',
-                alreadyDownloaded: false,
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: ResultTile(
+                item: SearchResultItem(
+                  spotifyUri: 'spotify:track:1',
+                  spotifyUrl: 'https://open.spotify.com/track/1',
+                  title: 'Hello',
+                  artist: 'World',
+                  alreadyDownloaded: false,
+                ),
               ),
             ),
           ),
@@ -286,15 +292,17 @@ void main() {
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: ResultTile(
-              item: SearchResultItem(
-                spotifyUri: 'spotify:track:2',
-                spotifyUrl: 'https://open.spotify.com/track/2',
-                title: 'Owned',
-                artist: 'X',
-                alreadyDownloaded: true,
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: ResultTile(
+                item: SearchResultItem(
+                  spotifyUri: 'spotify:track:2',
+                  spotifyUrl: 'https://open.spotify.com/track/2',
+                  title: 'Owned',
+                  artist: 'X',
+                  alreadyDownloaded: true,
+                ),
               ),
             ),
           ),
@@ -307,4 +315,225 @@ void main() {
       expect(opacity.opacity, 0.5);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // D1 — tap fires the download dispatcher; snackbar copy depends on
+  // `deduped`. We override dioClientProvider with a fake adapter so dispatch
+  // hits a canned response.
+  // -------------------------------------------------------------------------
+  group('D1 — tap dispatches /download', () {
+    Widget wrap(ProviderContainer container) {
+      return UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: SearchScreen()),
+      );
+    }
+
+    ProviderContainer makeContainer({
+      required _FakeAdapter adapter,
+    }) {
+      final Dio dio = Dio(BaseOptions(baseUrl: 'http://test/api/v1'));
+      dio.httpClientAdapter = adapter;
+      final ProviderContainer c = ProviderContainer(
+        overrides: <Override>[
+          _resultsValue(const AsyncData<SearchResponse>(_twoResults)),
+          dioClientProvider.overrideWith((_) => dio),
+        ],
+      );
+      // Seed the query so the body isn't in its empty-query branch.
+      c.read(searchQueryProvider.notifier).setQuery('q');
+      return c;
+    }
+
+    testWidgets('non-deduped response → "Queued" snackbar', (
+      WidgetTester tester,
+    ) async {
+      final _FakeAdapter adapter = _FakeAdapter(
+        (_) => _json202(<String, dynamic>{
+          'job_id': 'j1',
+          'state': 'queued',
+          'deduped': false,
+        }),
+      );
+      final ProviderContainer c = makeContainer(adapter: adapter);
+      addTearDown(c.dispose);
+
+      await tester.pumpWidget(wrap(c));
+      await tester.pumpAndSettle();
+
+      // runAsync escapes the fake-async zone so dio's internal stream-based
+      // body decoding actually resolves to wall-clock completion.
+      await tester.runAsync<void>(() async {
+        await tester.tap(find.text('First'));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pump(); // render the snackbar
+
+      expect(adapter.requests, hasLength(1));
+      expect(adapter.requests.single.path, '/download');
+      expect(adapter.requests.single.data, <String, dynamic>{
+        'spotify_uri': 'spotify:track:1',
+      });
+      expect(find.text('Queued'), findsOneWidget);
+    });
+
+    testWidgets('deduped=true response → "Already downloaded" snackbar', (
+      WidgetTester tester,
+    ) async {
+      final _FakeAdapter adapter = _FakeAdapter(
+        (_) => _json202(<String, dynamic>{
+          'job_id': 'existing-1',
+          'state': 'done',
+          'deduped': true,
+        }),
+      );
+      // We need an item that's NOT alreadyDownloaded (the tile disables onTap
+      // for downloaded items), but whose backend response says deduped.
+      final ProviderContainer c = ProviderContainer(
+        overrides: <Override>[
+          _resultsValue(const AsyncData<SearchResponse>(
+            SearchResponse(results: <SearchResultItem>[
+              SearchResultItem(
+                spotifyUri: 'spotify:track:dup',
+                spotifyUrl: 'https://open.spotify.com/track/dup',
+                title: 'Dup',
+                artist: 'Artist',
+                alreadyDownloaded: false,
+              ),
+            ]),
+          )),
+          dioClientProvider.overrideWith((_) {
+            final Dio dio = Dio(BaseOptions(baseUrl: 'http://test/api/v1'));
+            dio.httpClientAdapter = adapter;
+            return dio;
+          }),
+        ],
+      );
+      addTearDown(c.dispose);
+      c.read(searchQueryProvider.notifier).setQuery('q');
+
+      await tester.pumpWidget(wrap(c));
+      await tester.pumpAndSettle();
+
+      await tester.runAsync<void>(() async {
+        await tester.tap(find.text('Dup'));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pump();
+
+      expect(find.text('Already downloaded'), findsOneWidget);
+    });
+
+    testWidgets('ApiError → renders ApiError.message snackbar', (
+      WidgetTester tester,
+    ) async {
+      final _FakeAdapter adapter = _FakeAdapter(
+        (_) => _jsonStatus(
+          401,
+          <String, dynamic>{'detail': 'token revoked'},
+        ),
+      );
+      final ProviderContainer c = makeContainer(adapter: adapter);
+      addTearDown(c.dispose);
+
+      await tester.pumpWidget(wrap(c));
+      await tester.pumpAndSettle();
+
+      await tester.runAsync<void>(() async {
+        await tester.tap(find.text('First'));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      });
+      await tester.pump();
+
+      expect(find.text('token revoked'), findsOneWidget);
+    });
+
+    testWidgets('mid-flight: tile shows a spinner; clears on completion', (
+      WidgetTester tester,
+    ) async {
+      final Completer<ResponseBody> gate = Completer<ResponseBody>();
+      final _FakeAdapter adapter = _FakeAdapter((_) => gate.future);
+      final ProviderContainer c = makeContainer(adapter: adapter);
+      addTearDown(c.dispose);
+
+      await tester.pumpWidget(wrap(c));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('First'));
+      await tester.pump(); // dispatch starts, state set → tile rebuilds
+
+      // Spinner appears on the row that was tapped.
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      gate.complete(_json202(<String, dynamic>{
+        'job_id': 'j1',
+        'state': 'queued',
+        'deduped': false,
+      }));
+      await tester.pumpAndSettle();
+
+      // Spinner gone.
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+
+    testWidgets('alreadyDownloaded tile is not tappable → no request fires', (
+      WidgetTester tester,
+    ) async {
+      final _FakeAdapter adapter = _FakeAdapter(
+        (_) => _json202(<String, dynamic>{
+          'job_id': 'j1',
+          'state': 'queued',
+          'deduped': false,
+        }),
+      );
+      final ProviderContainer c = makeContainer(adapter: adapter);
+      addTearDown(c.dispose);
+
+      await tester.pumpWidget(wrap(c));
+      await tester.pumpAndSettle();
+
+      // Second row is `alreadyDownloaded: true`.
+      await tester.tap(find.text('Second'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(adapter.requests, isEmpty);
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Local D1 helpers — hand-rolled HTTP adapter, same shape as
+// test/api/client_test.dart and test/providers/download_test.dart.
+// ---------------------------------------------------------------------------
+
+class _FakeAdapter implements HttpClientAdapter {
+  _FakeAdapter(this.responder);
+  final FutureOr<ResponseBody> Function(RequestOptions options) responder;
+  final List<RequestOptions> requests = <RequestOptions>[];
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<dynamic>? cancelFuture,
+  ) async {
+    requests.add(options);
+    return responder(options);
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+ResponseBody _json202(Map<String, dynamic> body) => _jsonStatus(202, body);
+
+ResponseBody _jsonStatus(int statusCode, Map<String, dynamic> body) {
+  return ResponseBody.fromString(
+    jsonEncode(body),
+    statusCode,
+    headers: <String, List<String>>{
+      'content-type': <String>['application/json'],
+    },
+  );
 }
