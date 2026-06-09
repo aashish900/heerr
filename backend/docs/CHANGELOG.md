@@ -314,3 +314,21 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
 - `docker-compose.snippet.yml` — both `heerr-migrate` and `heerr-backend` services now reference `image: aashish900/heerr-backend:latest`. `build: ./backend` is retained so local rebuilds via `docker compose build` still work; remote pulls (`docker compose pull`) hit Docker Hub.
 - `backend/README.md` — "Deployment to the arr-stack" section expanded with two flows (pull-from-Hub and build-from-source), a "Releasing a new image" subsection covering the `git tag → push` UX, and the required-secrets list.
 - Rationale: the home-server deployment shouldn't need to clone the repo and run `docker build` — it should pull a pinned image. The workflow's tag-only push policy keeps Docker Hub clean of intermediate commits while PR builds still validate the Dockerfile.
+
+## 2026-06-09 — H-1: Ruff + mypy configured
+
+- `pyproject.toml` — added `ruff ^0.7` and `mypy ^1.13` to the dev dep group; configured both:
+  - **Ruff:** `target-version py313`, line-length 100, rules `E/W/F/I/B/UP/C4/SIM/RUF` selected with pragmatic ignores (`E501` line-too-long, `B008` for FastAPI `Depends()` idiom, `SIM117` nested with). `tests/**` per-file ignore for `B011`. `alembic/versions` excluded from lint and format.
+  - **Mypy:** `python_version 3.13`, `strict_optional`, `check_untyped_defs`, `disallow_untyped_defs`, `warn_redundant_casts`, `warn_unused_ignores`, `no_implicit_optional`. `pydantic.mypy` plugin enabled. `tests/` and `alembic/versions` excluded. `testcontainers.*` and `spotdl.*` imports ignored (no stubs published).
+- Auto-fixed 31 ruff violations with `--fix`; format applied across 30 files (test files were not previously format-normalized).
+- Manual fixes:
+  - `app/api/v1/search.py:66` — added `from e` to `HTTPException` raised inside `except` (B904).
+  - `app/cli.py:93` — added `from exc` to `typer.Exit` raised inside `except` (B904).
+  - `tests/test_models_match_schema.py:11` — inlined negated return (SIM103).
+- Mypy fixes (6 errors → 0):
+  - `app/cli.py:17` — `_make_sessionmaker()` annotated `-> tuple[AsyncEngine, async_sessionmaker[AsyncSession]]`.
+  - `app/services/jobs.py:71,81,91` — `cast(CursorResult, await session.execute(update(...)))` so `result.rowcount` type-checks. SQLAlchemy 2.x `AsyncSession.execute()` returns `Result[Any]`; the cast narrows to the DML runtime type without changing behaviour.
+  - `app/api/deps.py:38` — `require_scope(*required: str) -> Callable[[Token], Awaitable[Token]]`.
+  - `app/api/v1/queue.py:62` — `_view(j: Job) -> JobView` (added `JobView` import).
+- `README.md` — "Testing" section renamed to "Testing & lint" with `ruff check / format / mypy app/` commands added; noted that the same three gates run in CI on every PR (CI workflow added in H-3).
+- Verification: `poetry run ruff check . && poetry run ruff format --check . && poetry run mypy app/ && poetry run pytest -q` → all green; 151 tests pass.

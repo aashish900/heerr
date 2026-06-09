@@ -22,13 +22,9 @@ class Token(Base):
         primary_key=True,
         server_default=sa.text("gen_random_uuid()"),
     )
-    token_hash: Mapped[str] = mapped_column(
-        sa.Text, nullable=False, unique=True
-    )
+    token_hash: Mapped[str] = mapped_column(sa.Text, nullable=False, unique=True)
     owner_label: Mapped[str] = mapped_column(sa.Text, nullable=False)
-    scopes: Mapped[list[str]] = mapped_column(
-        postgresql.ARRAY(sa.Text()), nullable=False
-    )
+    scopes: Mapped[list[str]] = mapped_column(postgresql.ARRAY(sa.Text()), nullable=False)
     is_admin: Mapped[bool] = mapped_column(
         sa.Boolean, nullable=False, server_default=sa.text("false")
     )
@@ -37,6 +33,4 @@ class Token(Base):
         nullable=False,
         server_default=sa.text("now()"),
     )
-    revoked_at: Mapped[datetime | None] = mapped_column(
-        sa.TIMESTAMP(timezone=True), nullable=True
-    )
+    revoked_at: Mapped[datetime | None] = mapped_column(sa.TIMESTAMP(timezone=True), nullable=True)

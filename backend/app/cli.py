@@ -2,11 +2,11 @@ import asyncio
 import hashlib
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import typer
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.config import get_settings
 from app.db import build_engine, build_sessionmaker
@@ -15,7 +15,7 @@ from app.models import Token
 app = typer.Typer(help="heerr backend token management.", add_completion=False)
 
 
-def _make_sessionmaker():
+def _make_sessionmaker() -> tuple[AsyncEngine, async_sessionmaker[AsyncSession]]:
     engine = build_engine(get_settings().database_url)
     return engine, build_sessionmaker(engine)
 
@@ -63,9 +63,7 @@ def list_tokens() -> None:
         engine, sm = _make_sessionmaker()
         try:
             async with sm() as session:
-                result = await session.execute(
-                    select(Token).order_by(Token.created_at)
-                )
+                result = await session.execute(select(Token).order_by(Token.created_at))
                 return list(result.scalars().all())
         finally:
             await engine.dispose()
@@ -91,7 +89,7 @@ def revoke_token(
         tid = uuid.UUID(token_id)
     except ValueError as exc:
         typer.echo(f"invalid uuid: {exc}", err=True)
-        raise typer.Exit(code=2)
+        raise typer.Exit(code=2) from exc
 
     async def _run() -> str:
         engine, sm = _make_sessionmaker()
@@ -102,7 +100,7 @@ def revoke_token(
                     return "missing"
                 if tok.revoked_at is not None:
                     return "already_revoked"
-                tok.revoked_at = datetime.now(timezone.utc)
+                tok.revoked_at = datetime.now(UTC)
                 await session.commit()
                 return "ok"
         finally:

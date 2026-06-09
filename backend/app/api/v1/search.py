@@ -33,9 +33,7 @@ async def _hydrate_hints(
     downloaded: set[str] = set()
     if type_ == "track":
         r = await session.execute(
-            select(Download.spotify_track_uri).where(
-                Download.spotify_track_uri.in_(uris)
-            )
+            select(Download.spotify_track_uri).where(Download.spotify_track_uri.in_(uris))
         )
         downloaded = set(r.scalars().all())
 
@@ -68,7 +66,7 @@ async def search(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="upstream rate limited",
             headers={"Retry-After": str(e.retry_after)},
-        )
+        ) from e
 
     downloaded, active = await _hydrate_hints(session, sp_results, req.type)
 

@@ -1,4 +1,5 @@
 import hashlib
+from collections.abc import Awaitable, Callable
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -24,9 +25,7 @@ async def bearer_token(
             headers=_UNAUTH_HEADERS,
         )
     token_hash = hashlib.sha256(creds.credentials.encode()).hexdigest()
-    result = await session.execute(
-        select(Token).where(Token.token_hash == token_hash)
-    )
+    result = await session.execute(select(Token).where(Token.token_hash == token_hash))
     tok = result.scalar_one_or_none()
     if tok is None or tok.revoked_at is not None:
         raise HTTPException(
@@ -37,7 +36,7 @@ async def bearer_token(
     return tok
 
 
-def require_scope(*required: str):
+def require_scope(*required: str) -> Callable[[Token], Awaitable[Token]]:
     async def _dep(tok: Token = Depends(bearer_token)) -> Token:
         if not set(required).issubset(set(tok.scopes)):
             raise HTTPException(

@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+from datetime import UTC
 
 import pytest
 from fastapi import FastAPI
@@ -32,9 +33,7 @@ async def jobs_app(app_sm):
 @pytest.fixture
 async def client(jobs_app):
     transport = ASGITransport(app=jobs_app)
-    async with AsyncClient(
-        transport=transport, base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
 
 
@@ -50,9 +49,7 @@ async def cleanup(app_sm):
 async def _token_id_for(app_sm, raw: str):
     h = hashlib.sha256(raw.encode()).hexdigest()
     async with app_sm() as s:
-        r = await s.execute(
-            text("SELECT id FROM tokens WHERE token_hash = :h"), {"h": h}
-        )
+        r = await s.execute(text("SELECT id FROM tokens WHERE token_hash = :h"), {"h": h})
         return r.scalar_one()
 
 
@@ -65,14 +62,14 @@ async def _seed_job(
     state: str = "queued",
     set_finished: bool = False,
 ):
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     j = Job(
         spotify_uri=spotify_uri,
         spotify_type=spotify_type,
         state=state,
         created_by_token_id=token_id,
-        finished_at=datetime.now(timezone.utc) if set_finished else None,
+        finished_at=datetime.now(UTC) if set_finished else None,
     )
     async with app_sm() as s:
         s.add(j)
@@ -91,36 +88,26 @@ async def test_queue_requires_auth(client):
 
 async def test_queue_requires_read_scope(client, make_token):
     raw = await make_token(scopes=("download",))
-    r = await client.get(
-        "/api/v1/queue", headers={"Authorization": f"Bearer {raw}"}
-    )
+    r = await client.get("/api/v1/queue", headers={"Authorization": f"Bearer {raw}"})
     assert r.status_code == 403
 
 
 # ---- shape ----------------------------------------------------------------
 
 
-async def test_empty_queue_returns_empty_lists(
-    client, make_token, cleanup
-):
+async def test_empty_queue_returns_empty_lists(client, make_token, cleanup):
     raw = await make_token()
-    r = await client.get(
-        "/api/v1/queue", headers={"Authorization": f"Bearer {raw}"}
-    )
+    r = await client.get("/api/v1/queue", headers={"Authorization": f"Bearer {raw}"})
     assert r.status_code == 200
     body = r.json()
     assert body == {"active": [], "recent": []}
 
 
-async def test_queue_separates_active_and_recent(
-    client, make_token, app_sm, cleanup
-):
+async def test_queue_separates_active_and_recent(client, make_token, app_sm, cleanup):
     raw = await make_token()
     token_id = await _token_id_for(app_sm, raw)
 
-    q = await _seed_job(
-        app_sm, token_id=token_id, spotify_uri="spotify:track:q", state="queued"
-    )
+    q = await _seed_job(app_sm, token_id=token_id, spotify_uri="spotify:track:q", state="queued")
     r_ = await _seed_job(
         app_sm,
         token_id=token_id,
@@ -155,19 +142,13 @@ async def test_queue_separates_active_and_recent(
     assert recent_ids == {str(d.id), str(f.id)}
 
 
-async def test_active_sorted_oldest_first(
-    client, make_token, app_sm, cleanup
-):
+async def test_active_sorted_oldest_first(client, make_token, app_sm, cleanup):
     raw = await make_token()
     token_id = await _token_id_for(app_sm, raw)
 
-    first = await _seed_job(
-        app_sm, token_id=token_id, spotify_uri="spotify:track:older"
-    )
+    first = await _seed_job(app_sm, token_id=token_id, spotify_uri="spotify:track:older")
     await asyncio.sleep(0.01)  # ensure later created_at
-    second = await _seed_job(
-        app_sm, token_id=token_id, spotify_uri="spotify:track:newer"
-    )
+    second = await _seed_job(app_sm, token_id=token_id, spotify_uri="spotify:track:newer")
 
     body = (
         await client.get(
@@ -179,9 +160,7 @@ async def test_active_sorted_oldest_first(
     assert order == [str(first.id), str(second.id)]
 
 
-async def test_recent_sorted_newest_first(
-    client, make_token, app_sm, cleanup
-):
+async def test_recent_sorted_newest_first(client, make_token, app_sm, cleanup):
     raw = await make_token()
     token_id = await _token_id_for(app_sm, raw)
 
@@ -211,9 +190,7 @@ async def test_recent_sorted_newest_first(
     assert order == [str(newer.id), str(older.id)]
 
 
-async def test_recent_capped_at_20(
-    client, make_token, app_sm, cleanup
-):
+async def test_recent_capped_at_20(client, make_token, app_sm, cleanup):
     raw = await make_token()
     token_id = await _token_id_for(app_sm, raw)
 
@@ -235,9 +212,7 @@ async def test_recent_capped_at_20(
     assert len(body["recent"]) == 20
 
 
-async def test_recent_track_has_output_path(
-    client, make_token, app_sm, cleanup
-):
+async def test_recent_track_has_output_path(client, make_token, app_sm, cleanup):
     raw = await make_token()
     token_id = await _token_id_for(app_sm, raw)
     job = await _seed_job(

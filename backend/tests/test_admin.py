@@ -1,5 +1,6 @@
 import hashlib
 import uuid
+from datetime import UTC
 from uuid import UUID
 
 import pytest
@@ -48,9 +49,7 @@ async def admin_app(app_sm, fake_enqueuer):
 @pytest.fixture
 async def client(admin_app):
     transport = ASGITransport(app=admin_app)
-    async with AsyncClient(
-        transport=transport, base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
 
 
@@ -63,18 +62,14 @@ async def cleanup(app_sm):
         await s.execute(text("DELETE FROM jobs"))
         # tokens created by admin endpoint stay until end-of-test;
         # delete everything except those owned by make_token (which has its own cleanup).
-        await s.execute(
-            text("DELETE FROM tokens WHERE owner_label LIKE 'admin-test-%'")
-        )
+        await s.execute(text("DELETE FROM tokens WHERE owner_label LIKE 'admin-test-%'"))
         await s.commit()
 
 
 async def _token_id_for(app_sm, raw: str):
     h = hashlib.sha256(raw.encode()).hexdigest()
     async with app_sm() as s:
-        r = await s.execute(
-            text("SELECT id FROM tokens WHERE token_hash = :h"), {"h": h}
-        )
+        r = await s.execute(text("SELECT id FROM tokens WHERE token_hash = :h"), {"h": h})
         return r.scalar_one()
 
 
@@ -102,9 +97,7 @@ async def test_non_admin_token_returns_403(client, make_token):
 # ---- POST /admin/tokens ---------------------------------------------------
 
 
-async def test_create_token_returns_raw_once_and_persists_hash(
-    client, make_token, app_sm, cleanup
-):
+async def test_create_token_returns_raw_once_and_persists_hash(client, make_token, app_sm, cleanup):
     raw_admin = await make_token(is_admin=True)
     h = {"Authorization": f"Bearer {raw_admin}"}
     r = await client.post(
@@ -128,10 +121,7 @@ async def test_create_token_returns_raw_once_and_persists_hash(
     async with app_sm() as s:
         rec = (
             await s.execute(
-                text(
-                    "SELECT token_hash, owner_label FROM tokens "
-                    "WHERE token_hash = :h"
-                ),
+                text("SELECT token_hash, owner_label FROM tokens " "WHERE token_hash = :h"),
                 {"h": raw_hash},
             )
         ).first()
@@ -142,18 +132,14 @@ async def test_create_token_returns_raw_once_and_persists_hash(
     async with app_sm() as s:
         leaked = (
             await s.execute(
-                text(
-                    "SELECT count(*) FROM tokens WHERE token_hash = :raw"
-                ),
+                text("SELECT count(*) FROM tokens WHERE token_hash = :raw"),
                 {"raw": raw_new},
             )
         ).scalar_one()
         assert leaked == 0
 
 
-async def test_create_token_invalid_scope_returns_422(
-    client, make_token, cleanup
-):
+async def test_create_token_invalid_scope_returns_422(client, make_token, cleanup):
     raw_admin = await make_token(is_admin=True)
     h = {"Authorization": f"Bearer {raw_admin}"}
     r = await client.post(
@@ -164,9 +150,7 @@ async def test_create_token_invalid_scope_returns_422(
     assert r.status_code == 422
 
 
-async def test_create_token_empty_scopes_returns_422(
-    client, make_token, cleanup
-):
+async def test_create_token_empty_scopes_returns_422(client, make_token, cleanup):
     raw_admin = await make_token(is_admin=True)
     h = {"Authorization": f"Bearer {raw_admin}"}
     r = await client.post(
@@ -180,9 +164,7 @@ async def test_create_token_empty_scopes_returns_422(
 # ---- GET /admin/tokens ----------------------------------------------------
 
 
-async def test_list_tokens_does_not_leak_hash_or_raw(
-    client, make_token, cleanup
-):
+async def test_list_tokens_does_not_leak_hash_or_raw(client, make_token, cleanup):
     raw_admin = await make_token(is_admin=True)
     h = {"Authorization": f"Bearer {raw_admin}"}
     r1 = await client.post(
@@ -209,9 +191,7 @@ async def test_list_tokens_does_not_leak_hash_or_raw(
 # ---- POST /admin/tokens/{id}/revoke --------------------------------------
 
 
-async def test_revoke_token_sets_revoked_at(
-    client, make_token, cleanup
-):
+async def test_revoke_token_sets_revoked_at(client, make_token, cleanup):
     raw_admin = await make_token(is_admin=True)
     h = {"Authorization": f"Bearer {raw_admin}"}
     create_r = await client.post(
@@ -221,32 +201,22 @@ async def test_revoke_token_sets_revoked_at(
     )
     token_id = create_r.json()["id"]
 
-    revoke_r = await client.post(
-        f"/api/v1/admin/tokens/{token_id}/revoke", headers=h
-    )
+    revoke_r = await client.post(f"/api/v1/admin/tokens/{token_id}/revoke", headers=h)
     assert revoke_r.status_code == 204
 
     list_r = await client.get("/api/v1/admin/tokens", headers=h)
-    target = next(
-        t for t in list_r.json() if t["id"] == token_id
-    )
+    target = next(t for t in list_r.json() if t["id"] == token_id)
     assert target["revoked_at"] is not None
 
 
-async def test_revoke_unknown_token_returns_404(
-    client, make_token, cleanup
-):
+async def test_revoke_unknown_token_returns_404(client, make_token, cleanup):
     raw_admin = await make_token(is_admin=True)
     h = {"Authorization": f"Bearer {raw_admin}"}
-    r = await client.post(
-        f"/api/v1/admin/tokens/{uuid.uuid4()}/revoke", headers=h
-    )
+    r = await client.post(f"/api/v1/admin/tokens/{uuid.uuid4()}/revoke", headers=h)
     assert r.status_code == 404
 
 
-async def test_revoke_already_revoked_returns_409(
-    client, make_token, cleanup
-):
+async def test_revoke_already_revoked_returns_409(client, make_token, cleanup):
     raw_admin = await make_token(is_admin=True)
     h = {"Authorization": f"Bearer {raw_admin}"}
     create_r = await client.post(
@@ -255,12 +225,8 @@ async def test_revoke_already_revoked_returns_409(
         json={"owner_label": "admin-test-dblrev", "scopes": ["read"]},
     )
     token_id = create_r.json()["id"]
-    await client.post(
-        f"/api/v1/admin/tokens/{token_id}/revoke", headers=h
-    )
-    r = await client.post(
-        f"/api/v1/admin/tokens/{token_id}/revoke", headers=h
-    )
+    await client.post(f"/api/v1/admin/tokens/{token_id}/revoke", headers=h)
+    r = await client.post(f"/api/v1/admin/tokens/{token_id}/revoke", headers=h)
     assert r.status_code == 409
 
 
@@ -276,7 +242,7 @@ async def _seed_job(
     error_msg: str | None = None,
     attempt_count: int = 1,
 ):
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     j = Job(
         spotify_uri=spotify_uri,
@@ -285,7 +251,7 @@ async def _seed_job(
         error_msg=error_msg,
         attempt_count=attempt_count,
         created_by_token_id=token_id,
-        finished_at=datetime.now(timezone.utc) if state in ("done", "failed") else None,
+        finished_at=datetime.now(UTC) if state in ("done", "failed") else None,
     )
     async with app_sm() as s:
         s.add(j)
@@ -309,9 +275,7 @@ async def test_retry_failed_job_resets_state_and_enqueues_worker(
     )
 
     h = {"Authorization": f"Bearer {raw_admin}"}
-    r = await client.post(
-        f"/api/v1/admin/jobs/{job.id}/retry", headers=h
-    )
+    r = await client.post(f"/api/v1/admin/jobs/{job.id}/retry", headers=h)
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["state"] == "queued"
@@ -322,10 +286,7 @@ async def test_retry_failed_job_resets_state_and_enqueues_worker(
     async with app_sm() as s:
         row = (
             await s.execute(
-                text(
-                    "SELECT state, attempt_count, error_msg "
-                    "FROM jobs WHERE id = :i"
-                ),
+                text("SELECT state, attempt_count, error_msg " "FROM jobs WHERE id = :i"),
                 {"i": job.id},
             )
         ).first()
@@ -335,9 +296,7 @@ async def test_retry_failed_job_resets_state_and_enqueues_worker(
 
 
 @pytest.mark.parametrize("state", ["queued", "running", "done"])
-async def test_retry_non_failed_returns_409(
-    client, make_token, app_sm, state, cleanup
-):
+async def test_retry_non_failed_returns_409(client, make_token, app_sm, state, cleanup):
     raw_admin = await make_token(is_admin=True)
     token_id = await _token_id_for(app_sm, raw_admin)
     job = await _seed_job(
@@ -347,20 +306,14 @@ async def test_retry_non_failed_returns_409(
         state=state,
     )
     h = {"Authorization": f"Bearer {raw_admin}"}
-    r = await client.post(
-        f"/api/v1/admin/jobs/{job.id}/retry", headers=h
-    )
+    r = await client.post(f"/api/v1/admin/jobs/{job.id}/retry", headers=h)
     assert r.status_code == 409
 
 
-async def test_retry_unknown_job_returns_404(
-    client, make_token, cleanup
-):
+async def test_retry_unknown_job_returns_404(client, make_token, cleanup):
     raw_admin = await make_token(is_admin=True)
     h = {"Authorization": f"Bearer {raw_admin}"}
-    r = await client.post(
-        f"/api/v1/admin/jobs/{uuid.uuid4()}/retry", headers=h
-    )
+    r = await client.post(f"/api/v1/admin/jobs/{uuid.uuid4()}/retry", headers=h)
     assert r.status_code == 404
 
 
@@ -384,7 +337,5 @@ async def test_retry_blocked_when_another_active_job_for_same_uri(
         state="queued",
     )
     h = {"Authorization": f"Bearer {raw_admin}"}
-    r = await client.post(
-        f"/api/v1/admin/jobs/{failed.id}/retry", headers=h
-    )
+    r = await client.post(f"/api/v1/admin/jobs/{failed.id}/retry", headers=h)
     assert r.status_code == 409

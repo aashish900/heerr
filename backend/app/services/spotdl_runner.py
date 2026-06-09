@@ -27,9 +27,7 @@ class DownloadedFile:
 
 class SpotdlError(Exception):
     def __init__(self, exit_code: int, stderr_tail: str):
-        super().__init__(
-            f"spotdl exited {exit_code}: {stderr_tail[-500:]}"
-        )
+        super().__init__(f"spotdl exited {exit_code}: {stderr_tail[-500:]}")
         self.exit_code = exit_code
         self.stderr_tail = stderr_tail
 
@@ -50,9 +48,7 @@ def _scan_audio_files(output_dir: Path) -> set[Path]:
     return out
 
 
-async def run_spotdl(
-    spotify_uri: str, output_dir: str | Path
-) -> list[DownloadedFile]:
+async def run_spotdl(spotify_uri: str, output_dir: str | Path) -> list[DownloadedFile]:
     """Invoke `spotdl download <uri> --output <dir>` as a subprocess.
 
     Returns the list of new audio files produced (dir-diff before vs after).
@@ -74,18 +70,11 @@ async def run_spotdl(
     ]
     proc = await _spawn(cmd)
     _, stderr_b = await proc.communicate()
-    stderr_text = (stderr_b or b"").decode("utf-8", errors="replace")[
-        -_STDERR_TAIL_BYTES:
-    ]
+    stderr_text = (stderr_b or b"").decode("utf-8", errors="replace")[-_STDERR_TAIL_BYTES:]
 
     if proc.returncode != 0:
-        raise SpotdlError(
-            exit_code=proc.returncode or -1, stderr_tail=stderr_text
-        )
+        raise SpotdlError(exit_code=proc.returncode or -1, stderr_tail=stderr_text)
 
     after = _scan_audio_files(out_path)
     new_files = sorted(after - before)
-    return [
-        DownloadedFile(path=str(f), size_bytes=f.stat().st_size)
-        for f in new_files
-    ]
+    return [DownloadedFile(path=str(f), size_bytes=f.stat().st_size) for f in new_files]

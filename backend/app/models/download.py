@@ -25,16 +25,10 @@ class Download(Base):
         primary_key=True,
         server_default=sa.text("gen_random_uuid()"),
     )
-    spotify_track_uri: Mapped[str] = mapped_column(
-        sa.Text, nullable=False, unique=True
-    )
-    job_id: Mapped[UUID] = mapped_column(
-        postgresql.UUID(as_uuid=True), nullable=False
-    )
+    spotify_track_uri: Mapped[str] = mapped_column(sa.Text, nullable=False, unique=True)
+    job_id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), nullable=False)
     output_path: Mapped[str] = mapped_column(sa.Text, nullable=False)
-    file_size_bytes: Mapped[int | None] = mapped_column(
-        sa.BigInteger, nullable=True
-    )
+    file_size_bytes: Mapped[int | None] = mapped_column(sa.BigInteger, nullable=True)
     downloaded_at: Mapped[datetime] = mapped_column(
         sa.TIMESTAMP(timezone=True),
         nullable=False,

@@ -48,9 +48,7 @@ async def download_app(app_sm, fake_enqueuer):
 @pytest.fixture
 async def client(download_app):
     transport = ASGITransport(app=download_app)
-    async with AsyncClient(
-        transport=transport, base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
 
 
@@ -66,9 +64,7 @@ async def cleanup(app_sm):
 async def _token_id_for(app_sm, raw: str):
     h = hashlib.sha256(raw.encode()).hexdigest()
     async with app_sm() as s:
-        r = await s.execute(
-            text("SELECT id FROM tokens WHERE token_hash = :h"), {"h": h}
-        )
+        r = await s.execute(text("SELECT id FROM tokens WHERE token_hash = :h"), {"h": h})
         return r.scalar_one()
 
 
@@ -159,9 +155,7 @@ async def test_new_track_uri_creates_queued_job_and_enqueues_worker(
         assert row.state == "queued"
 
 
-async def test_new_album_uri_uses_album_type(
-    client, make_token, fake_enqueuer, app_sm, cleanup
-):
+async def test_new_album_uri_uses_album_type(client, make_token, fake_enqueuer, app_sm, cleanup):
     raw = await make_token()
     uri = "spotify:album:al1"
     r = await client.post(

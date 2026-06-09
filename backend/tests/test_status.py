@@ -1,5 +1,6 @@
 import hashlib
 import uuid
+from datetime import UTC
 
 import pytest
 from fastapi import FastAPI
@@ -32,9 +33,7 @@ async def jobs_app(app_sm):
 @pytest.fixture
 async def client(jobs_app):
     transport = ASGITransport(app=jobs_app)
-    async with AsyncClient(
-        transport=transport, base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
 
 
@@ -50,9 +49,7 @@ async def cleanup(app_sm):
 async def _token_id_for(app_sm, raw: str):
     h = hashlib.sha256(raw.encode()).hexdigest()
     async with app_sm() as s:
-        r = await s.execute(
-            text("SELECT id FROM tokens WHERE token_hash = :h"), {"h": h}
-        )
+        r = await s.execute(text("SELECT id FROM tokens WHERE token_hash = :h"), {"h": h})
         return r.scalar_one()
 
 
@@ -67,7 +64,7 @@ async def _seed_job(
     set_started: bool = False,
     set_finished: bool = False,
 ) -> Job:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     job = Job(
         spotify_uri=spotify_uri,
@@ -75,8 +72,8 @@ async def _seed_job(
         state=state,
         error_msg=error_msg,
         created_by_token_id=token_id,
-        started_at=datetime.now(timezone.utc) if set_started else None,
-        finished_at=datetime.now(timezone.utc) if set_finished else None,
+        started_at=datetime.now(UTC) if set_started else None,
+        finished_at=datetime.now(UTC) if set_finished else None,
     )
     async with app_sm() as s:
         s.add(job)
@@ -138,9 +135,7 @@ async def test_status_invalid_uuid_returns_422(client, make_token):
 # ---- contract shape -------------------------------------------------------
 
 
-async def test_queued_track_has_full_contract_shape(
-    client, make_token, app_sm, cleanup
-):
+async def test_queued_track_has_full_contract_shape(client, make_token, app_sm, cleanup):
     raw = await make_token()
     token_id = await _token_id_for(app_sm, raw)
     job = await _seed_job(
@@ -175,9 +170,7 @@ async def test_queued_track_has_full_contract_shape(
     assert body["finished_at"] is None
 
 
-async def test_running_job_has_started_at(
-    client, make_token, app_sm, cleanup
-):
+async def test_running_job_has_started_at(client, make_token, app_sm, cleanup):
     raw = await make_token()
     token_id = await _token_id_for(app_sm, raw)
     job = await _seed_job(
@@ -197,9 +190,7 @@ async def test_running_job_has_started_at(
     assert body["finished_at"] is None
 
 
-async def test_done_track_has_output_path(
-    client, make_token, app_sm, cleanup
-):
+async def test_done_track_has_output_path(client, make_token, app_sm, cleanup):
     raw = await make_token()
     token_id = await _token_id_for(app_sm, raw)
     job = await _seed_job(
@@ -226,9 +217,7 @@ async def test_done_track_has_output_path(
     assert body["finished_at"] is not None
 
 
-async def test_done_album_has_no_output_path(
-    client, make_token, app_sm, cleanup
-):
+async def test_done_album_has_no_output_path(client, make_token, app_sm, cleanup):
     raw = await make_token()
     token_id = await _token_id_for(app_sm, raw)
     job = await _seed_job(
@@ -249,9 +238,7 @@ async def test_done_album_has_no_output_path(
     assert body["output_path"] is None
 
 
-async def test_failed_job_has_error(
-    client, make_token, app_sm, cleanup
-):
+async def test_failed_job_has_error(client, make_token, app_sm, cleanup):
     raw = await make_token()
     token_id = await _token_id_for(app_sm, raw)
     job = await _seed_job(

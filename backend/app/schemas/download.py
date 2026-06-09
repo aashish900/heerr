@@ -16,9 +16,7 @@ class DownloadRequest(BaseModel):
     @classmethod
     def _validate(cls, v: str) -> str:
         if not _URI_RE.match(v):
-            raise ValueError(
-                "invalid spotify URI; expected spotify:(track|album|playlist):<id>"
-            )
+            raise ValueError("invalid spotify URI; expected spotify:(track|album|playlist):<id>")
         return v
 
     def parsed_type(self) -> Literal["track", "album", "playlist"]:

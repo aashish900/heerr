@@ -61,17 +61,13 @@ async def test_wrong_scheme_returns_401(client):
 
 
 async def test_unknown_token_returns_401(client):
-    r = await client.get(
-        "/whoami", headers={"Authorization": "Bearer not-a-real-token"}
-    )
+    r = await client.get("/whoami", headers={"Authorization": "Bearer not-a-real-token"})
     assert r.status_code == 401
 
 
 async def test_revoked_token_returns_401(client, make_token):
     raw = await make_token(revoked=True)
-    r = await client.get(
-        "/whoami", headers={"Authorization": f"Bearer {raw}"}
-    )
+    r = await client.get("/whoami", headers={"Authorization": f"Bearer {raw}"})
     assert r.status_code == 401
 
 
@@ -80,9 +76,7 @@ async def test_revoked_token_returns_401(client, make_token):
 
 async def test_valid_token_returns_owner(client, make_token):
     raw = await make_token(owner="aashish")
-    r = await client.get(
-        "/whoami", headers={"Authorization": f"Bearer {raw}"}
-    )
+    r = await client.get("/whoami", headers={"Authorization": f"Bearer {raw}"})
     assert r.status_code == 200
     body = r.json()
     assert body["owner"] == "aashish"
@@ -94,17 +88,13 @@ async def test_valid_token_returns_owner(client, make_token):
 
 async def test_missing_required_scope_returns_403(client, make_token):
     raw = await make_token(scopes=("read",))
-    r = await client.get(
-        "/needs-download", headers={"Authorization": f"Bearer {raw}"}
-    )
+    r = await client.get("/needs-download", headers={"Authorization": f"Bearer {raw}"})
     assert r.status_code == 403
 
 
 async def test_required_scope_present_returns_200(client, make_token):
     raw = await make_token(scopes=("read", "download"))
-    r = await client.get(
-        "/needs-download", headers={"Authorization": f"Bearer {raw}"}
-    )
+    r = await client.get("/needs-download", headers={"Authorization": f"Bearer {raw}"})
     assert r.status_code == 200
 
 
@@ -131,17 +121,13 @@ async def test_multiple_required_scopes_all_pass(client, make_token):
 
 async def test_non_admin_blocked_from_admin_route(client, make_token):
     raw = await make_token(is_admin=False)
-    r = await client.get(
-        "/admin-only", headers={"Authorization": f"Bearer {raw}"}
-    )
+    r = await client.get("/admin-only", headers={"Authorization": f"Bearer {raw}"})
     assert r.status_code == 403
 
 
 async def test_admin_allowed_on_admin_route(client, make_token):
     raw = await make_token(is_admin=True)
-    r = await client.get(
-        "/admin-only", headers={"Authorization": f"Bearer {raw}"}
-    )
+    r = await client.get("/admin-only", headers={"Authorization": f"Bearer {raw}"})
     assert r.status_code == 200
 
 

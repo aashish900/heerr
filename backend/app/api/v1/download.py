@@ -43,6 +43,4 @@ async def download(
     if not deduped:
         enqueue(bg, job.id)
 
-    return DownloadResponse(
-        job_id=job.id, state=job.state, deduped=deduped
-    )
+    return DownloadResponse(job_id=job.id, state=job.state, deduped=deduped)

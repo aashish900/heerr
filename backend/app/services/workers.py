@@ -46,16 +46,14 @@ async def run_job(
         try:
             await mark_running(s, job_id)
         except InvalidStateTransition:
-            logger.warning(
-                "run_job: job %s not in queued state; skipping", job_id
-            )
+            logger.warning("run_job: job %s not in queued state; skipping", job_id)
             return
         await s.commit()
 
     # Phase 2: invoke spotDL
     try:
         files = await runner(spotify_uri, output_dir)
-    except Exception as e:  # noqa: BLE001 — bg-task boundary
+    except Exception as e:
         msg = f"{type(e).__name__}: {e}"[-_ERROR_MSG_MAX:]
         await _safe_mark_failed(sm, job_id, msg)
         logger.exception("run_job: runner failed for %s", job_id)
@@ -78,31 +76,21 @@ async def run_job(
                 await s.flush()
             await mark_done(s, job_id)
             await s.commit()
-    except Exception as e:  # noqa: BLE001
-        msg = f"bookkeeping failed: {type(e).__name__}: {e}"[
-            -_ERROR_MSG_MAX:
-        ]
+    except Exception as e:
+        msg = f"bookkeeping failed: {type(e).__name__}: {e}"[-_ERROR_MSG_MAX:]
         await _safe_mark_failed(sm, job_id, msg)
-        logger.exception(
-            "run_job: post-download bookkeeping failed for %s", job_id
-        )
+        logger.exception("run_job: post-download bookkeeping failed for %s", job_id)
 
 
-async def _safe_mark_failed(
-    sm: async_sessionmaker, job_id: UUID, msg: str
-) -> None:
+async def _safe_mark_failed(sm: async_sessionmaker, job_id: UUID, msg: str) -> None:
     try:
         async with sm() as s:
             await mark_failed(s, job_id, msg)
             await s.commit()
     except InvalidStateTransition:
-        logger.warning(
-            "_safe_mark_failed: job %s not in queued/running", job_id
-        )
-    except Exception:  # noqa: BLE001
-        logger.exception(
-            "_safe_mark_failed: could not mark job %s failed", job_id
-        )
+        logger.warning("_safe_mark_failed: job %s not in queued/running", job_id)
+    except Exception:
+        logger.exception("_safe_mark_failed: could not mark job %s failed", job_id)
 
 
 class JobEnqueuer:

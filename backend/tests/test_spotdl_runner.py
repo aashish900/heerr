@@ -35,9 +35,7 @@ async def test_happy_path_returns_new_files(tmp_path, monkeypatch):
         (tmp_path / "song.mp3").write_bytes(b"audio-bytes")
         return FakeProc(returncode=0)
 
-    monkeypatch.setattr(
-        "app.services.spotdl_runner._spawn", fake_spawn
-    )
+    monkeypatch.setattr("app.services.spotdl_runner._spawn", fake_spawn)
 
     results = await run_spotdl("spotify:track:abc", tmp_path)
     assert len(results) == 1
@@ -53,9 +51,7 @@ async def test_command_invokes_spotdl_executable(tmp_path, monkeypatch):
         captured["cmd"] = list(cmd)
         return FakeProc(returncode=0)
 
-    monkeypatch.setattr(
-        "app.services.spotdl_runner._spawn", fake_spawn
-    )
+    monkeypatch.setattr("app.services.spotdl_runner._spawn", fake_spawn)
 
     await run_spotdl("spotify:album:x", tmp_path)
     cmd = captured["cmd"]
@@ -75,9 +71,7 @@ async def test_spotdl_executable_env_override(tmp_path, monkeypatch):
         return FakeProc(returncode=0)
 
     monkeypatch.setenv("SPOTDL_EXECUTABLE", "/opt/spotdl/bin/spotdl")
-    monkeypatch.setattr(
-        "app.services.spotdl_runner._spawn", fake_spawn
-    )
+    monkeypatch.setattr("app.services.spotdl_runner._spawn", fake_spawn)
 
     await run_spotdl("spotify:track:abc", tmp_path)
     assert captured["cmd"][0] == "/opt/spotdl/bin/spotdl"
@@ -89,9 +83,7 @@ async def test_multiple_files_produced(tmp_path, monkeypatch):
         (tmp_path / "b.flac").write_bytes(b"bb")
         return FakeProc(returncode=0)
 
-    monkeypatch.setattr(
-        "app.services.spotdl_runner._spawn", fake_spawn
-    )
+    monkeypatch.setattr("app.services.spotdl_runner._spawn", fake_spawn)
 
     results = await run_spotdl("spotify:album:m", tmp_path)
     paths = sorted(r.path for r in results)
@@ -107,9 +99,7 @@ async def test_existing_files_not_returned(tmp_path, monkeypatch):
         (tmp_path / "new.mp3").write_bytes(b"new")
         return FakeProc(returncode=0)
 
-    monkeypatch.setattr(
-        "app.services.spotdl_runner._spawn", fake_spawn
-    )
+    monkeypatch.setattr("app.services.spotdl_runner._spawn", fake_spawn)
 
     results = await run_spotdl("spotify:track:y", tmp_path)
     assert len(results) == 1
@@ -123,9 +113,7 @@ async def test_non_audio_files_ignored(tmp_path, monkeypatch):
         (tmp_path / "thumbnail.jpg").write_bytes(b"z")
         return FakeProc(returncode=0)
 
-    monkeypatch.setattr(
-        "app.services.spotdl_runner._spawn", fake_spawn
-    )
+    monkeypatch.setattr("app.services.spotdl_runner._spawn", fake_spawn)
 
     results = await run_spotdl("spotify:track:z", tmp_path)
     paths = [r.path for r in results]
@@ -142,9 +130,7 @@ async def test_nested_audio_files_picked_up(tmp_path, monkeypatch):
         (nested / "01-track.opus").write_bytes(b"abc")
         return FakeProc(returncode=0)
 
-    monkeypatch.setattr(
-        "app.services.spotdl_runner._spawn", fake_spawn
-    )
+    monkeypatch.setattr("app.services.spotdl_runner._spawn", fake_spawn)
 
     results = await run_spotdl("spotify:album:n", tmp_path)
     assert len(results) == 1
@@ -158,9 +144,7 @@ async def test_output_dir_created_when_missing(tmp_path, monkeypatch):
         (target / "ok.mp3").write_bytes(b"x")
         return FakeProc(returncode=0)
 
-    monkeypatch.setattr(
-        "app.services.spotdl_runner._spawn", fake_spawn
-    )
+    monkeypatch.setattr("app.services.spotdl_runner._spawn", fake_spawn)
 
     results = await run_spotdl("spotify:track:q", target)
     assert target.exists() and target.is_dir()
@@ -172,9 +156,7 @@ async def test_no_new_files_returns_empty(tmp_path, monkeypatch):
         # spotDL exits 0 but produces nothing — already-on-disk dedupe case
         return FakeProc(returncode=0)
 
-    monkeypatch.setattr(
-        "app.services.spotdl_runner._spawn", fake_spawn
-    )
+    monkeypatch.setattr("app.services.spotdl_runner._spawn", fake_spawn)
 
     results = await run_spotdl("spotify:track:none", tmp_path)
     assert results == []
@@ -190,9 +172,7 @@ async def test_non_zero_exit_raises_spotdl_error(tmp_path, monkeypatch):
             stderr=b"ConnectionError: could not resolve youtube.com",
         )
 
-    monkeypatch.setattr(
-        "app.services.spotdl_runner._spawn", fake_spawn
-    )
+    monkeypatch.setattr("app.services.spotdl_runner._spawn", fake_spawn)
 
     with pytest.raises(SpotdlError) as exc:
         await run_spotdl("spotify:track:bad", tmp_path)
@@ -208,9 +188,7 @@ async def test_failure_does_not_return_any_files(tmp_path, monkeypatch):
         (tmp_path / "partial.mp3").write_bytes(b"truncated")
         return FakeProc(returncode=2, stderr=b"boom")
 
-    monkeypatch.setattr(
-        "app.services.spotdl_runner._spawn", fake_spawn
-    )
+    monkeypatch.setattr("app.services.spotdl_runner._spawn", fake_spawn)
 
     with pytest.raises(SpotdlError):
         await run_spotdl("spotify:track:partial", tmp_path)
@@ -222,9 +200,7 @@ async def test_stderr_tail_truncated(tmp_path, monkeypatch):
     async def fake_spawn(cmd):
         return FakeProc(returncode=1, stderr=huge)
 
-    monkeypatch.setattr(
-        "app.services.spotdl_runner._spawn", fake_spawn
-    )
+    monkeypatch.setattr("app.services.spotdl_runner._spawn", fake_spawn)
 
     with pytest.raises(SpotdlError) as exc:
         await run_spotdl("spotify:track:noisy", tmp_path)

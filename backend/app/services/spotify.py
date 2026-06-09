@@ -48,9 +48,7 @@ class SpotifyClient:
         self._transport = transport
 
     def _make_http(self) -> httpx.AsyncClient:
-        return httpx.AsyncClient(
-            transport=self._transport, timeout=_HTTP_TIMEOUT_SEC
-        )
+        return httpx.AsyncClient(transport=self._transport, timeout=_HTTP_TIMEOUT_SEC)
 
     async def _get_token(self, http: httpx.AsyncClient) -> str:
         now = time.monotonic()
@@ -64,9 +62,7 @@ class SpotifyClient:
         r.raise_for_status()
         body = r.json()
         self._token = body["access_token"]
-        self._expires_at = (
-            now + int(body["expires_in"]) - _REFRESH_MARGIN_SEC
-        )
+        self._expires_at = now + int(body["expires_in"]) - _REFRESH_MARGIN_SEC
         return self._token
 
     async def _search(self, query: str, type_: str, limit: int) -> dict:
@@ -81,27 +77,19 @@ class SpotifyClient:
                 retry = int(r.headers.get("Retry-After", "1"))
                 raise SpotifyRateLimited(retry)
             if r.status_code >= 500:
-                raise SpotifyError(
-                    f"Spotify {r.status_code}: {r.text[:200]}"
-                )
+                raise SpotifyError(f"Spotify {r.status_code}: {r.text[:200]}")
             r.raise_for_status()
             return r.json()
 
-    async def search_tracks(
-        self, query: str, limit: int = 20
-    ) -> list[SpotifyResult]:
+    async def search_tracks(self, query: str, limit: int = 20) -> list[SpotifyResult]:
         body = await self._search(query, "track", limit)
         return [_track(t) for t in body["tracks"]["items"] if t]
 
-    async def search_albums(
-        self, query: str, limit: int = 20
-    ) -> list[SpotifyResult]:
+    async def search_albums(self, query: str, limit: int = 20) -> list[SpotifyResult]:
         body = await self._search(query, "album", limit)
         return [_album(a) for a in body["albums"]["items"] if a]
 
-    async def search_playlists(
-        self, query: str, limit: int = 20
-    ) -> list[SpotifyResult]:
+    async def search_playlists(self, query: str, limit: int = 20) -> list[SpotifyResult]:
         body = await self._search(query, "playlist", limit)
         return [_playlist(p) for p in body["playlists"]["items"] if p]
 

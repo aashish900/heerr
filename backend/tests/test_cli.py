@@ -74,9 +74,7 @@ def test_create_token_prints_raw_and_persists_hash(cli_env, cli_app):
     # raw token must not appear anywhere in the tokens table
     with psycopg.connect(cli_env) as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT count(*) FROM tokens WHERE token_hash = %s", (raw,)
-            )
+            cur.execute("SELECT count(*) FROM tokens WHERE token_hash = %s", (raw,))
             assert cur.fetchone()[0] == 0
 
 
@@ -109,9 +107,7 @@ def test_create_token_invalid_scope_fails(cli_env, cli_app):
 
 
 def test_list_tokens_shows_rows(cli_env, cli_app):
-    r1 = runner.invoke(
-        cli_app, ["create-token", "--owner", "u1", "--scopes", "read"]
-    )
+    r1 = runner.invoke(cli_app, ["create-token", "--owner", "u1", "--scopes", "read"])
     assert r1.exit_code == 0
     r2 = runner.invoke(
         cli_app,
@@ -133,9 +129,7 @@ def test_list_tokens_shows_rows(cli_env, cli_app):
 
 
 def test_list_tokens_does_not_leak_raw_or_hash(cli_env, cli_app):
-    r1 = runner.invoke(
-        cli_app, ["create-token", "--owner", "u", "--scopes", "read"]
-    )
+    r1 = runner.invoke(cli_app, ["create-token", "--owner", "u", "--scopes", "read"])
     raw = r1.stdout.strip()
     h = _hash(raw)
 
@@ -146,9 +140,7 @@ def test_list_tokens_does_not_leak_raw_or_hash(cli_env, cli_app):
 
 
 def test_revoke_token_sets_revoked_at(cli_env, cli_app):
-    r = runner.invoke(
-        cli_app, ["create-token", "--owner", "u", "--scopes", "read"]
-    )
+    r = runner.invoke(cli_app, ["create-token", "--owner", "u", "--scopes", "read"])
     raw = r.stdout.strip()
     row = _fetch_token(cli_env, _hash(raw))
     token_id = str(row[0])
@@ -158,9 +150,7 @@ def test_revoke_token_sets_revoked_at(cli_env, cli_app):
 
     with psycopg.connect(cli_env) as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT revoked_at FROM tokens WHERE id = %s", (token_id,)
-            )
+            cur.execute("SELECT revoked_at FROM tokens WHERE id = %s", (token_id,))
             assert cur.fetchone()[0] is not None
 
 
@@ -170,9 +160,7 @@ def test_revoke_token_unknown_id_fails(cli_env, cli_app):
 
 
 def test_revoke_token_already_revoked_fails(cli_env, cli_app):
-    r = runner.invoke(
-        cli_app, ["create-token", "--owner", "u", "--scopes", "read"]
-    )
+    r = runner.invoke(cli_app, ["create-token", "--owner", "u", "--scopes", "read"])
     raw = r.stdout.strip()
     row = _fetch_token(cli_env, _hash(raw))
     token_id = str(row[0])

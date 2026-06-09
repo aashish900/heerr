@@ -1,6 +1,6 @@
 import hashlib
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -61,11 +61,7 @@ async def list_tokens(
     session: AsyncSession = Depends(get_session),
     _admin: Token = Depends(require_admin),
 ) -> list[TokenView]:
-    rows = (
-        await session.execute(
-            select(Token).order_by(Token.created_at.asc())
-        )
-    ).scalars().all()
+    rows = (await session.execute(select(Token).order_by(Token.created_at.asc()))).scalars().all()
     return [
         TokenView(
             id=t.id,
@@ -99,7 +95,7 @@ async def revoke_token(
             status_code=status.HTTP_409_CONFLICT,
             detail="token already revoked",
         )
-    tok.revoked_at = datetime.now(timezone.utc)
+    tok.revoked_at = datetime.now(UTC)
 
 
 # ---- jobs -----------------------------------------------------------------

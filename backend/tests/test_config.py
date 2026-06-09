@@ -3,7 +3,6 @@ from pydantic import ValidationError
 
 from app.config import Settings
 
-
 REQUIRED_ENV = {
     "DATABASE_URL": "postgresql+asyncpg://u:p@h/d",
     "SPOTIFY_CLIENT_ID": "cid",

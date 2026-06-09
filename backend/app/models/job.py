@@ -51,17 +51,11 @@ class Job(Base):
     attempt_count: Mapped[int] = mapped_column(
         sa.Integer, nullable=False, server_default=sa.text("0")
     )
-    created_by_token_id: Mapped[UUID] = mapped_column(
-        postgresql.UUID(as_uuid=True), nullable=False
-    )
+    created_by_token_id: Mapped[UUID] = mapped_column(postgresql.UUID(as_uuid=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         sa.TIMESTAMP(timezone=True),
         nullable=False,
         server_default=sa.text("now()"),
     )
-    started_at: Mapped[datetime | None] = mapped_column(
-        sa.TIMESTAMP(timezone=True), nullable=True
-    )
-    finished_at: Mapped[datetime | None] = mapped_column(
-        sa.TIMESTAMP(timezone=True), nullable=True
-    )
+    started_at: Mapped[datetime | None] = mapped_column(sa.TIMESTAMP(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(sa.TIMESTAMP(timezone=True), nullable=True)

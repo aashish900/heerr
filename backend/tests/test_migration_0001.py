@@ -4,9 +4,7 @@ from psycopg import errors as pg_errors
 
 def test_extensions_present(db_conn):
     cur = db_conn.cursor()
-    cur.execute(
-        "SELECT extname FROM pg_extension WHERE extname IN ('pgcrypto', 'vector')"
-    )
+    cur.execute("SELECT extname FROM pg_extension WHERE extname IN ('pgcrypto', 'vector')")
     names = {row[0] for row in cur.fetchall()}
     assert names == {"pgcrypto", "vector"}
 
@@ -25,8 +23,7 @@ def test_tokens_scopes_check_rejects_invalid(db_conn):
     cur = db_conn.cursor()
     with pytest.raises(pg_errors.CheckViolation):
         cur.execute(
-            "INSERT INTO tokens (token_hash, owner_label, scopes) "
-            "VALUES (%s, %s, %s)",
+            "INSERT INTO tokens (token_hash, owner_label, scopes) " "VALUES (%s, %s, %s)",
             ("hash-bad-scope", "owner", ["read", "bogus"]),
         )
 
@@ -91,14 +88,12 @@ def test_downloads_unique_track_uri(db_conn, seed_token):
     )
     job_id = cur.fetchone()[0]
     cur.execute(
-        "INSERT INTO downloads (spotify_track_uri, job_id, output_path) "
-        "VALUES (%s, %s, %s)",
+        "INSERT INTO downloads (spotify_track_uri, job_id, output_path) " "VALUES (%s, %s, %s)",
         ("spotify:track:dl", job_id, "/data/media/music/dl.mp3"),
     )
     with pytest.raises(pg_errors.UniqueViolation):
         cur.execute(
-            "INSERT INTO downloads (spotify_track_uri, job_id, output_path) "
-            "VALUES (%s, %s, %s)",
+            "INSERT INTO downloads (spotify_track_uri, job_id, output_path) " "VALUES (%s, %s, %s)",
             ("spotify:track:dl", job_id, "/data/media/music/dl-dup.mp3"),
         )
 

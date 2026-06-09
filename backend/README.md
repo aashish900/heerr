@@ -314,13 +314,21 @@ FastAPI default `{"detail": "…"}` for now. PLAN's `{"error","code"}` envelope 
 
 ---
 
-## Testing
+## Testing & lint
 
 ```bash
 poetry run pytest                       # full suite (~7s on Apple Silicon)
 poetry run pytest tests/test_auth.py -v # one file
 poetry run pytest -k "scope and admin"  # by name
+
+poetry run ruff check .                 # lint
+poetry run ruff format .                # auto-format (or `--check` for CI dry-run)
+poetry run mypy app/                    # type-check (excludes tests/, alembic/versions/)
 ```
+
+Lint + type-check configs live in `pyproject.toml` (`[tool.ruff]`, `[tool.mypy]`).
+The same three gates run in CI on every PR — keep them green locally before
+pushing.
 
 **Architecture:**
 - Real Postgres via [`testcontainers-postgres`](https://testcontainers-python.readthedocs.io/) — session-scoped `pgvector/pgvector:pg17` container; the image is cached locally after the first run (~1.9s spin-up).

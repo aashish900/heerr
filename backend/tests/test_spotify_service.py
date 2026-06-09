@@ -26,9 +26,7 @@ TRACK_PAYLOAD = {
                     "name": "After Hours",
                     "images": [{"url": "https://i.scdn.co/cover.jpg"}],
                 },
-                "external_urls": {
-                    "spotify": "https://open.spotify.com/track/abc"
-                },
+                "external_urls": {"spotify": "https://open.spotify.com/track/abc"},
             }
         ]
     }
@@ -42,9 +40,7 @@ ALBUM_PAYLOAD = {
                 "name": "After Hours",
                 "artists": [{"name": "The Weeknd"}],
                 "images": [{"url": "https://i.scdn.co/album.jpg"}],
-                "external_urls": {
-                    "spotify": "https://open.spotify.com/album/xyz"
-                },
+                "external_urls": {"spotify": "https://open.spotify.com/album/xyz"},
             }
         ]
     }
@@ -58,9 +54,7 @@ PLAYLIST_PAYLOAD = {
                 "name": "Today's Top Hits",
                 "owner": {"display_name": "Spotify"},
                 "images": [{"url": "https://i.scdn.co/pl.jpg"}],
-                "external_urls": {
-                    "spotify": "https://open.spotify.com/playlist/pl1"
-                },
+                "external_urls": {"spotify": "https://open.spotify.com/playlist/pl1"},
             }
         ]
     }
@@ -86,9 +80,7 @@ def make_mock(*, search_response: httpx.Response):
 
 
 async def test_search_tracks_returns_typed_results():
-    transport, state = make_mock(
-        search_response=httpx.Response(200, json=TRACK_PAYLOAD)
-    )
+    transport, state = make_mock(search_response=httpx.Response(200, json=TRACK_PAYLOAD))
     client = SpotifyClient("cid", "csecret", transport=transport)
     results = await client.search_tracks("blinding lights")
     assert len(results) == 1
@@ -104,9 +96,7 @@ async def test_search_tracks_returns_typed_results():
 
 
 async def test_search_albums_returns_typed_results():
-    transport, _ = make_mock(
-        search_response=httpx.Response(200, json=ALBUM_PAYLOAD)
-    )
+    transport, _ = make_mock(search_response=httpx.Response(200, json=ALBUM_PAYLOAD))
     client = SpotifyClient("cid", "csecret", transport=transport)
     results = await client.search_albums("after hours")
     r = results[0]
@@ -119,9 +109,7 @@ async def test_search_albums_returns_typed_results():
 
 
 async def test_search_playlists_returns_typed_results():
-    transport, _ = make_mock(
-        search_response=httpx.Response(200, json=PLAYLIST_PAYLOAD)
-    )
+    transport, _ = make_mock(search_response=httpx.Response(200, json=PLAYLIST_PAYLOAD))
     client = SpotifyClient("cid", "csecret", transport=transport)
     results = await client.search_playlists("top hits")
     r = results[0]
@@ -133,9 +121,7 @@ async def test_search_playlists_returns_typed_results():
 
 
 async def test_token_cached_across_requests():
-    transport, state = make_mock(
-        search_response=httpx.Response(200, json=TRACK_PAYLOAD)
-    )
+    transport, state = make_mock(search_response=httpx.Response(200, json=TRACK_PAYLOAD))
     client = SpotifyClient("cid", "csecret", transport=transport)
     await client.search_tracks("x")
     await client.search_tracks("y")
@@ -144,9 +130,7 @@ async def test_token_cached_across_requests():
 
 
 async def test_token_refreshed_when_expired():
-    transport, state = make_mock(
-        search_response=httpx.Response(200, json=TRACK_PAYLOAD)
-    )
+    transport, state = make_mock(search_response=httpx.Response(200, json=TRACK_PAYLOAD))
     client = SpotifyClient("cid", "csecret", transport=transport)
     await client.search_tracks("x")
     client._expires_at = 0.0  # force expiry
@@ -156,9 +140,7 @@ async def test_token_refreshed_when_expired():
 
 async def test_rate_limit_raises_typed_exception():
     transport, _ = make_mock(
-        search_response=httpx.Response(
-            429, headers={"Retry-After": "5"}, json={}
-        )
+        search_response=httpx.Response(429, headers={"Retry-After": "5"}, json={})
     )
     client = SpotifyClient("cid", "csecret", transport=transport)
     with pytest.raises(SpotifyRateLimited) as exc:
@@ -167,9 +149,7 @@ async def test_rate_limit_raises_typed_exception():
 
 
 async def test_server_error_raises_spotify_error():
-    transport, _ = make_mock(
-        search_response=httpx.Response(500, text="oops")
-    )
+    transport, _ = make_mock(search_response=httpx.Response(500, text="oops"))
     client = SpotifyClient("cid", "csecret", transport=transport)
     with pytest.raises(SpotifyError):
         await client.search_tracks("x")
@@ -184,9 +164,7 @@ async def test_null_playlist_items_are_filtered():
             ]
         }
     }
-    transport, _ = make_mock(
-        search_response=httpx.Response(200, json=payload)
-    )
+    transport, _ = make_mock(search_response=httpx.Response(200, json=payload))
     client = SpotifyClient("cid", "csecret", transport=transport)
     results = await client.search_playlists("x")
     assert len(results) == 1
@@ -194,9 +172,7 @@ async def test_null_playlist_items_are_filtered():
 
 
 async def test_search_query_params_propagate():
-    transport, state = make_mock(
-        search_response=httpx.Response(200, json=TRACK_PAYLOAD)
-    )
+    transport, state = make_mock(search_response=httpx.Response(200, json=TRACK_PAYLOAD))
     client = SpotifyClient("cid", "csecret", transport=transport)
     await client.search_tracks("blinding lights", limit=7)
     last = state["last"]
@@ -217,8 +193,6 @@ async def test_authorization_header_uses_bearer_token():
             return httpx.Response(200, json=TRACK_PAYLOAD)
         raise AssertionError(url)
 
-    client = SpotifyClient(
-        "cid", "csecret", transport=httpx.MockTransport(handler)
-    )
+    client = SpotifyClient("cid", "csecret", transport=httpx.MockTransport(handler))
     await client.search_tracks("x")
     assert captured["search"].headers["authorization"] == "Bearer T1"

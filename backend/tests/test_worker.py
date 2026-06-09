@@ -8,7 +8,6 @@ from app.models import Download, Job, Token
 from app.services.spotdl_runner import DownloadedFile, SpotdlError
 from app.services.workers import run_job
 
-
 # ---- shared local fixtures ------------------------------------------------
 
 
@@ -27,9 +26,7 @@ async def token_id(app_sm):
         tid = tok.id
     yield tid
     async with app_sm() as s:
-        await s.execute(
-            text("DELETE FROM tokens WHERE id = :i"), {"i": tid}
-        )
+        await s.execute(text("DELETE FROM tokens WHERE id = :i"), {"i": tid})
         await s.commit()
 
 
@@ -42,9 +39,7 @@ async def cleanup_jobs(app_sm):
         await s.commit()
 
 
-async def _seed_queued_job(
-    app_sm, token_id, spotify_uri, spotify_type="track"
-):
+async def _seed_queued_job(app_sm, token_id, spotify_uri, spotify_type="track"):
     job = Job(
         spotify_uri=spotify_uri,
         spotify_type=spotify_type,
@@ -62,9 +57,7 @@ async def _count_downloads(app_sm, job_id):
     async with app_sm() as s:
         return (
             await s.execute(
-                select(func.count())
-                .select_from(Download)
-                .where(Download.job_id == job_id)
+                select(func.count()).select_from(Download).where(Download.job_id == job_id)
             )
         ).scalar_one()
 
@@ -103,11 +96,7 @@ async def test_run_job_track_happy_path_writes_download_row(
         assert j.finished_at is not None
         assert j.error_msg is None
 
-        dl = (
-            await s.execute(
-                select(Download).where(Download.job_id == job_id)
-            )
-        ).scalar_one()
+        dl = (await s.execute(select(Download).where(Download.job_id == job_id))).scalar_one()
         assert dl.spotify_track_uri == uri
         assert dl.output_path == file_path
         assert dl.file_size_bytes == 12345
@@ -123,9 +112,7 @@ async def test_run_job_track_with_no_produced_files_marks_done(
     async def fake_runner(spotify_uri, output_dir):
         return []
 
-    await run_job(
-        job_id, sm=app_sm, runner=fake_runner, output_dir=str(tmp_path)
-    )
+    await run_job(job_id, sm=app_sm, runner=fake_runner, output_dir=str(tmp_path))
 
     async with app_sm() as s:
         j = await s.get(Job, job_id)
@@ -133,28 +120,18 @@ async def test_run_job_track_with_no_produced_files_marks_done(
     assert await _count_downloads(app_sm, job_id) == 0
 
 
-async def test_run_job_album_does_not_write_download_rows(
-    app_sm, token_id, tmp_path, cleanup_jobs
-):
+async def test_run_job_album_does_not_write_download_rows(app_sm, token_id, tmp_path, cleanup_jobs):
     """v1 limitation: album/playlist jobs produce files but no DB rows."""
     uri = "spotify:album:al1"
-    job_id = await _seed_queued_job(
-        app_sm, token_id, uri, spotify_type="album"
-    )
+    job_id = await _seed_queued_job(app_sm, token_id, uri, spotify_type="album")
 
     async def fake_runner(spotify_uri, output_dir):
         return [
-            DownloadedFile(
-                path=str(tmp_path / "01.mp3"), size_bytes=100
-            ),
-            DownloadedFile(
-                path=str(tmp_path / "02.mp3"), size_bytes=200
-            ),
+            DownloadedFile(path=str(tmp_path / "01.mp3"), size_bytes=100),
+            DownloadedFile(path=str(tmp_path / "02.mp3"), size_bytes=200),
         ]
 
-    await run_job(
-        job_id, sm=app_sm, runner=fake_runner, output_dir=str(tmp_path)
-    )
+    await run_job(job_id, sm=app_sm, runner=fake_runner, output_dir=str(tmp_path))
 
     async with app_sm() as s:
         j = await s.get(Job, job_id)
@@ -166,20 +143,12 @@ async def test_run_job_playlist_does_not_write_download_rows(
     app_sm, token_id, tmp_path, cleanup_jobs
 ):
     uri = "spotify:playlist:pl1"
-    job_id = await _seed_queued_job(
-        app_sm, token_id, uri, spotify_type="playlist"
-    )
+    job_id = await _seed_queued_job(app_sm, token_id, uri, spotify_type="playlist")
 
     async def fake_runner(spotify_uri, output_dir):
-        return [
-            DownloadedFile(
-                path=str(tmp_path / "a.mp3"), size_bytes=500
-            )
-        ]
+        return [DownloadedFile(path=str(tmp_path / "a.mp3"), size_bytes=500)]
 
-    await run_job(
-        job_id, sm=app_sm, runner=fake_runner, output_dir=str(tmp_path)
-    )
+    await run_job(job_id, sm=app_sm, runner=fake_runner, output_dir=str(tmp_path))
 
     async with app_sm() as s:
         j = await s.get(Job, job_id)
@@ -197,13 +166,9 @@ async def test_run_job_spotdl_error_marks_failed_with_error_msg(
     job_id = await _seed_queued_job(app_sm, token_id, uri)
 
     async def fake_runner(spotify_uri, output_dir):
-        raise SpotdlError(
-            exit_code=1, stderr_tail="youtube unavailable"
-        )
+        raise SpotdlError(exit_code=1, stderr_tail="youtube unavailable")
 
-    await run_job(
-        job_id, sm=app_sm, runner=fake_runner, output_dir=str(tmp_path)
-    )
+    await run_job(job_id, sm=app_sm, runner=fake_runner, output_dir=str(tmp_path))
 
     async with app_sm() as s:
         j = await s.get(Job, job_id)
@@ -216,18 +181,14 @@ async def test_run_job_spotdl_error_marks_failed_with_error_msg(
     assert await _count_downloads(app_sm, job_id) == 0
 
 
-async def test_run_job_generic_exception_marks_failed(
-    app_sm, token_id, tmp_path, cleanup_jobs
-):
+async def test_run_job_generic_exception_marks_failed(app_sm, token_id, tmp_path, cleanup_jobs):
     uri = "spotify:track:boom"
     job_id = await _seed_queued_job(app_sm, token_id, uri)
 
     async def fake_runner(spotify_uri, output_dir):
         raise RuntimeError("unexpected crash")
 
-    await run_job(
-        job_id, sm=app_sm, runner=fake_runner, output_dir=str(tmp_path)
-    )
+    await run_job(job_id, sm=app_sm, runner=fake_runner, output_dir=str(tmp_path))
 
     async with app_sm() as s:
         j = await s.get(Job, job_id)
@@ -237,9 +198,7 @@ async def test_run_job_generic_exception_marks_failed(
     assert await _count_downloads(app_sm, job_id) == 0
 
 
-async def test_run_job_error_msg_truncated(
-    app_sm, token_id, tmp_path, cleanup_jobs
-):
+async def test_run_job_error_msg_truncated(app_sm, token_id, tmp_path, cleanup_jobs):
     """A spotDL error with a 100 KB stderr should not blow up the column."""
     uri = "spotify:track:huge-err"
     job_id = await _seed_queued_job(app_sm, token_id, uri)
@@ -249,9 +208,7 @@ async def test_run_job_error_msg_truncated(
     async def fake_runner(spotify_uri, output_dir):
         raise SpotdlError(exit_code=1, stderr_tail=huge)
 
-    await run_job(
-        job_id, sm=app_sm, runner=fake_runner, output_dir=str(tmp_path)
-    )
+    await run_job(job_id, sm=app_sm, runner=fake_runner, output_dir=str(tmp_path))
 
     async with app_sm() as s:
         j = await s.get(Job, job_id)
@@ -280,9 +237,7 @@ async def test_run_job_missing_job_is_noop(app_sm, tmp_path):
     assert runner_calls == []
 
 
-async def test_run_job_non_queued_job_is_noop(
-    app_sm, token_id, tmp_path, cleanup_jobs
-):
+async def test_run_job_non_queued_job_is_noop(app_sm, token_id, tmp_path, cleanup_jobs):
     """Job already running (e.g., duplicate dispatch). No double-run."""
     uri = "spotify:track:running"
     job = Job(
@@ -303,9 +258,7 @@ async def test_run_job_non_queued_job_is_noop(
         runner_calls.append(spotify_uri)
         return []
 
-    await run_job(
-        job_id, sm=app_sm, runner=fake_runner, output_dir=str(tmp_path)
-    )
+    await run_job(job_id, sm=app_sm, runner=fake_runner, output_dir=str(tmp_path))
 
     assert runner_calls == []  # never invoked
 

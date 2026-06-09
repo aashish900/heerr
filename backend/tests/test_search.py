@@ -1,5 +1,4 @@
 import uuid
-from datetime import datetime, timezone
 
 import pytest
 from fastapi import FastAPI
@@ -8,7 +7,7 @@ from sqlalchemy import text
 
 from app.api.v1.router import api_v1
 from app.db import get_session
-from app.models import Download, Job, Token
+from app.models import Download, Job
 from app.services.spotify import (
     SpotifyRateLimited,
     SpotifyResult,
@@ -106,9 +105,7 @@ async def search_app(app_sm, fake_spotify):
 @pytest.fixture
 async def client(search_app):
     transport = ASGITransport(app=search_app)
-    async with AsyncClient(
-        transport=transport, base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
 
 
@@ -167,9 +164,7 @@ async def _token_id_for(app_sm, raw: str):
 
     h = hashlib.sha256(raw.encode()).hexdigest()
     async with app_sm() as s:
-        r = await s.execute(
-            text("SELECT id FROM tokens WHERE token_hash = :h"), {"h": h}
-        )
+        r = await s.execute(text("SELECT id FROM tokens WHERE token_hash = :h"), {"h": h})
         return r.scalar_one()
 
 
@@ -177,9 +172,7 @@ async def _token_id_for(app_sm, raw: str):
 
 
 async def test_search_requires_auth(client):
-    r = await client.post(
-        "/api/v1/search", json={"query": "x", "type": "track"}
-    )
+    r = await client.post("/api/v1/search", json={"query": "x", "type": "track"})
     assert r.status_code == 401
 
 
@@ -239,13 +232,9 @@ async def test_unknown_field_returns_422(client, make_token):
 # ---- contract shape -------------------------------------------------------
 
 
-async def test_track_search_returns_contract_fields(
-    client, make_token, fake_spotify, cleanup
-):
+async def test_track_search_returns_contract_fields(client, make_token, fake_spotify, cleanup):
     raw = await make_token()
-    fake_spotify.tracks = [
-        _track("spotify:track:t1", title="Blinding Lights", artist="The Weeknd")
-    ]
+    fake_spotify.tracks = [_track("spotify:track:t1", title="Blinding Lights", artist="The Weeknd")]
     r = await client.post(
         "/api/v1/search",
         json={"query": "blinding lights", "type": "track"},
@@ -274,9 +263,7 @@ async def test_track_search_returns_contract_fields(
 # ---- dedup hints ----------------------------------------------------------
 
 
-async def test_track_already_downloaded_hint(
-    client, make_token, fake_spotify, app_sm, cleanup
-):
+async def test_track_already_downloaded_hint(client, make_token, fake_spotify, app_sm, cleanup):
     raw = await make_token()
     token_id = await _token_id_for(app_sm, raw)
     uri = "spotify:track:dl-1"
@@ -296,9 +283,7 @@ async def test_track_already_downloaded_hint(
     assert by_uri["spotify:track:other"]["already_downloaded"] is False
 
 
-async def test_track_active_job_hint(
-    client, make_token, fake_spotify, app_sm, cleanup
-):
+async def test_track_active_job_hint(client, make_token, fake_spotify, app_sm, cleanup):
     raw = await make_token()
     token_id = await _token_id_for(app_sm, raw)
     uri = "spotify:track:queued-1"
@@ -355,9 +340,7 @@ async def test_album_active_job_hint_but_no_download(
     assert item["duration_ms"] is None
 
 
-async def test_playlist_search_returns_results(
-    client, make_token, fake_spotify, cleanup
-):
+async def test_playlist_search_returns_results(client, make_token, fake_spotify, cleanup):
     raw = await make_token()
     fake_spotify.playlists = [_playlist("spotify:playlist:p1")]
     r = await client.post(
@@ -372,9 +355,7 @@ async def test_playlist_search_returns_results(
 # ---- rate limit translation ----------------------------------------------
 
 
-async def test_spotify_rate_limit_translates_to_503(
-    client, make_token, fake_spotify
-):
+async def test_spotify_rate_limit_translates_to_503(client, make_token, fake_spotify):
     raw = await make_token()
     fake_spotify.raise_rate_limit_after = 7
     r = await client.post(
@@ -389,9 +370,7 @@ async def test_spotify_rate_limit_translates_to_503(
 # ---- query plumbing -------------------------------------------------------
 
 
-async def test_query_and_limit_passed_to_spotify(
-    client, make_token, fake_spotify
-):
+async def test_query_and_limit_passed_to_spotify(client, make_token, fake_spotify):
     raw = await make_token()
     fake_spotify.tracks = []
     await client.post(

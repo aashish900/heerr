@@ -22,18 +22,14 @@ from app.services.jobs import (
 async def token_id(app_sm):
     h = hashlib.sha256(f"raw-{uuid.uuid4()}".encode()).hexdigest()
     async with app_sm() as s:
-        tok = Token(
-            token_hash=h, owner_label="test", scopes=["read", "download"]
-        )
+        tok = Token(token_hash=h, owner_label="test", scopes=["read", "download"])
         s.add(tok)
         await s.commit()
         await s.refresh(tok)
         tid = tok.id
     yield tid
     async with app_sm() as s:
-        await s.execute(
-            text("DELETE FROM tokens WHERE id = :i"), {"i": tid}
-        )
+        await s.execute(text("DELETE FROM tokens WHERE id = :i"), {"i": tid})
         await s.commit()
 
 
@@ -66,9 +62,7 @@ async def test_create_inserts_new_job(app_sm, token_id, cleanup_jobs):
     assert job.attempt_count == 0
 
 
-async def test_create_dedupes_when_active_exists(
-    app_sm, token_id, cleanup_jobs
-):
+async def test_create_dedupes_when_active_exists(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         first, _ = await create_job_idempotent(
             s,
@@ -90,9 +84,7 @@ async def test_create_dedupes_when_active_exists(
     assert second.id == first_id
 
 
-async def test_create_allows_requeue_after_done(
-    app_sm, token_id, cleanup_jobs
-):
+async def test_create_allows_requeue_after_done(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         first, _ = await create_job_idempotent(
             s,
@@ -148,9 +140,7 @@ async def test_create_concurrent_inserts_dedupe_via_partial_unique_index(
 # ---- mark_running ---------------------------------------------------------
 
 
-async def test_mark_running_sets_state_and_started_at(
-    app_sm, token_id, cleanup_jobs
-):
+async def test_mark_running_sets_state_and_started_at(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
@@ -171,9 +161,7 @@ async def test_mark_running_sets_state_and_started_at(
         assert row.started_at is not None
 
 
-async def test_mark_running_rejects_non_queued(
-    app_sm, token_id, cleanup_jobs
-):
+async def test_mark_running_rejects_non_queued(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
@@ -193,9 +181,7 @@ async def test_mark_running_rejects_non_queued(
 # ---- mark_done ------------------------------------------------------------
 
 
-async def test_mark_done_sets_state_and_finished_at(
-    app_sm, token_id, cleanup_jobs
-):
+async def test_mark_done_sets_state_and_finished_at(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
@@ -324,9 +310,7 @@ async def test_bump_attempt_increments(app_sm, token_id, cleanup_jobs):
 # ---- finders --------------------------------------------------------------
 
 
-async def test_find_active_for_uri_returns_active(
-    app_sm, token_id, cleanup_jobs
-):
+async def test_find_active_for_uri_returns_active(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
@@ -342,9 +326,7 @@ async def test_find_active_for_uri_returns_active(
     assert found.id == job.id
 
 
-async def test_find_active_for_uri_returns_none_after_done(
-    app_sm, token_id, cleanup_jobs
-):
+async def test_find_active_for_uri_returns_none_after_done(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
@@ -362,9 +344,7 @@ async def test_find_active_for_uri_returns_none_after_done(
     assert found is None
 
 
-async def test_find_download_for_track_returns_download(
-    app_sm, token_id, cleanup_jobs
-):
+async def test_find_download_for_track_returns_download(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
