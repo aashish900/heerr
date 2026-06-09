@@ -1,70 +1,108 @@
-# CLAUDE.md — heerr (Music Request App)
+# CLAUDE.md — heerr (project-wide)
 
-Strict rules for Claude in this project. Follow exactly.
+Project-wide rules for any Claude session in this repo. **App-specific rules and architecture facts live in each app's own `<app>/CLAUDE.md` / `<app>/docs/`** — this file is intentionally app-agnostic.
+
+Currently the repo has one app: `backend/`. A `flutter/` app will land later under the same convention.
 
 ---
 
-## 1. Mandatory Logs & Session Discipline
+## 1. Repo layout & docs convention
 
-### Where the docs live
-All project docs except this file live in **`backend/docs/`** (backend-scoped; Flutter phase will get its own `flutter/docs/` later). This file (`CLAUDE.md`) stays at repo root because it applies to the whole project.
+Every app under this repo follows the same structure:
 
-### Files
-- **`backend/README.md`** — backend entry point: how to install + run locally, full env-var list, CLI reference (`python -m app.cli`), API contract reference (every endpoint with request/response shapes + auth scopes + error codes), test architecture, project layout, deployment pointer. Read this when the question is "how do I run / call / test it".
-- **`backend/docs/CONTEXT.md`** — project brief (architecture, constraints, env). Source of truth for *what and why*.
-- **`backend/docs/DECISIONLOG.md`** — ADR of design **decisions** (trade-offs / choices with alternatives considered).
-- **`backend/docs/CHANGELOG.md`** — append-only record of **changes** (code/file edits Claude makes).
-- **`backend/docs/PLAN.md`** — frozen API contract v1 + schema v1 + implementation strategy.
-- **`backend/docs/ROADMAP.md`** — 17-milestone breakdown (A1 → H1) tracking backend build progress.
+```
+<app>/
+├── README.md            operational entry point — how to install / run / test
+├── CLAUDE.md            (optional) app-specific Claude rules
+└── docs/
+    ├── CONTEXT.md       project brief — architecture, constraints, env
+    ├── DECISIONLOG.md   ADR log (newest at bottom)
+    ├── CHANGELOG.md     append-only per-task change log
+    ├── PLAN.md          frozen contract / design
+    └── ROADMAP.md       milestone sequence
+```
 
-Decision vs change: a decision is *"we chose X over Y because Z"*; a change is *"edited file F to do G"*. The same action can produce both entries.
+Files at repo root that aren't per-app:
+- `CLAUDE.md` (this file)
+- `README.md` (top-level project description — usually auto-created)
+- `.env.example`, `docker-compose.snippet.yml`, `.gitignore` (deployment / repo metadata)
+
+---
+
+## 2. Session discipline (applies to every app)
 
 ### Session bootstrap
-At the start of every session, before answering non-trivial questions or proposing changes, read in order: `backend/docs/CONTEXT.md` → `backend/docs/DECISIONLOG.md` → `backend/docs/CHANGELOG.md`. Trivial one-liners (clarifications, definitions) may skip. Only read source code when these three are insufficient. Consult `backend/docs/PLAN.md` and `backend/docs/ROADMAP.md` when the question is about API contract, schema, or build sequence.
+
+At the start of every session, before non-trivial answers or proposals, identify which app is in scope and read in order:
+
+1. **`<app>/CLAUDE.md`** if it exists (app-specific rules)
+2. `<app>/docs/CONTEXT.md`
+3. `<app>/docs/DECISIONLOG.md`
+4. `<app>/docs/CHANGELOG.md`
+
+Consult `<app>/docs/PLAN.md` and `<app>/docs/ROADMAP.md` for questions about contract or build sequence, and `<app>/README.md` for operational lookup ("how do I run / call / test it").
+
+If the question is purely project-wide (not bound to a single app), this file is sufficient.
+
+Trivial one-liners (clarifications, definitions) may skip bootstrap. Only read source code when the docs are insufficient.
+
+### Decisions vs changes
+
+- A **decision** is *"we chose X over Y because Z"* → append to the relevant `DECISIONLOG.md`.
+- A **change** is *"edited file F to do G"* → append to the relevant `CHANGELOG.md`.
+- The same action can produce both entries.
 
 ### Entry format
-- DECISIONLOG: `## YYYY-MM-DD — <title>` then 1–3 lines: context, decision, why. Append newest at the bottom.
-- CHANGELOG: `## YYYY-MM-DD — <one-line summary>` then bullets: files touched + what changed. Append-only. Never edit or delete prior entries.
+
+- `DECISIONLOG.md`: `## YYYY-MM-DD — <title>` then **Context**, **Decision**, **Why**, **Alternatives considered**. Append newest at the bottom.
+- `CHANGELOG.md`: `## YYYY-MM-DD — <one-line summary>` then bullets — files touched + what changed. Append-only; never edit or delete prior entries.
 - Timestamps: use the date the harness injects into the system prompt. If unavailable, run `date` and cite it.
 
 ### Logging cadence
-Flush entries **at the end of each task** (not end of session). A "task" = one user-approved unit of work. If a task spans many edits, batch them into one CHANGELOG entry on completion.
+
+Flush entries **at the end of each task** (a user-approved unit of work), not end of session. If a task spans many edits, batch them into one CHANGELOG entry on completion.
 
 ### Staleness rule
-Code is the source of truth. If `backend/docs/DECISIONLOG.md` or `backend/docs/CONTEXT.md` contradicts current code, the log is stale — update it in the same turn you discover the drift, and note the correction in `backend/docs/CHANGELOG.md`.
+
+Code is the source of truth. If `DECISIONLOG.md` or `CONTEXT.md` contradicts current code, the log is stale — update it in the same turn you discover the drift, and note the correction in `CHANGELOG.md`.
 
 ### CONTEXT.md vs DECISIONLOG.md
-- Update **`backend/docs/CONTEXT.md`** when standing facts change (architecture, env, constraints).
-- Append to **`backend/docs/DECISIONLOG.md`** when a *new* decision is made (even if it also updates `CONTEXT.md`).
+
+- Update **CONTEXT.md** when standing facts change (architecture, env, constraints).
+- Append to **DECISIONLOG.md** when a *new* decision is made (even if it also updates CONTEXT.md).
 
 ---
 
-## 2. Project Hard Rules (derived from `backend/docs/CONTEXT.md` — do not re-litigate)
+## 3. Project-wide hard rules
 
-### Architecture
-- Flutter is a **thin client**. No download logic, no spotDL, no Spotify SDK on the device.
-- Backend is FastAPI in Docker, joins existing arr-stack at `~/docker/arr-stack/docker-compose.yml` (subnet `172.39.0.0/24`).
-- Backend writes downloads to `/data/media/music` (Navidrome watches it, ~1 min scan).
-- Connectivity is **Tailscale only**. Never propose public exposure, reverse proxies, or port-forwards.
-- **Reproducibility via compose.** All infra setup (DB init, file ownership, schema bootstrap) must live in `docker-compose.yml` / init containers. No manual host-side steps to bring up the stack.
+These apply regardless of which app you're working on.
 
-### Spotify
-- Use **client-credentials flow only** (server-side id + secret). Never propose user-OAuth / `--user-auth` / redirect URIs.
-- Feature scope: track / album / playlist search + user's own playlists. **No top-tracks** (endpoint removed).
-- **Never hardcode or commit the Spotify secret.** Load from `.env` / env var in the backend container. Flag any diff that violates this.
+### Connectivity & infra
+
+- **Connectivity is Tailscale only.** Never propose public exposure, reverse proxies, port-forwards to the open internet, or any path that bypasses the tailnet.
+- **Reproducibility via compose.** All infra setup (DB init, file ownership, schema bootstrap) lives in `docker-compose.yml` / init containers. No manual host-side steps to bring up the stack.
+
+### Secrets
+
+- **Never hardcode or commit secrets** (API keys, DB credentials, OAuth secrets). Load from `.env` / env vars in the runtime container. Flag any diff that violates this.
 
 ### Scope discipline
+
 - **Backend first, Flutter second.** Don't propose Flutter work until the backend endpoint it depends on exists and is curl-testable.
-- **No Redis / Celery / RabbitMQ to start.** Use FastAPI `BackgroundTasks` for the worker; persist jobs in **Postgres** (shared arr-stack instance — see DECISIONLOG 2026-06-08). Suggest a real queue only with evidence the current setup is outgrown.
 - **iOS is out of scope.** Don't suggest iOS-aware code, Cupertino widgets where Material works, or Xcode/CocoaPods steps.
-- spotDL runs server-side only — phone-side spotDL has been ruled out (iOS broken, Termux broken on `libpthread.so.0` / tls-client). Don't revisit.
 
-### Development workflow
-- **TDD by default (Python backend).** Write the failing test, then the implementation. No production logic merges without a test that exercises it first. Scope: FastAPI app code (endpoints, services, models, CLI). Out of scope: `docker-compose.yml`, Dockerfiles, Alembic migrations, Flutter UI — these have their own verification gates (`docker compose up` clean, `alembic upgrade head` clean, manual smoke).
-- **Green before, green after.** Run the test suite before starting a task and confirm it's passing. Run it again before declaring done. If tests were red before you started, fix or quarantine them first — don't pile changes onto a broken baseline.
+### Source-citation discipline
 
-### Frontend hand-holding
-- User has DevOps/data-eng background, **zero mobile-app experience**. On Flutter/Dart/Android tooling: explain step-by-step, name every file path, show full commands. On backend/Docker/Python: be terse — user is fluent.
+- Cite docs / file paths / log lines for non-trivial claims. Use `file:line` for code references.
+- Distinguish cited facts from inferences. Never present inferences as facts.
+- State assumptions explicitly before acting on them.
 
-### Sources
-- Cite docs / file paths / log lines for non-trivial claims. Distinguish cited facts from inferences. State assumptions before acting on them.
+---
+
+## 4. User background (for tailoring explanations)
+
+- DevOps + data-engineering background. Fluent on **backend / containers / Python / SQL / Docker / Linux / shell**.
+- **Zero mobile-app experience.** On Flutter / Dart / Android tooling: explain step-by-step, name every file path, show full commands. On backend / Docker / Python: be terse.
+- Blunt feedback preferred over diplomatic. Push back when reasoning seems unsound.
+- Cite sources (log lines, file paths, doc URLs) to avoid hallucination; explicitly distinguish facts from inferences.
+- Before modifying any shell config file (`.zshrc`, `.bashrc`, etc.), grep for existing entries — never add duplicates.

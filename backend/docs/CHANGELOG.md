@@ -294,3 +294,11 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
   - Further reading: cross-links to CLAUDE.md and every `docs/*.md`.
 - `CLAUDE.md §1 Files`: added `backend/README.md` as the first listed file with a one-line description of when to read it ("how do I run / call / test it"). Session-bootstrap order unchanged (CONTEXT → DECISIONLOG → CHANGELOG); README is for operational lookup, not session priming.
 - Rationale: a single entry point for a human developer (or fresh Claude) cloning the repo. The docs/ files remain the source of truth for *why* and *history*; README is the source of truth for *how*.
+
+## 2026-06-09 — CLAUDE.md split: app-agnostic root + per-app overlay
+
+- **Root `/CLAUDE.md` rewritten as app-agnostic.** Now covers only project-wide concerns: the docs convention (`<app>/README.md`, `<app>/CLAUDE.md`, `<app>/docs/{CONTEXT,DECISIONLOG,CHANGELOG,PLAN,ROADMAP}.md`), session discipline (bootstrap order, entry format, logging cadence, staleness rule), project-wide hard rules (Tailscale-only, never commit secrets, backend-first/Flutter-second scope, iOS out of scope, source-citation discipline), and the user-background hand-holding context.
+- **New `backend/CLAUDE.md`** carries every backend-specific rule that used to live in the root file: FastAPI-in-arr-stack architecture, `/data/media/music` + Navidrome target, Spotify client-credentials-only scope and feature set, BackgroundTasks-not-Redis job-queue choice, spotDL server-side / subprocess-only constraint, and TDD discipline scoped to FastAPI app code (not compose/Dockerfile/Alembic).
+- Bootstrap order from backend now reads: `/CLAUDE.md` → `backend/CLAUDE.md` → `backend/docs/CONTEXT.md` → `DECISIONLOG.md` → `CHANGELOG.md`. The root file explicitly tells Claude to look for `<app>/CLAUDE.md` before app-specific docs.
+- Rationale: when `flutter/` lands, a `flutter/CLAUDE.md` slots in the same way (Material/Dart/Android-specific rules) without touching the root file or backend's rules.
+- The root file's `§1 Files` entry for `backend/README.md` (added 2026-06-09 earlier) is superseded by the new `<app>/`-templated docs convention.
