@@ -172,3 +172,23 @@ Key invariants enforced at the DB level:
 **Trade-off:** The Docker image is ~150 MB larger than a hypothetical world where spotdl wasn't shipped, and image rebuilds re-resolve spotdl's deps unless layer-cached. For our home-server, single-container use case, this is invisible.
 
 **Revisit when:** spotdl drops the `fastapi==0.103` pin (track via [spotdl releases](https://github.com/spotDL/spotify-downloader/releases)). Then we could fold spotdl back into our main Poetry resolution if there's any reason to.
+
+## 2026-06-09 — Use pure-ASGI middleware for request logging (not BaseHTTPMiddleware)
+
+**Context:** H-2 needs middleware that (a) generates/echoes `X-Request-ID`, (b) emits one structured access-log line per request, and (c) surfaces `token.owner_label` in that log line. `owner_label` is only known *after* the auth dependency runs (it's the value of `tokens.owner_label` for the validated bearer token). The natural mechanism is a `ContextVar` set by the auth dep and read by the middleware after `call_next` returns.
+
+**Decision:** Implement `RequestLoggingMiddleware` as a **pure ASGI middleware** (a class with `async def __call__(self, scope, receive, send)`), not as a `starlette.middleware.base.BaseHTTPMiddleware` subclass. The middleware calls `await self.app(scope, receive, send_wrapper)` directly and wraps `send` to (a) intercept the response status code and (b) inject the `X-Request-ID` header.
+
+**Why:**
+- `BaseHTTPMiddleware.dispatch(request, call_next)` runs the inner application in a **child anyio task** (via `anyio.create_task_group`). Python `ContextVar` writes in a child task do **not** propagate back to the parent task — only the parent's snapshot is visible inside the child. So `owner_label_var.set(...)` performed in the auth dependency (which executes inside the child task that runs the route) is invisible when the middleware reads `owner_label_var.get()` after `call_next` returns.
+- Pure ASGI middleware runs in a single task — `await self.app(...)` is just a normal coroutine call — so any ContextVar mutation performed by downstream code (auth dep, route handler) is visible after the await completes.
+- Confirmed empirically: the BaseHTTPMiddleware version of this code logged `owner_label="-"` even for authenticated requests; switching to pure ASGI made it correctly log the authenticated owner.
+
+**Alternatives considered:**
+- **`request.state.owner_label`** instead of a ContextVar — would work for the middleware case (Request is shared across the chain), but ContextVars are the right tool for any other log call inside the request (services, workers spawned from BackgroundTasks) where there's no `request` object handy. We need ContextVars for the broader logging filter; switching middleware impl is the smaller change.
+- **Middleware re-resolves the auth itself** (parse `Authorization`, do its own DB lookup) — extra DB round-trip per request and duplicates a security-critical code path. Rejected.
+- **Async-context propagation libraries** (e.g. `asgi-correlation-id`) — would also work but pull in a dep for ~30 lines of code we control.
+
+**Trade-off:** Pure ASGI is slightly lower-level than BaseHTTPMiddleware (we wrap `send` ourselves to inject the header), but the middleware is small (~70 lines) and the predictability is worth it. Documented in `app/api/middleware.py` so future modifications don't accidentally regress to BaseHTTPMiddleware.
+
+**Reference:** `https://github.com/encode/starlette/issues/1438` — the long-standing Starlette issue tracking BaseHTTPMiddleware + ContextVars semantics.

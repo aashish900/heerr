@@ -6,6 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.context import owner_label_var
 from app.db import get_session
 from app.models import Token
 
@@ -33,6 +34,7 @@ async def bearer_token(
             detail="unknown or revoked token",
             headers=_UNAUTH_HEADERS,
         )
+    owner_label_var.set(tok.owner_label)
     return tok
 
 

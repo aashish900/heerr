@@ -13,7 +13,10 @@ database_url = os.environ.get("DATABASE_URL", "sqlite:///:memory:")
 config.set_main_option("sqlalchemy.url", database_url)
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers=False so loggers created by app modules
+    # imported earlier (e.g. when alembic runs inside the pytest process)
+    # aren't silently muted.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # target_metadata gets wired to the ORM Base in A3.
 target_metadata = None

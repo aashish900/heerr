@@ -146,6 +146,23 @@ All endpoints live under `/api/v1`. JSON in/out. UUIDv4 ids. ISO-8601 UTC timest
 
 The frozen contract lives in `docs/PLAN.md`. The summary below is enough to drive the client; consult `PLAN.md` for the locked decisions.
 
+### Request ID & access log
+
+Every response carries an `X-Request-ID` header. If the client supplies one
+on the request, the server echoes it; otherwise the server generates a
+UUIDv4 hex. The same id is included in the structured JSON access-log line
+the server emits for that request:
+
+```
+{"ts":"…","level":"INFO","logger":"heerr.access","msg":"request",
+ "request_id":"…","owner_label":"aashish","method":"POST",
+ "path":"/api/v1/download","status_code":202,"duration_ms":12.34,"client":"…"}
+```
+
+`owner_label` is the value from `tokens.owner_label` for the authenticated
+request, or `"-"` for `/health` (no auth) and 401 responses (auth failed
+before the dependency could resolve a token).
+
 ### Authentication
 
 Every endpoint **except `GET /health`** requires `Authorization: Bearer <raw-token>`. Failure modes:
