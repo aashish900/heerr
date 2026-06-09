@@ -198,3 +198,4 @@ See `PLAN.md` and `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file 
 3. H1 smoke succeeds against the real home stack.
 4. CHANGELOG entries exist for each milestone group.
 5. `git log --oneline backend/` reads as a clean A→H progression.
+
