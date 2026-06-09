@@ -58,7 +58,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    image: heerr-backend:latest
+    image: aashish900/heerr-backend:latest
     container_name: heerr-migrate
     env_file:
       - .env
@@ -74,7 +74,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    image: heerr-backend:latest
+    image: aashish900/heerr-backend:latest
     container_name: heerr-backend
     env_file:
       - .env

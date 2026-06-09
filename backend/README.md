@@ -384,15 +384,39 @@ The deployable artifacts are at the **repo root**, not under `backend/`:
 
 - `../.env.example` — env template; copy to `../.env` and fill in real values.
 - `../docker-compose.snippet.yml` — four services (`heerr-postgres-init`, `heerr-postgres`, `heerr-migrate`, `heerr-backend`) that merge into the existing arr-stack compose file.
+- `../.github/workflows/docker-publish.yml` — GitHub Actions workflow that builds + publishes `aashish900/heerr-backend` (multi-arch: amd64 + arm64) to Docker Hub on every `v*` tag push.
 
-Bring it up:
+### Bring it up — pull pre-built image from Docker Hub (typical)
 
 ```bash
+docker compose -f ../docker-compose.snippet.yml --env-file ../.env pull heerr-backend heerr-migrate
 docker compose -f ../docker-compose.snippet.yml --env-file ../.env up -d \
     heerr-postgres-init heerr-postgres heerr-migrate heerr-backend
 ```
 
-Connectivity is **Tailscale only** — no host ports are published. Backend listens at `172.39.0.51:8000` on the `arr-stack_default` docker network; reach it from any tailnet client via the host's subnet route. See `docs/CONTEXT.md` "heerr deployment shape" and `CLAUDE.md §2 Architecture" for the hard rules.
+### Bring it up — build from source (dev iteration)
+
+```bash
+docker compose -f ../docker-compose.snippet.yml --env-file ../.env build heerr-backend
+docker compose -f ../docker-compose.snippet.yml --env-file ../.env up -d \
+    heerr-postgres-init heerr-postgres heerr-migrate heerr-backend
+```
+
+Connectivity is **Tailscale only** — no host ports are published. Backend listens at `172.39.0.51:8000` on the `arr-stack_default` docker network; reach it from any tailnet client via the host's subnet route. See `docs/CONTEXT.md` "heerr deployment shape" and `/CLAUDE.md` for the hard rules.
+
+### Releasing a new image to Docker Hub
+
+```bash
+git tag v0.2.0 && git push --tags
+# GitHub Actions builds linux/amd64 + linux/arm64 manifests,
+# tags 0.2.0, 0.2, latest, sha-<short>, and pushes them.
+```
+
+Required GitHub repo secrets (Settings → Secrets and variables → Actions):
+- `DOCKERHUB_USERNAME` — your Docker Hub username (e.g. `aashish900`)
+- `DOCKERHUB_TOKEN` — Docker Hub access token (Hub → Account Settings → Security → New Access Token; scope: Read & Write). **Do not use your password.**
+
+PRs targeting `main` that touch `backend/**` or the workflow file build the image (multi-arch) without pushing — early signal if a change breaks the Docker build.
 
 ---
 

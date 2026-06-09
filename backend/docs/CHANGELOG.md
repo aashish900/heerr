@@ -302,3 +302,15 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
 - Bootstrap order from backend now reads: `/CLAUDE.md` → `backend/CLAUDE.md` → `backend/docs/CONTEXT.md` → `DECISIONLOG.md` → `CHANGELOG.md`. The root file explicitly tells Claude to look for `<app>/CLAUDE.md` before app-specific docs.
 - Rationale: when `flutter/` lands, a `flutter/CLAUDE.md` slots in the same way (Material/Dart/Android-specific rules) without touching the root file or backend's rules.
 - The root file's `§1 Files` entry for `backend/README.md` (added 2026-06-09 earlier) is superseded by the new `<app>/`-templated docs convention.
+
+## 2026-06-09 — GitHub Actions: publish multi-arch image to Docker Hub on tag
+
+- `.github/workflows/docker-publish.yml` — workflow that builds `aashish900/heerr-backend` on every `v*` tag push and pushes a multi-arch (linux/amd64 + linux/arm64) manifest to Docker Hub.
+  - **Triggers:** `push: tags: [v*]` (build + push) and `pull_request: branches: [main]` filtered to `backend/**` + the workflow file (build only, no push — early signal for breaking changes).
+  - **Tagging strategy** (via `docker/metadata-action@v5`): on `v0.1.0` tag push produces `0.1.0` + `0.1` + `latest` + `sha-<short>`. On PR builds: `pr-<N>`.
+  - **Login gated** on `startsWith(github.ref, 'refs/tags/v')` so secrets are never surfaced to PR runs (PRs from forks wouldn't get the secrets anyway, but explicit gating defends against future workflow changes).
+  - **Cache:** GitHub Actions cache (`type=gha,mode=max`). 10 GB cap.
+  - **Required GitHub repo secrets:** `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` (Docker Hub access token with Read & Write scope; never the account password).
+- `docker-compose.snippet.yml` — both `heerr-migrate` and `heerr-backend` services now reference `image: aashish900/heerr-backend:latest`. `build: ./backend` is retained so local rebuilds via `docker compose build` still work; remote pulls (`docker compose pull`) hit Docker Hub.
+- `backend/README.md` — "Deployment to the arr-stack" section expanded with two flows (pull-from-Hub and build-from-source), a "Releasing a new image" subsection covering the `git tag → push` UX, and the required-secrets list.
+- Rationale: the home-server deployment shouldn't need to clone the repo and run `docker build` — it should pull a pinned image. The workflow's tag-only push policy keeps Docker Hub clean of intermediate commits while PR builds still validate the Dockerfile.
