@@ -381,3 +381,13 @@ Three pre-existing bugs were blocking `v0.1.0`/`v0.1.1`/`v0.1.2` tag pushes from
 3. **`docker-publish.yml`** — added `skip-dirs: /opt/spotdl-venv` to the trivy-action step. The vendored spotdl 4.5.0 venv contains an older starlette (CVE-2024-47874, unreachable in our subprocess-CLI invocation) and yt-dlp extractor source files with hardcoded literals that trip secret scanners (false positives). Decision logged in `DECISIONLOG.md` 2026-06-09 "Trivy: skip spotdl venv".
 
 Tags pushed during this task: `v0.1.0` (failed, broken trivy-action ref), `v0.1.1` (failed, same broken ref), `v0.1.2` (failed, blocked by HIGH/CRITICAL trivy findings), `v0.1.3` (this commit — expected green).
+
+## 2026-06-09 — H1 unblock cont'd: image namespace correction (aashish900 → aashish010)
+
+- `aashish900` was a typo throughout the repo since H-4 — the real Docker Hub account is `aashish010` (confirmed by user's account-switcher screenshot). The Docker Hub login step in `docker-publish.yml` had been failing v0.1.3 with `unauthorized: incorrect username or password` because the credentials matched a non-existent namespace.
+- Renamed `aashish900/heerr-backend` → `aashish010/heerr-backend` in:
+  - `.github/workflows/docker-publish.yml` (image build target, comments, cache-ref note).
+  - `docker-compose.snippet.yml` (`heerr-migrate` + `heerr-backend` `image:` keys).
+  - `backend/README.md` (deployment section + example DOCKERHUB_USERNAME value).
+- **Left historical CHANGELOG entries untouched** (append-only convention, CLAUDE.md §1). The 2026-06-09 "H-4" and "H1 unblock" entries still reference the original `aashish900` name as written at the time; this entry is the historical correction record.
+- Also rotated `DOCKERHUB_TOKEN`: the previous token's plaintext value was inadvertently included in a screenshot during this task — user revoked at https://app.docker.com/settings/personal-access-tokens and minted a fresh one with Read & Write scope.

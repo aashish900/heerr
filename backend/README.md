@@ -410,7 +410,7 @@ The deployable artifacts are at the **repo root**, not under `backend/`:
 
 - `../.env.example` — env template; copy to `../.env` and fill in real values.
 - `../docker-compose.snippet.yml` — four services (`heerr-postgres-init`, `heerr-postgres`, `heerr-migrate`, `heerr-backend`) that merge into the existing arr-stack compose file.
-- `../.github/workflows/docker-publish.yml` — GitHub Actions workflow that builds + publishes `aashish900/heerr-backend` (multi-arch: amd64 + arm64) to Docker Hub on every `v*` tag push.
+- `../.github/workflows/docker-publish.yml` — GitHub Actions workflow that builds + publishes `aashish010/heerr-backend` (multi-arch: amd64 + arm64) to Docker Hub on every `v*` tag push.
 
 ### Bring it up — pull pre-built image from Docker Hub (typical)
 
@@ -439,7 +439,7 @@ git tag v0.2.0 && git push --tags
 ```
 
 Required GitHub repo secrets (Settings → Secrets and variables → Actions):
-- `DOCKERHUB_USERNAME` — your Docker Hub username (e.g. `aashish900`)
+- `DOCKERHUB_USERNAME` — your Docker Hub username (e.g. `aashish010`)
 - `DOCKERHUB_TOKEN` — Docker Hub access token (Hub → Account Settings → Security → New Access Token; scope: Read & Write). **Do not use your password.**
 
 PRs targeting `main` that touch `backend/**` or the workflow file build the image (multi-arch) without pushing — early signal if a change breaks the Docker build.

@@ -15,21 +15,21 @@
 #      cache means the amd64 layers from step 1 are reused.
 #
 # Image tags produced on a tag push (e.g. `git tag v0.1.0 && git push --tags`):
-#   - aashish900/heerr-backend:0.1.0    (semver full)
-#   - aashish900/heerr-backend:0.1      (semver major.minor)
-#   - aashish900/heerr-backend:latest   (always points at the most recent tag)
-#   - aashish900/heerr-backend:sha-abc1234  (commit SHA for traceability)
+#   - aashish010/heerr-backend:0.1.0    (semver full)
+#   - aashish010/heerr-backend:0.1      (semver major.minor)
+#   - aashish010/heerr-backend:latest   (always points at the most recent tag)
+#   - aashish010/heerr-backend:sha-abc1234  (commit SHA for traceability)
 #
 # Platforms: linux/amd64 + linux/arm64 (multi-arch manifest).
 #
 # Required GitHub repo secrets:
-#   - DOCKERHUB_USERNAME  → aashish900
+#   - DOCKERHUB_USERNAME  → aashish010
 #   - DOCKERHUB_TOKEN     → access token from Docker Hub (Account Settings →
 #                           Security → New Access Token; scope: Read & Write).
 #                           Do NOT use your Docker Hub password.
 #
 # Cache: GitHub Actions cache (type=gha). 10 GB cap, LRU eviction. Switch to
-# `type=registry,ref=aashish900/heerr-backend:buildcache` if you outgrow it.
+# `type=registry,ref=aashish010/heerr-backend:buildcache` if you outgrow it.
 
 name: Publish backend image to Docker Hub
 
@@ -104,7 +104,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: aashish900/heerr-backend
+          images: aashish010/heerr-backend
           tags: |
             type=ref,event=pr
             type=semver,pattern={{version}}
