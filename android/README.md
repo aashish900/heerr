@@ -137,15 +137,66 @@ The CI workflow on `main` runs `flutter analyze` + `flutter test` for every PR t
 
 ## Building a release APK
 
-**(post-F1):**
+### One-time setup — generate the signing keystore
+
+Android refuses to install an unsigned APK. The keystore + its passwords are **gitignored** and must live on your dev machine only. **Generate once, keep forever** — if you lose them you can't ship an update of this app over an existing install (you'd have to uninstall + reinstall, which clears the app's secure storage).
+
+1. **Generate the keystore.** From the repo root:
+
+   ```bash
+   keytool -genkey -v \
+     -keystore android/app/android/keystore.jks \
+     -alias heerr \
+     -keyalg RSA -keysize 2048 \
+     -validity 10000
+   ```
+
+   `keytool` ships with the JDK (Android Studio installs it). It will prompt for:
+
+   - **Keystore password** (twice). Pick a strong one and save it in your password manager.
+   - **Distinguished-name fields** (CN, OU, O, L, ST, C). For a personal sideload these can be anything — `heerr / personal / aashish / na / na / IN` is fine. They show up in the cert if anyone inspects the APK; not user-facing.
+   - **Key password** (twice). Pressing Enter reuses the keystore password — recommended.
+
+   Output: `android/app/android/keystore.jks` (gitignored). Lock-icon the file in Finder if you want.
+
+2. **Create `key.properties`.** Copy the example and fill in the passwords from step 1:
+
+   ```bash
+   cp android/app/android/key.properties.example android/app/android/key.properties
+   # then edit android/app/android/key.properties:
+   #   storePassword=<the one you typed at the keytool prompt>
+   #   keyPassword=<same as storePassword if you pressed Enter>
+   #   keyAlias=heerr
+   #   storeFile=keystore.jks
+   ```
+
+   Also gitignored. `storeFile` is resolved relative to `android/app/android/`.
+
+3. **Verify the keystore.** Quick sanity check:
+
+   ```bash
+   keytool -list -v -keystore android/app/android/keystore.jks -alias heerr
+   ```
+
+   Should print the cert fingerprint without errors.
+
+### Build + install
 
 ```bash
 cd android/app
-flutter build apk --release                    # → build/app/outputs/flutter-apk/app-release.apk
+flutter build apk --release
+# → build/app/outputs/flutter-apk/app-release.apk
+
 adb install build/app/outputs/flutter-apk/app-release.apk
 ```
 
-Signing keystore + `key.properties` are gitignored. Generation steps are in F1's commit message.
+If `key.properties` is missing, Gradle silently falls back to the debug key. That APK installs but is **not shippable** — it'll get refused as an "update" of any real release-signed install and is rejected by the Play Store. The build log shows `signingConfig signingConfigs.debug` in that case; check it before declaring a build "release".
+
+### What's gitignored
+
+- `android/app/android/keystore.jks`
+- `android/app/android/key.properties`
+- Any `**/*.jks` anywhere in the tree (belt + suspenders).
 
 ---
 

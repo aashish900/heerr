@@ -363,3 +363,24 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
 - New `android/app/test/widgets/empty_state_test.dart` — 3 tests: icon + title rendered; subtitle rendered when provided; subtitle widget not in the tree when null.
 - New `android/app/test/widgets/skeleton_test.dart` — 3 tests: `SkeletonBox` honours configured width/height via `BoxConstraints`; `SkeletonTile` is a `ListTile` composed of 3 `SkeletonBox`es; `SkeletonList(count: 3)` renders exactly 3 `SkeletonTile`s.
 - Verification: `flutter analyze` → no issues; `flutter test` → 115/115 pass (was 109; +3 empty_state + +3 skeleton).
+
+## 2026-06-09 — F1: Android signing + release build
+
+- Modified `android/app/android/app/build.gradle.kts`:
+  - Imports `java.util.Properties` + `java.io.FileInputStream` at the top.
+  - Reads `rootProject.file("key.properties")` (i.e. `android/app/android/key.properties`) into a `Properties` instance if the file exists.
+  - New `signingConfigs { create("release") { … } }` block populated from `key.properties` (`keyAlias`, `keyPassword`, `storeFile`, `storePassword`). `storeFile` is resolved via `rootProject.file(...)` so the path inside `key.properties` is rooted at `android/app/android/` — `storeFile=keystore.jks` puts the keystore next to `key.properties`.
+  - `buildTypes.release.signingConfig` is now `signingConfigs.release` when `key.properties` exists, falling back to `signingConfigs.debug` when it doesn't — fresh clones still build a release APK (debug-signed, marked as such in the Gradle log).
+  - Stripped the boilerplate "TODO: Specify your own unique Application ID" comments since `applicationId` is already `com.aashish.heerr`.
+- New `android/app/android/key.properties.example` — checked-in template with `CHANGE_ME` placeholders for `storePassword` / `keyPassword`, default `keyAlias=heerr` and `storeFile=keystore.jks`. Header comment documents that the real `key.properties` lives in the same directory and is gitignored.
+- Updated `android/README.md` "Building a release APK" section:
+  - 3-step "one-time setup" — `keytool -genkey -v -keystore android/app/android/keystore.jks -alias heerr -keyalg RSA -keysize 2048 -validity 10000`, prompts walkthrough (dname fields can be junk for personal sideload; press Enter at the key-password prompt to reuse the keystore password), then `cp key.properties.example key.properties` + fill in passwords, then `keytool -list -v` sanity check.
+  - "Build + install" steps for `flutter build apk --release` + `adb install`.
+  - Explicit warning that a missing `key.properties` silently falls back to the debug key — the resulting APK installs but **is not shippable**.
+  - "What's gitignored" recap: `keystore.jks`, `key.properties`, `**/*.jks`.
+- `.gitignore` entries were already in place from the planning round (`android/key.properties`, `android/keystore.jks`, `**/*.jks` in `android/app/.gitignore`) — no change needed.
+- Verification:
+  - `flutter analyze` → no issues; `flutter test` → 115/115 pass (no Dart changes; just Gradle + docs).
+  - `flutter build apk --debug` → succeeds (Gradle parses the new signing config without error).
+  - `flutter build apk --release` (no `key.properties` present) → succeeds via the debug-key fallback. Output APK at `build/app/outputs/flutter-apk/app-release.apk` (51.9 MB).
+  - Generation of the real keystore + `key.properties` is the user's responsibility — they own the secrets per `/CLAUDE.md` §3 "never hardcode or commit secrets". The README documents the exact `keytool` invocation.

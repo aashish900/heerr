@@ -128,7 +128,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 ## Phase F — Ship
 
-### [ ] F1. Android signing + release build
+### [x] F1. Android signing + release build
 **Files:** `android/app/android/app/build.gradle` (signingConfig), `android/app/android/key.properties` (gitignored), `android/app/android/keystore.jks` (gitignored), `android/README.md` (release build instructions).
 **Deliverable:** Keystore generated; `key.properties` configured locally; `flutter build apk --release` produces a signed APK at `android/app/build/app/outputs/flutter-apk/app-release.apk`.
 **Test gate:** none (out of TDD scope).
