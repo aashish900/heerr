@@ -1,11 +1,10 @@
 # heerr — arr-stack integration snippet
 # ==========================================================================
 # These services append to your existing arr-stack docker-compose.yml
-# (~/docker/arr-stack/docker-compose.yml per CONTEXT.md). Copy the four
-# services below + the `networks:` block into the arr-stack file, copy
-# `.env.example` to `.env` next to the merged compose file, fill in real
-# values, and `docker compose up -d heerr-postgres-init heerr-postgres
-# heerr-migrate heerr-backend`.
+# (~/docker/arr-stack/docker-compose.yml). Copy the four services below +
+# the `networks:` block into the arr-stack file, copy `.env.example` to
+# `.env` next to the merged compose file, fill in real values, and run:
+#   docker compose up -d heerr-postgres-init heerr-postgres heerr-migrate heerr-backend
 #
 # Connectivity: Tailscale-only — no host port publication. The arr-stack
 # subnet (172.39.0.0/24) is expected to be Tailscale-routable from the
@@ -47,7 +46,7 @@ services:
       heerr-postgres-init:
         condition: service_completed_successfully
     networks:
-      arr-stack:
+      arrnetwork:
         ipv4_address: 172.39.0.50
     restart: unless-stopped
 
@@ -67,7 +66,7 @@ services:
       heerr-postgres:
         condition: service_healthy
     networks:
-      - arr-stack
+      - arrnetwork
     restart: "no"
 
   heerr-backend:
@@ -96,16 +95,15 @@ services:
       heerr-migrate:
         condition: service_completed_successfully
     networks:
-      arr-stack:
+      arrnetwork:
         ipv4_address: 172.39.0.51
     restart: unless-stopped
 
 
 networks:
-  # External: the arr-stack network must already exist (created by your
-  # arr-stack compose). The `name:` here must match the actual Docker
-  # network name (run `docker network ls` to confirm — usually
-  # `<project>_arr-stack` or `arr-stack_default`).
-  arr-stack:
+  # External: the arrnetwork Docker network must already exist (created by
+  # the arr-stack compose). `name: arrnetwork` matches the `name:` field
+  # in the arr-stack docker-compose.yml networks section.
+  arrnetwork:
     external: true
-    name: arr-stack_default
+    name: arrnetwork
