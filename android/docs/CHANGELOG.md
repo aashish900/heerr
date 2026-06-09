@@ -64,3 +64,31 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
 - Test helper `_activeTitle(tester)` reads the AppBar title widget directly (instead of `find.text(...)`) — each stub renders the same label twice (in the AppBar and the body), so a text-based finder would be ambiguous.
 - `analysis_options.yaml`: removed `avoid_returning_null_for_future` (removed from Dart 3.3+, surfaced as a `removed_lint` warning during the first `flutter analyze` of this milestone).
 - Verification: `flutter analyze` → no issues; `flutter test` → 5/5 passed.
+
+## 2026-06-09 — A3: freezed models for the backend contract
+
+- New `android/app/build.yaml` — global `json_serializable` config (`field_rename: snake`, `explicit_to_json: true`, `include_if_null: false`). Single source of truth for the Dart-camelCase ↔ wire-snake_case mapping; no per-field `@JsonKey` annotations needed.
+- New `android/app/lib/models/`:
+  - `enums.dart` — `SpotifyType` (`track`/`album`/`playlist`) + `JobState` (`queued`/`running`/`done`/`failed`) with `@JsonValue('…')` for each variant. `JobStateX.isTerminal` extension exposes the polling-stop condition for the job-detail screen at D3.
+  - `search_request.dart` — `SearchRequest({query, type, limit=20})`.
+  - `search_result_item.dart` — `SearchResultItem({spotifyUri, spotifyUrl, title, artist, album?, durationMs?, coverUrl?, alreadyDownloaded, activeJobId?})`.
+  - `search_response.dart` — `SearchResponse({results})`.
+  - `download_request.dart` — `DownloadRequest({spotifyUri})`.
+  - `download_response.dart` — `DownloadResponse({jobId, state, deduped})`.
+  - `job_view.dart` — `JobView({jobId, spotifyUri, spotifyType, state, progress?, error?, outputPath?, createdAt, startedAt?, finishedAt?})`. `progress` is reserved by the backend (always `null` in v1).
+  - `queue_response.dart` — `QueueResponse({active, recent})`.
+- Codegen: `dart run build_runner build --delete-conflicting-outputs` produced 21 outputs (7×`*.freezed.dart` + 7×`*.g.dart` + supporting). Verified by re-running `flutter analyze` (no issues) and `flutter test` (17/17 passing: 12 new model tests + 5 router tests from A2).
+- New `android/app/test/models_test.dart` — 12 tests covering:
+  - `SearchRequest` snake_case key serialization + JsonValue mapping + round-trip.
+  - `SearchResponse` parse from a realistic backend payload + round-trip + `include_if_null: false` behaviour on nullable fields.
+  - `DownloadRequest` round-trip.
+  - `DownloadResponse` parse + enum mapping + `isTerminal` extension on `JobState.done`.
+  - `JobView` parse of every field from a `/status/{id}` payload + UTC `DateTime` preserved across round-trip.
+  - `QueueResponse` parse of both empty and populated lists.
+  - `JobState.isTerminal` table-driven check (done/failed terminal; queued/running not).
+- **Drift correction (per `/CLAUDE.md` staleness rule).** The planning round's `android/docs/PLAN.md` §3 had several drifts vs the actual backend schemas in `backend/app/schemas/`:
+  - `SearchResponse` had `{type, items}` — backend returns `{results}` (no envelope type field).
+  - `SearchResultItem` had `name`/`thumbnailUrl` — backend uses `title`/`cover_url`, and PLAN missed `spotify_url`.
+  - `JobView` had `id`/`error_msg`/`attempt_count`/`owner_label` — backend uses `job_id`/`error`, and `attempt_count`/`owner_label` are NOT in the wire shape (they live in the DB but aren't exposed in `JobView`). PLAN also missed `progress` (reserved, always null in v1).
+  - PLAN's §3 is now rewritten to match the implemented Dart models (which match the backend exactly). PLAN §2's model-file list updated to reflect the real `lib/models/` layout (added `enums.dart`, renamed `search_result.dart` → `search_result_item.dart`).
+- Verification (green-before + green-after per `CLAUDE.md`): `flutter analyze` → no issues; `flutter test` → 17/17 pass.

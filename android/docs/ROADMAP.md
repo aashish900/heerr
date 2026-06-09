@@ -31,7 +31,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** can switch tabs on the device; theme is dark with green accent.
 **Commit:** `feat(flutter): m3 dark theme + bottom-nav shell`
 
-### [ ] A3. Freezed models + JSON codegen
+### [x] A3. Freezed models + JSON codegen
 **Files:** `android/app/lib/models/*.dart`, `android/app/test/models_test.dart`.
 **Deliverable:** Every model in PLAN §3 implemented with freezed + json_serializable. `build_runner build` clean. Round-trip `fromJson(toJson(x)) == x` for representative payloads.
 **Test gate:** unit tests for serialization of each model.

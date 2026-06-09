@@ -43,7 +43,9 @@ android/
     │   │   ├── client.dart    Dio provider + interceptors
     │   │   └── endpoints.dart endpoint URL constants
     │   ├── models/            freezed models (search results, jobs, etc.)
-    │   │   ├── search_result.dart
+    │   │   ├── enums.dart            SpotifyType + JobState
+    │   │   ├── search_request.dart
+    │   │   ├── search_result_item.dart
     │   │   ├── search_response.dart
     │   │   ├── download_request.dart
     │   │   ├── download_response.dart
@@ -82,77 +84,108 @@ Endpoints (from `backend/docs/PLAN.md`):
 
 ### `POST /search` (scope `read`)
 
+Source of truth: `backend/app/schemas/search.py`. Models live at `android/app/lib/models/{search_request,search_response,search_result_item}.dart`.
+
 ```dart
-// Request body — DownloadRequest model.
-class SearchRequest {
-  final String type;       // "track" | "album" | "playlist"
-  final String query;      // free text or a spotify URI
-  final int limit;         // 1..50, default 20
+// Request body.
+@freezed
+class SearchRequest with _$SearchRequest {
+  const factory SearchRequest({
+    required String query,             // free text or a spotify URI
+    required SpotifyType type,         // track | album | playlist
+    @Default(20) int limit,            // 1..50
+  }) = _SearchRequest;
 }
 
-// Response body — SearchResponse.
-class SearchResponse {
-  final String type;
-  final List<SearchResult> items;
+// Response body — flat list, no envelope `type` field.
+@freezed
+class SearchResponse with _$SearchResponse {
+  const factory SearchResponse({
+    required List<SearchResultItem> results,
+  }) = _SearchResponse;
 }
 
-class SearchResult {
-  final String spotifyUri;        // "spotify:track:..."
-  final String name;
-  final String artist;            // formatted "Artist 1, Artist 2"
-  final String? album;            // null for playlists
-  final int? durationMs;          // null for albums/playlists
-  final String? thumbnailUrl;     // 300x300 from Spotify, may be null
-  final bool alreadyDownloaded;   // backend hint — dim the row
-  final String? activeJobId;      // if a job is queued/running for this URI
+@freezed
+class SearchResultItem with _$SearchResultItem {
+  const factory SearchResultItem({
+    required String spotifyUri,        // "spotify:track:..."
+    required String spotifyUrl,        // "https://open.spotify.com/track/..."
+    required String title,
+    required String artist,            // formatted "Artist 1, Artist 2"
+    String? album,                     // null for playlists
+    int? durationMs,                   // null for albums/playlists
+    String? coverUrl,                  // 300x300 from Spotify, may be null
+    required bool alreadyDownloaded,   // backend hint — dim the row
+    String? activeJobId,               // UUID of queued/running job for this URI
+  }) = _SearchResultItem;
 }
 ```
 
 ### `POST /download` (scope `download`)
 
+Source of truth: `backend/app/schemas/download.py`.
+
 ```dart
-// Request — DownloadRequestPayload.
-class DownloadRequestPayload {
-  final String spotifyUri;
-  // No "type" field — backend infers from URI prefix.
+@freezed
+class DownloadRequest with _$DownloadRequest {
+  const factory DownloadRequest({
+    required String spotifyUri,
+    // No "type" field — backend infers from URI prefix.
+  }) = _DownloadRequest;
 }
 
-// Response — DownloadResponse.
-class DownloadResponse {
-  final String jobId;
-  final String state;             // "queued" | "running" — "done" if dedup hit
-  final bool deduped;             // true if URI was already done OR active
+@freezed
+class DownloadResponse with _$DownloadResponse {
+  const factory DownloadResponse({
+    required String jobId,
+    required JobState state,           // "queued" | "running" | "done" | "failed"
+    required bool deduped,             // true if URI was already done OR active
+  }) = _DownloadResponse;
 }
 ```
 
 ### `GET /status/{job_id}` (scope `read`)
 
+Source of truth: `backend/app/schemas/job.py::JobView`. Note: backend uses
+`job_id` (not `id`) and `error` (not `error_msg`); no `attempt_count`,
+no `owner_label` in the v1 wire shape; `progress` is reserved (always
+`null` in v1).
+
 ```dart
-class JobView {
-  final String id;
-  final String spotifyUri;
-  final String spotifyType;       // "track" | "album" | "playlist"
-  final String state;             // "queued" | "running" | "done" | "failed"
-  final int attemptCount;
-  final DateTime? startedAt;
-  final DateTime? finishedAt;
-  final String? outputPath;       // populated for "track" jobs only in v1
-  final String? errorMsg;
-  final String ownerLabel;
-  final DateTime createdAt;
+@freezed
+class JobView with _$JobView {
+  const factory JobView({
+    required String jobId,
+    required String spotifyUri,
+    required SpotifyType spotifyType,
+    required JobState state,
+    int? progress,                     // reserved; null in v1
+    String? error,
+    String? outputPath,                // populated for "track" jobs only in v1
+    required DateTime createdAt,
+    DateTime? startedAt,
+    DateTime? finishedAt,
+  }) = _JobView;
 }
 ```
 
 ### `GET /queue` (scope `read`)
 
+Source of truth: `backend/app/schemas/job.py::QueueResponse`.
+
 ```dart
-class QueueResponse {
-  final List<JobView> active;     // queued + running
-  final List<JobView> recent;     // most-recently-finished 20
+@freezed
+class QueueResponse with _$QueueResponse {
+  const factory QueueResponse({
+    required List<JobView> active,     // queued + running
+    required List<JobView> recent,     // most-recently-finished 20
+  }) = _QueueResponse;
 }
 ```
 
 All timestamps are ISO-8601 UTC; the client renders `relative time` ("just now", "2 min ago") in lists, full timestamp on the job detail screen.
+
+JSON wire keys are snake_case; Dart fields are lowerCamelCase. Mapping is set globally via `android/app/build.yaml` (`field_rename: snake`). Enum values are mapped via `@JsonValue('queued')` etc. in `lib/models/enums.dart`.
 
 ---
 

@@ -1,0 +1,13 @@
+# Global json_serializable config. Applies to every freezed/json_serializable
+# model in lib/models/. Field naming follows the backend contract: Dart fields
+# stay lowerCamelCase; on the wire they map to snake_case to match the
+# Pydantic v2 schemas in backend/app/schemas/.
+
+targets:
+  $default:
+    builders:
+      json_serializable:
+        options:
+          field_rename: snake
+          explicit_to_json: true
+          include_if_null: false
