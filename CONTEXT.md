@@ -53,6 +53,21 @@ new files, so a downloaded track shows up for streaming within ~1 minute.
 - spotDL 4.5.0 + ffmpeg installed. Spotify app is in "Development mode".
 - Shared filesystem root at `/data`.
 
+## heerr deployment shape (G2)
+- `/.env.example` — env template; populate as `.env` next to the arr-stack
+  compose file (Postgres creds, Spotify creds, `DATABASE_URL`,
+  `MUSIC_OUTPUT_DIR`).
+- `/docker-compose.snippet.yml` — four services merged into arr-stack:
+  - `heerr-postgres-init` (one-shot: chowns `/data/postgres` to UID 999).
+  - `heerr-postgres` (`pgvector/pgvector:pg17`, bind-mounted `/data/postgres`,
+    fixed IP `172.39.0.50`).
+  - `heerr-migrate` (one-shot: `alembic upgrade head`).
+  - `heerr-backend` (uvicorn, mounts `/data/media/music`, fixed IP
+    `172.39.0.51`).
+- No host port publication; backend reachable via Tailscale at
+  `172.39.0.51:8000` (the host's tailscaled advertises `172.39.0.0/24` as a
+  subnet route).
+
 ## Spotify credentials
 - Client ID and secret already exist (Spotify Developer dashboard, app
   "Spotify for Aashish's Home Assistant").

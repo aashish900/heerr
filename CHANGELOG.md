@@ -256,3 +256,18 @@ Append-only record of changes Claude makes. Newest entries at the bottom.
   - Bonus smoke: `docker run -d -p 18000:8000 … heerr-backend:dev` boots uvicorn; `curl /api/v1/health` → `200 {"status":"ok"}`; `/api/v1/openapi.json` serves with the right title.
 - Image size: 1.28 GB (`python:3.13-slim` + ffmpeg + spotdl venv + our venv + code).
 - Full suite (after refactor + httpx promotion): `poetry run pytest` → 151 passed in 7.02s.
+
+## 2026-06-08 — G2 compose snippet + .env.example
+
+- `/.env.example` — full env template with placeholders for Spotify creds (`SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`), Postgres bootstrap (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`), the derived `DATABASE_URL` (asyncpg driver, host `postgres`), and `MUSIC_OUTPUT_DIR`. Documents the optional `SPOTDL_EXECUTABLE` override.
+- `/docker-compose.snippet.yml` — four services for arr-stack integration:
+  - `heerr-postgres-init` (alpine:3.20 one-shot): `mkdir -p /data/postgres && chown -R 999:999 /data/postgres`. Hard-required because bind-mounted dirs default to root-owned and the postgres image runs as UID 999.
+  - `heerr-postgres` (`pgvector/pgvector:pg17`): bind-mount `/data/postgres`; `PGDATA=/data/postgres`; `pg_isready` healthcheck via `CMD-SHELL` with `$${POSTGRES_USER}` / `$${POSTGRES_DB}` escapes (single-dollar after compose interpolation, shell-expanded at runtime); fixed IP `172.39.0.50`; depends_on `heerr-postgres-init: service_completed_successfully`.
+  - `heerr-migrate` (built from `./backend`, one-shot): `alembic upgrade head`; depends_on `heerr-postgres: service_healthy`. This is the "Alembic auto-applies" mechanism — backend will not start until this exits 0.
+  - `heerr-backend` (built from `./backend`): uvicorn `0.0.0.0:8000`, bind-mount `/data/media/music:rw`; healthcheck via `python -c "import urllib.request; …"` (no curl needed — Python is in the slim image); fixed IP `172.39.0.51`; depends_on `heerr-migrate: service_completed_successfully`.
+  - `networks.arr-stack` declared `external: true, name: arr-stack_default` (placeholder name; user verifies with `docker network ls`).
+- **No host port publication.** Backend reachable only via Tailscale at `172.39.0.51:8000` (the host's tailscaled is expected to advertise `172.39.0.0/24` as a subnet route).
+- `CONTEXT.md` — added "heerr deployment shape (G2)" section under "Server environment" pointing at `.env.example` + the compose snippet + the four-service breakdown.
+- Validation: `docker-compose -f docker-compose.snippet.yml --env-file .env config` exits 0; all four services render; the depends_on chain enforces `postgres-init → postgres → migrate → backend`.
+- ROADMAP G2 done-when is exercised at H1 (real arr-stack deployment).
+- Side issues handled at G2: the user's local `.env` had legacy `CLIENT_ID`/`CLIENT_SECRET` variable names (vs. our `Settings`-expected `SPOTIFY_CLIENT_ID`/`SECRET`); user renamed in `.env` to match. The repo's `.gitignore` confirmed-blocks `.env` from being committed (line 19); `.env` was never tracked in git history.

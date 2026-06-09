@@ -1,0 +1,111 @@
+# heerr — arr-stack integration snippet
+# ==========================================================================
+# These services append to your existing arr-stack docker-compose.yml
+# (~/docker/arr-stack/docker-compose.yml per CONTEXT.md). Copy the four
+# services below + the `networks:` block into the arr-stack file, copy
+# `.env.example` to `.env` next to the merged compose file, fill in real
+# values, and `docker compose up -d heerr-postgres-init heerr-postgres
+# heerr-migrate heerr-backend`.
+#
+# Connectivity: Tailscale-only — no host port publication. The arr-stack
+# subnet (172.39.0.0/24) is expected to be Tailscale-routable from the
+# tailnet via the host's tailscaled.
+# ==========================================================================
+
+services:
+
+  # One-shot: chown the bind-mount dir to the Postgres image's UID (999) so
+  # the postgres container can write its data files. Required because the
+  # bind mount is created with root ownership on first compose up.
+  heerr-postgres-init:
+    image: alpine:3.20
+    container_name: heerr-postgres-init
+    command:
+      - sh
+      - -c
+      - "mkdir -p /data/postgres && chown -R 999:999 /data/postgres"
+    volumes:
+      - /data/postgres:/data/postgres
+    restart: "no"
+
+  heerr-postgres:
+    image: pgvector/pgvector:pg17
+    container_name: heerr-postgres
+    env_file:
+      - .env
+    environment:
+      PGDATA: /data/postgres
+    volumes:
+      - /data/postgres:/data/postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+    depends_on:
+      heerr-postgres-init:
+        condition: service_completed_successfully
+    networks:
+      arr-stack:
+        ipv4_address: 172.39.0.50
+    restart: unless-stopped
+
+  # One-shot: applies Alembic migrations. Exits 0 on success. backend waits
+  # on this service_completed_successfully so the DB schema is ready when
+  # uvicorn starts.
+  heerr-migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: heerr-backend:latest
+    container_name: heerr-migrate
+    env_file:
+      - .env
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      heerr-postgres:
+        condition: service_healthy
+    networks:
+      - arr-stack
+    restart: "no"
+
+  heerr-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: heerr-backend:latest
+    container_name: heerr-backend
+    env_file:
+      - .env
+    volumes:
+      # Navidrome watches the host path and indexes new files within ~1 min.
+      - /data/media/music:/data/media/music:rw
+    healthcheck:
+      # Python urllib is in the slim image; avoids adding curl just for this.
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request,sys; r=urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health',timeout=2); sys.exit(0 if r.status==200 else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    depends_on:
+      heerr-migrate:
+        condition: service_completed_successfully
+    networks:
+      arr-stack:
+        ipv4_address: 172.39.0.51
+    restart: unless-stopped
+
+
+networks:
+  # External: the arr-stack network must already exist (created by your
+  # arr-stack compose). The `name:` here must match the actual Docker
+  # network name (run `docker network ls` to confirm — usually
+  # `<project>_arr-stack` or `arr-stack_default`).
+  arr-stack:
+    external: true
+    name: arr-stack_default
