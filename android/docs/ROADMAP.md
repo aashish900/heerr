@@ -67,7 +67,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 ## Phase C — Read path
 
-### [ ] C1. Search providers
+### [x] C1. Search providers
 **Files:** `android/app/lib/providers/search.dart`, `android/app/test/providers/search_test.dart`.
 **Deliverable:** `searchQueryProvider` (query + type state); `searchResultsProvider` (FutureProvider keyed off the query, debounced 300ms, calls dio).
 **Test gate:** unit test: provider emits results after the debounce; cancels in-flight on rapid retype.

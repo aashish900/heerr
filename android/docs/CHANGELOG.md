@@ -156,3 +156,25 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
 - Test infra: same hand-rolled `_FakeAdapter` from B2 tests; `_InMemoryStorage` snapshot getter asserts what actually hit storage. `dioClientProvider` is overridden directly to return a pre-built `Dio` with the fake adapter (riverpod codegen accepts `FutureOr<Dio>` for the override callback).
 - **Regression in `test/router_test.dart` repaired in the same milestone.** The A2 router test passed because `SettingsScreen` was a stub. With the real screen reading `settingsProvider`, the test hung in `pumpAndSettle` because `FlutterSecureStorageImpl` calls the Android platform channel (no mock in widget tests). Fix: the router test now overrides `secureStorageProvider` with a no-op `_NoopStorage` (read returns null, write/delete are no-ops). Per `/CLAUDE.md` staleness rule, fixed in the same task.
 - Verification: `flutter analyze` → no issues; `flutter test` → 45/45 pass (12 model + 7 settings + 13 api + 8 settings-screen + 5 router).
+
+## 2026-06-09 — C1: search providers
+
+- New `android/app/lib/providers/search.dart`:
+  - `typedef SearchQueryState = ({String query, SpotifyType type})` — Dart 3 record for the search-bar state. Free `==`, no codegen.
+  - `searchDebounceProvider` (Riverpod, `keepAlive: true`) returns `Duration` — default `300ms`. Exposed as its own provider so tests override to `Duration.zero` for the simple cases and to a short real duration only when verifying cancellation timing.
+  - `SearchQuery` (`@Riverpod(keepAlive: true) class … extends _$SearchQuery`) — `Notifier<SearchQueryState>`. `keepAlive: true` because the user's last query should survive a tab switch (Search → Queue → Search). Exposes `setQuery(String)` and `setType(SpotifyType)` mutators that preserve the other field.
+  - `searchResults` (`@riverpod Future<SearchResponse>`) — depends on `searchQueryProvider` and `dioClientProvider`. Empty query (incl. whitespace-only) short-circuits to `SearchResponse(results: [])` without touching the network. Non-empty:
+    1. Register `CancelToken` via `ref.onDispose(cancelToken.cancel)` — fires when the user retypes (provider invalidates → autoDispose tears down the old ref).
+    2. `await Future.delayed(debounce)`.
+    3. Bail with `_DebounceCancelled` if the cancelToken fired during the wait — the new query has already started building, this future has no listener.
+    4. `dio.post(/search, body: SearchRequest, cancelToken: cancelToken)` via `apiCall<SearchResponse>` from B2 — typed `ApiError` propagation comes for free.
+- New `android/app/test/providers/search_test.dart` — 8 unit tests:
+  - `SearchQuery state`: initial state (empty + track), `setQuery` preserves type, `setType` preserves query.
+  - `searchResults` empty query → empty results, zero adapter requests.
+  - `searchResults` whitespace-only query → same short-circuit.
+  - `searchResults` non-empty query → adapter sees `POST /search` with body `{query, type: 'track', limit: 20}`; parsed response shape matches.
+  - `searchResults` type toggle → second request fires with `type: 'album'`; exactly 2 adapter calls.
+  - `searchResults` rapid retype (a → ab → abc within a 100ms debounce window) → exactly 1 adapter request reaches the network and it carries `query: 'abc'` (proves cancellation cascade works).
+- Test infra: reuses the hand-rolled fake adapter pattern from B2/B3, parameterised as `_CountingAdapter` to expose `requests`. `_container(...)` helper wires the dio override + a configurable debounce. Crucial detail: tests must `c.listen(searchResultsProvider, …)` before awaiting `.future`, otherwise autoDispose tears down the ref between the `read` and the `await` and the cancelToken fires inside dio's `post`, surfacing as `NetworkError`. Documented in the comment in the "POSTs /search" test.
+- Codegen: `dart run build_runner build` regenerated `search.g.dart`.
+- Verification: `flutter analyze` → no issues; `flutter test` → 53/53 pass (12 model + 7 settings + 13 api + 8 settings-screen + 8 search + 5 router).
