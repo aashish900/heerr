@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../api/api_error.dart';
 import '../models/job_view.dart';
 import '../models/queue_response.dart';
 import '../providers/queue.dart';
+import '../router.dart';
 import '../widgets/status_pill.dart';
 
 /// Polled queue view. Two sections (Active / Recent), each a list of
@@ -120,8 +122,7 @@ class _JobTile extends StatelessWidget {
         style: Theme.of(context).textTheme.bodySmall,
       ),
       trailing: StatusPill(state: job.state),
-      // D3 will navigate to the job-detail screen; until then this is
-      // information-only.
+      onTap: () => context.push(Routes.job(job.jobId)),
     );
   }
 

@@ -271,3 +271,42 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
 - `pubspec.yaml`: added `fake_async: ^1.3.0` as a direct dev dep (already transitive via `flutter_test`; listing explicitly silences `depend_on_referenced_packages`).
 - Codegen: `dart run build_runner build --delete-conflicting-outputs` regenerated `queue.g.dart`.
 - Verification: `flutter analyze` → no issues; `flutter test` → 86/86 pass (was 74; +6 queue provider + +6 queue screen).
+
+## 2026-06-09 — D3: Job detail screen + polling provider
+
+- New `android/app/lib/providers/job_status.dart`:
+  - `jobStatusPollIntervalProvider` (Riverpod, `keepAlive: true`) — `Duration`, default `2s` per PLAN.md §8. Overrideable in tests.
+  - `JobStatus` (`@riverpod` family — i.e. **auto-dispose**) — `class … extends _$JobStatus { Future<JobView> build(String jobId) … }`. Auto-dispose so navigating away from the detail screen tears the timer down via `ref.onDispose`. Family arg is the `jobId`, so two open detail screens for different jobs get independent provider instances.
+  - `build(jobId)` does the initial fetch; if the state is non-terminal it schedules the next tick. `_tick` re-fetches via `AsyncValue.guard`, then reschedules **only if the new state isn't terminal**. Errors keep polling (transient blip shouldn't strand the screen).
+  - `JobStateX.isTerminal` (`done` or `failed`) is the gate.
+- New `android/app/lib/screens/job_detail_screen.dart`:
+  - `ConsumerWidget`. Watches `jobStatusProvider(jobId)`. `.when(loading, error, data)` → spinner / `ApiError.message` / `_JobBody`.
+  - `_JobBody` is a scrollable `ListView` containing: header row (`StatusPill` + spotify type), then `_Field` rows for `spotify uri`, `job id`, `_TimestampField`s for `created` (always), `started` (when non-null), `finished` (when non-null), an `_Field` for `output_path` (when present), and an `_ErrorField` (when `error` non-null).
+  - `_Field`: label + value, with optional copy-to-clipboard `InkWell` that calls `Clipboard.setData` and shows a `Copied <label>` snackbar.
+  - `_TimestampField`: relative ("5m ago") + absolute (`toIso8601String`) lines. `_relative` helper handles seconds/minutes/hours/days; no intl dep needed for the v1 thin client.
+  - `_ErrorField`: M3 `errorContainer` background, `error_outline` icon, message text in `onErrorContainer`.
+- Modified `android/app/lib/router.dart`:
+  - Added `import 'screens/job_detail_screen.dart'`.
+  - Registered `GoRoute(path: '/job/:id', …)` **outside** the `ShellRoute` so the detail screen is full-screen with a normal AppBar back button — no bottom nav stealing visual space. Path matches the existing `Routes.job(id)` helper.
+- Modified `android/app/lib/screens/queue_screen.dart`:
+  - Added `import 'package:go_router/go_router.dart'` + `import '../router.dart'`.
+  - `_JobTile.onTap` now calls `context.push(Routes.job(job.jobId))` so the back button returns to the queue with state intact.
+- New `android/app/test/providers/job_status_test.dart` — 7 tests (`fake_async`, same `_CountingAdapter` + `elapse(Duration(microseconds: 1))` drain pattern as queue_test):
+  - Initial fetch fires `GET /status/<id>` with the right path; response parsed.
+  - Non-terminal state polls every 2s for 3 ticks.
+  - Override interval (1s) honoured.
+  - Transient 500 keeps polling (state becomes error then data again).
+  - Initial `done` → no further ticks even after 30 s of elapsed time.
+  - `running → running → done` transition → polling stops after the terminal tick.
+  - `failed` is also terminal → no further ticks.
+- New `android/app/test/screens/job_detail_screen_test.dart` — 6 widget tests:
+  - AppBar shows "Job <short-id>"; loading shows `CircularProgressIndicator`.
+  - Full body for a running job: `StatusPill`, label, spotify uri, full job id, relative timestamps ("Xm ago").
+  - `output_path` rendered + tap → `Clipboard.setData` invoked + "Copied output path" snackbar. Clipboard verified via `TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, …)` capturing `Clipboard.setData` calls.
+  - Failed job → error container with `error_outline` icon + the error message.
+  - Provider error path → renders `ApiError.message` ("cannot reach backend — check tailscale").
+  - Queued job (no startedAt / finishedAt) → those field labels are not rendered.
+- Test infra: `_StubJobStatus extends JobStatus` with a stubbed `build(jobId)` that returns whatever `AsyncValue` was injected — same pattern as `_StubQueue` from D2. Avoids any real dio or Timer in widget tests.
+- `_jobJson` helper uses Dart 3 null-aware **value** elements (`'error': ?error,`) so optional fields are dropped from the wire payload when null. Lint `use_null_aware_elements` enforces this style.
+- Codegen: `dart run build_runner build --delete-conflicting-outputs` regenerated `job_status.g.dart`.
+- Verification: `flutter analyze` → no issues; `flutter test` → 99/99 pass (was 86; +7 job_status provider + +6 job_detail screen).

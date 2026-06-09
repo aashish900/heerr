@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'screens/job_detail_screen.dart';
 import 'screens/queue_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
@@ -44,6 +45,13 @@ GoRouter buildHeerrRouter() {
                 const SettingsScreen(),
           ),
         ],
+      ),
+      // Job-detail is outside the ShellRoute so it gets a focused full-screen
+      // view with a normal back button (and no bottom nav stealing space).
+      GoRoute(
+        path: '/job/:id',
+        builder: (BuildContext context, GoRouterState state) =>
+            JobDetailScreen(jobId: state.pathParameters['id']!),
       ),
     ],
   );

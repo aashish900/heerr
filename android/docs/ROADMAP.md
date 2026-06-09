@@ -99,7 +99,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** queue against stubbed backend shows both sections, polls correctly, and pauses when off-screen.
 **Commit:** `feat(flutter): queue screen with polling`
 
-### [ ] D3. Job detail screen + polling provider
+### [x] D3. Job detail screen + polling provider
 **Files:** `android/app/lib/providers/job_status.dart`, `android/app/lib/screens/job_detail_screen.dart`, `android/app/test/screens/job_detail_screen_test.dart`, `android/app/test/providers/job_status_test.dart`.
 **Deliverable:** `jobStatusProvider(jobId)` polls `/status/{id}` every 2s while non-terminal. Screen shows id (short), state, timestamps (relative + full), output_path (tap to copy), error_msg.
 **Test gate:** widget test + provider test (stops polling on terminal state).
