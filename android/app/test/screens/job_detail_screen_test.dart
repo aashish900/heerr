@@ -10,6 +10,7 @@ import 'package:heerr/models/enums.dart';
 import 'package:heerr/models/job_view.dart';
 import 'package:heerr/providers/job_status.dart';
 import 'package:heerr/screens/job_detail_screen.dart';
+import 'package:heerr/widgets/skeleton.dart';
 import 'package:heerr/widgets/status_pill.dart';
 
 // ---------------------------------------------------------------------------
@@ -69,7 +70,7 @@ JobView _job({
 // ---------------------------------------------------------------------------
 
 void main() {
-  testWidgets('appbar shows short job id; loading shows spinner', (
+  testWidgets('appbar shows short job id; loading renders skeleton', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -80,7 +81,8 @@ void main() {
     await tester.pump();
 
     expect(find.text('Job abcdefgh'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    // Several SkeletonBox stand-ins for the upcoming fields.
+    expect(find.byType(SkeletonBox), findsWidgets);
   });
 
   testWidgets('renders the full body for a running job', (

@@ -14,7 +14,9 @@ import 'package:heerr/models/search_response.dart';
 import 'package:heerr/models/search_result_item.dart';
 import 'package:heerr/providers/search.dart';
 import 'package:heerr/screens/search_screen.dart';
+import 'package:heerr/widgets/empty_state.dart';
 import 'package:heerr/widgets/result_tile.dart';
+import 'package:heerr/widgets/skeleton.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -67,7 +69,7 @@ const SearchResponse _twoResults = SearchResponse(
 // ---------------------------------------------------------------------------
 
 void main() {
-  testWidgets('initial state: empty query → "Type to search Spotify" hint', (
+  testWidgets('initial state: empty query → EmptyState "Search Spotify"', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -81,11 +83,18 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Type to search Spotify'), findsOneWidget);
+    expect(find.byType(EmptyState), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(EmptyState),
+        matching: find.text('Search Spotify'),
+      ),
+      findsOneWidget,
+    );
     expect(find.byType(ResultTile), findsNothing);
   });
 
-  testWidgets('loading state shows a CircularProgressIndicator', (
+  testWidgets('loading state renders a SkeletonList', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -98,7 +107,8 @@ void main() {
     // Don't pumpAndSettle — the loading provider never completes.
     await tester.pump();
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(SkeletonList), findsOneWidget);
+    expect(find.byType(SkeletonTile), findsWidgets);
   });
 
   testWidgets('non-empty query with results renders ResultTile per item', (
@@ -129,7 +139,7 @@ void main() {
     expect(find.byIcon(Icons.download_done), findsOneWidget);
   });
 
-  testWidgets('non-empty query with empty results shows "No results"', (
+  testWidgets('non-empty query with empty results → EmptyState "No results"', (
     WidgetTester tester,
   ) async {
     final ProviderContainer container = ProviderContainer(
@@ -150,6 +160,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.byType(EmptyState), findsOneWidget);
     expect(find.text('No results'), findsOneWidget);
   });
 

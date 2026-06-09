@@ -117,7 +117,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** every PLAN §9 row is exercised in a test.
 **Commit:** `feat(flutter): error ux per plan §9`
 
-### [ ] E2. Empty + loading polish
+### [x] E2. Empty + loading polish
 **Files modified:** all screens; new `android/app/lib/widgets/empty_state.dart`, `android/app/lib/widgets/skeleton.dart`.
 **Deliverable:** Pretty empty + loading states across Search / Queue / Job detail. M3-spec'd, dark-themed, low-contrast skeletons.
 **Test gate:** widget tests for each empty + loading state.

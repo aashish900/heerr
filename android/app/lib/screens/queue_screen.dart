@@ -9,7 +9,9 @@ import '../models/job_view.dart';
 import '../models/queue_response.dart';
 import '../providers/queue.dart';
 import '../router.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/error_snackbar.dart';
+import '../widgets/skeleton.dart';
 import '../widgets/status_pill.dart';
 
 /// Polled queue view. Two sections (Active / Recent), each a list of
@@ -65,12 +67,16 @@ class _QueueScreenState extends ConsumerState<QueueScreen>
     return Scaffold(
       appBar: AppBar(title: const Text('Queue')),
       body: queueAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const SkeletonList(count: 4),
         error: (Object e, _) =>
             Center(child: Text(e is ApiError ? e.message : 'Error: $e')),
         data: (QueueResponse r) {
           if (r.active.isEmpty && r.recent.isEmpty) {
-            return const Center(child: Text('No jobs yet'));
+            return const EmptyState(
+              icon: Icons.queue_music,
+              title: 'No jobs yet',
+              subtitle: 'Search and tap a track to queue a download',
+            );
           }
           return RefreshIndicator(
             onRefresh: () => ref.read(queueProvider.notifier).resume(),

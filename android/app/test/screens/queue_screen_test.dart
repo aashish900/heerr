@@ -10,6 +10,8 @@ import 'package:heerr/models/job_view.dart';
 import 'package:heerr/models/queue_response.dart';
 import 'package:heerr/providers/queue.dart';
 import 'package:heerr/screens/queue_screen.dart';
+import 'package:heerr/widgets/empty_state.dart';
+import 'package:heerr/widgets/skeleton.dart';
 import 'package:heerr/widgets/status_pill.dart';
 
 // ---------------------------------------------------------------------------
@@ -67,7 +69,7 @@ JobView _job({
 // ---------------------------------------------------------------------------
 
 void main() {
-  testWidgets('loading state renders CircularProgressIndicator', (
+  testWidgets('loading state renders a SkeletonList', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -75,10 +77,11 @@ void main() {
     );
     await tester.pump(); // do NOT pumpAndSettle (loading future never resolves)
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(SkeletonList), findsOneWidget);
+    expect(find.byType(SkeletonTile), findsWidgets);
   });
 
-  testWidgets('empty state renders "No jobs yet"', (
+  testWidgets('empty state renders EmptyState "No jobs yet"', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -90,6 +93,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.byType(EmptyState), findsOneWidget);
     expect(find.text('No jobs yet'), findsOneWidget);
   });
 

@@ -8,8 +8,10 @@ import '../models/search_response.dart';
 import '../models/search_result_item.dart';
 import '../providers/download.dart';
 import '../providers/search.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/error_snackbar.dart';
 import '../widgets/result_tile.dart';
+import '../widgets/skeleton.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -111,14 +113,22 @@ class _Body extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return resultsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const SkeletonList(count: 6),
       error: (Object e, _) => _Centered(text: _errorMessage(e)),
       data: (SearchResponse r) {
         if (query.query.trim().isEmpty) {
-          return const _Centered(text: 'Type to search Spotify');
+          return const EmptyState(
+            icon: Icons.search,
+            title: 'Search Spotify',
+            subtitle: 'Tracks, albums, or playlists',
+          );
         }
         if (r.results.isEmpty) {
-          return const _Centered(text: 'No results');
+          return const EmptyState(
+            icon: Icons.search_off,
+            title: 'No results',
+            subtitle: 'Try a different query',
+          );
         }
         return ListView.builder(
           itemCount: r.results.length,

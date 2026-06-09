@@ -337,3 +337,29 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
 - Updated `android/app/test/screens/settings_screen_test.dart` "Test connection on 401 shows the mapped error" → asserts the locked PLAN copy "auth failed — re-paste your token" (was "Connection failed: bad token").
 - Updated `android/app/test/screens/search_screen_test.dart` D1 401 test → renamed to "ApiError on download → showApiError snackbar (E1 copy)"; asserts the same locked PLAN copy.
 - Verification: `flutter analyze` → no issues; `flutter test` → 109/109 pass (was 99; +10 error_snackbar).
+
+## 2026-06-09 — E2: Empty + loading polish
+
+- New `android/app/lib/widgets/empty_state.dart` — `EmptyState({icon, title, subtitle?})`. Centered 56-px icon in `onSurfaceVariant` + `titleMedium` title + optional `bodyMedium` subtitle in the muted tint. Dark-theme neutral palette so it's unambiguously *not* an error.
+- New `android/app/lib/widgets/skeleton.dart`:
+  - `SkeletonBox(width, height, [borderRadius])` — low-contrast `surfaceContainerHighest` rectangle. Building block for every skeleton.
+  - `SkeletonTile` — `ListTile` shape: 56×56 leading box + 180×12 title box + 120×10 subtitle box. Used as the loading placeholder for the search-results list and the queue list.
+  - `SkeletonList({count})` — `ListView.builder` of `count` `SkeletonTile`s.
+- Modified `android/app/lib/screens/search_screen.dart` `_Body`:
+  - `loading` branch → `SkeletonList(count: 6)` (was `CircularProgressIndicator`).
+  - Empty-query data branch → `EmptyState(icon: search, title: 'Search Spotify', subtitle: 'Tracks, albums, or playlists')` (was the centered text "Type to search Spotify").
+  - Empty-results data branch → `EmptyState(icon: search_off, title: 'No results', subtitle: 'Try a different query')`.
+- Modified `android/app/lib/screens/queue_screen.dart`:
+  - `loading` → `SkeletonList(count: 4)`.
+  - Empty data → `EmptyState(icon: queue_music, title: 'No jobs yet', subtitle: 'Search and tap a track to queue a download')`.
+- Modified `android/app/lib/screens/job_detail_screen.dart`:
+  - `loading` → `_JobDetailSkeleton` — column of `SkeletonBox`es laid out to match the detail body's shape (status-pill placeholder + 3 label/value pairs). Visually telegraphs the structure the user is about to see.
+- Updated existing screen tests:
+  - `search_screen_test` loading test now asserts `SkeletonList` + `SkeletonTile`s (was `CircularProgressIndicator`).
+  - `search_screen_test` "empty query" test now asserts `EmptyState` + the "Search Spotify" text **scoped under the EmptyState** (the TextField's `labelText` also reads "Search Spotify" so the unscoped `find.text` matched twice).
+  - `search_screen_test` "no results" test asserts the `EmptyState` widget.
+  - `queue_screen_test` loading/empty tests assert `SkeletonList`/`EmptyState`.
+  - `job_detail_screen_test` loading test asserts `SkeletonBox`es.
+- New `android/app/test/widgets/empty_state_test.dart` — 3 tests: icon + title rendered; subtitle rendered when provided; subtitle widget not in the tree when null.
+- New `android/app/test/widgets/skeleton_test.dart` — 3 tests: `SkeletonBox` honours configured width/height via `BoxConstraints`; `SkeletonTile` is a `ListTile` composed of 3 `SkeletonBox`es; `SkeletonList(count: 3)` renders exactly 3 `SkeletonTile`s.
+- Verification: `flutter analyze` → no issues; `flutter test` → 115/115 pass (was 109; +3 empty_state + +3 skeleton).

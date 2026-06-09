@@ -6,6 +6,7 @@ import '../api/api_error.dart';
 import '../models/job_view.dart';
 import '../providers/job_status.dart';
 import '../widgets/error_snackbar.dart';
+import '../widgets/skeleton.dart';
 import '../widgets/status_pill.dart';
 
 /// One job's live view. Polls `GET /status/{jobId}` until the job reaches
@@ -28,7 +29,7 @@ class JobDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text('Job ${_short(jobId)}')),
       body: jobAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const _JobDetailSkeleton(),
         error: (Object e, _) =>
             Center(child: Text(e is ApiError ? e.message : 'Error: $e')),
         data: (JobView j) => _JobBody(job: j),
@@ -190,6 +191,38 @@ class _ErrorField extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _JobDetailSkeleton extends StatelessWidget {
+  const _JobDetailSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: const <Widget>[
+        Row(
+          children: <Widget>[
+            SkeletonBox(width: 80, height: 24, borderRadius: 12),
+            SizedBox(width: 12),
+            SkeletonBox(width: 60, height: 14),
+          ],
+        ),
+        SizedBox(height: 24),
+        SkeletonBox(width: 60, height: 10),
+        SizedBox(height: 6),
+        SkeletonBox(width: 240, height: 14),
+        SizedBox(height: 20),
+        SkeletonBox(width: 60, height: 10),
+        SizedBox(height: 6),
+        SkeletonBox(width: 200, height: 14),
+        SizedBox(height: 20),
+        SkeletonBox(width: 60, height: 10),
+        SizedBox(height: 6),
+        SkeletonBox(width: 160, height: 14),
+      ],
     );
   }
 }
