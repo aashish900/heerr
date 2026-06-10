@@ -214,9 +214,7 @@ async def test_recent_capped_at_20(client, make_token, app_sm, cleanup):
     assert len(body["recent"]) == 20
 
 
-async def test_queue_returns_display_name_for_each_item(
-    client, make_token, app_sm, cleanup
-):
+async def test_queue_returns_display_name_for_each_item(client, make_token, app_sm, cleanup):
     raw = await make_token()
     token_id = await _token_id_for(app_sm, raw)
     a = await _seed_job(
@@ -246,9 +244,7 @@ async def test_queue_returns_display_name_for_each_item(
     assert recent["display_name"] == "Done Track — Artist"
 
 
-async def test_queue_display_name_null_when_unset(
-    client, make_token, app_sm, cleanup
-):
+async def test_queue_display_name_null_when_unset(client, make_token, app_sm, cleanup):
     raw = await make_token()
     token_id = await _token_id_for(app_sm, raw)
     j = await _seed_job(

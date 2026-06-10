@@ -155,9 +155,7 @@ async def test_new_track_uri_creates_queued_job_and_enqueues_worker(
         assert row.state == "queued"
 
 
-async def test_download_persists_display_name(
-    client, make_token, fake_enqueuer, app_sm, cleanup
-):
+async def test_download_persists_display_name(client, make_token, fake_enqueuer, app_sm, cleanup):
     raw = await make_token()
     uri = "spotify:track:disp1"
     r = await client.post(
