@@ -132,7 +132,7 @@ class _JobTile extends StatelessWidget {
       color: _isActive ? heerrGreen.withOpacity(0.15) : null,
       child: ListTile(
         title: Text(
-          hasName ? name : job.spotifyUri,
+          hasName ? name : job.sourceUrl,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: hasName

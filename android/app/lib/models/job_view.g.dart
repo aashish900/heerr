@@ -9,8 +9,8 @@ part of 'job_view.dart';
 _$JobViewImpl _$$JobViewImplFromJson(Map<String, dynamic> json) =>
     _$JobViewImpl(
       jobId: json['job_id'] as String,
-      spotifyUri: json['spotify_uri'] as String,
-      spotifyType: $enumDecode(_$SpotifyTypeEnumMap, json['spotify_type']),
+      sourceUrl: json['source_url'] as String,
+      sourceType: $enumDecode(_$ContentTypeEnumMap, json['source_type']),
       state: $enumDecode(_$JobStateEnumMap, json['state']),
       displayName: json['display_name'] as String?,
       progress: (json['progress'] as num?)?.toInt(),
@@ -28,8 +28,8 @@ _$JobViewImpl _$$JobViewImplFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$$JobViewImplToJson(_$JobViewImpl instance) =>
     <String, dynamic>{
       'job_id': instance.jobId,
-      'spotify_uri': instance.spotifyUri,
-      'spotify_type': _$SpotifyTypeEnumMap[instance.spotifyType]!,
+      'source_url': instance.sourceUrl,
+      'source_type': _$ContentTypeEnumMap[instance.sourceType]!,
       'state': _$JobStateEnumMap[instance.state]!,
       if (instance.displayName case final value?) 'display_name': value,
       if (instance.progress case final value?) 'progress': value,
@@ -42,10 +42,10 @@ Map<String, dynamic> _$$JobViewImplToJson(_$JobViewImpl instance) =>
         'finished_at': value,
     };
 
-const _$SpotifyTypeEnumMap = {
-  SpotifyType.track: 'track',
-  SpotifyType.album: 'album',
-  SpotifyType.playlist: 'playlist',
+const _$ContentTypeEnumMap = {
+  ContentType.song: 'song',
+  ContentType.album: 'album',
+  ContentType.playlist: 'playlist',
 };
 
 const _$JobStateEnumMap = {

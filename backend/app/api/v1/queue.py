@@ -46,21 +46,21 @@ async def get_queue(
         .all()
     )
 
-    # Batch-load track output paths in a single query.
-    track_uris = [j.spotify_uri for j in (*active_rows, *recent_rows) if j.spotify_type == "track"]
+    # Batch-load song output paths in a single query.
+    song_urls = [j.source_url for j in (*active_rows, *recent_rows) if j.source_type == "song"]
     paths: dict[str, str] = {}
-    if track_uris:
+    if song_urls:
         rows = (
             await session.execute(
-                select(Download.spotify_track_uri, Download.output_path).where(
-                    Download.spotify_track_uri.in_(track_uris)
+                select(Download.source_url, Download.output_path).where(
+                    Download.source_url.in_(song_urls)
                 )
             )
         ).all()
         paths = {row[0]: row[1] for row in rows}
 
     def _view(j: Job) -> JobView:
-        op = paths.get(j.spotify_uri) if j.spotify_type == "track" else None
+        op = paths.get(j.source_url) if j.source_type == "song" else None
         return to_view(j, op)
 
     return QueueResponse(

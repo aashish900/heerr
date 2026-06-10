@@ -8,13 +8,13 @@ class SearchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     query: str = Field(..., min_length=1)
-    type: Literal["track", "album", "playlist"]
+    type: Literal["song", "album", "playlist"]
     limit: int = Field(default=20, ge=1, le=50)
 
 
 class SearchResultItem(BaseModel):
-    spotify_uri: str
-    spotify_url: str
+    source_url: str
+    source_type: str
     title: str
     artist: str
     album: str | None

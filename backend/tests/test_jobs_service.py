@@ -10,8 +10,8 @@ from app.services.jobs import (
     InvalidStateTransition,
     bump_attempt,
     create_job_idempotent,
-    find_active_for_uri,
-    find_download_for_track,
+    find_active_for_url,
+    find_download_for_song,
     mark_done,
     mark_failed,
     mark_running,
@@ -49,15 +49,15 @@ async def test_create_inserts_new_job(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         job, deduped = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:a",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=a",
+            source_type="song",
             token_id=token_id,
         )
         await s.commit()
     assert deduped is False
     assert job.state == "queued"
-    assert job.spotify_uri == "spotify:track:a"
-    assert job.spotify_type == "track"
+    assert job.source_url == "https://www.youtube.com/watch?v=a"
+    assert job.source_type == "song"
     assert job.created_by_token_id == token_id
     assert job.attempt_count == 0
     assert job.display_name is None
@@ -67,8 +67,8 @@ async def test_create_stores_display_name(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         job, deduped = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:disp-new",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=disp-new",
+            source_type="song",
             token_id=token_id,
             display_name="Bohemian Rhapsody — Queen",
         )
@@ -85,8 +85,8 @@ async def test_create_dedupe_keeps_existing_display_name(app_sm, token_id, clean
     async with app_sm() as s:
         first, _ = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:disp-dup",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=disp-dup",
+            source_type="song",
             token_id=token_id,
             display_name="Original Name",
         )
@@ -96,8 +96,8 @@ async def test_create_dedupe_keeps_existing_display_name(app_sm, token_id, clean
     async with app_sm() as s:
         second, deduped = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:disp-dup",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=disp-dup",
+            source_type="song",
             token_id=token_id,
             display_name="Other Name",
         )
@@ -110,8 +110,8 @@ async def test_create_dedupes_when_active_exists(app_sm, token_id, cleanup_jobs)
     async with app_sm() as s:
         first, _ = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:b",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=b",
+            source_type="song",
             token_id=token_id,
         )
         await s.commit()
@@ -120,8 +120,8 @@ async def test_create_dedupes_when_active_exists(app_sm, token_id, cleanup_jobs)
     async with app_sm() as s:
         second, deduped = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:b",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=b",
+            source_type="song",
             token_id=token_id,
         )
     assert deduped is True
@@ -132,8 +132,8 @@ async def test_create_allows_requeue_after_done(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         first, _ = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:c",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=c",
+            source_type="song",
             token_id=token_id,
         )
         await s.commit()
@@ -147,8 +147,8 @@ async def test_create_allows_requeue_after_done(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         second, deduped = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:c",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=c",
+            source_type="song",
             token_id=token_id,
         )
         await s.commit()
@@ -161,14 +161,14 @@ async def test_create_concurrent_inserts_dedupe_via_partial_unique_index(
     app_sm, token_id, cleanup_jobs
 ):
     """The partial-unique-index ensures only one of two parallel creates wins."""
-    uri = "spotify:track:race"
+    uri = "https://www.youtube.com/watch?v=race"
 
     async def _one():
         async with app_sm() as s:
             job, deduped = await create_job_idempotent(
                 s,
-                spotify_uri=uri,
-                spotify_type="track",
+                source_url=uri,
+                source_type="song",
                 token_id=token_id,
             )
             await s.commit()
@@ -188,8 +188,8 @@ async def test_mark_running_sets_state_and_started_at(app_sm, token_id, cleanup_
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:r1",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=r1",
+            source_type="song",
             token_id=token_id,
         )
         await s.commit()
@@ -209,8 +209,8 @@ async def test_mark_running_rejects_non_queued(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:r2",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=r2",
+            source_type="song",
             token_id=token_id,
         )
         await s.commit()
@@ -229,8 +229,8 @@ async def test_mark_done_sets_state_and_finished_at(app_sm, token_id, cleanup_jo
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:d1",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=d1",
+            source_type="song",
             token_id=token_id,
         )
         await s.commit()
@@ -251,8 +251,8 @@ async def test_mark_done_rejects_queued(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:d2",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=d2",
+            source_type="song",
             token_id=token_id,
         )
         await s.commit()
@@ -269,8 +269,8 @@ async def test_mark_failed_from_queued(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:f1",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=f1",
+            source_type="song",
             token_id=token_id,
         )
         await s.commit()
@@ -291,8 +291,8 @@ async def test_mark_failed_from_running(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:f2",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=f2",
+            source_type="song",
             token_id=token_id,
         )
         await s.commit()
@@ -313,8 +313,8 @@ async def test_mark_failed_rejects_done(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:f3",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=f3",
+            source_type="song",
             token_id=token_id,
         )
         await s.commit()
@@ -334,8 +334,8 @@ async def test_bump_attempt_increments(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:b1",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=b1",
+            source_type="song",
             token_id=token_id,
         )
         await s.commit()
@@ -354,28 +354,28 @@ async def test_bump_attempt_increments(app_sm, token_id, cleanup_jobs):
 # ---- finders --------------------------------------------------------------
 
 
-async def test_find_active_for_uri_returns_active(app_sm, token_id, cleanup_jobs):
+async def test_find_active_for_url_returns_active(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:find-a",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=find-a",
+            source_type="song",
             token_id=token_id,
         )
         await s.commit()
 
     async with app_sm() as s:
-        found = await find_active_for_uri(s, "spotify:track:find-a")
+        found = await find_active_for_url(s, "https://www.youtube.com/watch?v=find-a")
     assert found is not None
     assert found.id == job.id
 
 
-async def test_find_active_for_uri_returns_none_after_done(app_sm, token_id, cleanup_jobs):
+async def test_find_active_for_url_returns_none_after_done(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:find-b",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=find-b",
+            source_type="song",
             token_id=token_id,
         )
         await s.commit()
@@ -384,22 +384,22 @@ async def test_find_active_for_uri_returns_none_after_done(app_sm, token_id, cle
         await s.commit()
 
     async with app_sm() as s:
-        found = await find_active_for_uri(s, "spotify:track:find-b")
+        found = await find_active_for_url(s, "https://www.youtube.com/watch?v=find-b")
     assert found is None
 
 
-async def test_find_download_for_track_returns_download(app_sm, token_id, cleanup_jobs):
+async def test_find_download_for_song_returns_download(app_sm, token_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
-            spotify_uri="spotify:track:find-dl",
-            spotify_type="track",
+            source_url="https://www.youtube.com/watch?v=find-dl",
+            source_type="song",
             token_id=token_id,
         )
         await s.commit()
         s.add(
             Download(
-                spotify_track_uri="spotify:track:find-dl",
+                source_url="https://www.youtube.com/watch?v=find-dl",
                 job_id=job.id,
                 output_path="/data/media/music/x.mp3",
             )
@@ -407,12 +407,12 @@ async def test_find_download_for_track_returns_download(app_sm, token_id, cleanu
         await s.commit()
 
     async with app_sm() as s:
-        dl = await find_download_for_track(s, "spotify:track:find-dl")
+        dl = await find_download_for_song(s, "https://www.youtube.com/watch?v=find-dl")
     assert dl is not None
     assert dl.output_path == "/data/media/music/x.mp3"
 
 
-async def test_find_download_for_track_returns_none(app_sm, cleanup_jobs):
+async def test_find_download_for_song_returns_none(app_sm, cleanup_jobs):
     async with app_sm() as s:
-        dl = await find_download_for_track(s, "spotify:track:missing")
+        dl = await find_download_for_song(s, "https://www.youtube.com/watch?v=missing")
     assert dl is None

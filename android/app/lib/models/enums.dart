@@ -1,10 +1,10 @@
 import 'package:json_annotation/json_annotation.dart';
 
-/// Spotify entity kind. Wire values are the lowercase strings the backend
-/// uses (see `backend/app/schemas/search.py` and `backend/app/schemas/job.py`).
-enum SpotifyType {
-  @JsonValue('track')
-  track,
+/// Content type for search and download. Wire values match the backend's
+/// `source_type` field (see `backend/app/schemas/search.py`).
+enum ContentType {
+  @JsonValue('song')
+  song,
   @JsonValue('album')
   album,
   @JsonValue('playlist')

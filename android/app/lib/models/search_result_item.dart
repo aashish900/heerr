@@ -8,8 +8,8 @@ part 'search_result_item.g.dart';
 @freezed
 class SearchResultItem with _$SearchResultItem {
   const factory SearchResultItem({
-    required String spotifyUri,
-    required String spotifyUrl,
+    required String sourceUrl,
+    required String sourceType,
     required String title,
     required String artist,
     String? album,

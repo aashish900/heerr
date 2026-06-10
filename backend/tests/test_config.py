@@ -5,8 +5,6 @@ from app.config import Settings
 
 REQUIRED_ENV = {
     "DATABASE_URL": "postgresql+asyncpg://u:p@h/d",
-    "SPOTIFY_CLIENT_ID": "cid",
-    "SPOTIFY_CLIENT_SECRET": "csecret",
     "MUSIC_OUTPUT_DIR": "/data/media/music",
 }
 
@@ -23,8 +21,6 @@ def test_loads_from_env(monkeypatch):
         monkeypatch.setenv(k, v)
     s = Settings()
     assert s.database_url == REQUIRED_ENV["DATABASE_URL"]
-    assert s.spotify_client_id == REQUIRED_ENV["SPOTIFY_CLIENT_ID"]
-    assert s.spotify_client_secret.get_secret_value() == REQUIRED_ENV["SPOTIFY_CLIENT_SECRET"]
     assert s.music_output_dir == REQUIRED_ENV["MUSIC_OUTPUT_DIR"]
 
 
@@ -38,9 +34,10 @@ def test_missing_required_raises(monkeypatch, missing):
     assert missing.lower() in str(exc.value).lower()
 
 
-def test_secret_str_redacted_in_repr(monkeypatch):
+def test_extra_env_vars_ignored(monkeypatch):
     for k, v in REQUIRED_ENV.items():
         monkeypatch.setenv(k, v)
+    monkeypatch.setenv("SPOTIFY_CLIENT_ID", "leftover")
+    monkeypatch.setenv("SPOTIFY_CLIENT_SECRET", "leftover")
     s = Settings()
-    assert REQUIRED_ENV["SPOTIFY_CLIENT_SECRET"] not in repr(s)
-    assert REQUIRED_ENV["SPOTIFY_CLIENT_SECRET"] not in str(s)
+    assert s.database_url == REQUIRED_ENV["DATABASE_URL"]

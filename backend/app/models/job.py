@@ -22,12 +22,12 @@ class Job(Base):
             name="jobs_state_valid",
         ),
         sa.CheckConstraint(
-            "spotify_type IN ('track','album','playlist')",
-            name="jobs_type_valid",
+            "source_type IN ('song','album','playlist')",
+            name="jobs_source_type_valid",
         ),
         sa.Index(
-            "jobs_active_uri_idx",
-            "spotify_uri",
+            "jobs_active_source_url_idx",
+            "source_url",
             unique=True,
             postgresql_where=sa.text("state IN ('queued','running')"),
         ),
@@ -44,8 +44,8 @@ class Job(Base):
         primary_key=True,
         server_default=sa.text("gen_random_uuid()"),
     )
-    spotify_uri: Mapped[str] = mapped_column(sa.Text, nullable=False)
-    spotify_type: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    source_url: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    source_type: Mapped[str] = mapped_column(sa.Text, nullable=False)
     state: Mapped[str] = mapped_column(sa.Text, nullable=False)
     display_name: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     error_msg: Mapped[str | None] = mapped_column(sa.Text, nullable=True)

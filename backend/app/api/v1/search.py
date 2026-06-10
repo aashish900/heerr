@@ -10,11 +10,11 @@ from app.schemas.search import (
     SearchResponse,
     SearchResultItem,
 )
-from app.services.spotify import (
-    SpotifyClient,
-    SpotifyRateLimited,
-    SpotifyResult,
-    get_spotify_client,
+from app.services.ytmusic import (
+    YTMusicClient,
+    YTMusicError,
+    YTMusicResult,
+    get_ytmusic_client,
 )
 
 router = APIRouter(tags=["search"])
@@ -22,24 +22,24 @@ router = APIRouter(tags=["search"])
 
 async def _hydrate_hints(
     session: AsyncSession,
-    items: list[SpotifyResult],
-    type_: str,
+    items: list[YTMusicResult],
 ) -> tuple[set[str], dict[str, str]]:
-    """Return (downloaded_uris, active_job_id_by_uri)."""
-    uris = [it.spotify_uri for it in items]
-    if not uris:
+    """Return (downloaded_urls, active_job_id_by_url)."""
+    urls = [it.source_url for it in items]
+    if not urls:
         return set(), {}
 
     downloaded: set[str] = set()
-    if type_ == "track":
+    song_urls = [it.source_url for it in items if it.source_type == "song"]
+    if song_urls:
         r = await session.execute(
-            select(Download.spotify_track_uri).where(Download.spotify_track_uri.in_(uris))
+            select(Download.source_url).where(Download.source_url.in_(song_urls))
         )
         downloaded = set(r.scalars().all())
 
     r = await session.execute(
-        select(Job.spotify_uri, Job.id).where(
-            Job.spotify_uri.in_(uris),
+        select(Job.source_url, Job.id).where(
+            Job.source_url.in_(urls),
             Job.state.in_(["queued", "running"]),
         )
     )
@@ -51,37 +51,31 @@ async def _hydrate_hints(
 async def search(
     req: SearchRequest,
     session: AsyncSession = Depends(get_session),
-    spotify: SpotifyClient = Depends(get_spotify_client),
+    ytmusic: YTMusicClient = Depends(get_ytmusic_client),
     _token: Token = Depends(require_scope("read")),
 ) -> SearchResponse:
     try:
-        if req.type == "track":
-            sp_results = await spotify.search_tracks(req.query, req.limit)
-        elif req.type == "album":
-            sp_results = await spotify.search_albums(req.query, req.limit)
-        else:
-            sp_results = await spotify.search_playlists(req.query, req.limit)
-    except SpotifyRateLimited as e:
+        yt_results = await ytmusic.search(req.query, req.type, req.limit)
+    except YTMusicError as e:
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="upstream rate limited",
-            headers={"Retry-After": str(e.retry_after)},
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"YouTube Music error: {e}",
         ) from e
 
-    downloaded, active = await _hydrate_hints(session, sp_results, req.type)
+    downloaded, active = await _hydrate_hints(session, yt_results)
 
     items = [
         SearchResultItem(
-            spotify_uri=sp.spotify_uri,
-            spotify_url=sp.spotify_url,
-            title=sp.title,
-            artist=sp.artist,
-            album=sp.album,
-            duration_ms=sp.duration_ms,
-            cover_url=sp.cover_url,
-            already_downloaded=sp.spotify_uri in downloaded,
-            active_job_id=active.get(sp.spotify_uri),
+            source_url=yt.source_url,
+            source_type=yt.source_type,
+            title=yt.title,
+            artist=yt.artist,
+            album=yt.album,
+            duration_ms=yt.duration_ms,
+            cover_url=yt.cover_url,
+            already_downloaded=yt.source_url in downloaded,
+            active_job_id=active.get(yt.source_url),
         )
-        for sp in sp_results
+        for yt in yt_results
     ]
     return SearchResponse(results=items)

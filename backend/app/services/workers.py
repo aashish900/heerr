@@ -32,8 +32,8 @@ async def run_job(
 ) -> None:
     """Drive a job through queued -> running -> (done | failed).
 
-    On success, writes a single Download row for track jobs only — see
-    CHANGELOG F2 for why album/playlist jobs don't get download rows in v1.
+    On success, writes a single Download row for song jobs only — album/playlist
+    jobs transition to done but the per-track file mapping is omitted in v1.
     """
     # Phase 1: load job + transition queued -> running
     async with sm() as s:
@@ -41,8 +41,8 @@ async def run_job(
         if job is None:
             logger.warning("run_job: job %s missing", job_id)
             return
-        spotify_uri = job.spotify_uri
-        spotify_type = job.spotify_type
+        source_url = job.source_url
+        source_type = job.source_type
         try:
             await mark_running(s, job_id)
         except InvalidStateTransition:
@@ -52,22 +52,21 @@ async def run_job(
 
     # Phase 2: invoke spotDL
     try:
-        files = await runner(spotify_uri, output_dir)
+        files = await runner(source_url, output_dir)
     except Exception as e:
         msg = f"{type(e).__name__}: {e}"[-_ERROR_MSG_MAX:]
         await _safe_mark_failed(sm, job_id, msg)
         logger.exception("run_job: runner failed for %s", job_id)
         return
 
-    # Phase 3: write Download row(s) + transition running -> done
+    # Phase 3: write Download row + transition running -> done
     try:
         async with sm() as s:
-            if spotify_type == "track" and files:
-                # 1:1 mapping for track jobs: job.spotify_uri IS the track URI.
+            if source_type == "song" and files:
                 first = files[0]
                 s.add(
                     Download(
-                        spotify_track_uri=spotify_uri,
+                        source_url=source_url,
                         job_id=job_id,
                         output_path=first.path,
                         file_size_bytes=first.size_bytes,

@@ -12,6 +12,10 @@ from app.db import get_session
 from app.models import Download, Job
 from app.services.workers import get_enqueuer
 
+_SONG_URL = "https://www.youtube.com/watch?v=abc"
+_ALBUM_URL = "https://music.youtube.com/browse/al1"
+_PLAYLIST_URL = "https://music.youtube.com/browse/pl1"
+
 
 class RecordingEnqueuer:
     def __init__(self):
@@ -74,7 +78,7 @@ async def _token_id_for(app_sm, raw: str):
 async def test_download_requires_auth(client):
     r = await client.post(
         "/api/v1/download",
-        json={"spotify_uri": "spotify:track:abc"},
+        json={"source_url": _SONG_URL, "source_type": "song"},
     )
     assert r.status_code == 401
 
@@ -83,31 +87,31 @@ async def test_download_requires_download_scope(client, make_token):
     raw = await make_token(scopes=("read",))
     r = await client.post(
         "/api/v1/download",
-        json={"spotify_uri": "spotify:track:abc"},
+        json={"source_url": _SONG_URL, "source_type": "song"},
         headers={"Authorization": f"Bearer {raw}"},
     )
     assert r.status_code == 403
 
 
-# ---- URI validation -------------------------------------------------------
+# ---- URL validation -------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    "uri",
+    "url",
     [
         "",
-        "not-a-uri",
-        "spotify:podcast:abc",
-        "spotify:track:",
+        "not-a-url",
+        "https://vimeo.com/abc",
+        "https://www.youtube.com/watch?v=",  # empty video ID
         "https://open.spotify.com/track/abc",
-        "spotify::abc",
+        "https://music.youtube.com/browse/",  # empty browse ID
     ],
 )
-async def test_invalid_uri_returns_422(client, make_token, uri):
+async def test_invalid_url_returns_422(client, make_token, url):
     raw = await make_token()
     r = await client.post(
         "/api/v1/download",
-        json={"spotify_uri": uri},
+        json={"source_url": url, "source_type": "song"},
         headers={"Authorization": f"Bearer {raw}"},
     )
     assert r.status_code == 422
@@ -117,23 +121,23 @@ async def test_unknown_field_returns_422(client, make_token):
     raw = await make_token()
     r = await client.post(
         "/api/v1/download",
-        json={"spotify_uri": "spotify:track:abc", "extra": 1},
+        json={"source_url": _SONG_URL, "source_type": "song", "extra": 1},
         headers={"Authorization": f"Bearer {raw}"},
     )
     assert r.status_code == 422
 
 
-# ---- new-URI dispatch -----------------------------------------------------
+# ---- new-URL dispatch -----------------------------------------------------
 
 
-async def test_new_track_uri_creates_queued_job_and_enqueues_worker(
+async def test_new_song_url_creates_queued_job_and_enqueues_worker(
     client, make_token, fake_enqueuer, app_sm, cleanup
 ):
     raw = await make_token()
-    uri = "spotify:track:new1"
+    url = "https://www.youtube.com/watch?v=new1"
     r = await client.post(
         "/api/v1/download",
-        json={"spotify_uri": uri},
+        json={"source_url": url, "source_type": "song"},
         headers={"Authorization": f"Bearer {raw}"},
     )
     assert r.status_code == 202, r.text
@@ -146,21 +150,21 @@ async def test_new_track_uri_creates_queued_job_and_enqueues_worker(
     async with app_sm() as s:
         row = (
             await s.execute(
-                text("SELECT spotify_uri, spotify_type, state FROM jobs WHERE id = :i"),
+                text("SELECT source_url, source_type, state FROM jobs WHERE id = :i"),
                 {"i": job_id},
             )
         ).first()
-        assert row.spotify_uri == uri
-        assert row.spotify_type == "track"
+        assert row.source_url == url
+        assert row.source_type == "song"
         assert row.state == "queued"
 
 
 async def test_download_persists_display_name(client, make_token, fake_enqueuer, app_sm, cleanup):
     raw = await make_token()
-    uri = "spotify:track:disp1"
+    url = "https://www.youtube.com/watch?v=disp1"
     r = await client.post(
         "/api/v1/download",
-        json={"spotify_uri": uri, "display_name": "Imagine — John Lennon"},
+        json={"source_url": url, "source_type": "song", "display_name": "Imagine — John Lennon"},
         headers={"Authorization": f"Bearer {raw}"},
     )
     assert r.status_code == 202, r.text
@@ -179,10 +183,10 @@ async def test_download_display_name_is_optional(
     client, make_token, fake_enqueuer, app_sm, cleanup
 ):
     raw = await make_token()
-    uri = "spotify:track:nodisp1"
+    url = "https://www.youtube.com/watch?v=nodisp1"
     r = await client.post(
         "/api/v1/download",
-        json={"spotify_uri": uri},
+        json={"source_url": url, "source_type": "song"},
         headers={"Authorization": f"Bearer {raw}"},
     )
     assert r.status_code == 202, r.text
@@ -197,44 +201,40 @@ async def test_download_display_name_is_optional(
     assert name is None
 
 
-async def test_new_album_uri_uses_album_type(client, make_token, fake_enqueuer, app_sm, cleanup):
+async def test_new_album_url_uses_album_type(client, make_token, fake_enqueuer, app_sm, cleanup):
     raw = await make_token()
-    uri = "spotify:album:al1"
     r = await client.post(
         "/api/v1/download",
-        json={"spotify_uri": uri},
+        json={"source_url": _ALBUM_URL, "source_type": "album"},
         headers={"Authorization": f"Bearer {raw}"},
     )
     assert r.status_code == 202
-    body = r.json()
-    job_id = UUID(body["job_id"])
+    job_id = UUID(r.json()["job_id"])
     async with app_sm() as s:
         type_ = (
             await s.execute(
-                text("SELECT spotify_type FROM jobs WHERE id = :i"),
+                text("SELECT source_type FROM jobs WHERE id = :i"),
                 {"i": job_id},
             )
         ).scalar_one()
     assert type_ == "album"
 
 
-async def test_new_playlist_uri_uses_playlist_type(
+async def test_new_playlist_url_uses_playlist_type(
     client, make_token, fake_enqueuer, app_sm, cleanup
 ):
     raw = await make_token()
-    uri = "spotify:playlist:pl1"
     r = await client.post(
         "/api/v1/download",
-        json={"spotify_uri": uri},
+        json={"source_url": _PLAYLIST_URL, "source_type": "playlist"},
         headers={"Authorization": f"Bearer {raw}"},
     )
     assert r.status_code == 202
-    body = r.json()
-    job_id = UUID(body["job_id"])
+    job_id = UUID(r.json()["job_id"])
     async with app_sm() as s:
         type_ = (
             await s.execute(
-                text("SELECT spotify_type FROM jobs WHERE id = :i"),
+                text("SELECT source_type FROM jobs WHERE id = :i"),
                 {"i": job_id},
             )
         ).scalar_one()
@@ -248,45 +248,43 @@ async def test_active_job_returns_existing_with_deduped_true(
     client, make_token, fake_enqueuer, app_sm, cleanup
 ):
     raw = await make_token()
-    uri = "spotify:track:dup"
+    url = "https://www.youtube.com/watch?v=dup"
     r1 = await client.post(
         "/api/v1/download",
-        json={"spotify_uri": uri},
+        json={"source_url": url, "source_type": "song"},
         headers={"Authorization": f"Bearer {raw}"},
     )
     first_job_id = r1.json()["job_id"]
 
     r2 = await client.post(
         "/api/v1/download",
-        json={"spotify_uri": uri},
+        json={"source_url": url, "source_type": "song"},
         headers={"Authorization": f"Bearer {raw}"},
     )
     assert r2.status_code == 202
     body = r2.json()
     assert body["deduped"] is True
     assert body["job_id"] == first_job_id
-    # second call must not enqueue another worker
     assert len(fake_enqueuer.calls) == 1
 
 
 # ---- idempotency: already on disk -----------------------------------------
 
 
-async def test_on_disk_track_returns_synthetic_done(
+async def test_on_disk_song_returns_synthetic_done(
     client, make_token, fake_enqueuer, app_sm, cleanup
 ):
     raw = await make_token()
     token_id = await _token_id_for(app_sm, raw)
-    uri = "spotify:track:on-disk"
+    url = "https://www.youtube.com/watch?v=on-disk"
 
-    # seed a completed job + download
     job_id = uuid.uuid4()
     async with app_sm() as s:
         s.add(
             Job(
                 id=job_id,
-                spotify_uri=uri,
-                spotify_type="track",
+                source_url=url,
+                source_type="song",
                 state="done",
                 created_by_token_id=token_id,
             )
@@ -294,7 +292,7 @@ async def test_on_disk_track_returns_synthetic_done(
         await s.flush()
         s.add(
             Download(
-                spotify_track_uri=uri,
+                source_url=url,
                 job_id=job_id,
                 output_path="/data/media/music/on-disk.mp3",
             )
@@ -303,7 +301,7 @@ async def test_on_disk_track_returns_synthetic_done(
 
     r = await client.post(
         "/api/v1/download",
-        json={"spotify_uri": uri},
+        json={"source_url": url, "source_type": "song"},
         headers={"Authorization": f"Bearer {raw}"},
     )
     assert r.status_code == 202
@@ -311,4 +309,4 @@ async def test_on_disk_track_returns_synthetic_done(
     assert body["state"] == "done"
     assert body["deduped"] is True
     assert body["job_id"] == str(job_id)
-    assert fake_enqueuer.calls == []  # no worker scheduled
+    assert fake_enqueuer.calls == []

@@ -7,7 +7,7 @@ from app.api.deps import require_scope
 from app.db import get_session
 from app.models import Job, Token
 from app.schemas.job import JobView
-from app.services.jobs import find_download_for_track
+from app.services.jobs import find_download_for_song
 
 router = APIRouter(tags=["jobs"])
 
@@ -15,8 +15,8 @@ router = APIRouter(tags=["jobs"])
 def to_view(job: Job, output_path: str | None) -> JobView:
     return JobView(
         job_id=job.id,
-        spotify_uri=job.spotify_uri,
-        spotify_type=job.spotify_type,
+        source_url=job.source_url,
+        source_type=job.source_type,
         state=job.state,
         display_name=job.display_name,
         progress=None,
@@ -41,8 +41,8 @@ async def get_status(
             detail=f"job {job_id} not found",
         )
     output_path: str | None = None
-    if job.spotify_type == "track":
-        dl = await find_download_for_track(session, job.spotify_uri)
+    if job.source_type == "song":
+        dl = await find_download_for_song(session, job.source_url)
         if dl is not None:
             output_path = dl.output_path
     return to_view(job, output_path)

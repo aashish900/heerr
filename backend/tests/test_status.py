@@ -57,8 +57,8 @@ async def _seed_job(
     app_sm,
     *,
     token_id,
-    spotify_uri: str,
-    spotify_type: str = "track",
+    source_url: str,
+    source_type: str = "song",
     state: str = "queued",
     error_msg: str | None = None,
     display_name: str | None = None,
@@ -68,8 +68,8 @@ async def _seed_job(
     from datetime import datetime
 
     job = Job(
-        spotify_uri=spotify_uri,
-        spotify_type=spotify_type,
+        source_url=source_url,
+        source_type=source_type,
         state=state,
         display_name=display_name,
         error_msg=error_msg,
@@ -84,11 +84,11 @@ async def _seed_job(
     return job
 
 
-async def _seed_download(app_sm, *, job_id, spotify_track_uri, path):
+async def _seed_download(app_sm, *, job_id, source_url, path):
     async with app_sm() as s:
         s.add(
             Download(
-                spotify_track_uri=spotify_track_uri,
+                source_url=source_url,
                 job_id=job_id,
                 output_path=path,
             )
@@ -143,7 +143,7 @@ async def test_queued_track_has_full_contract_shape(client, make_token, app_sm, 
     job = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri="spotify:track:q1",
+        source_url="https://www.youtube.com/watch?v=q1",
         state="queued",
     )
     r = await client.get(
@@ -154,8 +154,8 @@ async def test_queued_track_has_full_contract_shape(client, make_token, app_sm, 
     body = r.json()
     assert set(body.keys()) == {
         "job_id",
-        "spotify_uri",
-        "spotify_type",
+        "source_url",
+        "source_type",
         "state",
         "display_name",
         "progress",
@@ -180,7 +180,7 @@ async def test_status_returns_stored_display_name(client, make_token, app_sm, cl
     job = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri="spotify:track:disp-status",
+        source_url="https://www.youtube.com/watch?v=disp-status",
         state="queued",
         display_name="Imagine — John Lennon",
     )
@@ -198,7 +198,7 @@ async def test_running_job_has_started_at(client, make_token, app_sm, cleanup):
     job = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri="spotify:track:run1",
+        source_url="https://www.youtube.com/watch?v=run1",
         state="running",
         set_started=True,
     )
@@ -218,7 +218,7 @@ async def test_done_track_has_output_path(client, make_token, app_sm, cleanup):
     job = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri="spotify:track:done1",
+        source_url="https://www.youtube.com/watch?v=done1",
         state="done",
         set_started=True,
         set_finished=True,
@@ -226,7 +226,7 @@ async def test_done_track_has_output_path(client, make_token, app_sm, cleanup):
     await _seed_download(
         app_sm,
         job_id=job.id,
-        spotify_track_uri="spotify:track:done1",
+        source_url="https://www.youtube.com/watch?v=done1",
         path="/data/media/music/done1.mp3",
     )
     r = await client.get(
@@ -245,8 +245,8 @@ async def test_done_album_has_no_output_path(client, make_token, app_sm, cleanup
     job = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri="spotify:album:done-al",
-        spotify_type="album",
+        source_url="https://music.youtube.com/browse/done-al",
+        source_type="album",
         state="done",
         set_started=True,
         set_finished=True,
@@ -266,7 +266,7 @@ async def test_failed_job_has_error(client, make_token, app_sm, cleanup):
     job = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri="spotify:track:fail1",
+        source_url="https://www.youtube.com/watch?v=fail1",
         state="failed",
         error_msg="spotdl crashed",
         set_started=True,

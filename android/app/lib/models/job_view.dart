@@ -12,8 +12,8 @@ part 'job_view.g.dart';
 class JobView with _$JobView {
   const factory JobView({
     required String jobId,
-    required String spotifyUri,
-    required SpotifyType spotifyType,
+    required String sourceUrl,
+    required ContentType sourceType,
     required JobState state,
     String? displayName,
     int? progress,

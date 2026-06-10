@@ -20,12 +20,11 @@ def test_jobs_display_name_column_exists(db_conn):
 def test_jobs_display_name_accepts_text(db_conn, seed_token):
     cur = db_conn.cursor()
     cur.execute(
-        "INSERT INTO jobs (spotify_uri, spotify_type, state, "
-        "display_name, created_by_token_id) "
+        "INSERT INTO jobs (source_url, source_type, state, display_name, created_by_token_id) "
         "VALUES (%s, %s, %s, %s, %s) RETURNING id",
         (
-            f"spotify:track:disp-{uuid.uuid4()}",
-            "track",
+            f"https://www.youtube.com/watch?v=disp-{uuid.uuid4()}",
+            "song",
             "queued",
             "Bohemian Rhapsody — Queen",
             seed_token,
@@ -39,11 +38,11 @@ def test_jobs_display_name_accepts_text(db_conn, seed_token):
 def test_jobs_display_name_nullable(db_conn, seed_token):
     cur = db_conn.cursor()
     cur.execute(
-        "INSERT INTO jobs (spotify_uri, spotify_type, state, created_by_token_id) "
+        "INSERT INTO jobs (source_url, source_type, state, created_by_token_id) "
         "VALUES (%s, %s, %s, %s) RETURNING id",
         (
-            f"spotify:track:nodisp-{uuid.uuid4()}",
-            "track",
+            f"https://www.youtube.com/watch?v=nodisp-{uuid.uuid4()}",
+            "song",
             "queued",
             seed_token,
         ),

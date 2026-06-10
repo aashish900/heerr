@@ -10,15 +10,11 @@ import '../models/search_result_item.dart';
 
 part 'search.g.dart';
 
-/// Current search bar state. `query` is what the user typed (raw text or a
-/// Spotify URI); `type` is the entity to search for.
-typedef SearchQueryState = ({String query, SpotifyType type});
+/// Current search bar state.
+typedef SearchQueryState = ({String query, ContentType type});
 
 const Duration _kDefaultSearchDebounce = Duration(milliseconds: 300);
 
-/// Debounce duration applied to keystrokes before firing `/search`. Exposed
-/// as a provider so widget tests can override it to `Duration.zero` and
-/// avoid wall-clock delays.
 @Riverpod(keepAlive: true)
 Duration searchDebounce(SearchDebounceRef ref) => _kDefaultSearchDebounce;
 
@@ -27,13 +23,13 @@ Duration searchDebounce(SearchDebounceRef ref) => _kDefaultSearchDebounce;
 @Riverpod(keepAlive: true)
 class SearchQuery extends _$SearchQuery {
   @override
-  SearchQueryState build() => (query: '', type: SpotifyType.track);
+  SearchQueryState build() => (query: '', type: ContentType.song);
 
   void setQuery(String query) {
     state = (query: query, type: state.type);
   }
 
-  void setType(SpotifyType type) {
+  void setType(ContentType type) {
     state = (query: state.query, type: type);
   }
 }
@@ -52,16 +48,11 @@ Future<SearchResponse> searchResults(SearchResultsRef ref) async {
     return const SearchResponse(results: <SearchResultItem>[]);
   }
 
-  // Register cancellation BEFORE the await so the token is cancelled when
-  // this provider rebuilds (the user typed another character).
   final CancelToken cancelToken = CancelToken();
   ref.onDispose(cancelToken.cancel);
 
   await Future<void>.delayed(debounce);
 
-  // If we were cancelled during the debounce wait, throw — riverpod has
-  // already started a new computation for the latest query, so this future
-  // has no listener.
   if (cancelToken.isCancelled) {
     throw const _DebounceCancelled();
   }

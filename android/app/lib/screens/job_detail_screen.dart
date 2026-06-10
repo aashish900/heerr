@@ -56,7 +56,7 @@ class _JobBody extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                job.spotifyType.name,
+                job.sourceType.name,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
@@ -70,7 +70,7 @@ class _JobBody extends StatelessWidget {
           ),
           const SizedBox(height: 16),
         ],
-        _Field(label: 'spotify uri', value: job.spotifyUri, copyable: true),
+        _Field(label: 'source url', value: job.sourceUrl, copyable: true),
         _Field(label: 'job id', value: job.jobId, copyable: true),
         _TimestampField(label: 'created', when: job.createdAt, now: now),
         if (job.startedAt != null)

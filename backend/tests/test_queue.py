@@ -57,8 +57,8 @@ async def _seed_job(
     app_sm,
     *,
     token_id,
-    spotify_uri: str,
-    spotify_type: str = "track",
+    source_url: str,
+    source_type: str = "song",
     state: str = "queued",
     display_name: str | None = None,
     set_finished: bool = False,
@@ -66,8 +66,8 @@ async def _seed_job(
     from datetime import datetime
 
     j = Job(
-        spotify_uri=spotify_uri,
-        spotify_type=spotify_type,
+        source_url=source_url,
+        source_type=source_type,
         state=state,
         display_name=display_name,
         created_by_token_id=token_id,
@@ -109,24 +109,26 @@ async def test_queue_separates_active_and_recent(client, make_token, app_sm, cle
     raw = await make_token()
     token_id = await _token_id_for(app_sm, raw)
 
-    q = await _seed_job(app_sm, token_id=token_id, spotify_uri="spotify:track:q", state="queued")
+    q = await _seed_job(
+        app_sm, token_id=token_id, source_url="https://www.youtube.com/watch?v=q", state="queued"
+    )
     r_ = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri="spotify:track:r",
+        source_url="https://www.youtube.com/watch?v=r",
         state="running",
     )
     d = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri="spotify:track:d",
+        source_url="https://www.youtube.com/watch?v=d",
         state="done",
         set_finished=True,
     )
     f = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri="spotify:track:f",
+        source_url="https://www.youtube.com/watch?v=f",
         state="failed",
         set_finished=True,
     )
@@ -148,9 +150,13 @@ async def test_active_sorted_oldest_first(client, make_token, app_sm, cleanup):
     raw = await make_token()
     token_id = await _token_id_for(app_sm, raw)
 
-    first = await _seed_job(app_sm, token_id=token_id, spotify_uri="spotify:track:older")
+    first = await _seed_job(
+        app_sm, token_id=token_id, source_url="https://www.youtube.com/watch?v=older"
+    )
     await asyncio.sleep(0.01)  # ensure later created_at
-    second = await _seed_job(app_sm, token_id=token_id, spotify_uri="spotify:track:newer")
+    second = await _seed_job(
+        app_sm, token_id=token_id, source_url="https://www.youtube.com/watch?v=newer"
+    )
 
     body = (
         await client.get(
@@ -169,7 +175,7 @@ async def test_recent_sorted_newest_first(client, make_token, app_sm, cleanup):
     older = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri="spotify:track:f-older",
+        source_url="https://www.youtube.com/watch?v=f-older",
         state="done",
         set_finished=True,
     )
@@ -177,7 +183,7 @@ async def test_recent_sorted_newest_first(client, make_token, app_sm, cleanup):
     newer = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri="spotify:track:f-newer",
+        source_url="https://www.youtube.com/watch?v=f-newer",
         state="failed",
         set_finished=True,
     )
@@ -200,7 +206,7 @@ async def test_recent_capped_at_20(client, make_token, app_sm, cleanup):
         await _seed_job(
             app_sm,
             token_id=token_id,
-            spotify_uri=f"spotify:track:bulk-{i}",
+            source_url=f"https://www.youtube.com/watch?v=bulk-{i}",
             state="done",
             set_finished=True,
         )
@@ -220,14 +226,14 @@ async def test_queue_returns_display_name_for_each_item(client, make_token, app_
     a = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri="spotify:track:disp-active",
+        source_url="https://www.youtube.com/watch?v=disp-active",
         state="queued",
         display_name="Active Track — Artist",
     )
     d = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri="spotify:track:disp-done",
+        source_url="https://www.youtube.com/watch?v=disp-done",
         state="done",
         display_name="Done Track — Artist",
         set_finished=True,
@@ -250,7 +256,7 @@ async def test_queue_display_name_null_when_unset(client, make_token, app_sm, cl
     j = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri="spotify:track:no-disp-q",
+        source_url="https://www.youtube.com/watch?v=no-disp-q",
         state="queued",
     )
     body = (
@@ -269,14 +275,14 @@ async def test_recent_track_has_output_path(client, make_token, app_sm, cleanup)
     job = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri="spotify:track:withdl",
+        source_url="https://www.youtube.com/watch?v=withdl",
         state="done",
         set_finished=True,
     )
     async with app_sm() as s:
         s.add(
             Download(
-                spotify_track_uri="spotify:track:withdl",
+                source_url="https://www.youtube.com/watch?v=withdl",
                 job_id=job.id,
                 output_path="/data/media/music/withdl.mp3",
             )

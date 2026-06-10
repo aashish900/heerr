@@ -1,27 +1,27 @@
-import re
 from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-_URI_RE = re.compile(r"^spotify:(track|album|playlist):[A-Za-z0-9_-]+$")
+_YOUTUBE_WATCH = "https://www.youtube.com/watch?v="
+_YTM_BROWSE = "https://music.youtube.com/browse/"
 
 
 class DownloadRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    spotify_uri: str
+    source_url: str
+    source_type: Literal["song", "album", "playlist"]
     display_name: str | None = None
 
-    @field_validator("spotify_uri")
+    @field_validator("source_url")
     @classmethod
     def _validate(cls, v: str) -> str:
-        if not _URI_RE.match(v):
-            raise ValueError("invalid spotify URI; expected spotify:(track|album|playlist):<id>")
-        return v
-
-    def parsed_type(self) -> Literal["track", "album", "playlist"]:
-        return self.spotify_uri.split(":", 2)[1]  # type: ignore[return-value]
+        if v.startswith(_YOUTUBE_WATCH) and len(v) > len(_YOUTUBE_WATCH):
+            return v
+        if v.startswith(_YTM_BROWSE) and len(v) > len(_YTM_BROWSE):
+            return v
+        raise ValueError("source_url must be a YouTube watch URL or YouTube Music browse URL")
 
 
 class DownloadResponse(BaseModel):

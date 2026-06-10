@@ -21,7 +21,8 @@ DownloadRequest _$DownloadRequestFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$DownloadRequest {
-  String get spotifyUri => throw _privateConstructorUsedError;
+  String get sourceUrl => throw _privateConstructorUsedError;
+  String get sourceType => throw _privateConstructorUsedError;
   String? get displayName => throw _privateConstructorUsedError;
 
   /// Serializes this DownloadRequest to a JSON map.
@@ -41,7 +42,7 @@ abstract class $DownloadRequestCopyWith<$Res> {
     $Res Function(DownloadRequest) then,
   ) = _$DownloadRequestCopyWithImpl<$Res, DownloadRequest>;
   @useResult
-  $Res call({String spotifyUri, String? displayName});
+  $Res call({String sourceUrl, String sourceType, String? displayName});
 }
 
 /// @nodoc
@@ -58,12 +59,20 @@ class _$DownloadRequestCopyWithImpl<$Res, $Val extends DownloadRequest>
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
-  $Res call({Object? spotifyUri = null, Object? displayName = freezed}) {
+  $Res call({
+    Object? sourceUrl = null,
+    Object? sourceType = null,
+    Object? displayName = freezed,
+  }) {
     return _then(
       _value.copyWith(
-            spotifyUri: null == spotifyUri
-                ? _value.spotifyUri
-                : spotifyUri // ignore: cast_nullable_to_non_nullable
+            sourceUrl: null == sourceUrl
+                ? _value.sourceUrl
+                : sourceUrl // ignore: cast_nullable_to_non_nullable
+                      as String,
+            sourceType: null == sourceType
+                ? _value.sourceType
+                : sourceType // ignore: cast_nullable_to_non_nullable
                       as String,
             displayName: freezed == displayName
                 ? _value.displayName
@@ -84,7 +93,7 @@ abstract class _$$DownloadRequestImplCopyWith<$Res>
   ) = __$$DownloadRequestImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({String spotifyUri, String? displayName});
+  $Res call({String sourceUrl, String sourceType, String? displayName});
 }
 
 /// @nodoc
@@ -100,12 +109,20 @@ class __$$DownloadRequestImplCopyWithImpl<$Res>
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
-  $Res call({Object? spotifyUri = null, Object? displayName = freezed}) {
+  $Res call({
+    Object? sourceUrl = null,
+    Object? sourceType = null,
+    Object? displayName = freezed,
+  }) {
     return _then(
       _$DownloadRequestImpl(
-        spotifyUri: null == spotifyUri
-            ? _value.spotifyUri
-            : spotifyUri // ignore: cast_nullable_to_non_nullable
+        sourceUrl: null == sourceUrl
+            ? _value.sourceUrl
+            : sourceUrl // ignore: cast_nullable_to_non_nullable
+                  as String,
+        sourceType: null == sourceType
+            ? _value.sourceType
+            : sourceType // ignore: cast_nullable_to_non_nullable
                   as String,
         displayName: freezed == displayName
             ? _value.displayName
@@ -119,19 +136,25 @@ class __$$DownloadRequestImplCopyWithImpl<$Res>
 /// @nodoc
 @JsonSerializable()
 class _$DownloadRequestImpl implements _DownloadRequest {
-  const _$DownloadRequestImpl({required this.spotifyUri, this.displayName});
+  const _$DownloadRequestImpl({
+    required this.sourceUrl,
+    required this.sourceType,
+    this.displayName,
+  });
 
   factory _$DownloadRequestImpl.fromJson(Map<String, dynamic> json) =>
       _$$DownloadRequestImplFromJson(json);
 
   @override
-  final String spotifyUri;
+  final String sourceUrl;
+  @override
+  final String sourceType;
   @override
   final String? displayName;
 
   @override
   String toString() {
-    return 'DownloadRequest(spotifyUri: $spotifyUri, displayName: $displayName)';
+    return 'DownloadRequest(sourceUrl: $sourceUrl, sourceType: $sourceType, displayName: $displayName)';
   }
 
   @override
@@ -139,15 +162,18 @@ class _$DownloadRequestImpl implements _DownloadRequest {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$DownloadRequestImpl &&
-            (identical(other.spotifyUri, spotifyUri) ||
-                other.spotifyUri == spotifyUri) &&
+            (identical(other.sourceUrl, sourceUrl) ||
+                other.sourceUrl == sourceUrl) &&
+            (identical(other.sourceType, sourceType) ||
+                other.sourceType == sourceType) &&
             (identical(other.displayName, displayName) ||
                 other.displayName == displayName));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, spotifyUri, displayName);
+  int get hashCode =>
+      Object.hash(runtimeType, sourceUrl, sourceType, displayName);
 
   /// Create a copy of DownloadRequest
   /// with the given fields replaced by the non-null parameter values.
@@ -168,7 +194,8 @@ class _$DownloadRequestImpl implements _DownloadRequest {
 
 abstract class _DownloadRequest implements DownloadRequest {
   const factory _DownloadRequest({
-    required final String spotifyUri,
+    required final String sourceUrl,
+    required final String sourceType,
     final String? displayName,
   }) = _$DownloadRequestImpl;
 
@@ -176,7 +203,9 @@ abstract class _DownloadRequest implements DownloadRequest {
       _$DownloadRequestImpl.fromJson;
 
   @override
-  String get spotifyUri;
+  String get sourceUrl;
+  @override
+  String get sourceType;
   @override
   String? get displayName;
 

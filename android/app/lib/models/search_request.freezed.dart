@@ -22,7 +22,7 @@ SearchRequest _$SearchRequestFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$SearchRequest {
   String get query => throw _privateConstructorUsedError;
-  SpotifyType get type => throw _privateConstructorUsedError;
+  ContentType get type => throw _privateConstructorUsedError;
   int get limit => throw _privateConstructorUsedError;
 
   /// Serializes this SearchRequest to a JSON map.
@@ -42,7 +42,7 @@ abstract class $SearchRequestCopyWith<$Res> {
     $Res Function(SearchRequest) then,
   ) = _$SearchRequestCopyWithImpl<$Res, SearchRequest>;
   @useResult
-  $Res call({String query, SpotifyType type, int limit});
+  $Res call({String query, ContentType type, int limit});
 }
 
 /// @nodoc
@@ -69,7 +69,7 @@ class _$SearchRequestCopyWithImpl<$Res, $Val extends SearchRequest>
             type: null == type
                 ? _value.type
                 : type // ignore: cast_nullable_to_non_nullable
-                      as SpotifyType,
+                      as ContentType,
             limit: null == limit
                 ? _value.limit
                 : limit // ignore: cast_nullable_to_non_nullable
@@ -89,7 +89,7 @@ abstract class _$$SearchRequestImplCopyWith<$Res>
   ) = __$$SearchRequestImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({String query, SpotifyType type, int limit});
+  $Res call({String query, ContentType type, int limit});
 }
 
 /// @nodoc
@@ -115,7 +115,7 @@ class __$$SearchRequestImplCopyWithImpl<$Res>
         type: null == type
             ? _value.type
             : type // ignore: cast_nullable_to_non_nullable
-                  as SpotifyType,
+                  as ContentType,
         limit: null == limit
             ? _value.limit
             : limit // ignore: cast_nullable_to_non_nullable
@@ -140,7 +140,7 @@ class _$SearchRequestImpl implements _SearchRequest {
   @override
   final String query;
   @override
-  final SpotifyType type;
+  final ContentType type;
   @override
   @JsonKey()
   final int limit;
@@ -181,7 +181,7 @@ class _$SearchRequestImpl implements _SearchRequest {
 abstract class _SearchRequest implements SearchRequest {
   const factory _SearchRequest({
     required final String query,
-    required final SpotifyType type,
+    required final ContentType type,
     final int limit,
   }) = _$SearchRequestImpl;
 
@@ -191,7 +191,7 @@ abstract class _SearchRequest implements SearchRequest {
   @override
   String get query;
   @override
-  SpotifyType get type;
+  ContentType get type;
   @override
   int get limit;
 

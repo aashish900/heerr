@@ -92,7 +92,7 @@ void main() {
 
       final DownloadResponse res = await c
           .read(downloadDispatcherProvider.notifier)
-          .dispatch('spotify:track:abc');
+          .dispatch('https://www.youtube.com/watch?v=test', sourceType: 'song');
 
       expect(res.jobId, 'job-1');
       expect(res.state, JobState.queued);
@@ -101,7 +101,8 @@ void main() {
       expect(adapter.requests.single.path, '/download');
       expect(adapter.requests.single.method, 'POST');
       expect(adapter.requests.single.data, <String, dynamic>{
-        'spotify_uri': 'spotify:track:abc',
+        'source_url': 'https://www.youtube.com/watch?v=test',
+        'source_type': 'song',
       });
     });
 
@@ -113,11 +114,13 @@ void main() {
       addTearDown(c.dispose);
 
       await c.read(downloadDispatcherProvider.notifier).dispatch(
-            'spotify:track:abc',
+            'https://www.youtube.com/watch?v=test',
+            sourceType: 'song',
             displayName: 'Imagine — John Lennon',
           );
       expect(adapter.requests.single.data, <String, dynamic>{
-        'spotify_uri': 'spotify:track:abc',
+        'source_url': 'https://www.youtube.com/watch?v=test',
+        'source_type': 'song',
         'display_name': 'Imagine — John Lennon',
       });
     });
@@ -134,7 +137,7 @@ void main() {
 
       final DownloadResponse res = await c
           .read(downloadDispatcherProvider.notifier)
-          .dispatch('spotify:track:abc');
+          .dispatch('https://www.youtube.com/watch?v=test', sourceType: 'song');
 
       expect(res.deduped, isTrue);
       expect(res.state, JobState.done);
@@ -160,10 +163,10 @@ void main() {
 
       final Future<DownloadResponse> pending = c
           .read(downloadDispatcherProvider.notifier)
-          .dispatch('spotify:track:abc');
+          .dispatch('https://www.youtube.com/watch?v=test', sourceType: 'song');
 
       // Mid-flight: the URI is in the set.
-      expect(c.read(downloadDispatcherProvider), <String>{'spotify:track:abc'});
+      expect(c.read(downloadDispatcherProvider), <String>{'https://www.youtube.com/watch?v=test'});
 
       gate.complete(_json(202, _payload()));
       await pending;
@@ -173,7 +176,7 @@ void main() {
       // Saw at least: {}, {uri}, {} — order matters but we don't assert
       // exact length to keep the test robust to fireImmediately quirks.
       expect(seen.first, isEmpty);
-      expect(seen.any((Set<String> s) => s.contains('spotify:track:abc')), isTrue);
+      expect(seen.any((Set<String> s) => s.contains('https://www.youtube.com/watch?v=test')), isTrue);
       expect(seen.last, isEmpty);
     });
   });
@@ -187,7 +190,7 @@ void main() {
       addTearDown(c.dispose);
 
       await expectLater(
-        c.read(downloadDispatcherProvider.notifier).dispatch('spotify:track:x'),
+        c.read(downloadDispatcherProvider.notifier).dispatch('https://www.youtube.com/watch?v=test', sourceType: 'song'),
         throwsA(isA<UnauthorizedError>()),
       );
       // finally block must have removed the URI even though the request
@@ -198,29 +201,31 @@ void main() {
     test('two concurrent dispatches for different URIs are both tracked', () async {
       final Completer<ResponseBody> gate1 = Completer<ResponseBody>();
       final Completer<ResponseBody> gate2 = Completer<ResponseBody>();
+      const String url1 = 'https://www.youtube.com/watch?v=vid1';
+      const String url2 = 'https://www.youtube.com/watch?v=vid2';
       final _FakeAdapter adapter = _FakeAdapter((RequestOptions o) {
         final String uri =
-            (o.data as Map<String, dynamic>)['spotify_uri'] as String;
-        return uri.endsWith(':1') ? gate1.future : gate2.future;
+            (o.data as Map<String, dynamic>)['source_url'] as String;
+        return uri == url1 ? gate1.future : gate2.future;
       });
       final ProviderContainer c = _container(_dioWith(adapter));
       addTearDown(c.dispose);
 
       final Future<DownloadResponse> a = c
           .read(downloadDispatcherProvider.notifier)
-          .dispatch('spotify:track:1');
+          .dispatch(url1, sourceType: 'song');
       final Future<DownloadResponse> b = c
           .read(downloadDispatcherProvider.notifier)
-          .dispatch('spotify:track:2');
+          .dispatch(url2, sourceType: 'song');
 
       expect(
         c.read(downloadDispatcherProvider),
-        <String>{'spotify:track:1', 'spotify:track:2'},
+        <String>{url1, url2},
       );
 
       gate1.complete(_json(202, _payload(jobId: 'j1')));
       await a;
-      expect(c.read(downloadDispatcherProvider), <String>{'spotify:track:2'});
+      expect(c.read(downloadDispatcherProvider), <String>{url2});
 
       gate2.complete(_json(202, _payload(jobId: 'j2')));
       await b;

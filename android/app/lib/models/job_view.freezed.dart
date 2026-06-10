@@ -22,8 +22,8 @@ JobView _$JobViewFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$JobView {
   String get jobId => throw _privateConstructorUsedError;
-  String get spotifyUri => throw _privateConstructorUsedError;
-  SpotifyType get spotifyType => throw _privateConstructorUsedError;
+  String get sourceUrl => throw _privateConstructorUsedError;
+  ContentType get sourceType => throw _privateConstructorUsedError;
   JobState get state => throw _privateConstructorUsedError;
   String? get displayName => throw _privateConstructorUsedError;
   int? get progress => throw _privateConstructorUsedError;
@@ -49,8 +49,8 @@ abstract class $JobViewCopyWith<$Res> {
   @useResult
   $Res call({
     String jobId,
-    String spotifyUri,
-    SpotifyType spotifyType,
+    String sourceUrl,
+    ContentType sourceType,
     JobState state,
     String? displayName,
     int? progress,
@@ -78,8 +78,8 @@ class _$JobViewCopyWithImpl<$Res, $Val extends JobView>
   @override
   $Res call({
     Object? jobId = null,
-    Object? spotifyUri = null,
-    Object? spotifyType = null,
+    Object? sourceUrl = null,
+    Object? sourceType = null,
     Object? state = null,
     Object? displayName = freezed,
     Object? progress = freezed,
@@ -95,14 +95,14 @@ class _$JobViewCopyWithImpl<$Res, $Val extends JobView>
                 ? _value.jobId
                 : jobId // ignore: cast_nullable_to_non_nullable
                       as String,
-            spotifyUri: null == spotifyUri
-                ? _value.spotifyUri
-                : spotifyUri // ignore: cast_nullable_to_non_nullable
+            sourceUrl: null == sourceUrl
+                ? _value.sourceUrl
+                : sourceUrl // ignore: cast_nullable_to_non_nullable
                       as String,
-            spotifyType: null == spotifyType
-                ? _value.spotifyType
-                : spotifyType // ignore: cast_nullable_to_non_nullable
-                      as SpotifyType,
+            sourceType: null == sourceType
+                ? _value.sourceType
+                : sourceType // ignore: cast_nullable_to_non_nullable
+                      as ContentType,
             state: null == state
                 ? _value.state
                 : state // ignore: cast_nullable_to_non_nullable
@@ -151,8 +151,8 @@ abstract class _$$JobViewImplCopyWith<$Res> implements $JobViewCopyWith<$Res> {
   @useResult
   $Res call({
     String jobId,
-    String spotifyUri,
-    SpotifyType spotifyType,
+    String sourceUrl,
+    ContentType sourceType,
     JobState state,
     String? displayName,
     int? progress,
@@ -179,8 +179,8 @@ class __$$JobViewImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? jobId = null,
-    Object? spotifyUri = null,
-    Object? spotifyType = null,
+    Object? sourceUrl = null,
+    Object? sourceType = null,
     Object? state = null,
     Object? displayName = freezed,
     Object? progress = freezed,
@@ -196,14 +196,14 @@ class __$$JobViewImplCopyWithImpl<$Res>
             ? _value.jobId
             : jobId // ignore: cast_nullable_to_non_nullable
                   as String,
-        spotifyUri: null == spotifyUri
-            ? _value.spotifyUri
-            : spotifyUri // ignore: cast_nullable_to_non_nullable
+        sourceUrl: null == sourceUrl
+            ? _value.sourceUrl
+            : sourceUrl // ignore: cast_nullable_to_non_nullable
                   as String,
-        spotifyType: null == spotifyType
-            ? _value.spotifyType
-            : spotifyType // ignore: cast_nullable_to_non_nullable
-                  as SpotifyType,
+        sourceType: null == sourceType
+            ? _value.sourceType
+            : sourceType // ignore: cast_nullable_to_non_nullable
+                  as ContentType,
         state: null == state
             ? _value.state
             : state // ignore: cast_nullable_to_non_nullable
@@ -246,8 +246,8 @@ class __$$JobViewImplCopyWithImpl<$Res>
 class _$JobViewImpl implements _JobView {
   const _$JobViewImpl({
     required this.jobId,
-    required this.spotifyUri,
-    required this.spotifyType,
+    required this.sourceUrl,
+    required this.sourceType,
     required this.state,
     this.displayName,
     this.progress,
@@ -264,9 +264,9 @@ class _$JobViewImpl implements _JobView {
   @override
   final String jobId;
   @override
-  final String spotifyUri;
+  final String sourceUrl;
   @override
-  final SpotifyType spotifyType;
+  final ContentType sourceType;
   @override
   final JobState state;
   @override
@@ -286,7 +286,7 @@ class _$JobViewImpl implements _JobView {
 
   @override
   String toString() {
-    return 'JobView(jobId: $jobId, spotifyUri: $spotifyUri, spotifyType: $spotifyType, state: $state, displayName: $displayName, progress: $progress, error: $error, outputPath: $outputPath, createdAt: $createdAt, startedAt: $startedAt, finishedAt: $finishedAt)';
+    return 'JobView(jobId: $jobId, sourceUrl: $sourceUrl, sourceType: $sourceType, state: $state, displayName: $displayName, progress: $progress, error: $error, outputPath: $outputPath, createdAt: $createdAt, startedAt: $startedAt, finishedAt: $finishedAt)';
   }
 
   @override
@@ -295,10 +295,10 @@ class _$JobViewImpl implements _JobView {
         (other.runtimeType == runtimeType &&
             other is _$JobViewImpl &&
             (identical(other.jobId, jobId) || other.jobId == jobId) &&
-            (identical(other.spotifyUri, spotifyUri) ||
-                other.spotifyUri == spotifyUri) &&
-            (identical(other.spotifyType, spotifyType) ||
-                other.spotifyType == spotifyType) &&
+            (identical(other.sourceUrl, sourceUrl) ||
+                other.sourceUrl == sourceUrl) &&
+            (identical(other.sourceType, sourceType) ||
+                other.sourceType == sourceType) &&
             (identical(other.state, state) || other.state == state) &&
             (identical(other.displayName, displayName) ||
                 other.displayName == displayName) &&
@@ -320,8 +320,8 @@ class _$JobViewImpl implements _JobView {
   int get hashCode => Object.hash(
     runtimeType,
     jobId,
-    spotifyUri,
-    spotifyType,
+    sourceUrl,
+    sourceType,
     state,
     displayName,
     progress,
@@ -349,8 +349,8 @@ class _$JobViewImpl implements _JobView {
 abstract class _JobView implements JobView {
   const factory _JobView({
     required final String jobId,
-    required final String spotifyUri,
-    required final SpotifyType spotifyType,
+    required final String sourceUrl,
+    required final ContentType sourceType,
     required final JobState state,
     final String? displayName,
     final int? progress,
@@ -366,9 +366,9 @@ abstract class _JobView implements JobView {
   @override
   String get jobId;
   @override
-  String get spotifyUri;
+  String get sourceUrl;
   @override
-  SpotifyType get spotifyType;
+  ContentType get sourceType;
   @override
   JobState get state;
   @override

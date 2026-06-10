@@ -7,8 +7,8 @@ from pydantic import BaseModel
 
 class JobView(BaseModel):
     job_id: UUID
-    spotify_uri: str
-    spotify_type: Literal["track", "album", "playlist"]
+    source_url: str
+    source_type: Literal["song", "album", "playlist"]
     state: Literal["queued", "running", "done", "failed"]
     display_name: str | None
     progress: None = None  # v1: always null per PLAN; reserved for future

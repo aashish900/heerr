@@ -11,7 +11,7 @@ part 'search_request.g.dart';
 class SearchRequest with _$SearchRequest {
   const factory SearchRequest({
     required String query,
-    required SpotifyType type,
+    required ContentType type,
     @Default(20) int limit,
   }) = _SearchRequest;
 

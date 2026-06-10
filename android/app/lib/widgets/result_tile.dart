@@ -33,7 +33,7 @@ class ResultTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final bool inFlight = ref.watch(
       downloadDispatcherProvider.select(
-        (Set<String> s) => s.contains(item.spotifyUri),
+        (Set<String> s) => s.contains(item.sourceUrl),
       ),
     );
     final bool tappable =

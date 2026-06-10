@@ -14,12 +14,12 @@ void main() {
     test('serializes to snake_case keys + JsonValue type string', () {
       const SearchRequest req = SearchRequest(
         query: 'tame impala',
-        type: SpotifyType.track,
+        type: ContentType.song,
         limit: 10,
       );
       expect(req.toJson(), <String, dynamic>{
         'query': 'tame impala',
-        'type': 'track',
+        'type': 'song',
         'limit': 10,
       });
     });
@@ -27,7 +27,7 @@ void main() {
     test('round-trip via JSON', () {
       const SearchRequest a = SearchRequest(
         query: 'q',
-        type: SpotifyType.playlist,
+        type: ContentType.playlist,
       );
       final SearchRequest b = SearchRequest.fromJson(a.toJson());
       expect(b, equals(a));
@@ -40,8 +40,8 @@ void main() {
       final Map<String, dynamic> payload = <String, dynamic>{
         'results': <Map<String, dynamic>>[
           <String, dynamic>{
-            'spotify_uri': 'spotify:track:abc123',
-            'spotify_url': 'https://open.spotify.com/track/abc123',
+            'source_url': 'https://www.youtube.com/watch?v=test',
+            'source_type': 'song',
             'title': 'The Less I Know The Better',
             'artist': 'Tame Impala',
             'album': 'Currents',
@@ -56,8 +56,8 @@ void main() {
 
       expect(r.results, hasLength(1));
       final SearchResultItem item = r.results.first;
-      expect(item.spotifyUri, 'spotify:track:abc123');
-      expect(item.spotifyUrl, 'https://open.spotify.com/track/abc123');
+      expect(item.sourceUrl, 'https://www.youtube.com/watch?v=test');
+      expect(item.sourceType, 'song');
       expect(item.title, 'The Less I Know The Better');
       expect(item.artist, 'Tame Impala');
       expect(item.album, 'Currents');
@@ -71,8 +71,8 @@ void main() {
       const SearchResponse a = SearchResponse(
         results: <SearchResultItem>[
           SearchResultItem(
-            spotifyUri: 'spotify:album:xyz',
-            spotifyUrl: 'https://open.spotify.com/album/xyz',
+            sourceUrl: 'https://music.youtube.com/browse/album1',
+            sourceType: 'song',
             title: 'Currents',
             artist: 'Tame Impala',
             alreadyDownloaded: true,
@@ -86,8 +86,8 @@ void main() {
 
     test('nullable fields omitted when null (include_if_null: false)', () {
       const SearchResultItem item = SearchResultItem(
-        spotifyUri: 'spotify:track:1',
-        spotifyUrl: 'https://open.spotify.com/track/1',
+        sourceUrl: 'https://www.youtube.com/watch?v=test',
+        sourceType: 'song',
         title: 't',
         artist: 'a',
         alreadyDownloaded: false,
@@ -103,10 +103,12 @@ void main() {
   group('DownloadRequest', () {
     test('omits display_name from JSON when null', () {
       const DownloadRequest a = DownloadRequest(
-        spotifyUri: 'spotify:track:abc',
+        sourceUrl: 'https://www.youtube.com/watch?v=test',
+        sourceType: 'song',
       );
       expect(a.toJson(), <String, dynamic>{
-        'spotify_uri': 'spotify:track:abc',
+        'source_url': 'https://www.youtube.com/watch?v=test',
+        'source_type': 'song',
       });
       final DownloadRequest b = DownloadRequest.fromJson(a.toJson());
       expect(b, equals(a));
@@ -114,11 +116,13 @@ void main() {
 
     test('round-trips with display_name set', () {
       const DownloadRequest a = DownloadRequest(
-        spotifyUri: 'spotify:track:abc',
+        sourceUrl: 'https://www.youtube.com/watch?v=test',
+        sourceType: 'song',
         displayName: 'Imagine — John Lennon',
       );
       expect(a.toJson(), <String, dynamic>{
-        'spotify_uri': 'spotify:track:abc',
+        'source_url': 'https://www.youtube.com/watch?v=test',
+        'source_type': 'song',
         'display_name': 'Imagine — John Lennon',
       });
       final DownloadRequest b = DownloadRequest.fromJson(a.toJson());
@@ -159,8 +163,8 @@ void main() {
     test('parses every field from /status/{id} payload', () {
       final Map<String, dynamic> payload = <String, dynamic>{
         'job_id': 'j-1',
-        'spotify_uri': 'spotify:track:1',
-        'spotify_type': 'track',
+        'source_url': 'https://www.youtube.com/watch?v=test',
+        'source_type': 'song',
         'state': 'done',
         'display_name': 'The Less I Know The Better — Tame Impala',
         'progress': null,
@@ -172,8 +176,8 @@ void main() {
       };
       final JobView j = JobView.fromJson(payload);
       expect(j.jobId, 'j-1');
-      expect(j.spotifyUri, 'spotify:track:1');
-      expect(j.spotifyType, SpotifyType.track);
+      expect(j.sourceUrl, 'https://www.youtube.com/watch?v=test');
+      expect(j.sourceType, ContentType.song);
       expect(j.state, JobState.done);
       expect(j.displayName, 'The Less I Know The Better — Tame Impala');
       expect(j.outputPath, '/data/media/music/Tame Impala/Currents/01.mp3');
@@ -185,8 +189,8 @@ void main() {
     test('round-trip via JSON preserves DateTime equality', () {
       final JobView a = JobView(
         jobId: 'j',
-        spotifyUri: 'spotify:track:x',
-        spotifyType: SpotifyType.track,
+        sourceUrl: 'https://www.youtube.com/watch?v=test',
+        sourceType: ContentType.song,
         state: JobState.failed,
         error: 'spotdl exited 1',
         createdAt: DateTime.utc(2026, 6, 9, 10),
@@ -211,8 +215,8 @@ void main() {
         'active': <Map<String, dynamic>>[
           <String, dynamic>{
             'job_id': 'j-running',
-            'spotify_uri': 'spotify:track:run',
-            'spotify_type': 'track',
+            'source_url': 'https://www.youtube.com/watch?v=test',
+            'source_type': 'song',
             'state': 'running',
             'progress': null,
             'error': null,
@@ -225,8 +229,8 @@ void main() {
         'recent': <Map<String, dynamic>>[
           <String, dynamic>{
             'job_id': 'j-done',
-            'spotify_uri': 'spotify:album:done',
-            'spotify_type': 'album',
+            'source_url': 'https://music.youtube.com/browse/album1',
+            'source_type': 'album',
             'state': 'done',
             'progress': null,
             'error': null,

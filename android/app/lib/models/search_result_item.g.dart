@@ -9,8 +9,8 @@ part of 'search_result_item.dart';
 _$SearchResultItemImpl _$$SearchResultItemImplFromJson(
   Map<String, dynamic> json,
 ) => _$SearchResultItemImpl(
-  spotifyUri: json['spotify_uri'] as String,
-  spotifyUrl: json['spotify_url'] as String,
+  sourceUrl: json['source_url'] as String,
+  sourceType: json['source_type'] as String,
   title: json['title'] as String,
   artist: json['artist'] as String,
   album: json['album'] as String?,
@@ -23,8 +23,8 @@ _$SearchResultItemImpl _$$SearchResultItemImplFromJson(
 Map<String, dynamic> _$$SearchResultItemImplToJson(
   _$SearchResultItemImpl instance,
 ) => <String, dynamic>{
-  'spotify_uri': instance.spotifyUri,
-  'spotify_url': instance.spotifyUrl,
+  'source_url': instance.sourceUrl,
+  'source_type': instance.sourceType,
   'title': instance.title,
   'artist': instance.artist,
   if (instance.album case final value?) 'album': value,

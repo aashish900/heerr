@@ -7,20 +7,11 @@ part of 'download.dart';
 // **************************************************************************
 
 String _$downloadDispatcherHash() =>
-    r'0623991b76aa1c847687569f31cd89f5d5c59c59';
+    r'bf59ef5efdeaecd4b3555b62d685766b966d8e48';
 
-/// Tracks which `spotify_uri`s have an in-flight `POST /download`. The state
-/// is the **set of in-flight URIs**; UI watches its own URI's membership
+/// Tracks which `source_url`s have an in-flight `POST /download`. The state
+/// is the **set of in-flight URLs**; UI watches its own URL's membership
 /// (via `.select`) to render a spinner while the request is mid-flight.
-///
-/// `dispatch` is the imperative entry point — call it from a tap handler,
-/// await the [DownloadResponse], and use `deduped` to choose snackbar copy.
-/// The in-flight URI is removed in a `finally`, so a thrown [ApiError] still
-/// leaves the tile responsive.
-///
-/// `keepAlive: true` so the in-flight set survives screen rebuilds (typing
-/// in the query box rebuilds the result list — we don't want a tile-spinner
-/// to flicker off when the list refreshes underneath it).
 ///
 /// Copied from [DownloadDispatcher].
 @ProviderFor(DownloadDispatcher)

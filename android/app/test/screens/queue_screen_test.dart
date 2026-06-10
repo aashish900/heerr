@@ -53,12 +53,12 @@ Widget _wrap(List<Override> overrides) {
 JobView _job({
   String jobId = 'job-aaaaaaaa-1',
   JobState state = JobState.queued,
-  String uri = 'spotify:track:abc',
+  String uri = 'https://www.youtube.com/watch?v=test',
 }) {
   return JobView(
     jobId: jobId,
-    spotifyUri: uri,
-    spotifyType: SpotifyType.track,
+    sourceUrl: uri,
+    sourceType: ContentType.song,
     state: state,
     createdAt: DateTime.utc(2026, 6, 9, 12),
   );

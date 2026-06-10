@@ -5,7 +5,7 @@ from app.api.deps import require_scope
 from app.db import get_session
 from app.models import Token
 from app.schemas.download import DownloadRequest, DownloadResponse
-from app.services.jobs import create_job_idempotent, find_download_for_track
+from app.services.jobs import create_job_idempotent, find_download_for_song
 from app.services.workers import JobEnqueuer, get_enqueuer
 
 router = APIRouter(tags=["download"])
@@ -23,10 +23,8 @@ async def download(
     enqueue: JobEnqueuer = Depends(get_enqueuer),
     tok: Token = Depends(require_scope("download")),
 ) -> DownloadResponse:
-    type_ = req.parsed_type()
-
-    if type_ == "track":
-        existing_dl = await find_download_for_track(session, req.spotify_uri)
+    if req.source_type == "song":
+        existing_dl = await find_download_for_song(session, req.source_url)
         if existing_dl is not None:
             return DownloadResponse(
                 job_id=existing_dl.job_id,
@@ -36,8 +34,8 @@ async def download(
 
     job, deduped = await create_job_idempotent(
         session,
-        spotify_uri=req.spotify_uri,
-        spotify_type=type_,
+        source_url=req.source_url,
+        source_type=req.source_type,
         token_id=tok.id,
         display_name=req.display_name,
     )

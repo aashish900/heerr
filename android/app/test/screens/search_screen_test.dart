@@ -47,15 +47,15 @@ Override _resultsValue(AsyncValue<SearchResponse> value) {
 const SearchResponse _twoResults = SearchResponse(
   results: <SearchResultItem>[
     SearchResultItem(
-      spotifyUri: 'spotify:track:1',
-      spotifyUrl: 'https://open.spotify.com/track/1',
+      sourceUrl: 'https://www.youtube.com/watch?v=vid1',
+      sourceType: 'song',
       title: 'First',
       artist: 'Artist A',
       alreadyDownloaded: false,
     ),
     SearchResultItem(
-      spotifyUri: 'spotify:track:2',
-      spotifyUrl: 'https://open.spotify.com/track/2',
+      sourceUrl: 'https://www.youtube.com/watch?v=vid2',
+      sourceType: 'song',
       title: 'Second',
       artist: 'Artist B',
       album: 'Album X',
@@ -69,7 +69,7 @@ const SearchResponse _twoResults = SearchResponse(
 // ---------------------------------------------------------------------------
 
 void main() {
-  testWidgets('initial state: empty query → EmptyState "Search Spotify"', (
+  testWidgets('initial state: empty query → EmptyState "Search YouTube Music"', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -87,7 +87,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(EmptyState),
-        matching: find.text('Search Spotify'),
+        matching: find.text('Search YouTube Music'),
       ),
       findsOneWidget,
     );
@@ -211,11 +211,11 @@ void main() {
     await tester.tap(find.text('Albums'));
     await tester.pumpAndSettle();
 
-    expect(container.read(searchQueryProvider).type, SpotifyType.album);
+    expect(container.read(searchQueryProvider).type, ContentType.album);
 
     await tester.tap(find.text('Playlists'));
     await tester.pumpAndSettle();
-    expect(container.read(searchQueryProvider).type, SpotifyType.playlist);
+    expect(container.read(searchQueryProvider).type, ContentType.playlist);
   });
 
   testWidgets('typing in the text field updates searchQueryProvider.query', (
@@ -280,8 +280,8 @@ void main() {
             home: Scaffold(
               body: ResultTile(
                 item: SearchResultItem(
-                  spotifyUri: 'spotify:track:1',
-                  spotifyUrl: 'https://open.spotify.com/track/1',
+                  sourceUrl: 'https://www.youtube.com/watch?v=test',
+                  sourceType: 'song',
                   title: 'Hello',
                   artist: 'World',
                   alreadyDownloaded: false,
@@ -308,8 +308,8 @@ void main() {
             home: Scaffold(
               body: ResultTile(
                 item: SearchResultItem(
-                  spotifyUri: 'spotify:track:2',
-                  spotifyUrl: 'https://open.spotify.com/track/2',
+                  sourceUrl: 'https://www.youtube.com/watch?v=test',
+                  sourceType: 'song',
                   title: 'Owned',
                   artist: 'X',
                   alreadyDownloaded: true,
@@ -383,7 +383,8 @@ void main() {
       expect(adapter.requests, hasLength(1));
       expect(adapter.requests.single.path, '/download');
       expect(adapter.requests.single.data, <String, dynamic>{
-        'spotify_uri': 'spotify:track:1',
+        'source_url': 'https://www.youtube.com/watch?v=vid1',
+        'source_type': 'song',
         'display_name': 'First — Artist A',
       });
       expect(find.text('Queued'), findsOneWidget);
@@ -406,8 +407,8 @@ void main() {
           _resultsValue(const AsyncData<SearchResponse>(
             SearchResponse(results: <SearchResultItem>[
               SearchResultItem(
-                spotifyUri: 'spotify:track:dup',
-                spotifyUrl: 'https://open.spotify.com/track/dup',
+                sourceUrl: 'https://www.youtube.com/watch?v=test',
+                sourceType: 'song',
                 title: 'Dup',
                 artist: 'Artist',
                 alreadyDownloaded: false,

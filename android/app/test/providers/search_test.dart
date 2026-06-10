@@ -67,8 +67,8 @@ Map<String, dynamic> _stubSearchPayload({String title = 'Result'}) {
   return <String, dynamic>{
     'results': <Map<String, dynamic>>[
       <String, dynamic>{
-        'spotify_uri': 'spotify:track:abc',
-        'spotify_url': 'https://open.spotify.com/track/abc',
+        'source_url': 'https://www.youtube.com/watch?v=test',
+        'source_type': 'song',
         'title': title,
         'artist': 'Test Artist',
         'already_downloaded': false,
@@ -89,7 +89,7 @@ void main() {
 
       final SearchQueryState v = c.read(searchQueryProvider);
       expect(v.query, '');
-      expect(v.type, SpotifyType.track);
+      expect(v.type, ContentType.song);
     });
 
     test('setQuery updates query and preserves type', () {
@@ -99,7 +99,7 @@ void main() {
       c.read(searchQueryProvider.notifier).setQuery('tame impala');
       final SearchQueryState v = c.read(searchQueryProvider);
       expect(v.query, 'tame impala');
-      expect(v.type, SpotifyType.track);
+      expect(v.type, ContentType.song);
     });
 
     test('setType updates type and preserves query', () {
@@ -107,10 +107,10 @@ void main() {
       addTearDown(c.dispose);
 
       c.read(searchQueryProvider.notifier).setQuery('q');
-      c.read(searchQueryProvider.notifier).setType(SpotifyType.album);
+      c.read(searchQueryProvider.notifier).setType(ContentType.album);
       final SearchQueryState v = c.read(searchQueryProvider);
       expect(v.query, 'q');
-      expect(v.type, SpotifyType.album);
+      expect(v.type, ContentType.album);
     });
   });
 
@@ -163,7 +163,7 @@ void main() {
       expect(req.method, 'POST');
       expect(req.data, <String, dynamic>{
         'query': 'tame impala',
-        'type': 'track',
+        'type': 'song',
         'limit': 20,
       });
     });
@@ -179,9 +179,9 @@ void main() {
 
       c.read(searchQueryProvider.notifier).setQuery('q');
       await c.read(searchResultsProvider.future);
-      expect(adapter.requests.last.data, containsPair('type', 'track'));
+      expect(adapter.requests.last.data, containsPair('type', 'song'));
 
-      c.read(searchQueryProvider.notifier).setType(SpotifyType.album);
+      c.read(searchQueryProvider.notifier).setType(ContentType.album);
       await c.read(searchResultsProvider.future);
       expect(adapter.requests.last.data, containsPair('type', 'album'));
       expect(adapter.requests, hasLength(2));

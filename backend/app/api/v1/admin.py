@@ -17,7 +17,7 @@ from app.schemas.token import (
     CreateTokenResponse,
     TokenView,
 )
-from app.services.jobs import find_active_for_uri
+from app.services.jobs import find_active_for_url
 from app.services.workers import JobEnqueuer, get_enqueuer
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -120,11 +120,11 @@ async def retry_job(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"can only retry failed jobs (current state: {job.state})",
         )
-    other = await find_active_for_uri(session, job.spotify_uri)
+    other = await find_active_for_url(session, job.source_url)
     if other is not None and other.id != job.id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"another active job exists for {job.spotify_uri}",
+            detail=f"another active job exists for {job.source_url}",
         )
     job.state = "queued"
     job.error_msg = None

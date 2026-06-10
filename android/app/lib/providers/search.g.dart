@@ -8,11 +8,7 @@ part of 'search.dart';
 
 String _$searchDebounceHash() => r'b299e6ddbcd847cd680232b2bdafb3bee0459ae6';
 
-/// Debounce duration applied to keystrokes before firing `/search`. Exposed
-/// as a provider so widget tests can override it to `Duration.zero` and
-/// avoid wall-clock delays.
-///
-/// Copied from [searchDebounce].
+/// See also [searchDebounce].
 @ProviderFor(searchDebounce)
 final searchDebounceProvider = Provider<Duration>.internal(
   searchDebounce,
@@ -51,7 +47,7 @@ final searchResultsProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef SearchResultsRef = AutoDisposeFutureProviderRef<SearchResponse>;
-String _$searchQueryHash() => r'2ac33fa639a7f8253042c9b7174393f66aa68057';
+String _$searchQueryHash() => r'b41337bb28c511be75dc7c5c51074a42173a5b98';
 
 /// Search bar state. `keepAlive: true` because the user's last query should
 /// survive tab switches (Search → Queue → Search).

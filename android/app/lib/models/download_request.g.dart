@@ -9,13 +9,15 @@ part of 'download_request.dart';
 _$DownloadRequestImpl _$$DownloadRequestImplFromJson(
   Map<String, dynamic> json,
 ) => _$DownloadRequestImpl(
-  spotifyUri: json['spotify_uri'] as String,
+  sourceUrl: json['source_url'] as String,
+  sourceType: json['source_type'] as String,
   displayName: json['display_name'] as String?,
 );
 
 Map<String, dynamic> _$$DownloadRequestImplToJson(
   _$DownloadRequestImpl instance,
 ) => <String, dynamic>{
-  'spotify_uri': instance.spotifyUri,
+  'source_url': instance.sourceUrl,
+  'source_type': instance.sourceType,
   if (instance.displayName case final value?) 'display_name': value,
 };

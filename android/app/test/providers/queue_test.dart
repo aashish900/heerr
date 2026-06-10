@@ -82,12 +82,12 @@ Map<String, dynamic> _queueWith({
 Map<String, dynamic> _jobJson({
   String jobId = 'job-1',
   String state = 'queued',
-  String spotifyUri = 'spotify:track:abc',
+  String spotifyUri = 'https://www.youtube.com/watch?v=test',
 }) {
   return <String, dynamic>{
     'job_id': jobId,
-    'spotify_uri': spotifyUri,
-    'spotify_type': 'track',
+    'source_url': spotifyUri,
+    'source_type': 'song',
     'state': state,
     'created_at': '2026-06-09T12:00:00Z',
   };

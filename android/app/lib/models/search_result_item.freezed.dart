@@ -21,8 +21,8 @@ SearchResultItem _$SearchResultItemFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$SearchResultItem {
-  String get spotifyUri => throw _privateConstructorUsedError;
-  String get spotifyUrl => throw _privateConstructorUsedError;
+  String get sourceUrl => throw _privateConstructorUsedError;
+  String get sourceType => throw _privateConstructorUsedError;
   String get title => throw _privateConstructorUsedError;
   String get artist => throw _privateConstructorUsedError;
   String? get album => throw _privateConstructorUsedError;
@@ -49,8 +49,8 @@ abstract class $SearchResultItemCopyWith<$Res> {
   ) = _$SearchResultItemCopyWithImpl<$Res, SearchResultItem>;
   @useResult
   $Res call({
-    String spotifyUri,
-    String spotifyUrl,
+    String sourceUrl,
+    String sourceType,
     String title,
     String artist,
     String? album,
@@ -76,8 +76,8 @@ class _$SearchResultItemCopyWithImpl<$Res, $Val extends SearchResultItem>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? spotifyUri = null,
-    Object? spotifyUrl = null,
+    Object? sourceUrl = null,
+    Object? sourceType = null,
     Object? title = null,
     Object? artist = null,
     Object? album = freezed,
@@ -88,13 +88,13 @@ class _$SearchResultItemCopyWithImpl<$Res, $Val extends SearchResultItem>
   }) {
     return _then(
       _value.copyWith(
-            spotifyUri: null == spotifyUri
-                ? _value.spotifyUri
-                : spotifyUri // ignore: cast_nullable_to_non_nullable
+            sourceUrl: null == sourceUrl
+                ? _value.sourceUrl
+                : sourceUrl // ignore: cast_nullable_to_non_nullable
                       as String,
-            spotifyUrl: null == spotifyUrl
-                ? _value.spotifyUrl
-                : spotifyUrl // ignore: cast_nullable_to_non_nullable
+            sourceType: null == sourceType
+                ? _value.sourceType
+                : sourceType // ignore: cast_nullable_to_non_nullable
                       as String,
             title: null == title
                 ? _value.title
@@ -140,8 +140,8 @@ abstract class _$$SearchResultItemImplCopyWith<$Res>
   @override
   @useResult
   $Res call({
-    String spotifyUri,
-    String spotifyUrl,
+    String sourceUrl,
+    String sourceType,
     String title,
     String artist,
     String? album,
@@ -166,8 +166,8 @@ class __$$SearchResultItemImplCopyWithImpl<$Res>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? spotifyUri = null,
-    Object? spotifyUrl = null,
+    Object? sourceUrl = null,
+    Object? sourceType = null,
     Object? title = null,
     Object? artist = null,
     Object? album = freezed,
@@ -178,13 +178,13 @@ class __$$SearchResultItemImplCopyWithImpl<$Res>
   }) {
     return _then(
       _$SearchResultItemImpl(
-        spotifyUri: null == spotifyUri
-            ? _value.spotifyUri
-            : spotifyUri // ignore: cast_nullable_to_non_nullable
+        sourceUrl: null == sourceUrl
+            ? _value.sourceUrl
+            : sourceUrl // ignore: cast_nullable_to_non_nullable
                   as String,
-        spotifyUrl: null == spotifyUrl
-            ? _value.spotifyUrl
-            : spotifyUrl // ignore: cast_nullable_to_non_nullable
+        sourceType: null == sourceType
+            ? _value.sourceType
+            : sourceType // ignore: cast_nullable_to_non_nullable
                   as String,
         title: null == title
             ? _value.title
@@ -223,8 +223,8 @@ class __$$SearchResultItemImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$SearchResultItemImpl implements _SearchResultItem {
   const _$SearchResultItemImpl({
-    required this.spotifyUri,
-    required this.spotifyUrl,
+    required this.sourceUrl,
+    required this.sourceType,
     required this.title,
     required this.artist,
     this.album,
@@ -238,9 +238,9 @@ class _$SearchResultItemImpl implements _SearchResultItem {
       _$$SearchResultItemImplFromJson(json);
 
   @override
-  final String spotifyUri;
+  final String sourceUrl;
   @override
-  final String spotifyUrl;
+  final String sourceType;
   @override
   final String title;
   @override
@@ -258,7 +258,7 @@ class _$SearchResultItemImpl implements _SearchResultItem {
 
   @override
   String toString() {
-    return 'SearchResultItem(spotifyUri: $spotifyUri, spotifyUrl: $spotifyUrl, title: $title, artist: $artist, album: $album, durationMs: $durationMs, coverUrl: $coverUrl, alreadyDownloaded: $alreadyDownloaded, activeJobId: $activeJobId)';
+    return 'SearchResultItem(sourceUrl: $sourceUrl, sourceType: $sourceType, title: $title, artist: $artist, album: $album, durationMs: $durationMs, coverUrl: $coverUrl, alreadyDownloaded: $alreadyDownloaded, activeJobId: $activeJobId)';
   }
 
   @override
@@ -266,10 +266,10 @@ class _$SearchResultItemImpl implements _SearchResultItem {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$SearchResultItemImpl &&
-            (identical(other.spotifyUri, spotifyUri) ||
-                other.spotifyUri == spotifyUri) &&
-            (identical(other.spotifyUrl, spotifyUrl) ||
-                other.spotifyUrl == spotifyUrl) &&
+            (identical(other.sourceUrl, sourceUrl) ||
+                other.sourceUrl == sourceUrl) &&
+            (identical(other.sourceType, sourceType) ||
+                other.sourceType == sourceType) &&
             (identical(other.title, title) || other.title == title) &&
             (identical(other.artist, artist) || other.artist == artist) &&
             (identical(other.album, album) || other.album == album) &&
@@ -287,8 +287,8 @@ class _$SearchResultItemImpl implements _SearchResultItem {
   @override
   int get hashCode => Object.hash(
     runtimeType,
-    spotifyUri,
-    spotifyUrl,
+    sourceUrl,
+    sourceType,
     title,
     artist,
     album,
@@ -317,8 +317,8 @@ class _$SearchResultItemImpl implements _SearchResultItem {
 
 abstract class _SearchResultItem implements SearchResultItem {
   const factory _SearchResultItem({
-    required final String spotifyUri,
-    required final String spotifyUrl,
+    required final String sourceUrl,
+    required final String sourceType,
     required final String title,
     required final String artist,
     final String? album,
@@ -332,9 +332,9 @@ abstract class _SearchResultItem implements SearchResultItem {
       _$SearchResultItemImpl.fromJson;
 
   @override
-  String get spotifyUri;
+  String get sourceUrl;
   @override
-  String get spotifyUrl;
+  String get sourceType;
   @override
   String get title;
   @override

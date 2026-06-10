@@ -237,7 +237,7 @@ async def _seed_job(
     app_sm,
     *,
     token_id,
-    spotify_uri: str,
+    source_url: str,
     state: str = "failed",
     error_msg: str | None = None,
     attempt_count: int = 1,
@@ -245,8 +245,8 @@ async def _seed_job(
     from datetime import datetime
 
     j = Job(
-        spotify_uri=spotify_uri,
-        spotify_type="track",
+        source_url=source_url,
+        source_type="song",
         state=state,
         error_msg=error_msg,
         attempt_count=attempt_count,
@@ -268,7 +268,7 @@ async def test_retry_failed_job_resets_state_and_enqueues_worker(
     job = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri="spotify:track:retry-1",
+        source_url="https://www.youtube.com/watch?v=retry-1",
         state="failed",
         error_msg="boom",
         attempt_count=2,
@@ -302,7 +302,7 @@ async def test_retry_non_failed_returns_409(client, make_token, app_sm, state, c
     job = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri=f"spotify:track:state-{state}",
+        source_url=f"https://www.youtube.com/watch?v=state-{state}",
         state=state,
     )
     h = {"Authorization": f"Bearer {raw_admin}"}
@@ -322,18 +322,18 @@ async def test_retry_blocked_when_another_active_job_for_same_uri(
 ):
     raw_admin = await make_token(is_admin=True)
     token_id = await _token_id_for(app_sm, raw_admin)
-    uri = "spotify:track:race-retry"
+    uri = "https://www.youtube.com/watch?v=race-retry"
     # Failed job and an active queued job (different rows) on the same URI
     failed = await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri=uri,
+        source_url=uri,
         state="failed",
     )
     await _seed_job(
         app_sm,
         token_id=token_id,
-        spotify_uri=uri,
+        source_url=uri,
         state="queued",
     )
     h = {"Authorization": f"Bearer {raw_admin}"}

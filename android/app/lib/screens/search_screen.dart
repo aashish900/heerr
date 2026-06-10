@@ -26,8 +26,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   void initState() {
     super.initState();
-    // Seed the text field from the provider so the user's last query
-    // survives a tab-switch (Search → Queue → Search).
     _controller = TextEditingController(
       text: ref.read(searchQueryProvider).query,
     );
@@ -45,9 +43,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final AsyncValue<SearchResponse> resultsAsync =
         ref.watch(searchResultsProvider);
 
-    // Snackbar-route every search/Spotify error per PLAN §9. The dedup in
-    // reactToApiError prevents repeated snackbars when the same error class
-    // recurs across rapid retypes.
     ref.listen<AsyncValue<SearchResponse>>(
       searchResultsProvider,
       (AsyncValue<SearchResponse>? prev, AsyncValue<SearchResponse> next) {
@@ -65,7 +60,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               controller: _controller,
               autocorrect: false,
               decoration: const InputDecoration(
-                labelText: 'Search Spotify',
+                labelText: 'Search YouTube Music',
                 prefixIcon: Icon(Icons.search),
                 border: OutlineInputBorder(),
               ),
@@ -74,23 +69,23 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: SegmentedButton<SpotifyType>(
-              segments: const <ButtonSegment<SpotifyType>>[
-                ButtonSegment<SpotifyType>(
-                  value: SpotifyType.track,
-                  label: Text('Tracks'),
+            child: SegmentedButton<ContentType>(
+              segments: const <ButtonSegment<ContentType>>[
+                ButtonSegment<ContentType>(
+                  value: ContentType.song,
+                  label: Text('Songs'),
                 ),
-                ButtonSegment<SpotifyType>(
-                  value: SpotifyType.album,
+                ButtonSegment<ContentType>(
+                  value: ContentType.album,
                   label: Text('Albums'),
                 ),
-                ButtonSegment<SpotifyType>(
-                  value: SpotifyType.playlist,
+                ButtonSegment<ContentType>(
+                  value: ContentType.playlist,
                   label: Text('Playlists'),
                 ),
               ],
-              selected: <SpotifyType>{query.type},
-              onSelectionChanged: (Set<SpotifyType> set) {
+              selected: <ContentType>{query.type},
+              onSelectionChanged: (Set<ContentType> set) {
                 ref.read(searchQueryProvider.notifier).setType(set.first);
               },
             ),
@@ -119,8 +114,8 @@ class _Body extends ConsumerWidget {
         if (query.query.trim().isEmpty) {
           return const EmptyState(
             icon: Icons.search,
-            title: 'Search Spotify',
-            subtitle: 'Tracks, albums, or playlists',
+            title: 'Search YouTube Music',
+            subtitle: 'Songs, albums, or playlists',
           );
         }
         if (r.results.isEmpty) {
@@ -154,7 +149,11 @@ Future<void> _dispatchDownload(
   try {
     final DownloadResponse res = await ref
         .read(downloadDispatcherProvider.notifier)
-        .dispatch(item.spotifyUri, displayName: _displayNameFor(item));
+        .dispatch(
+          item.sourceUrl,
+          sourceType: item.sourceType,
+          displayName: _displayNameFor(item),
+        );
     if (!context.mounted) return;
     messenger
       ..hideCurrentSnackBar()
@@ -169,13 +168,8 @@ Future<void> _dispatchDownload(
   }
 }
 
-/// Human-readable label persisted on the queued job, so the queue tile shows
-/// "{title} — {artist}" for tracks/albums and "{title}" for playlists, instead
-/// of the raw `spotify:…:id` URI. Playlists drop the artist because the search
-/// result's `artist` field carries the owner name, not a musical artist.
 String _displayNameFor(SearchResultItem item) {
-  final String type = item.spotifyUri.split(':')[1];
-  if (type == 'playlist') return item.title;
+  if (item.sourceType == 'playlist') return item.title;
   return '${item.title} — ${item.artist}';
 }
 

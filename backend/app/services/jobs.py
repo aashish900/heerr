@@ -13,54 +13,47 @@ class InvalidStateTransition(Exception):
     pass
 
 
-async def find_active_for_uri(session: AsyncSession, spotify_uri: str) -> Job | None:
+async def find_active_for_url(session: AsyncSession, source_url: str) -> Job | None:
     r = await session.execute(
         select(Job).where(
-            Job.spotify_uri == spotify_uri,
+            Job.source_url == source_url,
             Job.state.in_(["queued", "running"]),
         )
     )
     return r.scalar_one_or_none()
 
 
-async def find_download_for_track(session: AsyncSession, spotify_track_uri: str) -> Download | None:
-    r = await session.execute(
-        select(Download).where(Download.spotify_track_uri == spotify_track_uri)
-    )
+async def find_download_for_song(session: AsyncSession, source_url: str) -> Download | None:
+    r = await session.execute(select(Download).where(Download.source_url == source_url))
     return r.scalar_one_or_none()
 
 
 async def create_job_idempotent(
     session: AsyncSession,
     *,
-    spotify_uri: str,
-    spotify_type: str,
+    source_url: str,
+    source_type: str,
     token_id: UUID,
     display_name: str | None = None,
 ) -> tuple[Job, bool]:
     """Return (job, deduped).
 
-    deduped=True means an existing active (queued|running) job for the URI
+    deduped=True means an existing active (queued|running) job for the URL
     was returned; deduped=False means a new row was inserted.
 
-    `display_name` is the human-readable label rendered in the queue UI
-    ("{title} — {artist}" for tracks/albums, "{title}" for playlists). It's
-    only applied when inserting a new row — existing active jobs keep the
-    name they were created with.
-
     Race protection: the partial unique index
-    `jobs_active_uri_idx` on `jobs(spotify_uri) WHERE state IN
+    `jobs_active_source_url_idx` on `jobs(source_url) WHERE state IN
     ('queued','running')` makes concurrent duplicate inserts impossible at
     the DB level. The IntegrityError-then-refetch path below converts the
     loser of a race into a clean `deduped=True` result.
     """
-    existing = await find_active_for_uri(session, spotify_uri)
+    existing = await find_active_for_url(session, source_url)
     if existing is not None:
         return existing, True
 
     job = Job(
-        spotify_uri=spotify_uri,
-        spotify_type=spotify_type,
+        source_url=source_url,
+        source_type=source_type,
         state="queued",
         display_name=display_name,
         created_by_token_id=token_id,
@@ -70,7 +63,7 @@ async def create_job_idempotent(
         async with session.begin_nested():
             await session.flush()
     except IntegrityError:
-        existing = await find_active_for_uri(session, spotify_uri)
+        existing = await find_active_for_url(session, source_url)
         if existing is None:
             raise
         return existing, True

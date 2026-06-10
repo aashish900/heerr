@@ -45,7 +45,7 @@ Widget _wrap(String jobId, List<Override> overrides) {
 JobView _job({
   String jobId = 'abc12345-rest-of-uuid',
   JobState state = JobState.running,
-  String uri = 'spotify:track:xyz',
+  String uri = 'https://www.youtube.com/watch?v=test',
   DateTime? createdAt,
   DateTime? startedAt,
   DateTime? finishedAt,
@@ -54,8 +54,8 @@ JobView _job({
 }) {
   return JobView(
     jobId: jobId,
-    spotifyUri: uri,
-    spotifyType: SpotifyType.track,
+    sourceUrl: uri,
+    sourceType: ContentType.song,
     state: state,
     createdAt: createdAt ?? DateTime.utc(2026, 6, 9, 12),
     startedAt: startedAt,
@@ -103,7 +103,7 @@ void main() {
 
     expect(find.byType(StatusPill), findsOneWidget);
     expect(find.text('running'), findsOneWidget);
-    expect(find.text('spotify:track:xyz'), findsOneWidget);
+    expect(find.text('https://www.youtube.com/watch?v=test'), findsOneWidget);
     expect(find.text('abcdefgh-rest'), findsOneWidget); // full job id field
     expect(find.textContaining('m ago'), findsWidgets); // relative timestamps
   });
