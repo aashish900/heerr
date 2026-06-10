@@ -66,7 +66,7 @@ async def run_spotdl(spotify_uri: str, output_dir: str | Path) -> list[Downloade
         "download",
         spotify_uri,
         "--audio",
-        "youtube-music,youtube,soundcloud",
+        "youtube",
         "--output",
         str(out_path / "{title}-{artist}.{output-ext}"),
     ]
