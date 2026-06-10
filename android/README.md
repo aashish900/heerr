@@ -3,7 +3,7 @@
 [![Android APK](https://github.com/aashish900/heerr/actions/workflows/android-publish.yml/badge.svg)](https://github.com/aashish900/heerr/actions/workflows/android-publish.yml)
 [![latest release](https://img.shields.io/github/v/release/aashish900/heerr)](https://github.com/aashish900/heerr/releases/latest)
 
-Native Android app: search Spotify, dispatch downloads to the home-server backend, watch the queue. Talks REST over Tailscale to the FastAPI service in [`../backend/`](../backend/).
+Native Android app: search YouTube Music, dispatch downloads to the home-server backend, watch the queue. Talks REST over Tailscale to the FastAPI service in [`../backend/`](../backend/).
 
 > **Status (2026-06-09):** planning complete. Flutter project itself does not exist yet — `android/app/` is created at milestone A1. Until then this README is forward-looking; commands marked **(post-A1)** won't work yet.
 

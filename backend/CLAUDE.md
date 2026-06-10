@@ -9,7 +9,7 @@ Backend-specific Claude rules. **Project-wide rules live in `/CLAUDE.md` at repo
 In order:
 1. `/CLAUDE.md` (project-wide rules)
 2. `backend/CLAUDE.md` (this file — backend hard rules)
-3. `backend/docs/CONTEXT.md` (server env, Spotify scope, hard learnings)
+3. `backend/docs/CONTEXT.md` (server env, architecture, hard learnings)
 4. `backend/docs/DECISIONLOG.md` (ADRs — newest at the bottom)
 5. `backend/docs/CHANGELOG.md` (per-task history)
 
@@ -53,5 +53,5 @@ For the build sequence: `backend/docs/ROADMAP.md`.
   - **Scope:** FastAPI app code — endpoints, services, models, CLI.
   - **Out of scope:** `docker-compose.yml`, `Dockerfile`, Alembic migrations, Flutter UI. These have their own verification gates: `docker compose up` clean, `alembic upgrade head` clean, manual smoke.
 - **Green before, green after.** Run the test suite (`poetry run pytest`) before starting a task and confirm it's passing. Run it again before declaring done. If tests were red before you started, fix or quarantine them first — don't pile changes onto a broken baseline.
-- Real Postgres in tests via `testcontainers-postgres` (no SQLite mocks). Spotify mocked at the service boundary via FastAPI `dependency_overrides`. spotDL mocked at the subprocess boundary via `monkeypatch.setattr` on `_spawn`.
+- Real Postgres in tests via `testcontainers-postgres` (no SQLite mocks). YouTube Music mocked at the service boundary via FastAPI `dependency_overrides[get_ytmusic_client]` (see `tests/test_search.py`). spotDL mocked at the subprocess boundary via `monkeypatch.setattr` on `_spawn`.
 - Commit per ROADMAP milestone with the Conventional Commits message prescribed by `docs/ROADMAP.md`.

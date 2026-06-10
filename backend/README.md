@@ -4,7 +4,7 @@
 [![Docker publish](https://github.com/aashish900/heerr/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/aashish900/heerr/actions/workflows/docker-publish.yml)
 [![Docker Image Version](https://img.shields.io/docker/v/aashish010/heerr-backend?sort=semver&label=docker%20hub)](https://hub.docker.com/r/aashish010/heerr-backend/tags)
 
-FastAPI service that wraps **spotDL** to download Spotify tracks/albums/playlists into a music library that **Navidrome** indexes. Single-user by default; per-user opaque tokens with scopes make sharing possible later. Runs in Docker against a shared Postgres in the existing arr-stack. See `docs/CONTEXT.md` for the why.
+FastAPI service that wraps **spotDL** to download songs found via YouTube Music into a music library that **Navidrome** indexes. Single-user by default; per-user opaque tokens with scopes make sharing possible later. Runs in Docker against a shared Postgres in the existing arr-stack. See `docs/CONTEXT.md` for the why.
 
 ---
 
@@ -43,11 +43,11 @@ poetry install              # creates an in-project .venv, installs runtime + de
 
 ### Configure a `.env`
 
-The app reads four env vars at startup. The cleanest path is to start from the template at the repo root:
+The app reads two env vars at startup. The cleanest path is to start from the template at the repo root:
 
 ```bash
 cp ../.env.example ../.env  # repo root
-# edit ../.env  → fill in your Spotify creds; set DATABASE_URL to your local Postgres
+# edit ../.env  → fill in POSTGRES_PASSWORD and DATABASE_URL for your local Postgres
 ```
 
 For local dev outside Docker, `DATABASE_URL` is typically `postgresql+asyncpg://<user>:<pw>@127.0.0.1:5432/<db>` against a local Postgres you run yourself (`docker run -p 5432:5432 -e POSTGRES_PASSWORD=… pgvector/pgvector:pg17`). `MUSIC_OUTPUT_DIR` can be any writable path while developing (e.g. `./tmp-music`).
@@ -88,32 +88,12 @@ Source: `app/config.py`.
 | Var | Required | Example | Purpose |
 |---|:-:|---|---|
 | `DATABASE_URL` | ✓ | `postgresql+asyncpg://music_request_app:…@postgres:5432/music_request` | SQLAlchemy async URL. Driver must be `asyncpg`. |
-| `SPOTIFY_CLIENT_ID` | ✓ | (from Spotify Dev dashboard) | client-credentials flow ID |
-| `SPOTIFY_CLIENT_SECRET` | ✓ | (from Spotify Dev dashboard) | client-credentials flow secret. Stored as `SecretStr` — redacted from logs/`repr`. |
 | `MUSIC_OUTPUT_DIR` | ✓ | `/data/media/music` | where spotDL writes; Navidrome indexes this dir |
 | `SPOTDL_EXECUTABLE` | optional | `/opt/spotdl-venv/bin/spotdl` | overrides the spotdl binary path (default `"spotdl"` — looked up on `PATH`) |
 
 In the Docker image, `SPOTDL_EXECUTABLE` defaults to `/opt/spotdl-venv/bin/spotdl` (set by the Dockerfile).
 
-### Getting Spotify credentials
-
-_Verified 2026-06-10 — the Spotify Developer dashboard moves links around occasionally, so the exact wording may drift over time._
-
-A **free** Spotify account is enough. **Premium is NOT required** — the backend uses the Web API only for metadata (search, track info, cover art) via the **client-credentials flow**. Audio is downloaded from YouTube by spotDL, not streamed from Spotify.
-
-1. Go to https://developer.spotify.com/dashboard and log in with your normal Spotify account.
-2. Click **Create app**.
-3. Fill in any name + description ("heerr backend" works). Pick *any* redirect URI (e.g. `http://localhost`) — client-credentials flow doesn't redirect, but the form requires the field. Check **Web API**. Accept the terms. Click **Save**.
-4. Open the app you just created → **Settings** → **Basic Information**.
-5. Copy **Client ID** → set as `SPOTIFY_CLIENT_ID` in `.env`.
-6. Click **View client secret** → copy → set as `SPOTIFY_CLIENT_SECRET` in `.env`.
-
-That's it — no scope picker, no OAuth consent screen for users to click through. The backend uses these two values server-side to mint an app token every hour (see `app/services/spotify.py`).
-
-If credentials don't work, common causes:
-- App is in **Development mode** with no Web API access checked — fix in app settings.
-- Trailing whitespace in `.env` — the secret is sensitive to it.
-- `403` from `/api/v1/search` usually means the *bearer token* (heerr's own token) lacks the `read` scope; not a Spotify creds issue.
+No Spotify credentials required. Search is powered by `ytmusicapi` (unofficial YouTube Music API, no credentials).
 
 ---
 
@@ -217,14 +197,14 @@ No auth.
 curl -X POST http://localhost:8000/api/v1/search \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"query": "blinding lights", "type": "track", "limit": 10}'
+  -d '{"query": "blinding lights", "type": "song", "limit": 10}'
 ```
 
 Request schema (`app/schemas/search.py`):
 ```json
 {
   "query": "blinding lights",
-  "type": "track",       // strict: "track" | "album" | "playlist"
+  "type": "song",        // strict: "song" | "album" | "playlist"
   "limit": 20            // 1..50, default 20
 }
 ```
@@ -235,21 +215,21 @@ Response 200:
 {
   "results": [
     {
-      "spotify_uri":        "spotify:track:0VjIjW4GlUZAMYd2vXMi3b",
-      "spotify_url":        "https://open.spotify.com/track/0VjIjW…",
+      "source_url":         "https://music.youtube.com/watch?v=0VjIjW4GlU",
+      "source_type":        "song",
       "title":              "Blinding Lights",
       "artist":             "The Weeknd",
       "album":              "After Hours",     // null for albums/playlists
       "duration_ms":        200040,            // null for albums/playlists
-      "cover_url":          "https://i.scdn.co/…",
-      "already_downloaded": true,              // hint from DB; track-level only
-      "active_job_id":      null               // populated when a queued/running job exists for this URI
+      "cover_url":          "https://lh3.googleusercontent.com/…",
+      "already_downloaded": true,              // hint from DB; song-level only
+      "active_job_id":      null               // populated when a queued/running job exists for this URL
     }
   ]
 }
 ```
 
-Spotify `429` → backend returns `503` with `Retry-After` propagated.
+YouTube Music errors → backend returns `502`.
 
 #### `POST /api/v1/download` (scope: `download`)
 
@@ -257,22 +237,25 @@ Spotify `429` → backend returns `503` with `Retry-After` propagated.
 curl -X POST http://localhost:8000/api/v1/download \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"spotify_uri": "spotify:track:0VjIjW4GlUZAMYd2vXMi3b"}'
+  -d '{"source_url": "https://music.youtube.com/watch?v=0VjIjW4GlU", "source_type": "song"}'
 ```
 
 Request:
 ```json
-{ "spotify_uri": "spotify:track:0VjIjW4GlUZAMYd2vXMi3b" }
+{
+  "source_url":  "https://music.youtube.com/watch?v=0VjIjW4GlU",
+  "source_type": "song"
+}
 ```
-Validation regex: `^spotify:(track|album|playlist):[A-Za-z0-9_-]+$`. Bad URIs → `422`.
+`source_url` must start with `https://music.youtube.com/watch?v=` (song) or `https://music.youtube.com/browse/` (album/playlist). Bad URLs → `422`.
 
 Response 202 — three idempotency outcomes:
 
 | Outcome | `state` | `deduped` | When |
 |---|---|:-:|---|
-| New job enqueued | `"queued"` | `false` | first-ever request for this URI |
-| Active duplicate | `"queued"` *(unchanged)* | `true` | another `queued`/`running` job exists for the same URI |
-| Already on disk *(track only)* | `"done"` | `true` | a `downloads` row exists for this `spotify_track_uri` |
+| New job enqueued | `"queued"` | `false` | first-ever request for this URL |
+| Active duplicate | `"queued"` *(unchanged)* | `true` | another `queued`/`running` job exists for the same URL |
+| Already on disk *(song only)* | `"done"` | `true` | a `downloads` row exists for this `source_url` |
 
 ```json
 { "job_id": "f3a…", "state": "queued", "deduped": false }
@@ -289,12 +272,12 @@ Response 200:
 ```json
 {
   "job_id":      "f3a…",
-  "spotify_uri": "spotify:track:0VjIjW…",
-  "spotify_type": "track",
+  "source_url":  "https://music.youtube.com/watch?v=0VjIjW…",
+  "source_type": "song",
   "state":       "running",   // queued | running | done | failed
   "progress":    null,         // v1: always null
   "error":       null,         // populated when state="failed"
-  "output_path": null,         // populated when state="done" AND spotify_type="track"
+  "output_path": null,         // populated when state="done" AND source_type="song"
   "created_at":  "2026-06-08T17:42:01Z",
   "started_at":  "2026-06-08T17:42:03Z",
   "finished_at": null
@@ -303,7 +286,7 @@ Response 200:
 
 404 on unknown id; 422 on non-UUID path arg.
 
-**Album/playlist jobs**: `output_path` is always `null`. Files exist on disk (Navidrome will see them) but the `downloads` table only tracks per-track jobs. See `docs/DECISIONLOG.md` 2026-06-08 "downloads rows: track jobs only in v1".
+**Album/playlist jobs**: `output_path` is always `null`. Files exist on disk (Navidrome will see them) but the `downloads` table only tracks per-song jobs. See `docs/DECISIONLOG.md` 2026-06-08 "downloads rows: track jobs only in v1".
 
 #### `GET /api/v1/queue` (scope: `read`)
 
@@ -374,7 +357,7 @@ The same four gates (`ruff check`, `ruff format --check`, `mypy app/`,
 
 **Architecture:**
 - Real Postgres via [`testcontainers-postgres`](https://testcontainers-python.readthedocs.io/) — session-scoped `pgvector/pgvector:pg17` container; the image is cached locally after the first run (~1.9s spin-up).
-- Spotify is faked at the service boundary via FastAPI `dependency_overrides[get_spotify_client]` (see `tests/test_search.py::FakeSpotify`).
+- YouTube Music is faked at the service boundary via FastAPI `dependency_overrides[get_ytmusic_client]` (see `tests/test_search.py::FakeYTMusic`).
 - spotDL is faked at the subprocess boundary via `monkeypatch.setattr("app.services.spotdl_runner._spawn", …)` (see `tests/test_spotdl_runner.py`). No real spotDL or network needed for tests.
 - Job worker tested directly through `run_job(...)` with an injected `runner`/`sm` — no FastAPI test-app machinery needed.
 
@@ -411,8 +394,8 @@ backend/
 │   ├── models/                SQLAlchemy 2.x ORM (Token / Job / Download / Base)
 │   ├── schemas/               pydantic-v2 request/response models
 │   └── services/
-│       ├── spotify.py         async SpotifyClient (httpx + client-credentials cache)
-│       ├── spotdl_runner.py   `run_spotdl(uri, dir)` subprocess wrapper
+│       ├── ytmusic.py         async YTMusicClient (ytmusicapi wrapper, no credentials)
+│       ├── spotdl_runner.py   `run_spotdl(url, dir)` subprocess wrapper
 │       ├── jobs.py            state-machine + idempotent create
 │       └── workers.py         `run_job(...)` + `JobEnqueuer` BackgroundTasks shim
 ├── tests/                     pytest + pytest-asyncio (auto mode) + testcontainers
@@ -475,7 +458,7 @@ PRs targeting `main` that touch `backend/**` or the workflow file build the imag
 | File | What's in it |
 |---|---|
 | `../CLAUDE.md` | Project-wide rules (session discipline, hard architectural rules) — read this first if you're a future Claude session. |
-| `docs/CONTEXT.md` | Standing facts: server env, Spotify scope, hard learnings. |
+| `docs/CONTEXT.md` | Standing facts: server env, architecture, hard learnings. |
 | `docs/DECISIONLOG.md` | ADRs — every "we chose X over Y because Z" decision with alternatives considered. |
 | `docs/PLAN.md` | Frozen v1 contract: endpoints, schema, implementation strategy. |
 | `docs/ROADMAP.md` | 17-milestone build sequence with per-milestone commit messages. |

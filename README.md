@@ -1,6 +1,6 @@
 # heerr
 
-**Seerr, but for music.** Search Spotify from your phone, dispatch downloads to your home server, watch the queue as tracks land in Navidrome.
+**Seerr, but for music.** Search YouTube Music from your phone, dispatch downloads to your home server, watch the queue as tracks land in Navidrome.
 
 [![backend CI](https://github.com/aashish900/heerr/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/aashish900/heerr/actions/workflows/backend-ci.yml)
 [![Docker publish](https://github.com/aashish900/heerr/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/aashish900/heerr/actions/workflows/docker-publish.yml)
@@ -15,7 +15,7 @@
 Phone (Android app)
   │  search query / download request (Bearer token over HTTPS)
   ▼  (Tailscale only — no public ingress)
-FastAPI backend  ──── Spotify Web API (client-credentials)
+FastAPI backend  ──── YouTube Music (ytmusicapi, no credentials)
   │  spotDL subprocess (yt-dlp under the hood)
   ▼
 /data/media/music/...
@@ -38,7 +38,7 @@ heerr/
 │   ├── app/
 │   │   ├── api/v1/           endpoints: /health /search /download /status /queue /admin
 │   │   ├── models/           SQLAlchemy ORM (tokens, jobs, downloads)
-│   │   ├── services/         spotify.py · jobs.py · spotdl_runner.py · workers.py
+│   │   ├── services/         ytmusic.py · jobs.py · spotdl_runner.py · workers.py
 │   │   └── cli.py            token management (create / list / revoke)
 │   ├── alembic/              migrations (0001 schema v1, 0002 display_name)
 │   ├── tests/                pytest suite (testcontainers-postgres)
@@ -76,8 +76,7 @@ heerr/
 ```bash
 # Configure environment
 cp .env.example .env
-# edit .env — fill in SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, POSTGRES_PASSWORD,
-#             DATABASE_URL, MUSIC_OUTPUT_DIR
+# edit .env — fill in POSTGRES_PASSWORD, DATABASE_URL, MUSIC_OUTPUT_DIR
 
 # Merge docker-compose.snippet.yml into your arr-stack compose file, then:
 docker compose up -d heerr-postgres-init heerr-postgres
@@ -88,7 +87,7 @@ docker compose up -d heerr-backend
 curl http://localhost:8000/api/v1/health    # → {"status":"ok"}
 ```
 
-Spotify credentials walkthrough, full env-var reference, curl examples, CLI usage: [`backend/README.md`](backend/README.md).
+Full env-var reference, curl examples, CLI usage: [`backend/README.md`](backend/README.md).
 
 ### 2. Mint a bearer token
 
@@ -119,7 +118,7 @@ All under `/api/v1`. JSON in/out. `Authorization: Bearer <raw-token>` on every e
 | Method | Path | Scope | Purpose |
 |---|---|---|---|
 | `GET` | `/health` | none | Liveness — used by compose healthcheck + app's "Test connection" |
-| `POST` | `/search` | `read` | Spotify track/album/playlist search with dedupe hints |
+| `POST` | `/search` | `read` | YouTube Music song/album/playlist search with dedupe hints |
 | `POST` | `/download` | `download` | Idempotent dispatch — returns `deduped=true` for active or on-disk URIs |
 | `GET` | `/status/{job_id}` | `read` | Single-job state for the job-detail screen |
 | `GET` | `/queue` | `read` | Active jobs + recent 20 finished — queue screen polls every 3s |
@@ -171,7 +170,7 @@ Docker Hub: [`aashish010/heerr-backend`](https://hub.docker.com/r/aashish010/hee
 | Database | PostgreSQL 17 (`pgvector/pgvector:pg17`) |
 | Migrations | Alembic |
 | Download engine | spotDL 4.5.0 — invoked as a subprocess, isolated venv |
-| Spotify | Client-credentials flow only (server-side) |
+| Search | YouTube Music via ytmusicapi (no API key) |
 | Worker | FastAPI `BackgroundTasks` (no Redis/Celery — single-user scale) |
 | Auth | Per-user opaque bearer tokens with scopes (`read`, `download`) — sha256 hashed at rest |
 | Android app | Flutter 3.44.0 / Dart 3.12.0 |
@@ -190,10 +189,9 @@ Rationale for every choice lives in the per-app `docs/DECISIONLOG.md`.
 ## Hard constraints (do not re-litigate)
 
 - **No public ingress.** App-to-backend traffic runs over Tailscale only.
-- **No secrets in the repo.** Spotify creds, DB passwords, bearer tokens — all `.env` / GitHub Secrets / `flutter_secure_storage`.
+- **No secrets in the repo.** DB passwords, bearer tokens — all `.env` / GitHub Secrets / `flutter_secure_storage`.
 - **iOS is out of scope.** No Xcode, no Cupertino, no CocoaPods.
 - **spotDL runs server-side only** — phone-side spotDL is broken (iOS unsupported; Android/Termux dies on `libpthread.so.0`).
-- **Client-credentials Spotify flow only.** No user-OAuth, no redirect URIs, no liked-songs sync.
 
 Full project-wide rules: [`CLAUDE.md`](CLAUDE.md).
 
@@ -203,7 +201,7 @@ Full project-wide rules: [`CLAUDE.md`](CLAUDE.md).
 
 | Document | Contents |
 |---|---|
-| [`backend/README.md`](backend/README.md) | Install, run, curl examples, Spotify credentials walkthrough, env reference, CLI |
+| [`backend/README.md`](backend/README.md) | Install, run, curl examples, env-var reference, CLI |
 | [`backend/docs/CONTEXT.md`](backend/docs/CONTEXT.md) | Server environment, architecture decisions, hard constraints |
 | [`backend/docs/PLAN.md`](backend/docs/PLAN.md) | Frozen API contract — endpoint shapes, scopes, error envelope |
 | [`backend/docs/ROADMAP.md`](backend/docs/ROADMAP.md) | A1–H1 milestones and current status |
