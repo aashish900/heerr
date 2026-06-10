@@ -126,14 +126,18 @@ class _JobTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String? name = job.displayName;
+    final bool hasName = name != null && name.isNotEmpty;
     return Container(
       color: _isActive ? heerrGreen.withOpacity(0.15) : null,
       child: ListTile(
         title: Text(
-          job.spotifyUri,
+          hasName ? name : job.spotifyUri,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+          style: hasName
+              ? const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)
+              : const TextStyle(fontFamily: 'monospace', fontSize: 13),
         ),
         subtitle: Text(
           'job ${_shortId(job.jobId)}',

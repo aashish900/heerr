@@ -154,7 +154,7 @@ Future<void> _dispatchDownload(
   try {
     final DownloadResponse res = await ref
         .read(downloadDispatcherProvider.notifier)
-        .dispatch(item.spotifyUri);
+        .dispatch(item.spotifyUri, displayName: _displayNameFor(item));
     if (!context.mounted) return;
     messenger
       ..hideCurrentSnackBar()
@@ -167,6 +167,16 @@ Future<void> _dispatchDownload(
     if (!context.mounted) return;
     showApiError(context, e, action: 'download');
   }
+}
+
+/// Human-readable label persisted on the queued job, so the queue tile shows
+/// "{title} — {artist}" for tracks/albums and "{title}" for playlists, instead
+/// of the raw `spotify:…:id` URI. Playlists drop the artist because the search
+/// result's `artist` field carries the owner name, not a musical artist.
+String _displayNameFor(SearchResultItem item) {
+  final String type = item.spotifyUri.split(':')[1];
+  if (type == 'playlist') return item.title;
+  return '${item.title} — ${item.artist}';
 }
 
 class _Centered extends StatelessWidget {

@@ -7,7 +7,7 @@ part of 'download.dart';
 // **************************************************************************
 
 String _$downloadDispatcherHash() =>
-    r'a0e1ad071acac6f9b884baa70b273fcce13cd250';
+    r'0623991b76aa1c847687569f31cd89f5d5c59c59';
 
 /// Tracks which `spotify_uri`s have an in-flight `POST /download`. The state
 /// is the **set of in-flight URIs**; UI watches its own URI's membership

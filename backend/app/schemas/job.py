@@ -10,6 +10,7 @@ class JobView(BaseModel):
     spotify_uri: str
     spotify_type: Literal["track", "album", "playlist"]
     state: Literal["queued", "running", "done", "failed"]
+    display_name: str | None
     progress: None = None  # v1: always null per PLAN; reserved for future
     error: str | None
     output_path: str | None

@@ -11,6 +11,7 @@ class DownloadRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     spotify_uri: str
+    display_name: str | None = None
 
     @field_validator("spotify_uri")
     @classmethod

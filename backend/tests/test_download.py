@@ -155,6 +155,50 @@ async def test_new_track_uri_creates_queued_job_and_enqueues_worker(
         assert row.state == "queued"
 
 
+async def test_download_persists_display_name(
+    client, make_token, fake_enqueuer, app_sm, cleanup
+):
+    raw = await make_token()
+    uri = "spotify:track:disp1"
+    r = await client.post(
+        "/api/v1/download",
+        json={"spotify_uri": uri, "display_name": "Imagine — John Lennon"},
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert r.status_code == 202, r.text
+    job_id = UUID(r.json()["job_id"])
+    async with app_sm() as s:
+        name = (
+            await s.execute(
+                text("SELECT display_name FROM jobs WHERE id = :i"),
+                {"i": job_id},
+            )
+        ).scalar_one()
+    assert name == "Imagine — John Lennon"
+
+
+async def test_download_display_name_is_optional(
+    client, make_token, fake_enqueuer, app_sm, cleanup
+):
+    raw = await make_token()
+    uri = "spotify:track:nodisp1"
+    r = await client.post(
+        "/api/v1/download",
+        json={"spotify_uri": uri},
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert r.status_code == 202, r.text
+    job_id = UUID(r.json()["job_id"])
+    async with app_sm() as s:
+        name = (
+            await s.execute(
+                text("SELECT display_name FROM jobs WHERE id = :i"),
+                {"i": job_id},
+            )
+        ).scalar_one()
+    assert name is None
+
+
 async def test_new_album_uri_uses_album_type(client, make_token, fake_enqueuer, app_sm, cleanup):
     raw = await make_token()
     uri = "spotify:album:al1"

@@ -25,11 +25,17 @@ class DownloadDispatcher extends _$DownloadDispatcher {
   @override
   Set<String> build() => const <String>{};
 
-  Future<DownloadResponse> dispatch(String spotifyUri) async {
+  Future<DownloadResponse> dispatch(
+    String spotifyUri, {
+    String? displayName,
+  }) async {
     state = <String>{...state, spotifyUri};
     try {
       final Dio dio = await ref.read(dioClientProvider.future);
-      final DownloadRequest body = DownloadRequest(spotifyUri: spotifyUri);
+      final DownloadRequest body = DownloadRequest(
+        spotifyUri: spotifyUri,
+        displayName: displayName,
+      );
       return await apiCall<DownloadResponse>(
         () => dio.post<dynamic>(Endpoints.download, data: body.toJson()),
         (dynamic data) =>

@@ -384,6 +384,7 @@ void main() {
       expect(adapter.requests.single.path, '/download');
       expect(adapter.requests.single.data, <String, dynamic>{
         'spotify_uri': 'spotify:track:1',
+        'display_name': 'First — Artist A',
       });
       expect(find.text('Queued'), findsOneWidget);
     });

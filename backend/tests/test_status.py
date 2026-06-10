@@ -61,6 +61,7 @@ async def _seed_job(
     spotify_type: str = "track",
     state: str = "queued",
     error_msg: str | None = None,
+    display_name: str | None = None,
     set_started: bool = False,
     set_finished: bool = False,
 ) -> Job:
@@ -70,6 +71,7 @@ async def _seed_job(
         spotify_uri=spotify_uri,
         spotify_type=spotify_type,
         state=state,
+        display_name=display_name,
         error_msg=error_msg,
         created_by_token_id=token_id,
         started_at=datetime.now(UTC) if set_started else None,
@@ -155,6 +157,7 @@ async def test_queued_track_has_full_contract_shape(client, make_token, app_sm, 
         "spotify_uri",
         "spotify_type",
         "state",
+        "display_name",
         "progress",
         "error",
         "output_path",
@@ -163,11 +166,30 @@ async def test_queued_track_has_full_contract_shape(client, make_token, app_sm, 
         "finished_at",
     }
     assert body["state"] == "queued"
+    assert body["display_name"] is None
     assert body["progress"] is None
     assert body["error"] is None
     assert body["output_path"] is None
     assert body["started_at"] is None
     assert body["finished_at"] is None
+
+
+async def test_status_returns_stored_display_name(client, make_token, app_sm, cleanup):
+    raw = await make_token()
+    token_id = await _token_id_for(app_sm, raw)
+    job = await _seed_job(
+        app_sm,
+        token_id=token_id,
+        spotify_uri="spotify:track:disp-status",
+        state="queued",
+        display_name="Imagine — John Lennon",
+    )
+    r = await client.get(
+        f"/api/v1/status/{job.id}",
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert r.status_code == 200
+    assert r.json()["display_name"] == "Imagine — John Lennon"
 
 
 async def test_running_job_has_started_at(client, make_token, app_sm, cleanup):

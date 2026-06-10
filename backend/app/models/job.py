@@ -47,6 +47,7 @@ class Job(Base):
     spotify_uri: Mapped[str] = mapped_column(sa.Text, nullable=False)
     spotify_type: Mapped[str] = mapped_column(sa.Text, nullable=False)
     state: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    display_name: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     error_msg: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     attempt_count: Mapped[int] = mapped_column(
         sa.Integer, nullable=False, server_default=sa.text("0")

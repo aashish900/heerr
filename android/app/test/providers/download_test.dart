@@ -105,6 +105,23 @@ void main() {
       });
     });
 
+    test('forwards display_name when provided', () async {
+      final _FakeAdapter adapter = _FakeAdapter(
+        (_) => _json(202, _payload()),
+      );
+      final ProviderContainer c = _container(_dioWith(adapter));
+      addTearDown(c.dispose);
+
+      await c.read(downloadDispatcherProvider.notifier).dispatch(
+            'spotify:track:abc',
+            displayName: 'Imagine — John Lennon',
+          );
+      expect(adapter.requests.single.data, <String, dynamic>{
+        'spotify_uri': 'spotify:track:abc',
+        'display_name': 'Imagine — John Lennon',
+      });
+    });
+
     test('deduped response is surfaced through DownloadResponse.deduped', () async {
       final _FakeAdapter adapter = _FakeAdapter(
         (_) => _json(

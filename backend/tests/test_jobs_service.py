@@ -60,6 +60,50 @@ async def test_create_inserts_new_job(app_sm, token_id, cleanup_jobs):
     assert job.spotify_type == "track"
     assert job.created_by_token_id == token_id
     assert job.attempt_count == 0
+    assert job.display_name is None
+
+
+async def test_create_stores_display_name(app_sm, token_id, cleanup_jobs):
+    async with app_sm() as s:
+        job, deduped = await create_job_idempotent(
+            s,
+            spotify_uri="spotify:track:disp-new",
+            spotify_type="track",
+            token_id=token_id,
+            display_name="Bohemian Rhapsody — Queen",
+        )
+        await s.commit()
+        job_id = job.id
+
+    async with app_sm() as s:
+        row = (await s.execute(select(Job).where(Job.id == job_id))).scalar_one()
+        assert row.display_name == "Bohemian Rhapsody — Queen"
+
+
+async def test_create_dedupe_keeps_existing_display_name(app_sm, token_id, cleanup_jobs):
+    """Re-dispatching an active URI does not overwrite the original label."""
+    async with app_sm() as s:
+        first, _ = await create_job_idempotent(
+            s,
+            spotify_uri="spotify:track:disp-dup",
+            spotify_type="track",
+            token_id=token_id,
+            display_name="Original Name",
+        )
+        await s.commit()
+        first_id = first.id
+
+    async with app_sm() as s:
+        second, deduped = await create_job_idempotent(
+            s,
+            spotify_uri="spotify:track:disp-dup",
+            spotify_type="track",
+            token_id=token_id,
+            display_name="Other Name",
+        )
+    assert deduped is True
+    assert second.id == first_id
+    assert second.display_name == "Original Name"
 
 
 async def test_create_dedupes_when_active_exists(app_sm, token_id, cleanup_jobs):

@@ -414,3 +414,17 @@ End-to-end smoke executed against live home server (arr-stack, `172.39.0.51`):
 8. Missing token → 401; read-only token → 403 on `/download` — OK.
 
 Backend roadmap (A1–H1) complete.
+
+
+## 2026-06-10 — display_name on jobs
+
+Human-readable label persisted alongside each job so the Android queue UI shows "Imagine — John Lennon" instead of `spotify:track:7pKfPomDEeI4TPT6EOYjn9`.
+
+- **`backend/alembic/versions/0002_jobs_display_name.py`** — new migration adds nullable `display_name TEXT` column to `jobs`.
+- **`backend/app/models/job.py`** — `display_name: Mapped[str | None]` on the ORM.
+- **`backend/app/schemas/download.py`** — `DownloadRequest.display_name: str | None = None` (optional; old clients keep working without it).
+- **`backend/app/schemas/job.py`** — `JobView.display_name` added to the response contract.
+- **`backend/app/services/jobs.py`** — `create_job_idempotent` accepts `display_name`; dedupe path preserves the existing label rather than overwriting (only new inserts apply the new name).
+- **`backend/app/api/v1/download.py`** — forwards `display_name` from the request body to the service.
+- **`backend/app/api/v1/status.py`** — `to_view` populates `display_name` on the JobView.
+- **Tests:** `test_migration_0002.py` (column shape, nullable, accepts text); extensions in `test_jobs_service.py`, `test_download.py`, `test_status.py`, `test_queue.py` asserting the round-trip + null-on-omitted behaviour. Suite: 171 passing.

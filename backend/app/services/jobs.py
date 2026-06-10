@@ -36,11 +36,17 @@ async def create_job_idempotent(
     spotify_uri: str,
     spotify_type: str,
     token_id: UUID,
+    display_name: str | None = None,
 ) -> tuple[Job, bool]:
     """Return (job, deduped).
 
     deduped=True means an existing active (queued|running) job for the URI
     was returned; deduped=False means a new row was inserted.
+
+    `display_name` is the human-readable label rendered in the queue UI
+    ("{title} — {artist}" for tracks/albums, "{title}" for playlists). It's
+    only applied when inserting a new row — existing active jobs keep the
+    name they were created with.
 
     Race protection: the partial unique index
     `jobs_active_uri_idx` on `jobs(spotify_uri) WHERE state IN
@@ -56,6 +62,7 @@ async def create_job_idempotent(
         spotify_uri=spotify_uri,
         spotify_type=spotify_type,
         state="queued",
+        display_name=display_name,
         created_by_token_id=token_id,
     )
     session.add(job)

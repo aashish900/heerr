@@ -45,6 +45,8 @@ class _JobBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final DateTime now = DateTime.now();
+    final String? name = job.displayName;
+    final bool hasName = name != null && name.isNotEmpty;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: <Widget>[
@@ -61,6 +63,13 @@ class _JobBody extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
+        if (hasName) ...<Widget>[
+          Text(
+            name,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 16),
+        ],
         _Field(label: 'spotify uri', value: job.spotifyUri, copyable: true),
         _Field(label: 'job id', value: job.jobId, copyable: true),
         _TimestampField(label: 'created', when: job.createdAt, now: now),

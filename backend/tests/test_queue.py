@@ -60,6 +60,7 @@ async def _seed_job(
     spotify_uri: str,
     spotify_type: str = "track",
     state: str = "queued",
+    display_name: str | None = None,
     set_finished: bool = False,
 ):
     from datetime import datetime
@@ -68,6 +69,7 @@ async def _seed_job(
         spotify_uri=spotify_uri,
         spotify_type=spotify_type,
         state=state,
+        display_name=display_name,
         created_by_token_id=token_id,
         finished_at=datetime.now(UTC) if set_finished else None,
     )
@@ -210,6 +212,59 @@ async def test_recent_capped_at_20(client, make_token, app_sm, cleanup):
         )
     ).json()
     assert len(body["recent"]) == 20
+
+
+async def test_queue_returns_display_name_for_each_item(
+    client, make_token, app_sm, cleanup
+):
+    raw = await make_token()
+    token_id = await _token_id_for(app_sm, raw)
+    a = await _seed_job(
+        app_sm,
+        token_id=token_id,
+        spotify_uri="spotify:track:disp-active",
+        state="queued",
+        display_name="Active Track — Artist",
+    )
+    d = await _seed_job(
+        app_sm,
+        token_id=token_id,
+        spotify_uri="spotify:track:disp-done",
+        state="done",
+        display_name="Done Track — Artist",
+        set_finished=True,
+    )
+    body = (
+        await client.get(
+            "/api/v1/queue",
+            headers={"Authorization": f"Bearer {raw}"},
+        )
+    ).json()
+    active = next(it for it in body["active"] if it["job_id"] == str(a.id))
+    recent = next(it for it in body["recent"] if it["job_id"] == str(d.id))
+    assert active["display_name"] == "Active Track — Artist"
+    assert recent["display_name"] == "Done Track — Artist"
+
+
+async def test_queue_display_name_null_when_unset(
+    client, make_token, app_sm, cleanup
+):
+    raw = await make_token()
+    token_id = await _token_id_for(app_sm, raw)
+    j = await _seed_job(
+        app_sm,
+        token_id=token_id,
+        spotify_uri="spotify:track:no-disp-q",
+        state="queued",
+    )
+    body = (
+        await client.get(
+            "/api/v1/queue",
+            headers={"Authorization": f"Bearer {raw}"},
+        )
+    ).json()
+    item = next(it for it in body["active"] if it["job_id"] == str(j.id))
+    assert item["display_name"] is None
 
 
 async def test_recent_track_has_output_path(client, make_token, app_sm, cleanup):

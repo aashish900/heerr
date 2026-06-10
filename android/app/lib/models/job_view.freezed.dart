@@ -25,6 +25,7 @@ mixin _$JobView {
   String get spotifyUri => throw _privateConstructorUsedError;
   SpotifyType get spotifyType => throw _privateConstructorUsedError;
   JobState get state => throw _privateConstructorUsedError;
+  String? get displayName => throw _privateConstructorUsedError;
   int? get progress => throw _privateConstructorUsedError;
   String? get error => throw _privateConstructorUsedError;
   String? get outputPath => throw _privateConstructorUsedError;
@@ -51,6 +52,7 @@ abstract class $JobViewCopyWith<$Res> {
     String spotifyUri,
     SpotifyType spotifyType,
     JobState state,
+    String? displayName,
     int? progress,
     String? error,
     String? outputPath,
@@ -79,6 +81,7 @@ class _$JobViewCopyWithImpl<$Res, $Val extends JobView>
     Object? spotifyUri = null,
     Object? spotifyType = null,
     Object? state = null,
+    Object? displayName = freezed,
     Object? progress = freezed,
     Object? error = freezed,
     Object? outputPath = freezed,
@@ -104,6 +107,10 @@ class _$JobViewCopyWithImpl<$Res, $Val extends JobView>
                 ? _value.state
                 : state // ignore: cast_nullable_to_non_nullable
                       as JobState,
+            displayName: freezed == displayName
+                ? _value.displayName
+                : displayName // ignore: cast_nullable_to_non_nullable
+                      as String?,
             progress: freezed == progress
                 ? _value.progress
                 : progress // ignore: cast_nullable_to_non_nullable
@@ -147,6 +154,7 @@ abstract class _$$JobViewImplCopyWith<$Res> implements $JobViewCopyWith<$Res> {
     String spotifyUri,
     SpotifyType spotifyType,
     JobState state,
+    String? displayName,
     int? progress,
     String? error,
     String? outputPath,
@@ -174,6 +182,7 @@ class __$$JobViewImplCopyWithImpl<$Res>
     Object? spotifyUri = null,
     Object? spotifyType = null,
     Object? state = null,
+    Object? displayName = freezed,
     Object? progress = freezed,
     Object? error = freezed,
     Object? outputPath = freezed,
@@ -199,6 +208,10 @@ class __$$JobViewImplCopyWithImpl<$Res>
             ? _value.state
             : state // ignore: cast_nullable_to_non_nullable
                   as JobState,
+        displayName: freezed == displayName
+            ? _value.displayName
+            : displayName // ignore: cast_nullable_to_non_nullable
+                  as String?,
         progress: freezed == progress
             ? _value.progress
             : progress // ignore: cast_nullable_to_non_nullable
@@ -236,6 +249,7 @@ class _$JobViewImpl implements _JobView {
     required this.spotifyUri,
     required this.spotifyType,
     required this.state,
+    this.displayName,
     this.progress,
     this.error,
     this.outputPath,
@@ -256,6 +270,8 @@ class _$JobViewImpl implements _JobView {
   @override
   final JobState state;
   @override
+  final String? displayName;
+  @override
   final int? progress;
   @override
   final String? error;
@@ -270,7 +286,7 @@ class _$JobViewImpl implements _JobView {
 
   @override
   String toString() {
-    return 'JobView(jobId: $jobId, spotifyUri: $spotifyUri, spotifyType: $spotifyType, state: $state, progress: $progress, error: $error, outputPath: $outputPath, createdAt: $createdAt, startedAt: $startedAt, finishedAt: $finishedAt)';
+    return 'JobView(jobId: $jobId, spotifyUri: $spotifyUri, spotifyType: $spotifyType, state: $state, displayName: $displayName, progress: $progress, error: $error, outputPath: $outputPath, createdAt: $createdAt, startedAt: $startedAt, finishedAt: $finishedAt)';
   }
 
   @override
@@ -284,6 +300,8 @@ class _$JobViewImpl implements _JobView {
             (identical(other.spotifyType, spotifyType) ||
                 other.spotifyType == spotifyType) &&
             (identical(other.state, state) || other.state == state) &&
+            (identical(other.displayName, displayName) ||
+                other.displayName == displayName) &&
             (identical(other.progress, progress) ||
                 other.progress == progress) &&
             (identical(other.error, error) || other.error == error) &&
@@ -305,6 +323,7 @@ class _$JobViewImpl implements _JobView {
     spotifyUri,
     spotifyType,
     state,
+    displayName,
     progress,
     error,
     outputPath,
@@ -333,6 +352,7 @@ abstract class _JobView implements JobView {
     required final String spotifyUri,
     required final SpotifyType spotifyType,
     required final JobState state,
+    final String? displayName,
     final int? progress,
     final String? error,
     final String? outputPath,
@@ -351,6 +371,8 @@ abstract class _JobView implements JobView {
   SpotifyType get spotifyType;
   @override
   JobState get state;
+  @override
+  String? get displayName;
   @override
   int? get progress;
   @override

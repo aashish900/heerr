@@ -398,3 +398,15 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
 - Backend port 8000 was published on the host (added `ports: ["8000:8000"]` to `heerr-backend` in `~/docker/arr-stack/docker-compose.yml`) so the phone can reach it over Tailscale — the container network `172.39.0.0/24` is host-internal. The bind is on all host interfaces but only `100.x.x.x` is reachable from the tailnet, so the Tailscale-only posture holds.
 
 Android roadmap (A1–G1) complete.
+
+## 2026-06-10 — display_name shown in queue + job detail
+
+Queue and job-detail screens now show human-readable labels ("Imagine — John Lennon", "Currents — Tame Impala", playlist names) instead of the raw `spotify:…:id` URI. Computed client-side from the search result and passed to `POST /download` for backend persistence.
+
+- **`android/app/lib/models/download_request.dart`** — added optional `displayName`. Generated `toJson` omits the key when null, so old-shape requests are still valid wire-compatible bodies.
+- **`android/app/lib/models/job_view.dart`** — added optional `displayName` mirroring backend `JobView.display_name`.
+- **`android/app/lib/providers/download.dart`** — `dispatch(spotifyUri, {displayName})` named-arg signature.
+- **`android/app/lib/screens/search_screen.dart`** — new `_displayNameFor(item)` helper formats `"{title} — {artist}"` for tracks/albums and `"{title}"` for playlists (their `artist` field carries the owner, not a musical artist).
+- **`android/app/lib/screens/queue_screen.dart`** — `_JobTile` renders `displayName` in the body font when present; falls back to monospace URI for legacy jobs (display_name is null on rows created before the upgrade).
+- **`android/app/lib/screens/job_detail_screen.dart`** — `_JobBody` shows the display name as a `titleLarge` heading above the technical fields when present.
+- **Tests:** updated `test/models_test.dart` (DownloadRequest two-case round-trip, JobView payload), `test/providers/download_test.dart` (asserts new dispatch signature + body), `test/screens/search_screen_test.dart` (asserts the formatted display_name in the POST body), `test/screens/settings_screen_test.dart` rewritten to target the new SettingsScreen → ServersScreen navigation (the prior tests targeted the inline URL/token form which moved to ServersScreen earlier today). Suite: 111 passing.

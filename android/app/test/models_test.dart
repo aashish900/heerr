@@ -101,11 +101,26 @@ void main() {
   });
 
   group('DownloadRequest', () {
-    test('round-trip via JSON', () {
+    test('omits display_name from JSON when null', () {
       const DownloadRequest a = DownloadRequest(
         spotifyUri: 'spotify:track:abc',
       );
-      expect(a.toJson(), <String, dynamic>{'spotify_uri': 'spotify:track:abc'});
+      expect(a.toJson(), <String, dynamic>{
+        'spotify_uri': 'spotify:track:abc',
+      });
+      final DownloadRequest b = DownloadRequest.fromJson(a.toJson());
+      expect(b, equals(a));
+    });
+
+    test('round-trips with display_name set', () {
+      const DownloadRequest a = DownloadRequest(
+        spotifyUri: 'spotify:track:abc',
+        displayName: 'Imagine — John Lennon',
+      );
+      expect(a.toJson(), <String, dynamic>{
+        'spotify_uri': 'spotify:track:abc',
+        'display_name': 'Imagine — John Lennon',
+      });
       final DownloadRequest b = DownloadRequest.fromJson(a.toJson());
       expect(b, equals(a));
     });
@@ -147,6 +162,7 @@ void main() {
         'spotify_uri': 'spotify:track:1',
         'spotify_type': 'track',
         'state': 'done',
+        'display_name': 'The Less I Know The Better — Tame Impala',
         'progress': null,
         'error': null,
         'output_path': '/data/media/music/Tame Impala/Currents/01.mp3',
@@ -159,6 +175,7 @@ void main() {
       expect(j.spotifyUri, 'spotify:track:1');
       expect(j.spotifyType, SpotifyType.track);
       expect(j.state, JobState.done);
+      expect(j.displayName, 'The Less I Know The Better — Tame Impala');
       expect(j.outputPath, '/data/media/music/Tame Impala/Currents/01.mp3');
       expect(j.createdAt.isUtc, isTrue);
       expect(j.startedAt!.isUtc, isTrue);

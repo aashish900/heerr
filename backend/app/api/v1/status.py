@@ -18,6 +18,7 @@ def to_view(job: Job, output_path: str | None) -> JobView:
         spotify_uri=job.spotify_uri,
         spotify_type=job.spotify_type,
         state=job.state,
+        display_name=job.display_name,
         progress=None,
         error=job.error_msg,
         output_path=output_path,

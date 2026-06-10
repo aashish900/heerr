@@ -15,6 +15,7 @@ class JobView with _$JobView {
     required String spotifyUri,
     required SpotifyType spotifyType,
     required JobState state,
+    String? displayName,
     int? progress,
     String? error,
     String? outputPath,

@@ -9,8 +9,10 @@ part 'download_request.g.dart';
 /// (`spotify:track:…` / `spotify:album:…` / `spotify:playlist:…`).
 @freezed
 class DownloadRequest with _$DownloadRequest {
-  const factory DownloadRequest({required String spotifyUri}) =
-      _DownloadRequest;
+  const factory DownloadRequest({
+    required String spotifyUri,
+    String? displayName,
+  }) = _DownloadRequest;
 
   factory DownloadRequest.fromJson(Map<String, dynamic> json) =>
       _$DownloadRequestFromJson(json);

@@ -39,6 +39,7 @@ async def download(
         spotify_uri=req.spotify_uri,
         spotify_type=type_,
         token_id=tok.id,
+        display_name=req.display_name,
     )
     # Commit before enqueuing: BackgroundTasks run before the get_session
     # dependency commits on teardown, so run_job would find no row otherwise.
