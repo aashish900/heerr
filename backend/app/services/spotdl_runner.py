@@ -66,7 +66,7 @@ async def run_spotdl(spotify_uri: str, output_dir: str | Path) -> list[Downloade
         "download",
         spotify_uri,
         "--output",
-        str(out_path),
+        str(out_path / "{title}-{artist}.{output-ext}"),
     ]
     proc = await _spawn(cmd)
     _, stderr_b = await proc.communicate()

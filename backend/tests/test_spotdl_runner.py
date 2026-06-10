@@ -60,7 +60,9 @@ async def test_command_invokes_spotdl_executable(tmp_path, monkeypatch):
     assert "spotify:album:x" in cmd
     assert "--output" in cmd
     out_idx = cmd.index("--output")
-    assert Path(cmd[out_idx + 1]).resolve() == tmp_path.resolve()
+    output_val = cmd[out_idx + 1]
+    assert output_val.startswith(str(tmp_path.resolve()))
+    assert output_val.endswith("{title}-{artist}.{output-ext}")
 
 
 async def test_spotdl_executable_env_override(tmp_path, monkeypatch):
