@@ -43,7 +43,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     SPOTDL_EXECUTABLE=/opt/spotdl-venv/bin/spotdl
 
 # Runtime system deps. ffmpeg is required by spotdl/yt-dlp for transcoding.
+# apt-get upgrade picks up any fixed CVEs in the base image (e.g. libssl3).
 RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
