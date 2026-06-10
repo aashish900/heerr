@@ -57,7 +57,7 @@ async def test_command_invokes_spotdl_executable(tmp_path, monkeypatch):
     assert cmd[1] == "download"
     assert "spotify:album:x" in cmd
     assert "--audio" in cmd
-    assert cmd[cmd.index("--audio") + 1] == "youtube-music"
+    assert cmd[cmd.index("--audio") + 1] == "youtube-music,youtube,soundcloud"
     assert "--output" in cmd
     out_idx = cmd.index("--output")
     output_val = cmd[out_idx + 1]
