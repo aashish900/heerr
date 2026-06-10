@@ -163,7 +163,7 @@ See `PLAN.md` and `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file 
 
 ## Phase H — End-to-end smoke
 
-### [ ] H1. Smoke on the home server — **PENDING (awaiting home-server access)**
+### [x] H1. Smoke on the home server
 **Files:** optional `docs/smoke.md` capturing commands + output.
 **Deliverable:** Real Navidrome lists a track downloaded via the API.
 **Test gate:** manual; the 8 verification steps in project `PLAN.md`.
