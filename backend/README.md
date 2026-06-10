@@ -2,6 +2,7 @@
 
 [![backend CI](https://github.com/aashish900/heerr/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/aashish900/heerr/actions/workflows/backend-ci.yml)
 [![Docker publish](https://github.com/aashish900/heerr/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/aashish900/heerr/actions/workflows/docker-publish.yml)
+[![Docker Image Version](https://img.shields.io/docker/v/aashish010/heerr-backend?sort=semver&label=docker%20hub)](https://hub.docker.com/r/aashish010/heerr-backend/tags)
 
 FastAPI service that wraps **spotDL** to download Spotify tracks/albums/playlists into a music library that **Navidrome** indexes. Single-user by default; per-user opaque tokens with scopes make sharing possible later. Runs in Docker against a shared Postgres in the existing arr-stack. See `docs/CONTEXT.md` for the why.
 
