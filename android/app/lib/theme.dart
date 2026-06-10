@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 const Color heerrGreen = Color(0xFF1DB954);
-const Color heerrGolden = Color(0xFFA0724A);
 const Color heerrBlack = Color(0xFF000000);
 
 ThemeData heerrDarkTheme() {
@@ -9,10 +8,10 @@ ThemeData heerrDarkTheme() {
     brightness: Brightness.dark,
     primary: heerrGreen,
     onPrimary: heerrBlack,
-    secondary: heerrGolden,
-    onSecondary: Colors.white,
-    tertiary: heerrGolden,
-    onTertiary: Colors.white,
+    secondary: heerrGreen,
+    onSecondary: heerrBlack,
+    tertiary: heerrGreen,
+    onTertiary: heerrBlack,
     error: Color(0xFFCF6679),
     onError: heerrBlack,
     surface: heerrBlack,
@@ -27,20 +26,20 @@ ThemeData heerrDarkTheme() {
     colorScheme: cs,
     scaffoldBackgroundColor: heerrBlack,
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: heerrGolden,
+      backgroundColor: Colors.transparent,
       height: 80,
-      indicatorColor: heerrGreen,
+      indicatorColor: Colors.transparent,
       iconTheme: WidgetStateProperty.resolveWith((Set<WidgetState> states) {
         if (states.contains(WidgetState.selected)) {
-          return const IconThemeData(color: Colors.white);
+          return const IconThemeData(color: heerrGreen);
         }
-        return const IconThemeData(color: Color(0xFFEEDDCC));
+        return const IconThemeData(color: Color(0xFF808080));
       }),
       labelTextStyle: WidgetStateProperty.resolveWith((Set<WidgetState> states) {
         if (states.contains(WidgetState.selected)) {
-          return const TextStyle(color: Colors.white, fontWeight: FontWeight.w600);
+          return const TextStyle(color: heerrGreen, fontWeight: FontWeight.w600);
         }
-        return const TextStyle(color: Color(0xFFEEDDCC));
+        return const TextStyle(color: Color(0xFF808080));
       }),
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(

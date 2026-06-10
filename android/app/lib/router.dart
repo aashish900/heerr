@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'screens/job_detail_screen.dart';
 import 'screens/queue_screen.dart';
 import 'screens/search_screen.dart';
+import 'screens/servers_screen.dart';
 import 'screens/settings_screen.dart';
 
 // Route paths — kept as constants so widget tests and link callers don't
@@ -13,6 +14,7 @@ class Routes {
   static const String search = '/';
   static const String queue = '/queue';
   static const String settings = '/settings';
+  static const String servers = '/settings/servers';
 
   // Job-detail lands at D3; route shape defined here to lock the URL.
   static String job(String id) => '/job/$id';
@@ -43,6 +45,13 @@ GoRouter buildHeerrRouter() {
             path: Routes.settings,
             builder: (BuildContext context, GoRouterState state) =>
                 const SettingsScreen(),
+            routes: <RouteBase>[
+              GoRoute(
+                path: 'servers',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const ServersScreen(),
+              ),
+            ],
           ),
         ],
       ),

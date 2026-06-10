@@ -1,20 +1,41 @@
+import 'dart:convert';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'secure_storage.dart';
 
 part 'settings.g.dart';
 
-/// Persisted client settings — what the user pastes into the Settings screen
-/// at first launch. Stored via `flutter_secure_storage` so the bearer token
-/// never lands in plaintext SharedPreferences (decided in
-/// `docs/DECISIONLOG.md` 2026-06-09 "Token storage").
-///
-/// Record type rather than a freezed class — two strings with native value
-/// equality, no codegen needed.
 typedef SettingsValue = ({String? backendBaseUrl, String? bearerToken});
 
 const String _kKeyUrl = 'backend_base_url';
 const String _kKeyToken = 'bearer_token';
+const String _kKeyProfiles = 'server_profiles';
+const String _kKeyActiveName = 'active_server_name';
+
+class ServerProfile {
+  const ServerProfile({
+    required this.name,
+    required this.backendBaseUrl,
+    required this.bearerToken,
+  });
+
+  final String name;
+  final String backendBaseUrl;
+  final String bearerToken;
+
+  Map<String, String> toJson() => <String, String>{
+        'name': name,
+        'backendBaseUrl': backendBaseUrl,
+        'bearerToken': bearerToken,
+      };
+
+  factory ServerProfile.fromJson(Map<String, dynamic> j) => ServerProfile(
+        name: j['name'] as String,
+        backendBaseUrl: j['backendBaseUrl'] as String,
+        bearerToken: j['bearerToken'] as String,
+      );
+}
 
 @riverpod
 class Settings extends _$Settings {
@@ -26,31 +47,68 @@ class Settings extends _$Settings {
     return (backendBaseUrl: url, bearerToken: token);
   }
 
-  /// Persist any provided value. Pass `null` for a field to leave it
-  /// untouched (use [clear] to wipe both). The provider invalidates itself
-  /// after writing so dependents (e.g. the dio client at B2) rebuild against
-  /// the new values.
-  ///
-  /// Named `save` rather than `update` because `AsyncNotifierBase` already
-  /// owns `update(...)` for mutating the cached AsyncValue — overriding it
-  /// would break the type signature.
   Future<void> save({String? backendBaseUrl, String? bearerToken}) async {
     final SecureStorage store = ref.read(secureStorageProvider);
-    if (backendBaseUrl != null) {
-      await store.write(_kKeyUrl, backendBaseUrl);
-    }
-    if (bearerToken != null) {
-      await store.write(_kKeyToken, bearerToken);
-    }
+    if (backendBaseUrl != null) await store.write(_kKeyUrl, backendBaseUrl);
+    if (bearerToken != null) await store.write(_kKeyToken, bearerToken);
     ref.invalidateSelf();
   }
 
-  /// Wipe both keys. Used when the user revokes the token from the backend
-  /// CLI and wants to clear the device state before pasting a fresh one.
   Future<void> clear() async {
     final SecureStorage store = ref.read(secureStorageProvider);
     await store.delete(_kKeyUrl);
     await store.delete(_kKeyToken);
     ref.invalidateSelf();
+  }
+}
+
+@riverpod
+class ServerProfiles extends _$ServerProfiles {
+  @override
+  Future<List<ServerProfile>> build() async {
+    final SecureStorage store = ref.read(secureStorageProvider);
+    final String? raw = await store.read(_kKeyProfiles);
+    if (raw == null) return <ServerProfile>[];
+    final List<dynamic> list = jsonDecode(raw) as List<dynamic>;
+    return list
+        .map((dynamic e) => ServerProfile.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<String?> activeName() async {
+    return ref.read(secureStorageProvider).read(_kKeyActiveName);
+  }
+
+  /// Upsert by name, then make it the active server.
+  Future<void> saveProfile(ServerProfile profile) async {
+    final SecureStorage store = ref.read(secureStorageProvider);
+    final List<ServerProfile> current = await future;
+    final List<ServerProfile> updated = <ServerProfile>[
+      for (final ServerProfile p in current)
+        if (p.name != profile.name) p,
+      profile,
+    ];
+    await store.write(_kKeyProfiles, jsonEncode(updated.map((ServerProfile p) => p.toJson()).toList()));
+    await store.write(_kKeyActiveName, profile.name);
+    // Mirror into the active keys so dioClient picks up the change.
+    await ref.read(settingsProvider.notifier).save(
+          backendBaseUrl: profile.backendBaseUrl,
+          bearerToken: profile.bearerToken,
+        );
+    ref.invalidateSelf();
+  }
+
+  /// Load a saved profile into the active keys.
+  Future<ServerProfile?> activate(String name) async {
+    final List<ServerProfile> current = await future;
+    final ServerProfile? profile = current.where((ServerProfile p) => p.name == name).firstOrNull;
+    if (profile == null) return null;
+    final SecureStorage store = ref.read(secureStorageProvider);
+    await store.write(_kKeyActiveName, name);
+    await ref.read(settingsProvider.notifier).save(
+          backendBaseUrl: profile.backendBaseUrl,
+          bearerToken: profile.bearerToken,
+        );
+    return profile;
   }
 }
