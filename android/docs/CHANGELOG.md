@@ -384,3 +384,17 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
   - `flutter build apk --debug` → succeeds (Gradle parses the new signing config without error).
   - `flutter build apk --release` (no `key.properties` present) → succeeds via the debug-key fallback. Output APK at `build/app/outputs/flutter-apk/app-release.apk` (51.9 MB).
   - Generation of the real keystore + `key.properties` is the user's responsibility — they own the secrets per `/CLAUDE.md` §3 "never hardcode or commit secrets". The README documents the exact `keytool` invocation.
+
+## 2026-06-10 — G1: end-to-end smoke on home server
+
+- **`android/app/android/app/src/main/AndroidManifest.xml`** — added `android:usesCleartextTraffic="true"` to `<application>`. Android API 28+ blocks plain HTTP by default, which made every dio request fail as a `NetworkError` ("cannot reach backend — check Tailscale") even though `curl` over Tailscale worked fine. The backend is reached as `http://<tailscale-ip>:8000/api/v1` (no TLS — Tailscale already provides authenticated transport between tailnet peers, see `/CLAUDE.md` §3 "Connectivity is Tailscale only"), so cleartext over the tailnet is the intended posture.
+- Manual smoke verified end-to-end on the Pixel 7 (Android 16) against the live home server (Tailscale IP `100.106.120.121`, backend port 8000):
+  1. Settings: pasted URL + admin bearer token, "Test connection" → "Connection OK" snackbar.
+  2. Search: query returned Spotify results with thumbnails and the type toggle behaved.
+  3. Dispatch: tap a result → backend accepted `/download`, snackbar fired.
+  4. Queue + Job detail screens polled correctly through `queued → running → done`.
+  5. File landed in `/data/media/music/...` on the home server; Navidrome indexed within ~1 min.
+- `flutter analyze` clean; `flutter test` 115/115 pass (no Dart changes).
+- Backend port 8000 was published on the host (added `ports: ["8000:8000"]` to `heerr-backend` in `~/docker/arr-stack/docker-compose.yml`) so the phone can reach it over Tailscale — the container network `172.39.0.0/24` is host-internal. The bind is on all host interfaces but only `100.x.x.x` is reachable from the tailnet, so the Tailscale-only posture holds.
+
+Android roadmap (A1–G1) complete.

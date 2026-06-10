@@ -139,7 +139,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 ## Phase G — Smoke
 
-### [ ] G1. End-to-end smoke against the home server
+### [x] G1. End-to-end smoke against the home server
 **Files:** optional `android/docs/smoke.md` capturing the verification log.
 **Deliverable:** Real APK on the Pixel reaches the backend on the home server (via Tailscale), searches Spotify, dispatches a download, watches the queue, and confirms the file lands in Navidrome.
 **Test gate:** manual; the 7-step verification block in PLAN §12.
