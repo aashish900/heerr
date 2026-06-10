@@ -28,11 +28,13 @@ For the build sequence: `backend/docs/ROADMAP.md`.
 
 ---
 
-## Spotify integration
+## Search: YouTube Music (not Spotify)
 
-- Use **client-credentials flow only** (server-side `SPOTIFY_CLIENT_ID` + `SPOTIFY_CLIENT_SECRET`). Never propose user-OAuth / `spotdl --user-auth` / redirect URIs.
-- Feature scope: track / album / public-playlist search + the user's *own public* playlists by URL. **No top-tracks** (Spotify removed the endpoint). No private / liked-songs library — that requires user-auth.
-- Spotify secret loaded from `.env` in the backend container. **Never hardcoded, never committed** (already covered by the project-wide secrets rule).
+- Search is via `ytmusicapi` (unofficial YouTube Music API, no credentials required). `app/services/ytmusic.py`.
+- `POST /search` accepts `type: song | album | playlist`. Returns `source_url` (YouTube Music URL) + `source_type`.
+- Songs return `music.youtube.com/watch?v=<videoId>`; albums/playlists return `music.youtube.com/browse/<browseId>`.
+- No Spotify credentials anywhere in heerr. The old `SPOTIFY_CLIENT_ID`/`SECRET` env vars are ignored (`extra="ignore"` in Settings).
+- Do NOT propose re-adding Spotify search — the switch to YouTube Music was made specifically to fix regional song mismatches (see DECISIONLOG 2026-06-10).
 
 ---
 

@@ -428,3 +428,17 @@ Human-readable label persisted alongside each job so the Android queue UI shows 
 - **`backend/app/api/v1/download.py`** — forwards `display_name` from the request body to the service.
 - **`backend/app/api/v1/status.py`** — `to_view` populates `display_name` on the JobView.
 - **Tests:** `test_migration_0002.py` (column shape, nullable, accepts text); extensions in `test_jobs_service.py`, `test_download.py`, `test_status.py`, `test_queue.py` asserting the round-trip + null-on-omitted behaviour. Suite: 171 passing.
+
+## 2026-06-10 — Post-roadmap: display_name + YTMusic swap + output format + bug fixes
+
+- **display_name on jobs** (migration 0002): `jobs.display_name TEXT` added; `POST /download` accepts optional `display_name`; `JobView` exposes it. Human-readable label shown in queue UI instead of raw URI.
+- **YTMusic search swap** (migration 0003, v0.2.0): Replaced `SpotifyClient` with `YTMusicClient` (`ytmusicapi`, no credentials). `POST /search` now queries YouTube Music; returns `source_url`/`source_type` instead of `spotify_uri`/`spotify_type`. Migration 0003 renames `jobs.spotify_uri→source_url`, `spotify_type→source_type` (track→song), `downloads.spotify_track_uri→source_url`. `SPOTIFY_CLIENT_ID`/`SECRET` removed from `Settings`. 164 tests passing.
+- **spotDL output format** (v0.1.4): `--output {title}-{artist}.{output-ext}` template so files are named `Song Title-Artist Name.mp3` instead of the default `Artist - Title.mp3`.
+- **stdout capture fix** (v0.2.1): `stderr=STDOUT` in subprocess so spotDL's actual error output lands in `SpotdlError.stderr_tail`.
+- **URL format fix** (v0.2.1): Songs use `music.youtube.com/watch?v=` (not `youtube.com/watch?v=`) — spotDL handles these more reliably.
+- **Removed `--audio` flag**: spotDL no longer needs `--audio` since we pass the full YouTube Music URL directly.
+- **Dockerfile**: `apt-get upgrade -y` added to runtime stage to patch CVEs in base image (e.g. CVE-2026-45447 libssl3).
+- **CI**: `timeout-minutes` added to all three workflows (backend-ci: 10m, docker-publish: 30m, android-publish: 20m). Docker Hub version badge added to `backend/README.md`.
+- **Bug fix (alembic)**: `env.py` replaced `+asyncpg` with `+psycopg` for sync Alembic runs in the migrate container.
+- **Bug fix (download.py)**: explicit `await session.commit()` before enqueuing worker — BackgroundTasks execute before the session dependency teardown, so the job row must be committed first.
+- **Bug fix (compose)**: network name corrected from `arr-stack_default` to `arrnetwork`; host port 8000 added to `heerr-backend` so the phone reaches it over Tailscale.

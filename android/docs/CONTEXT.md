@@ -8,12 +8,12 @@ Project brief for resuming the Android client build in Claude Code. Read this af
 
 ## Goal
 
-A native Android app where the user (single-user, single-device) searches Spotify, dispatches downloads to the home-server backend, and watches the queue / job-status as files are written into the Navidrome library on the home server.
+A native Android app where the user (single-user, single-device) searches YouTube Music, dispatches downloads to the home-server backend, and watches the queue / job-status as files are written into the Navidrome library on the home server.
 
 ## What the app does NOT do
 
 - **No download logic on-device.** The backend invokes spotDL; the device only POSTs `/download` and polls `/status`.
-- **No Spotify SDK / OAuth.** The backend uses client-credentials; the device speaks only to the backend.
+- **No Spotify SDK / OAuth.** Search is via YouTube Music (backend `ytmusicapi`); the device speaks only to the backend.
 - **No real-time channel.** No WebSocket / SSE / FCM. Status updates come from polling `/queue` and `/status/{id}`.
 - **No iOS.** Out of scope (no Xcode / Apple Developer account). Don't propose iOS-aware code.
 - **No public ingress.** App reaches the backend via Tailscale. No "internet" path.
@@ -69,7 +69,7 @@ Polling cadences and error semantics are locked in `PLAN.md`.
 | 401 | Snackbar "auth failed" + push the user back to Settings (token expired / revoked). |
 | 403 | Snackbar "insufficient scope" — token doesn't have `download`. Don't redirect. |
 | 422 | Inline form error if it was a user-entered field; snackbar otherwise. |
-| 503 | "Spotify rate-limited — retry in {Retry-After}s" banner. |
+| 502 | "YouTube Music error: …" — ytmusicapi failure. |
 | network failure | "can't reach backend — check Tailscale" snackbar. |
 | other 4xx/5xx | Snackbar with the `detail` field from the backend's error envelope. |
 

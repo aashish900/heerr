@@ -6,23 +6,17 @@ Project brief for resuming the build in Claude Code. Read this first.
 **heerr** — phonetic blend of "hear" and "Seerr" (the Sonarr/Radarr request-app pattern this mirrors). Use this name in all conversation, file headings, and the working directory (`~/Documents/Personal/Android/heerr`).
 
 ## Frontend aesthetic (FYI for Flutter phase)
-Target look: Spotify's black + green theme. Material 3 with a custom seed colour ≈ `#1DB954` on a dark surface. Detailed UI design happens at the Flutter-phase planning, not now.
+Target look: Spotify-influenced black + green. Material 3 with a custom seed colour ≈ `#1DB954` on a dark surface.
 
 ## Goal
-A native mobile app where I search for songs (via Spotify) and, if found, the
-song is downloaded to my home server's music library. Navidrome auto-indexes
-new files, so a downloaded track shows up for streaming within ~1 minute.
+A native mobile app where I search for songs (via YouTube Music) and, if found, the song is downloaded to my home server's music library. Navidrome auto-indexes new files, so a downloaded track shows up for streaming within ~1 minute.
 
 ## Architecture (decided)
-- **Frontend:** native Flutter app (Android-first). Thin client — it only talks
-  to my backend's REST API. No download logic on the device.
-- **Backend:** FastAPI service that wraps spotDL. Runs as a Docker container in
-  my existing arr-stack. Exposes `search`, `download`, and `status/queue`.
-- **Search auth:** Spotify **client-credentials flow** (client-id + secret,
-  server-side only). NOT user-auth OAuth.
-- **Download:** backend shells out to / imports spotDL, writes to the music dir.
-- **Connectivity:** app reaches the backend over Tailscale (MagicDNS), no public
-  exposure.
+- **Frontend:** native Flutter app (Android-first). Thin client — it only talks to my backend's REST API. No download logic on the device.
+- **Backend:** FastAPI service that wraps spotDL. Runs as a Docker container in my existing arr-stack. Exposes `search`, `download`, and `status/queue`.
+- **Search:** YouTube Music via `ytmusicapi` (no API key — unofficial API). Returns `music.youtube.com` URLs for songs, browse URLs for albums/playlists.
+- **Download:** backend shells out to spotDL, passing the YouTube Music URL directly. Files named `{title}-{artist}.mp3`. spotDL is isolated in its own venv due to FastAPI version conflicts.
+- **Connectivity:** app reaches the backend over Tailscale (MagicDNS), no public exposure.
 
 ## Build order
 1. Backend API first (my wheelhouse — containerized REST service + job queue).
@@ -31,68 +25,41 @@ new files, so a downloaded track shows up for streaming within ~1 minute.
    the most hand-holding on — I have no mobile/app-dev experience.
 
 ## Hard constraints / learnings (don't re-litigate)
-- spotDL **cannot run on the phone**: fails on iOS entirely; on Android via
-  Termux it dies on a `libpthread.so.0` / tls-client dependency. Backend-only.
-- spotDL `--user-auth` (liked-songs `saved`) does **not** scale to an app —
-  per-user OAuth + redirect-URI pain. Design around URL/search downloads only.
-- Spotify **removed the top-tracks endpoint** — center the app on track / album
-  / playlist search and the user's own playlists. No "my top songs".
-- Single-user: **no Redis/Celery needed to start.** FastAPI BackgroundTasks or a
-  small SQLite job table is enough. Add a real queue only if outgrown.
-
-## Possible shortcut
-- Fork `DavidCroitoru/SpotDL-Complete-Web-Interface` for the backend (Flask
-  wrapper around spotDL). Off-the-shelf alternative if the build is abandoned:
-  SpotSpot (web UI, port 6544).
+- spotDL **cannot run on the phone**: fails on iOS entirely; on Android via Termux it dies on a `libpthread.so.0` / tls-client dependency. Backend-only.
+- Spotify search was replaced by YouTube Music (2026-06-10): spotDL's Spotify→YouTube matching produced wrong songs for regional/non-English tracks. Passing `music.youtube.com/watch?v=` URLs directly to spotDL bypasses all matching.
+- Single-user: **no Redis/Celery needed to start.** FastAPI BackgroundTasks + Postgres job table. Add a real queue only if outgrown.
+- spotDL invoked via subprocess (not library import) — isolation + cancellability + no version-coupling. Installed in `/opt/spotdl-venv` in the Docker image.
 
 ## Server environment (already running)
 - Ubuntu 26.04, user `aashish`, LAN IP `192.168.1.43`, Tailscale `100.106.120.121`.
-- arr-stack at `~/docker/arr-stack/docker-compose.yml`, Docker subnet
-  `172.39.0.0/24` with fixed IPs.
+- arr-stack at `~/docker/arr-stack/docker-compose.yml`, Docker subnet `172.39.0.0/24` with fixed IPs.
 - Navidrome watches `/data/media/music` (scan interval 1m). Download target.
-- spotDL 4.5.0 + ffmpeg installed. Spotify app is in "Development mode".
+- spotDL 4.5.0 + ffmpeg installed in the Docker image.
 - Shared filesystem root at `/data`.
 
-## heerr deployment shape (G2)
-- `/.env.example` — env template; populate as `.env` next to the arr-stack
-  compose file (Postgres creds, Spotify creds, `DATABASE_URL`,
-  `MUSIC_OUTPUT_DIR`).
+## heerr deployment shape
+- `/.env.example` — env template; populate as `.env` next to the arr-stack compose file (Postgres creds, `DATABASE_URL`, `MUSIC_OUTPUT_DIR`). No Spotify credentials needed.
 - `/docker-compose.snippet.yml` — four services merged into arr-stack:
   - `heerr-postgres-init` (one-shot: chowns `/data/postgres` to UID 999).
-  - `heerr-postgres` (`pgvector/pgvector:pg17`, bind-mounted `/data/postgres`,
-    fixed IP `172.39.0.50`).
+  - `heerr-postgres` (`pgvector/pgvector:pg17`, bind-mounted `/data/postgres`, fixed IP `172.39.0.50`).
   - `heerr-migrate` (one-shot: `alembic upgrade head`).
-  - `heerr-backend` (uvicorn, mounts `/data/media/music`, fixed IP
-    `172.39.0.51`).
-- No host port publication; backend reachable via Tailscale at
-  `172.39.0.51:8000` (the host's tailscaled advertises `172.39.0.0/24` as a
-  subnet route).
-
-## Spotify credentials
-- Client ID and secret already exist (Spotify Developer dashboard, app
-  "Spotify for Aashish's Home Assistant").
-- **Do NOT hardcode the secret in code or commit it.** Load from an `.env` /
-  environment variable in the backend container. (Client-credentials flow needs
-  only id + secret server-side.)
+  - `heerr-backend` (uvicorn, mounts `/data/media/music`, fixed IP `172.39.0.51`).
+- Backend also published on host port 8000 (added manually to arr-stack compose) so the phone can reach it over Tailscale.
+- No Spotify API credentials required anywhere in heerr.
 
 ## Dev environment (set up + smoke-tested)
 - Flutter 3.44.0 stable, on Mac (Apple Silicon / arm64), at `~/develop/flutter`.
 - Dart 3.12.0 (bundled).
-- Android SDK 36.1.0 via Android Studio; cmdline-tools installed; licenses
-  accepted.
+- Android SDK 36.1.0 via Android Studio; cmdline-tools installed; licenses accepted.
 - `adb` on PATH (`~/Library/Android/sdk/platform-tools`).
-- Test device: Pixel 7, Android 16 (API 36), connected over **wireless adb**
-  (`adb pair` then `adb connect` — note pairing port ≠ connect port).
-- iOS path intentionally skipped (no Xcode/CocoaPods). Revisit only if iOS is
-  wanted later (needs Mac + Xcode + Apple Developer account + an iPhone).
-- Smoke test passed: `flutter create` starter app builds and runs on the Pixel.
+- Test device: Pixel 7, Android 16 (API 36), connected over **wireless adb** (`adb pair` then `adb connect` — note pairing port ≠ connect port).
+- iOS path intentionally skipped (no Xcode/CocoaPods).
 
 ## My background
-DevOps + data engineering. Strong on backend/containers/infra. **No app-dev
-experience** — need step-by-step hand-holding on the Flutter/frontend side
-specifically. Prefer decisions backed by sources/docs. Prefer blunt, concise
-answers; check shell config with grep before adding entries (no duplicates).
+DevOps + data engineering. Strong on backend/containers/infra. **No app-dev experience** — need step-by-step hand-holding on the Flutter/frontend side specifically. Prefer decisions backed by sources/docs. Prefer blunt, concise answers; check shell config with grep before adding entries (no duplicates).
 
-## Next action
-Design the FastAPI backend: endpoint contract for `search`, `download`,
-`status`, then a containerized skeleton that drops into arr-stack.
+## Status
+Both roadmaps complete and smoke-tested end-to-end:
+- Backend: A1–H1 done, running on home server as `aashish010/heerr-backend:latest`.
+- Android: A1–G1 done, APK sideloaded on Pixel 7, working against live server.
+- Post-roadmap: display_name on jobs (v0.1.x), YTMusic search swap (v0.2.x).

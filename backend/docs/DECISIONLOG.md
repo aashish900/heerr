@@ -219,3 +219,24 @@ b) **Skip Trivy scanning of `/opt/spotdl-venv`** by adding `skip-dirs: /opt/spot
 - **Set `exit-code: 0`** to make Trivy informational. Rejected: silently hides real findings in our own code.
 
 **Revisit when:** spotdl 4.6+ ships with a relaxed FastAPI pin (then we could re-include `/opt/spotdl-venv` under the scanner), or if a vulnerability lands that is reachable from how we actually use spotdl (e.g. a subprocess-execution CVE in spotdl itself, which `skip-dirs` would suppress — accept this trade-off and audit spotdl's release notes manually on bumps).
+
+## 2026-06-10 — Search: replace Spotify with YouTube Music
+
+**Context:** The backend used Spotify client-credentials to power `POST /search`, and passed the resulting `spotify:track:xxx` URIs to spotDL. spotDL then fuzzy-matched the URI to a YouTube video. For regional/non-English songs (e.g. Tamil indie), this matching was systematically wrong — spotDL would download an unrelated song.
+
+**Decision:** Replace `SpotifyClient` with `YTMusicClient` (ytmusicapi, unofficial YouTube Music API, no credentials required). `POST /search` now queries YouTube Music and returns `music.youtube.com` URLs. `POST /download` passes the URL directly to spotDL — bypassing spotDL's Spotify→YouTube matching entirely.
+
+**Why:** When the download URL is already a YouTube Music URL, spotDL downloads exactly that video. No matching step, no wrong songs. ytmusicapi's search also gives better regional coverage than Spotify's catalog.
+
+**Alternatives considered:**
+- `--audio youtube-music,youtube,soundcloud` comma list: spotDL 4.5.0 doesn't accept comma-separated `--audio`. Rejected.
+- `--audio youtube` or `--audio youtube-music` as single flag: changes the search source but not the matching algorithm — still wrong songs for regional tracks.
+- Upgrade spotDL: spotDL 4.5.0 is already recent; newer versions' matching is still fundamentally the same.
+
+## 2026-06-10 — spotDL output template + stdout capture
+
+**Context:** Files were being stored with default spotDL naming (`Artist - Title.mp3`). User wanted `Title-Artist.mp3`. Also, when spotDL failed, `stderr_tail` was empty because spotDL writes to stdout, not stderr.
+
+**Decision:** Pass `--output {out_path}/{title}-{artist}.{output-ext}` to spotDL. Merge stderr into stdout (`stderr=STDOUT`) so all spotDL output is captured in `SpotdlError.stderr_tail`. Use `music.youtube.com/watch?v=` URLs (not `youtube.com/watch?v=`) — spotDL has explicit YouTube Music support and handles these more reliably.
+
+**Why:** Flat `Title-Artist.mp3` files are easier to browse on the server and match user expectations. Capturing stdout surfaces real error messages for debugging.
