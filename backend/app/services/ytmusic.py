@@ -51,7 +51,7 @@ class YTMusicClient:
             album_info: dict = item.get("album") or {}
             duration_s: int = item.get("duration_seconds") or 0
             return YTMusicResult(
-                source_url=f"https://www.youtube.com/watch?v={video_id}",
+                source_url=f"https://music.youtube.com/watch?v={video_id}",
                 source_type="song",
                 title=item.get("title", ""),
                 artist=artist,

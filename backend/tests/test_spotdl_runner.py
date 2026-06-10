@@ -15,11 +15,11 @@ class FakeProc:
         stderr: bytes = b"",
     ):
         self.returncode = returncode
-        self._stdout = stdout
-        self._stderr = stderr
+        # Simulate stderr=STDOUT merge: combined output lands in stdout
+        self._combined = stdout + stderr
 
     async def communicate(self):
-        return self._stdout, self._stderr
+        return self._combined, None
 
 
 # ---- happy path: produces new files --------------------------------------
@@ -56,8 +56,6 @@ async def test_command_invokes_spotdl_executable(tmp_path, monkeypatch):
     assert cmd[0] == "spotdl"
     assert cmd[1] == "download"
     assert "spotify:album:x" in cmd
-    assert "--audio" in cmd
-    assert cmd[cmd.index("--audio") + 1] == "youtube"
     assert "--output" in cmd
     out_idx = cmd.index("--output")
     output_val = cmd[out_idx + 1]

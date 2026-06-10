@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 _AUDIO_SUFFIXES = {".mp3", ".m4a", ".opus", ".flac", ".ogg", ".wav"}
-_STDERR_TAIL_BYTES = 4000
+_OUTPUT_TAIL_BYTES = 4000
 
 
 def _spotdl_executable() -> str:
@@ -36,7 +36,7 @@ async def _spawn(cmd: list[str]) -> asyncio.subprocess.Process:
     return await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,  # merge stderr into stdout
     )
 
 
@@ -48,11 +48,11 @@ def _scan_audio_files(output_dir: Path) -> set[Path]:
     return out
 
 
-async def run_spotdl(spotify_uri: str, output_dir: str | Path) -> list[DownloadedFile]:
-    """Invoke `spotdl download <uri> --output <dir>` as a subprocess.
+async def run_spotdl(source_url: str, output_dir: str | Path) -> list[DownloadedFile]:
+    """Invoke `spotdl download <url> --output <template>` as a subprocess.
 
     Returns the list of new audio files produced (dir-diff before vs after).
-    Raises `SpotdlError(exit_code, stderr_tail)` on non-zero exit.
+    Raises `SpotdlError(exit_code, combined_output_tail)` on non-zero exit.
     Executable is resolved via `_spotdl_executable()` (env `SPOTDL_EXECUTABLE`
     or PATH).
     """
@@ -64,18 +64,16 @@ async def run_spotdl(spotify_uri: str, output_dir: str | Path) -> list[Downloade
     cmd = [
         _spotdl_executable(),
         "download",
-        spotify_uri,
-        "--audio",
-        "youtube",
+        source_url,
         "--output",
         str(out_path / "{title}-{artist}.{output-ext}"),
     ]
     proc = await _spawn(cmd)
-    _, stderr_b = await proc.communicate()
-    stderr_text = (stderr_b or b"").decode("utf-8", errors="replace")[-_STDERR_TAIL_BYTES:]
+    stdout_b, _ = await proc.communicate()
+    output_text = (stdout_b or b"").decode("utf-8", errors="replace")[-_OUTPUT_TAIL_BYTES:]
 
     if proc.returncode != 0:
-        raise SpotdlError(exit_code=proc.returncode or -1, stderr_tail=stderr_text)
+        raise SpotdlError(exit_code=proc.returncode or -1, stderr_tail=output_text)
 
     after = _scan_audio_files(out_path)
     new_files = sorted(after - before)
