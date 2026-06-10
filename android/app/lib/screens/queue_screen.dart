@@ -9,6 +9,7 @@ import '../models/job_view.dart';
 import '../models/queue_response.dart';
 import '../providers/queue.dart';
 import '../router.dart';
+import '../theme.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_snackbar.dart';
 import '../widgets/skeleton.dart';
@@ -121,21 +122,26 @@ class _JobTile extends StatelessWidget {
   const _JobTile({required this.job});
   final JobView job;
 
+  bool get _isActive => job.state == 'queued' || job.state == 'running';
+
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      title: Text(
-        job.spotifyUri,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+    return Container(
+      color: _isActive ? heerrGreen.withOpacity(0.15) : null,
+      child: ListTile(
+        title: Text(
+          job.spotifyUri,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+        ),
+        subtitle: Text(
+          'job ${_shortId(job.jobId)}',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        trailing: StatusPill(state: job.state),
+        onTap: () => context.push(Routes.job(job.jobId)),
       ),
-      subtitle: Text(
-        'job ${_shortId(job.jobId)}',
-        style: Theme.of(context).textTheme.bodySmall,
-      ),
-      trailing: StatusPill(state: job.state),
-      onTap: () => context.push(Routes.job(job.jobId)),
     );
   }
 
