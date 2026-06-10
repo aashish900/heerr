@@ -45,6 +45,11 @@ services:
     depends_on:
       heerr-postgres-init:
         condition: service_completed_successfully
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       arrnetwork:
         ipv4_address: 172.39.0.50
@@ -94,6 +99,11 @@ services:
     depends_on:
       heerr-migrate:
         condition: service_completed_successfully
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       arrnetwork:
         ipv4_address: 172.39.0.51
