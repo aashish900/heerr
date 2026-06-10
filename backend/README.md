@@ -91,6 +91,26 @@ Source: `app/config.py`.
 
 In the Docker image, `SPOTDL_EXECUTABLE` defaults to `/opt/spotdl-venv/bin/spotdl` (set by the Dockerfile).
 
+### Getting Spotify credentials
+
+_Verified 2026-06-10 — the Spotify Developer dashboard moves links around occasionally, so the exact wording may drift over time._
+
+A **free** Spotify account is enough. **Premium is NOT required** — the backend uses the Web API only for metadata (search, track info, cover art) via the **client-credentials flow**. Audio is downloaded from YouTube by spotDL, not streamed from Spotify.
+
+1. Go to https://developer.spotify.com/dashboard and log in with your normal Spotify account.
+2. Click **Create app**.
+3. Fill in any name + description ("heerr backend" works). Pick *any* redirect URI (e.g. `http://localhost`) — client-credentials flow doesn't redirect, but the form requires the field. Check **Web API**. Accept the terms. Click **Save**.
+4. Open the app you just created → **Settings** → **Basic Information**.
+5. Copy **Client ID** → set as `SPOTIFY_CLIENT_ID` in `.env`.
+6. Click **View client secret** → copy → set as `SPOTIFY_CLIENT_SECRET` in `.env`.
+
+That's it — no scope picker, no OAuth consent screen for users to click through. The backend uses these two values server-side to mint an app token every hour (see `app/services/spotify.py`).
+
+If credentials don't work, common causes:
+- App is in **Development mode** with no Web API access checked — fix in app settings.
+- Trailing whitespace in `.env` — the secret is sensitive to it.
+- `403` from `/api/v1/search` usually means the *bearer token* (heerr's own token) lacks the `read` scope; not a Spotify creds issue.
+
 ---
 
 ## CLI — `python -m app.cli`
