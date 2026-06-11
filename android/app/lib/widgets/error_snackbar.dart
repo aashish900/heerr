@@ -5,6 +5,17 @@ import 'package:go_router/go_router.dart';
 import '../api/api_error.dart';
 import '../router.dart';
 
+/// Shared default for transient toast/notice messages (success / info).
+/// Material's default is 4s — too long for the user, who prefers a quicker
+/// disappear. Errors use [kSnackBarErrorDuration] (longer) so the user has
+/// time to read them.
+const Duration kSnackBarDuration = Duration(seconds: 1);
+
+/// Duration for error snackbars built via [buildApiErrorSnackBar]. Longer
+/// than [kSnackBarDuration] so a real failure stays on screen long enough
+/// to read.
+const Duration kSnackBarErrorDuration = Duration(seconds: 2);
+
 /// Build the `SnackBar` for a typed [ApiError] per PLAN.md §9. Pure
 /// function so it's easy to unit-test — `showApiError` wraps this with the
 /// side-effects (snackbar display + 401 redirect).
@@ -14,9 +25,11 @@ import '../router.dart';
 SnackBar buildApiErrorSnackBar(ApiError error, {String? action}) {
   return switch (error) {
     UnauthorizedError() => const SnackBar(
+        duration: kSnackBarErrorDuration,
         content: Text('auth failed — re-paste your token'),
       ),
     ForbiddenError() => SnackBar(
+        duration: kSnackBarErrorDuration,
         content: Text(
           action != null
               ? 'this token cannot $action'
@@ -24,6 +37,7 @@ SnackBar buildApiErrorSnackBar(ApiError error, {String? action}) {
         ),
       ),
     UnprocessableError(detail: final String? detail) => SnackBar(
+        duration: kSnackBarErrorDuration,
         content: Text(detail ?? 'invalid request'),
       ),
     RateLimitedError(retryAfter: final Duration retryAfter) => SnackBar(
@@ -32,18 +46,22 @@ SnackBar buildApiErrorSnackBar(ApiError error, {String? action}) {
         duration: Duration(seconds: retryAfter.inSeconds.clamp(2, 10)),
       ),
     NetworkError() => const SnackBar(
+        duration: kSnackBarErrorDuration,
         content: Text('cannot reach backend — check Tailscale'),
       ),
     NotFoundError(detail: final String? detail) => SnackBar(
+        duration: kSnackBarErrorDuration,
         content: Text(detail ?? 'not found'),
       ),
     NavidromeAuthError() => const SnackBar(
+        duration: kSnackBarErrorDuration,
         content: Text(
           'wrong Navidrome username or password — check Settings',
         ),
       ),
     NavidromeServerError(code: final int code, detail: final String? detail) =>
       SnackBar(
+        duration: kSnackBarErrorDuration,
         content: Text(
           () {
             final String d = (detail ?? '').trim();
@@ -58,6 +76,7 @@ SnackBar buildApiErrorSnackBar(ApiError error, {String? action}) {
       detail: final String? detail,
     ) =>
       SnackBar(
+        duration: kSnackBarErrorDuration,
         content: Text('$statusCode: ${detail ?? 'request failed'}'),
       ),
   };

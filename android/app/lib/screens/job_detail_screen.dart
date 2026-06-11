@@ -102,7 +102,10 @@ class _Field extends StatelessWidget {
     if (!context.mounted) return;
     messenger
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('Copied $label')));
+      ..showSnackBar(SnackBar(
+        duration: kSnackBarDuration,
+        content: Text('Copied $label'),
+      ));
   }
 
   @override

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 const Color heerrGreen = Color(0xFF1DB954);
 const Color heerrBlack = Color(0xFF000000);
+const Color heerrGolden = Color(0xFFD4A857);
 
 ThemeData heerrDarkTheme() {
   const ColorScheme cs = ColorScheme(

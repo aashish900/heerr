@@ -15,6 +15,7 @@ import '../models/subsonic/song.dart';
 import '../providers/library/library_album.dart';
 import '../providers/library/library_playlist.dart';
 import '../providers/settings.dart';
+import '../widgets/error_snackbar.dart';
 import 'player_provider.dart';
 import 'song_to_media_item.dart';
 
@@ -42,6 +43,7 @@ Future<_Creds?> _resolveCreds(WidgetRef ref) async {
 
 void _credsMissingSnack(BuildContext context) {
   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+    duration: kSnackBarDuration,
     content: Text(
       'Navidrome creds missing — fill them in under Settings → Servers',
     ),
@@ -50,7 +52,10 @@ void _credsMissingSnack(BuildContext context) {
 
 void _errSnack(BuildContext context, Object e) {
   final String msg = e is ApiError ? e.message : 'Play failed: $e';
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    duration: kSnackBarDuration,
+    content: Text(msg),
+  ));
 }
 
 MediaItem _toMediaItem(Song s, _Creds c) => songToMediaItem(
@@ -76,6 +81,7 @@ Future<void> playSongFromSubsonic(
     final MediaItem item = _toMediaItem(song, creds);
     await ref.read(audioHandlerProvider).playSong(item);
     messenger.showSnackBar(SnackBar(
+      duration: kSnackBarDuration,
       content: Text('Playing: ${song.title}'),
     ));
   } catch (e) {
@@ -93,6 +99,7 @@ Future<void> playAllSongsFromSubsonic(
 }) async {
   if (songs.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      duration: kSnackBarDuration,
       content: Text('Nothing to play.'),
     ));
     return;
@@ -166,6 +173,7 @@ Future<void> playJobDoneFromSubsonic(
     final List<String> candidates = _jobSearchCandidates(job);
     if (candidates.isEmpty) {
       messenger.showSnackBar(const SnackBar(
+        duration: kSnackBarDuration,
         content: Text("Can't search — job has no output path or title."),
       ));
       return;
@@ -192,6 +200,7 @@ Future<void> playJobDoneFromSubsonic(
       }
     }
     messenger.showSnackBar(const SnackBar(
+      duration: kSnackBarDuration,
       content: Text('Not in library yet — try again in a minute.'),
     ));
   } catch (e) {

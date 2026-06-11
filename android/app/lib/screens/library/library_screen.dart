@@ -330,6 +330,7 @@ class _YtmSection extends ConsumerWidget {
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
+                        duration: kSnackBarDuration,
                         content: Text('Queued: ${item.title}'),
                       ),
                     );

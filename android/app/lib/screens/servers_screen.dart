@@ -180,7 +180,10 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
     if (!mounted) return;
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Saved "${profile.name}"')),
+      SnackBar(
+        duration: kSnackBarDuration,
+        content: Text('Saved "${profile.name}"'),
+      ),
     );
   }
 
@@ -197,7 +200,10 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Connection OK')),
+        const SnackBar(
+          duration: kSnackBarDuration,
+          content: Text('Connection OK'),
+        ),
       );
     } on ApiError catch (e) {
       if (!mounted) return;
@@ -216,6 +222,7 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
         profile.navidromePassword == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
+          duration: kSnackBarDuration,
           content: Text('Fill in all 3 Navidrome fields first'),
         ),
       );
@@ -231,7 +238,10 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Connection OK')),
+        const SnackBar(
+          duration: kSnackBarDuration,
+          content: Text('Connection OK'),
+        ),
       );
     } on ApiError catch (e) {
       if (!mounted) return;

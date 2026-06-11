@@ -681,3 +681,39 @@ Final polish milestone before the K2 e2e smoke. Three independent threads:
 - `flutter test` **207/207** pass (was 200 + 4 new error-snackbar + 3 NowPlaying = +7; net is **+7**).
 - `pubspec.yaml` version bump: `0.4.1+6` → `0.4.2+7`.
 - On-device verification deferred to K2 (the e2e smoke milestone) — bad-creds snackbar, Now Playing tint on a colourful album cover, queue-poll pause check via network log.
+
+## 2026-06-11 — mini-player redesign + snackbar duration polish (user-driven UX tweak)
+
+Two unrelated UX changes driven by on-device feedback after the K1 install. Not a roadmap milestone — pure polish.
+
+### Mini-player redesign (`android/app/lib/widgets/mini_player.dart`)
+- Was: full-bleed dark `Material(color: cs.surfaceContainerHigh)` flush against the nav bar, indistinct from the app background.
+- Now: floating pill above the nav bar — 98% screen width (`FractionallySizedBox(widthFactor: 0.98)`), `BorderRadius.circular(9)`, 4/6 px vertical padding so it doesn't touch the `NavigationBar`.
+- Background colour is the **dominant colour of the current cover art at 55% alpha** (reuses `dominantColorFor` from `lib/utils/palette.dart`). Falls back to the new `heerrGolden` constant while extraction is pending or fails.
+- Same stale-response guard pattern as Now Playing — a slow extraction for the previous track can't overwrite the current track's tint.
+- `MiniPlayer` converted `ConsumerWidget` → `ConsumerStatefulWidget` to hold the cached `_tintArtUri` + `_tintColor`. Test seam `miniPlayerPaletteExtractorOverride` added (typedef + `@visibleForTesting` mutable variable, same shape as the Now Playing one).
+- Title text forced `Colors.white` and artist `white70` so they remain legible on any tint. **Caveat carried forward:** on very bright covers the white-on-tint contrast can be marginal; revisit if it shows up in real use.
+- **`android/app/lib/theme.dart`:** new constant `heerrGolden = Color(0xFFD4A857)` — used as the mini-player fallback when palette extraction yields null.
+
+### Snackbar duration polish
+- Material default is 4s; UX feedback: too long for both success and error toasts.
+- **`android/app/lib/widgets/error_snackbar.dart`:** two top-level constants:
+  - `kSnackBarDuration = Duration(seconds: 1)` — success / info default (Connection OK, Saved, Copied, Playing, Queued, "Nothing to play", "Not in library yet", etc.).
+  - `kSnackBarErrorDuration = Duration(seconds: 2)` — used only by `buildApiErrorSnackBar` so real failures stay readable.
+  - `RateLimitedError` keeps its own clamped duration (`retryAfter.inSeconds.clamp(2, 10)`).
+- Every existing `SnackBar` call site received an explicit `duration:` field — no reliance on the Material default anywhere:
+  - `lib/widgets/error_snackbar.dart`: 7 cases → `kSnackBarErrorDuration`.
+  - `lib/screens/servers_screen.dart`: 4 cases → `kSnackBarDuration`.
+  - `lib/screens/job_detail_screen.dart`: 1 case → `kSnackBarDuration`.
+  - `lib/screens/library/library_screen.dart`: 1 case → `kSnackBarDuration`.
+  - `lib/player/playback_actions.dart`: 6 cases → `kSnackBarDuration` (added `import '../widgets/error_snackbar.dart'`).
+
+### Test gate
+- `flutter analyze` clean.
+- `flutter test` **207/207** pass (no test changes — `MiniPlayer` tests use null `artUri` so the palette extractor returns null without network calls; snackbar tests don't assert duration).
+- On-device: confirmed visible time is now ~1s (success) / ~2s (error), excluding the ~250ms slide-in / slide-out animation envelope.
+
+### Not done in this commit
+- `pubspec.yaml` version not bumped — these are polish tweaks between K1 (`0.4.2+7`) and the K2 e2e smoke. Next milestone will carry the bump.
+- No `DECISIONLOG.md` entry — neither change reverses a prior decision; both are surface-level UX dials.
+
