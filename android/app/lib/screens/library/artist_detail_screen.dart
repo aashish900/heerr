@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../api/api_error.dart';
 import '../../models/subsonic/album.dart';
 import '../../models/subsonic/artist.dart';
+import '../../player/playback_actions.dart';
 import '../../providers/library/library_artist.dart';
 import '../../router.dart';
 import '../../widgets/empty_state.dart';
@@ -53,6 +54,8 @@ class ArtistDetailScreen extends ConsumerWidget {
                 subtitle: album.year == null ? null : '${album.year}',
                 coverArtId: album.coverArt,
                 trailingPlay: true,
+                onPlay: () =>
+                    playAlbumFromSubsonic(ref, context, album.id),
                 onTap: () => context.push(Routes.libraryAlbum(album.id)),
               );
             },

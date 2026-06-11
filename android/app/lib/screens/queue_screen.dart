@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../api/api_error.dart';
+import '../models/enums.dart';
 import '../models/job_view.dart';
 import '../models/queue_response.dart';
+import '../player/playback_actions.dart';
 import '../providers/queue.dart';
 import '../router.dart';
 import '../theme.dart';
@@ -118,34 +120,44 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _JobTile extends StatelessWidget {
+class _JobTile extends ConsumerWidget {
   const _JobTile({required this.job});
   final JobView job;
 
-  bool get _isActive => job.state == 'queued' || job.state == 'running';
+  bool get _isActive =>
+      job.state == JobState.queued || job.state == JobState.running;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final String? name = job.displayName;
     final bool hasName = name != null && name.isNotEmpty;
-    return Container(
-      color: _isActive ? heerrGreen.withOpacity(0.15) : null,
-      child: ListTile(
-        title: Text(
-          hasName ? name : job.sourceUrl,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: hasName
-              ? const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)
-              : const TextStyle(fontFamily: 'monospace', fontSize: 13),
-        ),
-        subtitle: Text(
-          'job ${_shortId(job.jobId)}',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        trailing: StatusPill(state: job.state),
-        onTap: () => context.push(Routes.job(job.jobId)),
+    return ListTile(
+      tileColor: _isActive ? heerrGreen.withValues(alpha: 0.15) : null,
+      title: Text(
+        hasName ? name : job.sourceUrl,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: hasName
+            ? const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)
+            : const TextStyle(fontFamily: 'monospace', fontSize: 13),
       ),
+      subtitle: Text(
+        'job ${_shortId(job.jobId)}',
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (job.state == JobState.done)
+            IconButton(
+              icon: const Icon(Icons.play_arrow),
+              tooltip: 'Play',
+              onPressed: () => playJobDoneFromSubsonic(ref, context, job),
+            ),
+          StatusPill(state: job.state),
+        ],
+      ),
+      onTap: () => context.push(Routes.job(job.jobId)),
     );
   }
 

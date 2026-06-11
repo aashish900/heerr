@@ -587,3 +587,47 @@ Post-J1-merge on-device test reproduced `PlatformException(The Activity class de
   4. Lock-screen media controls render (Android per-channel lock-screen visibility had to be enabled in system Settings — not a code config, surfaced for future docs).
 - **Known limitation, by design:** the notification's "skip forward" button is a no-op at J1 because the debug FAB only queues a single song. Real album / playlist queueing lands at J2.
 - **No test changes.** This is a platform-channel + base-class fix; covered by manual device smoke, not unit tests.
+
+## 2026-06-11 — J2: Now Playing + mini-player + library playback wiring
+
+Second Phase-J milestone. Wires every "tap a thing in the library → audio plays" path the v1 UI needs: library Song tile, library Album play icon, library Playlist play icon, library Artist's album play icon, Album / Playlist detail-screen song-row tap and "Play all" AppBar icon, Queue tab's done-job play action. Adds the persistent mini-player above the bottom nav and the full-screen Now Playing surface at `/player`. Removes the J1 debug FAB.
+
+- **New: `android/app/lib/screens/player/now_playing_screen.dart`.** Full-screen Now Playing built around three Riverpod streams:
+  - `playerSnapshotProvider` for current `MediaItem` + transport flags;
+  - `playerQueueProvider` for the bottom queue list;
+  - `currentMediaItemProvider` for highlighting the active row in the queue.
+  - Cover art (240px square) via `Image.network(item.artUri)` with a music-note fallback. Title + artist below.
+  - Scrubber: a `Slider` whose `value` is the snapshot's `state.position` (extrapolated from `updatePosition + elapsed * speed` by audio_service). A 250ms periodic `Timer` triggers `setState` so the slider animates between PlaybackState emissions, which only fire on play / pause / seek / buffer events. While the user is dragging the thumb, the slider value is held to a local `_scrubOverride` so the live position can't fight the drag; on `onChangeEnd` we call `handler.seek(...)` once and clear the override.
+  - Transport row: skip-prev, play/pause (centre, large), skip-next. Each `onPressed` does `ref.read(audioHandlerProvider).<method>()` — the handler is read inside the callback (not at build time) so widget tests that don't override `audioHandlerProvider` still render correctly when the buttons aren't tapped.
+  - Queue list at the bottom: `ListTile` per `MediaItem`. The current item gets the `Icons.equalizer` leading icon + bold title; tapping any row calls `handler.skipToQueueItem(i)`.
+- **New: `android/app/lib/widgets/mini_player.dart`.** Persistent media bar shown above the `NavigationBar` via `_ShellScaffold`. ConsumerWidget watching `playerSnapshotProvider`. When `snap.valueOrNull?.item == null` (nothing queued, snapshot still loading, or `audioHandlerProvider` un-overridden in tests), returns `SizedBox.shrink()` — zero height — so the bottom nav layout is identical to before J2 when the player is idle. When an item is present, renders a 56px tall Material bar: 40x40 cover thumb, title + artist column, trailing play/pause IconButton. Tap on the bar (anywhere not on the play/pause button) pushes `/player`.
+- **New: `android/app/lib/player/playback_actions.dart`.** Top-level functions consumed by every "play this" surface so the cred-resolution + snackbar logic isn't duplicated:
+  - `playSongFromSubsonic(ref, context, Song)` — single-song queue + play.
+  - `playAllSongsFromSubsonic(ref, context, List<Song>, {startIndex})` — replace queue + play; used by album / playlist song-row tap and "Play all".
+  - `playAlbumFromSubsonic(ref, context, albumId)` — fetch album via `libraryAlbumProvider(id).future` then call `playAllSongsFromSubsonic` (used by Artist detail's per-album play icon and Library search Album play icon).
+  - `playPlaylistFromSubsonic(ref, context, playlistId)` — same shape, via `libraryPlaylistProvider`.
+  - `playJobDoneFromSubsonic(ref, context, JobView)` — derive search query from `outputPath` basename (extension stripped) or `displayName` fallback; call Subsonic `search3` once; if exactly one `Song` match, `playSongFromSubsonic`; else snackbar "Not in library yet — try again in a minute." Single-match guard prevents picking the wrong track when Subsonic returns multiple title hits.
+  - All five surface failures via uniform snackbars: "Navidrome creds missing" when settings are blank, `ApiError.message` for Subsonic-side errors, generic "Play failed" for everything else.
+- **`android/app/lib/player/player_provider.dart`:** new `playerQueueProvider` (`Stream<List<MediaItem>>`) backed by `handler.queue.stream`. Existing `audioHandlerProvider` / `playerSnapshotProvider` / `currentMediaItemProvider` unchanged.
+- **`android/app/lib/router.dart`:**
+  - New top-level route `/player` (outside `ShellRoute`, like `/job/:id`) so Now Playing pushes full-screen above the bottom nav with a normal back button.
+  - `_ShellScaffold.bottomNavigationBar` is now a `Column(mainAxisSize: MainAxisSize.min, …)` containing `MiniPlayer()` above the `NavigationBar`. The mini-player hides itself, so when nothing is queued the nav looks identical to pre-J2.
+- **Library screen wiring (`android/app/lib/screens/library/library_screen.dart`):**
+  - Browse-mode Albums list: `LibraryResultTile.onPlay` wired to `playAlbumFromSubsonic`. Songs aren't directly clickable from the browse tabs — that flow is via the search field or by drilling into an album.
+  - Browse-mode Playlists list: `onPlay` → `playPlaylistFromSubsonic`.
+  - Search-mode library section: Song tiles → `playSongFromSubsonic`; Album tiles → `onPlay = playAlbumFromSubsonic`; Artist tiles unchanged (navigate to detail, no direct play).
+  - **`_DebugPlayFirstSongFab` removed**, along with its imports of `audio_service`, `playerProvider`, `songToMediaItem`, `Settings`, `libraryAlbumsProvider`, `libraryAlbumProvider` — the FAB was the sole consumer of those imports in this file.
+- **Album detail (`album_detail_screen.dart`):** AppBar "Play all" → `playAllSongsFromSubsonic(album.song)`. Song row tap → `playAllSongsFromSubsonic(album.song, startIndex: i)` (starting at the tapped song; the rest of the album queues up after it).
+- **Playlist detail (`playlist_detail_screen.dart`):** same shape, with `playlist.entry` as the song list.
+- **Artist detail (`artist_detail_screen.dart`):** each `LibraryResultTile`'s `onPlay` → `playAlbumFromSubsonic(album.id)`. Tap on the row body still navigates to album detail.
+- **Queue tab (`queue_screen.dart`):**
+  - Per-job play action: when `job.state == JobState.done`, render `Icons.play_arrow` in the trailing slot before the `StatusPill`. Tap → `playJobDoneFromSubsonic(job)`.
+  - **Side bug fix:** `_isActive` previously compared `job.state` (enum `JobState`) to string literals `'queued'` / `'running'`, which is always false. The active-job background tint never rendered. Fixed to `job.state == JobState.queued || job.state == JobState.running`. Made `_JobTile` a `ConsumerWidget` so the play action can `ref.read`.
+  - Replaced the `Container(color: …)` wrapper with `ListTile.tileColor` to silence the Material 3 "ListTile background color or ink splashes may be invisible" assertion — the assertion was dormant pre-fix because `_isActive` was always false.
+  - Also flipped the deprecated `Color.withOpacity(0.15)` → `Color.withValues(alpha: 0.15)` in the same line — clears the only `flutter analyze` info on the tree.
+- **Tests added:**
+  - `test/widgets/mini_player_test.dart` (6 cases): hidden when no item, hidden when stream is loading, hidden when `audioHandlerProvider` isn't overridden (router-test compat), renders title + artist + play icon when paused, renders pause icon when playing, tap pushes `/player`.
+  - `test/screens/player/now_playing_screen_test.dart` (7 cases): no item → "Nothing is playing", paused state renders play icon + duration, playing state renders pause icon, queue list renders both tracks + marks the current one with `Icons.equalizer`, empty queue → "Queue is empty", scrubber slider max equals duration in ms, loading stream → CircularProgressIndicator. The queue-marker test uses `tester.view.physicalSize = Size(1080, 2400)` to give the queue list enough vertical room past the cover art + scrubber + transport stack (default 800×600 test viewport doesn't fit both queue rows).
+- **Test gate:** `dart run build_runner build --delete-conflicting-outputs` clean (1 new `.g.dart` output for `playerQueueProvider`). `flutter analyze` clean — **zero** issues (was 1 info pre-J2; the `withOpacity` cleanup eliminated it). `flutter test` **200/200** pass (was 187 + 6 mini-player + 7 now-playing = +13).
+- `pubspec.yaml` version bump: `0.4.0+5` → `0.4.1+6`.
+- **On-device verification deferred to K2 smoke** (alongside the J2-touched paths): tap library song → audio plays + mini-player appears across all three tabs; tap mini-player → `/player` opens with cover/title/artist/scrubber/transport/queue; back → mini-player still present; lock-screen controls work; scrubber moves in real time; skip-next plays the next song; tap a done queue job → audio plays.

@@ -4,13 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/api_error.dart';
 import '../../models/subsonic/album.dart';
 import '../../models/subsonic/song.dart';
+import '../../player/playback_actions.dart';
 import '../../providers/library/library_album.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/library_cover_art.dart';
 import '../../widgets/skeleton.dart';
 
 /// Album detail. Header with cover + name + artist + year above the song
-/// list. Song-tap and "play all" actions land at J2 — at I1 they're no-ops.
+/// list. Song row tap = play the album starting at that song. AppBar
+/// "Play all" = play the album from the top.
 class AlbumDetailScreen extends ConsumerWidget {
   const AlbumDetailScreen({required this.albumId, super.key});
 
@@ -31,7 +33,9 @@ class AlbumDetailScreen extends ConsumerWidget {
             icon: const Icon(Icons.play_arrow_outlined),
             tooltip: 'Play all',
             onPressed: () {
-              // J2 wires the player. I1 is a no-op placeholder.
+              final Album? a = async.valueOrNull;
+              if (a == null) return;
+              playAllSongsFromSubsonic(ref, context, a.song);
             },
           ),
         ],
@@ -47,13 +51,13 @@ class AlbumDetailScreen extends ConsumerWidget {
   }
 }
 
-class _Body extends StatelessWidget {
+class _Body extends ConsumerWidget {
   const _Body({required this.album});
 
   final Album album;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (album.song.isEmpty) {
       return const EmptyState(
         icon: Icons.music_note_outlined,
@@ -65,7 +69,8 @@ class _Body extends StatelessWidget {
       itemCount: album.song.length + 1,
       itemBuilder: (BuildContext c, int i) {
         if (i == 0) return _AlbumHeader(album: album);
-        final Song s = album.song[i - 1];
+        final int idx = i - 1;
+        final Song s = album.song[idx];
         return ListTile(
           leading: Text(
             s.track == null ? '' : '${s.track}',
@@ -79,7 +84,12 @@ class _Body extends StatelessWidget {
           subtitle: s.duration == null
               ? null
               : Text(_formatDuration(s.duration!)),
-          // onTap wired at J2.
+          onTap: () => playAllSongsFromSubsonic(
+            ref,
+            context,
+            album.song,
+            startIndex: idx,
+          ),
         );
       },
     );

@@ -1,4 +1,3 @@
-import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,16 +11,13 @@ import '../../models/subsonic/artist_index.dart';
 import '../../models/subsonic/playlist.dart';
 import '../../models/subsonic/search_result3.dart';
 import '../../models/subsonic/song.dart';
-import '../../player/player_provider.dart';
-import '../../player/song_to_media_item.dart';
+import '../../player/playback_actions.dart';
 import '../../providers/download.dart';
 import '../../providers/library/combined_search.dart';
-import '../../providers/library/library_album.dart';
 import '../../providers/library/library_albums.dart';
 import '../../providers/library/library_artists.dart';
 import '../../providers/library/library_playlists.dart';
 import '../../providers/library/library_search_query.dart';
-import '../../providers/settings.dart';
 import '../../router.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_snackbar.dart';
@@ -109,83 +105,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             _PlaylistsTab(),
           ],
         ),
-        // J1 debug FAB: plays the first song of the first album in the
-        // library to exercise the audio handler end-to-end (foreground
-        // notification + lock-screen controls). Removed at J2 once the
-        // real tap-to-play wiring on song tiles lands.
-        floatingActionButton: const _DebugPlayFirstSongFab(),
       ),
-    );
-  }
-}
-
-/// Temporary J1 affordance. Reads settings → libraryAlbums → first album →
-/// libraryAlbum(id) → first song → converts to a MediaItem → calls
-/// `playSong` on the audio handler. Reports problems via snackbar.
-class _DebugPlayFirstSongFab extends ConsumerWidget {
-  const _DebugPlayFirstSongFab();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return FloatingActionButton.extended(
-      icon: const Icon(Icons.play_arrow),
-      label: const Text('Debug play'),
-      tooltip: 'J1 debug: play the first song of the first album',
-      onPressed: () async {
-        final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-        try {
-          final SettingsValue settings =
-              await ref.read(settingsProvider.future);
-          final String? url = settings.navidromeBaseUrl;
-          final String? user = settings.navidromeUsername;
-          final String? pass = settings.navidromePassword;
-          if (url == null ||
-              url.isEmpty ||
-              user == null ||
-              user.isEmpty ||
-              pass == null ||
-              pass.isEmpty) {
-            messenger.showSnackBar(const SnackBar(
-              content: Text(
-                'Navidrome creds missing — fill them in under Settings → Servers',
-              ),
-            ));
-            return;
-          }
-
-          final List<Album> albums =
-              await ref.read(libraryAlbumsProvider.future);
-          if (albums.isEmpty) {
-            messenger.showSnackBar(const SnackBar(
-              content: Text('Library is empty — download a song first'),
-            ));
-            return;
-          }
-          final Album firstAlbum =
-              await ref.read(libraryAlbumProvider(albums.first.id).future);
-          if (firstAlbum.song.isEmpty) {
-            messenger.showSnackBar(const SnackBar(
-              content: Text('First album has no songs'),
-            ));
-            return;
-          }
-          final Song first = firstAlbum.song.first;
-          final MediaItem item = songToMediaItem(
-            song: first,
-            navidromeBaseUrl: url,
-            navidromeUsername: user,
-            navidromePassword: pass,
-          );
-          await ref.read(audioHandlerProvider).playSong(item);
-          messenger.showSnackBar(SnackBar(
-            content: Text('Playing: ${first.title}'),
-          ));
-        } on ApiError catch (e) {
-          messenger.showSnackBar(SnackBar(content: Text(e.message)));
-        } catch (e) {
-          messenger.showSnackBar(SnackBar(content: Text('Play failed: $e')));
-        }
-      },
     );
   }
 }
@@ -305,15 +225,7 @@ class _CombinedResultsBody extends ConsumerWidget {
                     title: s.title,
                     subtitle: _songSubtitle(s),
                     coverArtId: s.coverArt,
-                    // Tap = navigate to the song's album for now; play wires
-                    // at J2. If we don't have an albumId, fall back to a
-                    // no-op tap so the tile is still visible.
-                    onTap: () {
-                      final String? albumId = s.albumId;
-                      if (albumId != null) {
-                        context.push(Routes.libraryAlbum(albumId));
-                      }
-                    },
+                    onTap: () => playSongFromSubsonic(ref, context, s),
                   ),
               ],
               if (lib.album.isNotEmpty) ...<Widget>[
@@ -324,6 +236,8 @@ class _CombinedResultsBody extends ConsumerWidget {
                     subtitle: a.artist,
                     coverArtId: a.coverArt,
                     trailingPlay: true,
+                    onPlay: () =>
+                        playAlbumFromSubsonic(ref, context, a.id),
                     onTap: () => context.push(Routes.libraryAlbum(a.id)),
                   ),
               ],
@@ -520,6 +434,7 @@ class _AlbumsTab extends ConsumerWidget {
               subtitle: a.artist,
               coverArtId: a.coverArt,
               trailingPlay: true,
+              onPlay: () => playAlbumFromSubsonic(ref, context, a.id),
               onTap: () => context.push(Routes.libraryAlbum(a.id)),
             );
           },
@@ -558,6 +473,7 @@ class _PlaylistsTab extends ConsumerWidget {
               subtitle: p.songCount == null ? null : '${p.songCount} songs',
               coverArtId: p.coverArt,
               trailingPlay: true,
+              onPlay: () => playPlaylistFromSubsonic(ref, context, p.id),
               onTap: () => context.push(Routes.libraryPlaylist(p.id)),
             );
           },

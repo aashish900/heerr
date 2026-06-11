@@ -6,9 +6,11 @@ import 'screens/library/album_detail_screen.dart';
 import 'screens/library/artist_detail_screen.dart';
 import 'screens/library/library_screen.dart';
 import 'screens/library/playlist_detail_screen.dart';
+import 'screens/player/now_playing_screen.dart';
 import 'screens/queue_screen.dart';
 import 'screens/servers_screen.dart';
 import 'screens/settings_screen.dart';
+import 'widgets/mini_player.dart';
 
 // Route paths — kept as constants so widget tests and link callers don't
 // drift apart. Settings is exposed via `/settings`; routing redirects to
@@ -89,12 +91,20 @@ GoRouter buildHeerrRouter() {
         builder: (BuildContext context, GoRouterState state) =>
             JobDetailScreen(jobId: state.pathParameters['id']!),
       ),
+      // Now Playing — top-level so it pushes full-screen above the bottom nav.
+      GoRoute(
+        path: '/player',
+        builder: (BuildContext context, GoRouterState state) =>
+            const NowPlayingScreen(),
+      ),
     ],
   );
 }
 
-// Bottom-nav shell. Wraps every child route with the same `NavigationBar`
-// so tab switches don't tear down state inside the surrounding scaffold.
+// Bottom-nav shell. Wraps every child route with the same `NavigationBar` so
+// tab switches don't tear down state inside the surrounding scaffold. The
+// mini-player sits above the NavigationBar; it hides itself when nothing is
+// queued.
 class _ShellScaffold extends StatelessWidget {
   const _ShellScaffold({required this.location, required this.child});
 
@@ -137,16 +147,22 @@ class _ShellScaffold extends StatelessWidget {
     final int currentIndex = _indexFor(location);
     return Scaffold(
       body: child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: currentIndex,
-        onDestinationSelected: (int i) => context.go(_tabs[i].path),
-        destinations: <NavigationDestination>[
-          for (final _NavTab t in _tabs)
-            NavigationDestination(
-              icon: Icon(t.icon),
-              selectedIcon: Icon(t.selectedIcon),
-              label: t.label,
-            ),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const MiniPlayer(),
+          NavigationBar(
+            selectedIndex: currentIndex,
+            onDestinationSelected: (int i) => context.go(_tabs[i].path),
+            destinations: <NavigationDestination>[
+              for (final _NavTab t in _tabs)
+                NavigationDestination(
+                  icon: Icon(t.icon),
+                  selectedIcon: Icon(t.selectedIcon),
+                  label: t.label,
+                ),
+            ],
+          ),
         ],
       ),
     );

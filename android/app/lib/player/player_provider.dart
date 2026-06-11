@@ -32,3 +32,10 @@ Stream<PlayerSnapshot> playerSnapshot(PlayerSnapshotRef ref) {
 Stream<MediaItem?> currentMediaItem(CurrentMediaItemRef ref) {
   return ref.watch(audioHandlerProvider).mediaItem.stream;
 }
+
+/// Stream of the current queue. J2's Now Playing screen renders the
+/// queue list from this; tests override it with a controlled stream.
+@riverpod
+Stream<List<MediaItem>> playerQueue(PlayerQueueRef ref) {
+  return ref.watch(audioHandlerProvider).queue.stream;
+}

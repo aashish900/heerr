@@ -70,5 +70,25 @@ final currentMediaItemProvider = AutoDisposeStreamProvider<MediaItem?>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CurrentMediaItemRef = AutoDisposeStreamProviderRef<MediaItem?>;
+String _$playerQueueHash() => r'229785a12cb60364b097b78abe7662624eca1120';
+
+/// Stream of the current queue. J2's Now Playing screen renders the
+/// queue list from this; tests override it with a controlled stream.
+///
+/// Copied from [playerQueue].
+@ProviderFor(playerQueue)
+final playerQueueProvider = AutoDisposeStreamProvider<List<MediaItem>>.internal(
+  playerQueue,
+  name: r'playerQueueProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$playerQueueHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef PlayerQueueRef = AutoDisposeStreamProviderRef<List<MediaItem>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

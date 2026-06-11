@@ -138,7 +138,7 @@ Widget tests:
 
 ---
 
-### [ ] J2. Now Playing screen + persistent mini-player + wire library taps
+### [x] J2. Now Playing screen + persistent mini-player + wire library taps
 **Files:**
 - New: `android/app/lib/screens/player/now_playing_screen.dart`, `android/app/lib/widgets/mini_player.dart`.
 - Modified: `android/app/lib/screens/_shell_scaffold.dart` — mount mini-player above the bottom nav; hidden when player queue is empty.
