@@ -6,7 +6,7 @@ part of 'settings.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$settingsHash() => r'c915027b45a7477dfefb77d6c17f402404f414f6';
+String _$settingsHash() => r'7beec090fafb097caffa5d40983f27dbea1344b6';
 
 /// See also [Settings].
 @ProviderFor(Settings)
@@ -22,7 +22,7 @@ final settingsProvider =
     );
 
 typedef _$Settings = AutoDisposeAsyncNotifier<SettingsValue>;
-String _$serverProfilesHash() => r'f4e709c318112410ef9e6289c843dff044e88d72';
+String _$serverProfilesHash() => r'ef68bc7b1736558c10a8410f96014926ba06c5cb';
 
 /// See also [ServerProfiles].
 @ProviderFor(ServerProfiles)

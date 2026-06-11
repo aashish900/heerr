@@ -60,6 +60,14 @@ final class NetworkError extends ApiError {
   String get message => 'cannot reach backend — check tailscale';
 }
 
+/// 404 / Subsonic code 70 — requested entity (artist / album / playlist /
+/// stream) does not exist. UI: snackbar with the detail message.
+final class NotFoundError extends ApiError {
+  const NotFoundError({super.detail});
+  @override
+  String get message => detail ?? 'not found';
+}
+
 /// Catch-all for any other 4xx/5xx. UI: snackbar with the status + detail.
 final class HttpStatusError extends ApiError {
   const HttpStatusError({required this.statusCode, super.detail});
@@ -99,6 +107,8 @@ ApiError mapDioErrorToApiError(DioException e) {
       return UnauthorizedError(detail: detail);
     case 403:
       return ForbiddenError(detail: detail);
+    case 404:
+      return NotFoundError(detail: detail);
     case 422:
       return UnprocessableError(detail: detail);
     case 503:

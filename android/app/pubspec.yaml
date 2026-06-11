@@ -2,7 +2,7 @@ name: heerr
 description: heerr Android client — thin REST client for the heerr FastAPI backend.
 publish_to: 'none'
 
-version: 0.1.0+1
+version: 0.3.0+1
 
 environment:
   sdk: ^3.12.0
@@ -27,6 +27,10 @@ dependencies:
 
   # Navigation
   go_router: ^14.6.0
+
+  # md5 for Subsonic auth token: t = md5(password + salt). Stdlib doesn't
+  # ship a hashing impl; `crypto` is the dart-lang-maintained package.
+  crypto: ^3.0.0
 
   # Material Icons font is enabled in the `flutter:` section below; no extra
   # font deps needed for the dark M3 theme.

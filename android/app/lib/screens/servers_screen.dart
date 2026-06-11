@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_error.dart';
 import '../api/client.dart';
 import '../api/endpoints.dart';
+import '../api/subsonic_client.dart';
+import '../api/subsonic_endpoints.dart';
 import '../providers/settings.dart';
 import '../theme.dart';
 import '../widgets/error_snackbar.dart';
@@ -90,7 +92,13 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
   late final TextEditingController _nameController;
   late final TextEditingController _urlController;
   late final TextEditingController _tokenController;
-  bool _testing = false;
+  late final TextEditingController _navidromeUrlController;
+  late final TextEditingController _navidromeUserController;
+  late final TextEditingController _navidromePassController;
+  bool _testingHeerr = false;
+  bool _testingNavidrome = false;
+
+  bool get _anyTesting => _testingHeerr || _testingNavidrome;
 
   @override
   void initState() {
@@ -101,6 +109,12 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
         TextEditingController(text: widget.existing?.backendBaseUrl ?? '');
     _tokenController =
         TextEditingController(text: widget.existing?.bearerToken ?? '');
+    _navidromeUrlController =
+        TextEditingController(text: widget.existing?.navidromeBaseUrl ?? '');
+    _navidromeUserController =
+        TextEditingController(text: widget.existing?.navidromeUsername ?? '');
+    _navidromePassController =
+        TextEditingController(text: widget.existing?.navidromePassword ?? '');
   }
 
   @override
@@ -108,6 +122,9 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
     _nameController.dispose();
     _urlController.dispose();
     _tokenController.dispose();
+    _navidromeUrlController.dispose();
+    _navidromeUserController.dispose();
+    _navidromePassController.dispose();
     super.dispose();
   }
 
@@ -128,14 +145,31 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
     return null;
   }
 
+  /// Navidrome URL is optional but, if provided, must be a valid http(s) URL.
+  String? _validateOptionalUrl(String? value) {
+    final String v = (value ?? '').trim();
+    if (v.isEmpty) return null;
+    return _validateUrl(value);
+  }
+
+  /// Validate, normalise URLs, build a [ServerProfile]. Returns null if form
+  /// validation fails so callers can early-return without showing UI noise.
   Future<ServerProfile?> _buildProfile() async {
     if (!(_formKey.currentState?.validate() ?? false)) return null;
     final String url = _normalizeUrl(_urlController.text);
     _urlController.text = url;
+    final String nUrlRaw = _navidromeUrlController.text.trim();
+    final String? nUrl = nUrlRaw.isEmpty ? null : _normalizeUrl(nUrlRaw);
+    if (nUrl != null) _navidromeUrlController.text = nUrl;
+    final String nUser = _navidromeUserController.text.trim();
+    final String nPass = _navidromePassController.text;
     return ServerProfile(
       name: _nameController.text.trim(),
       backendBaseUrl: url,
       bearerToken: _tokenController.text.trim(),
+      navidromeBaseUrl: nUrl,
+      navidromeUsername: nUser.isEmpty ? null : nUser,
+      navidromePassword: nPass.isEmpty ? null : nPass,
     );
   }
 
@@ -150,10 +184,10 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
     );
   }
 
-  Future<void> _testConnection() async {
+  Future<void> _testHeerr() async {
     final ServerProfile? profile = await _buildProfile();
     if (profile == null) return;
-    setState(() => _testing = true);
+    setState(() => _testingHeerr = true);
     try {
       await ref.read(serverProfilesProvider.notifier).saveProfile(profile);
       final Dio dio = await ref.read(dioClientProvider.future);
@@ -169,8 +203,54 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
       if (!mounted) return;
       showApiError(context, e);
     } finally {
-      if (mounted) setState(() => _testing = false);
+      if (mounted) setState(() => _testingHeerr = false);
     }
+  }
+
+  Future<void> _testNavidrome() async {
+    final ServerProfile? profile = await _buildProfile();
+    if (profile == null) return;
+    if (!mounted) return;
+    if (profile.navidromeBaseUrl == null ||
+        profile.navidromeUsername == null ||
+        profile.navidromePassword == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Fill in all 3 Navidrome fields first'),
+        ),
+      );
+      return;
+    }
+    setState(() => _testingNavidrome = true);
+    try {
+      await ref.read(serverProfilesProvider.notifier).saveProfile(profile);
+      final Dio dio = await ref.read(subsonicDioClientProvider.future);
+      await subsonicCall<dynamic>(
+        () => dio.get<dynamic>(SubsonicEndpoints.ping),
+        (Map<String, dynamic> env) => env,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Connection OK')),
+      );
+    } on ApiError catch (e) {
+      if (!mounted) return;
+      showApiError(context, e);
+    } finally {
+      if (mounted) setState(() => _testingNavidrome = false);
+    }
+  }
+
+  Widget _spinnerOr(bool loading, String label) {
+    if (!loading) return Text(label);
+    return const SizedBox(
+      width: 16,
+      height: 16,
+      child: CircularProgressIndicator(
+        strokeWidth: 2,
+        color: heerrGreen,
+      ),
+    );
   }
 
   @override
@@ -180,83 +260,126 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
       padding: EdgeInsets.fromLTRB(16, 24, 16, 24 + bottomInset),
       child: Form(
         key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Text(
-              widget.existing == null ? 'Add server' : 'Edit server',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Server name',
-                helperText: 'e.g. Home, VPN, Office',
-                border: OutlineInputBorder(),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Text(
+                widget.existing == null ? 'Add server' : 'Edit server',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
-              autocorrect: false,
-              validator: _required,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _urlController,
-              decoration: const InputDecoration(
-                labelText: 'Backend URL',
-                helperText: 'e.g. http://100.106.120.121:8000/api/v1',
-                border: OutlineInputBorder(),
-              ),
-              autocorrect: false,
-              keyboardType: TextInputType.url,
-              validator: _validateUrl,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _tokenController,
-              decoration: const InputDecoration(
-                labelText: 'Bearer token',
-                border: OutlineInputBorder(),
-              ),
-              autocorrect: false,
-              obscureText: true,
-              validator: _required,
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: FilledButton(
-                    onPressed: _testing ? null : _save,
-                    child: const Text('Save'),
-                  ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Server name',
+                  helperText: 'e.g. Home, VPN, Office',
+                  border: OutlineInputBorder(),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _testing ? null : _testConnection,
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.white),
-                      foregroundColor: Colors.white,
+                autocorrect: false,
+                validator: _required,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _urlController,
+                decoration: const InputDecoration(
+                  labelText: 'Backend URL',
+                  helperText: 'e.g. http://100.106.120.121:8000/api/v1',
+                  border: OutlineInputBorder(),
+                ),
+                autocorrect: false,
+                keyboardType: TextInputType.url,
+                validator: _validateUrl,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _tokenController,
+                decoration: const InputDecoration(
+                  labelText: 'Bearer token',
+                  border: OutlineInputBorder(),
+                ),
+                autocorrect: false,
+                obscureText: true,
+                validator: _required,
+              ),
+              const SizedBox(height: 24),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
+              Text(
+                'Navidrome (optional)',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _navidromeUrlController,
+                decoration: const InputDecoration(
+                  labelText: 'Navidrome URL',
+                  helperText: 'e.g. http://100.106.120.121:4533',
+                  border: OutlineInputBorder(),
+                ),
+                autocorrect: false,
+                keyboardType: TextInputType.url,
+                validator: _validateOptionalUrl,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _navidromeUserController,
+                decoration: const InputDecoration(
+                  labelText: 'Navidrome username',
+                  border: OutlineInputBorder(),
+                ),
+                autocorrect: false,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _navidromePassController,
+                decoration: const InputDecoration(
+                  labelText: 'Navidrome password',
+                  border: OutlineInputBorder(),
+                ),
+                autocorrect: false,
+                obscureText: true,
+              ),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: _anyTesting ? null : _save,
+                child: const Text('Save'),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _anyTesting ? null : _testHeerr,
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.white),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: _spinnerOr(_testingHeerr, 'Test heerr'),
                     ),
-                    child: _testing
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: heerrGreen,
-                            ),
-                          )
-                        : const Text('Test connection'),
                   ),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _anyTesting ? null : _testNavidrome,
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.white),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: _spinnerOr(_testingNavidrome, 'Test Navidrome'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

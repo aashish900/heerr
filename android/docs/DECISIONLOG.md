@@ -126,3 +126,25 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **Raw `Timer.periodic` in `QueueScreen`**: explicitly forbidden by PLAN §8.
 
 **Trade-off:** PLAN.md §6 + §8 wording was updated in the same task to match the implementation (CLAUDE.md staleness rule). The line "ticks every 3s + emits `QueueResponse`" still holds — the visible behaviour is the same; only the mechanism changed.
+
+---
+
+## 2026-06-11 — Stream via Navidrome Subsonic API, not via heerr backend
+
+**Context:** Roadmap `ROADMAP_STREAMER.md` adds a streaming feature to the Android app so the user can play music in-app instead of falling back to Navidrome's web UI or a third-party Subsonic client. The library + audio data already exist on the home server — Navidrome scans `/data/media/music`, indexes everything, and exposes the standard Subsonic REST API (`/rest/*.view`). The question is whether the streaming/library endpoints belong on the heerr backend or whether the Android client should talk to Navidrome directly.
+
+**Decision:** Android client speaks Subsonic to Navidrome directly. The heerr backend stays ingestion-only — its existing endpoints (`/search`, `/download`, `/queue`, `/status`) and scopes (`read`, `download`) are untouched. The Android app gains a second HTTP client (`subsonic_client.dart`) parallel to the existing heerr-backend dio, configured from a new set of Navidrome credentials persisted alongside the existing bearer-token settings.
+
+**Why:**
+- **Navidrome already implements the entire surface area we need** (auth, library browse, range-request streaming, transcoding, cover art, search). Re-implementing or proxying any of it in the heerr backend would duplicate working code for no gain.
+- **No backend change → no new tests, migrations, or deploy.** The streaming feature ships as a pure-Android change, which is the smallest possible blast radius (and matches the "backend first, Android second" sequencing in `/CLAUDE.md` §3 — backend is *done* for this feature, no work blocked on it).
+- **Subsonic is a stable, widely-implemented protocol.** Navidrome's implementation is well-tested by third-party clients (Symfonium, DSub, play:Sub). Talking to it directly inherits that maturity.
+- **Single-user / Tailscale-only posture is preserved.** The phone reaches Navidrome over the tailnet exactly the way it reaches the heerr backend today — `http://<tailscale-host>:4533`. No new public surface, no new auth model.
+- **Symmetric credential UX.** A second "Test Navidrome" button alongside the existing "Test heerr" button keeps the Settings flow intuitive — both backends are visible, both are testable, both are persisted via the same `flutter_secure_storage` abstraction.
+
+**Alternatives considered:**
+- **Proxy Subsonic through heerr.** Would let us put a single bearer token in front of both ingestion and streaming. Rejected: re-implements protocol semantics (range requests, error envelope, transcoding), adds Navidrome as a soft dependency the heerr backend would need to monitor, and gives the phone no new capability — the latency added by a second hop is real-time-perceptible during seek.
+- **Implement streaming endpoints natively in heerr.** Same downsides as proxying, plus we'd be reinventing Navidrome's library scanner / metadata extraction. Rejected on principle (don't rebuild what works).
+- **Use a third-party Subsonic client (Symfonium, DSub) for playback; keep heerr ingestion-only.** Rejected per the original scoping conversation: the user explicitly wants find → download → play in one app. Context-switching to another app on a "just downloaded a song, want to play it" flow is the exact friction this work removes.
+
+**Trade-off:** The phone now needs two sets of credentials (bearer token for heerr, username/password for Navidrome) and two sets of `flutter_secure_storage` keys. Mitigated by the per-server `ServerProfile` record (added at the existing servers screen) carrying both — the user fills both in once per server. Existing profiles written before H1 are read back with `null` navidrome fields (the JSON parsing is tolerant), so the upgrade is silent for users that only have a heerr backend configured.

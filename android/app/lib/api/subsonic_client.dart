@@ -1,0 +1,191 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:crypto/crypto.dart';
+import 'package:dio/dio.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../providers/settings.dart';
+import 'api_error.dart';
+
+part 'subsonic_client.g.dart';
+
+/// Subsonic API version this client implements. Navidrome supports 1.16.1
+/// and accepts older clients; pinning here makes the version we send
+/// explicit + testable.
+const String _subsonicApiVersion = '1.16.1';
+
+/// `c=` client identifier. Navidrome logs this; useful for distinguishing
+/// the heerr Android client from a generic Subsonic browser.
+const String _subsonicClientName = 'heerr';
+
+/// Injects the standard Subsonic auth query params on every outbound request:
+///   `u=<username>`
+///   `s=<random hex salt, regenerated per request>`
+///   `t=md5(password + salt)`
+///   `v=1.16.1`
+///   `c=heerr`
+///   `f=json`
+///
+/// When username or password is null/empty the interceptor is a no-op — the
+/// request goes out unauthenticated and Navidrome returns a Subsonic 40
+/// error envelope (mapped to [UnauthorizedError] by [subsonicCall]).
+///
+/// [saltGenerator] is injectable for deterministic unit tests; production
+/// callers should pass nothing and let the default cryptographically-strong
+/// generator fire.
+class SubsonicAuthInterceptor extends Interceptor {
+  SubsonicAuthInterceptor({
+    required this.username,
+    required this.password,
+    String Function()? saltGenerator,
+  }) : _saltGenerator = saltGenerator ?? _randomHexSalt;
+
+  final String? username;
+  final String? password;
+  final String Function() _saltGenerator;
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    final String? u = username;
+    final String? p = password;
+    if (u != null && u.isNotEmpty && p != null && p.isNotEmpty) {
+      final String salt = _saltGenerator();
+      final String token =
+          md5.convert(utf8.encode(p + salt)).toString();
+      options.queryParameters = <String, dynamic>{
+        ...options.queryParameters,
+        'u': u,
+        's': salt,
+        't': token,
+        'v': _subsonicApiVersion,
+        'c': _subsonicClientName,
+        'f': 'json',
+      };
+    }
+    handler.next(options);
+  }
+}
+
+/// Default salt generator: 6 cryptographically-random bytes, hex-encoded.
+/// (12 hex chars; Subsonic clients in the wild use 6-byte salts.)
+String _randomHexSalt() {
+  final Random rng = Random.secure();
+  final List<int> bytes =
+      List<int>.generate(6, (_) => rng.nextInt(256));
+  return bytes
+      .map((int b) => b.toRadixString(16).padLeft(2, '0'))
+      .join();
+}
+
+/// Builds a `Dio` for Subsonic calls against the user-configured Navidrome
+/// base URL. Depends on [settingsProvider] so a saved credential change
+/// invalidates and rebuilds with the new auth.
+@riverpod
+Future<Dio> subsonicDioClient(SubsonicDioClientRef ref) async {
+  final SettingsValue settings = await ref.watch(settingsProvider.future);
+
+  final Dio dio = Dio(
+    BaseOptions(
+      baseUrl: settings.navidromeBaseUrl ?? '',
+      connectTimeout: const Duration(seconds: 10),
+      sendTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+    ),
+  );
+  dio.interceptors.add(
+    SubsonicAuthInterceptor(
+      username: settings.navidromeUsername,
+      password: settings.navidromePassword,
+    ),
+  );
+  return dio;
+}
+
+/// Wrap a Subsonic dio call, parse the standard envelope, and translate
+/// failures into the shared [ApiError] hierarchy.
+///
+/// Every Subsonic response is wrapped as:
+/// ```
+/// {
+///   "subsonic-response": {
+///     "status": "ok" | "failed",
+///     "version": "1.16.1",
+///     ...payload (when ok)...
+///     "error": { "code": N, "message": "..." }   (when failed)
+///   }
+/// }
+/// ```
+///
+/// Note: Subsonic returns HTTP 200 even on semantic failures (e.g. wrong
+/// password) — the failure is inside the envelope. [subsonicCall] inspects
+/// the envelope and throws the matching [ApiError]. Transport-level
+/// failures (network, 5xx) still go through [mapDioErrorToApiError].
+///
+/// [parse] receives the envelope map (everything under `subsonic-response`)
+/// so callers can pick their payload key — e.g. `(env) => env['album']`.
+Future<T> subsonicCall<T>(
+  Future<Response<dynamic>> Function() request,
+  T Function(Map<String, dynamic> envelope) parse,
+) async {
+  final Response<dynamic> res;
+  try {
+    res = await request();
+  } on DioException catch (e) {
+    throw mapDioErrorToApiError(e);
+  }
+
+  final dynamic body = res.data;
+  if (body is! Map<String, dynamic>) {
+    throw const HttpStatusError(
+      statusCode: 0,
+      detail: 'invalid subsonic response envelope',
+    );
+  }
+  final dynamic envelope = body['subsonic-response'];
+  if (envelope is! Map<String, dynamic>) {
+    throw const HttpStatusError(
+      statusCode: 0,
+      detail: 'missing subsonic-response envelope',
+    );
+  }
+
+  if (envelope['status'] == 'failed') {
+    final dynamic err = envelope['error'];
+    if (err is Map<String, dynamic>) {
+      throw mapSubsonicErrorToApiError(
+        (err['code'] as num?)?.toInt() ?? 0,
+        err['message'] as String?,
+      );
+    }
+    throw const HttpStatusError(
+      statusCode: 0,
+      detail: 'subsonic failed without error block',
+    );
+  }
+
+  return parse(envelope);
+}
+
+/// Map a Subsonic error code (per the Subsonic API docs) to an [ApiError]
+/// variant. Only the codes we expect to handle distinctly are translated;
+/// everything else falls through to [HttpStatusError] carrying the code.
+///
+/// References:
+/// - 40: Wrong username or password.
+/// - 41: Token authentication not supported for LDAP users.
+/// - 50: User is not authorized for the given operation.
+/// - 70: The requested data was not found.
+ApiError mapSubsonicErrorToApiError(int code, String? message) {
+  switch (code) {
+    case 40:
+    case 41:
+      return UnauthorizedError(detail: message);
+    case 50:
+      return ForbiddenError(detail: message);
+    case 70:
+      return NotFoundError(detail: message);
+    default:
+      return HttpStatusError(statusCode: code, detail: message);
+  }
+}

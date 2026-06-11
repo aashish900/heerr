@@ -34,6 +34,9 @@ SnackBar buildApiErrorSnackBar(ApiError error, {String? action}) {
     NetworkError() => const SnackBar(
         content: Text('cannot reach backend — check Tailscale'),
       ),
+    NotFoundError(detail: final String? detail) => SnackBar(
+        content: Text(detail ?? 'not found'),
+      ),
     HttpStatusError(
       statusCode: final int statusCode,
       detail: final String? detail,
