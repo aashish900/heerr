@@ -149,12 +149,13 @@ Future<void> playPlaylistFromSubsonic(
 /// via Subsonic `search3`. Used by the Queue screen's per-done-job play
 /// action.
 ///
-/// Strategy: query string is the basename of `outputPath` (extension
-/// stripped). If `outputPath` is absent we fall back to `displayName`.
-/// Subsonic `search3` returns up to 20 songs; we require **exactly one**
-/// hit so we don't accidentally play the wrong track when titles collide.
-/// On ambiguity or zero hits we surface a "Not in library yet" snackbar —
-/// usually the re-index is still pending (typical lag ~30–60s).
+/// Strategy: try a ranked list of candidate queries — `displayName` first
+/// (cleanest, matches what the user typed/saw), then the bare `outputPath`
+/// basename without extension. For each candidate we hit `search3` once
+/// and take the first `Song` hit. We **don't** require an exact-1 match —
+/// Subsonic returns fuzzy hits ordered by relevance, so the first hit is
+/// almost always the right one. Only when every candidate yields zero
+/// hits do we surface "Not in library yet" (re-index pending).
 Future<void> playJobDoneFromSubsonic(
   WidgetRef ref,
   BuildContext context,
@@ -162,46 +163,64 @@ Future<void> playJobDoneFromSubsonic(
 ) async {
   final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
   try {
-    final String? query = _jobSearchQuery(job);
-    if (query == null || query.trim().isEmpty) {
+    final List<String> candidates = _jobSearchCandidates(job);
+    if (candidates.isEmpty) {
       messenger.showSnackBar(const SnackBar(
         content: Text("Can't search — job has no output path or title."),
       ));
       return;
     }
     final Dio dio = await ref.read(subsonicDioClientProvider.future);
-    final SearchResult3 result = await subsonicCall<SearchResult3>(
-      () => dio.get<dynamic>(
-        SubsonicEndpoints.search3,
-        queryParameters: <String, dynamic>{'query': query},
-      ),
-      (Map<String, dynamic> env) {
-        final dynamic payload = env['searchResult3'];
-        if (payload is! Map<String, dynamic>) {
-          return const SearchResult3();
-        }
-        return SearchResult3.fromJson(payload);
-      },
-    );
-    if (!context.mounted) return;
-    if (result.song.length != 1) {
-      messenger.showSnackBar(const SnackBar(
-        content: Text('Not in library yet — try again in a minute.'),
-      ));
-      return;
+    for (final String query in candidates) {
+      final SearchResult3 result = await subsonicCall<SearchResult3>(
+        () => dio.get<dynamic>(
+          SubsonicEndpoints.search3,
+          queryParameters: <String, dynamic>{'query': query},
+        ),
+        (Map<String, dynamic> env) {
+          final dynamic payload = env['searchResult3'];
+          if (payload is! Map<String, dynamic>) {
+            return const SearchResult3();
+          }
+          return SearchResult3.fromJson(payload);
+        },
+      );
+      if (!context.mounted) return;
+      if (result.song.isNotEmpty) {
+        await playSongFromSubsonic(ref, context, result.song.first);
+        return;
+      }
     }
-    await playSongFromSubsonic(ref, context, result.song.first);
+    messenger.showSnackBar(const SnackBar(
+      content: Text('Not in library yet — try again in a minute.'),
+    ));
   } catch (e) {
     if (context.mounted) _errSnack(context, e);
   }
 }
 
-String? _jobSearchQuery(JobView job) {
+/// Ordered list of search3 queries to try for a done job. De-duped + empties
+/// dropped. Prefers `displayName` over the filesystem basename — the
+/// basename can include track-number prefixes, accent-stripped chars, or
+/// other sanitisation that Subsonic's tokenizer doesn't reconcile with
+/// the song's actual title in the index.
+List<String> _jobSearchCandidates(JobView job) {
+  final List<String> out = <String>[];
+  void push(String? s) {
+    if (s == null) return;
+    final String t = s.trim();
+    if (t.isEmpty) return;
+    if (!out.contains(t)) out.add(t);
+  }
+
+  push(job.displayName);
+
   final String? path = job.outputPath;
   if (path != null && path.isNotEmpty) {
     final String basename = path.split('/').last;
     final int dot = basename.lastIndexOf('.');
-    return dot > 0 ? basename.substring(0, dot) : basename;
+    final String stem = dot > 0 ? basename.substring(0, dot) : basename;
+    push(stem);
   }
-  return job.displayName;
+  return out;
 }
