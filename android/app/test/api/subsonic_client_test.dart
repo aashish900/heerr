@@ -234,7 +234,7 @@ void main() {
   });
 
   group('subsonicCall — error envelope mapping', () {
-    test('code 40 → UnauthorizedError with detail message', () async {
+    test('code 40 → NavidromeAuthError with detail message', () async {
       final _FakeAdapter adapter = _FakeAdapter(
         (_) => _json(
           200,
@@ -254,8 +254,8 @@ void main() {
           (Map<String, dynamic> e) => e,
         ),
         throwsA(
-          isA<UnauthorizedError>().having(
-            (UnauthorizedError e) => e.detail,
+          isA<NavidromeAuthError>().having(
+            (NavidromeAuthError e) => e.detail,
             'detail',
             'Wrong username or password.',
           ),
@@ -263,7 +263,7 @@ void main() {
       );
     });
 
-    test('code 41 → UnauthorizedError (LDAP token-auth refusal)', () async {
+    test('code 41 → NavidromeAuthError (LDAP token-auth refusal)', () async {
       final _FakeAdapter adapter = _FakeAdapter(
         (_) => _json(200, _failedEnvelope(code: 41, message: 'LDAP')),
       );
@@ -279,7 +279,7 @@ void main() {
           () => dio.get<dynamic>('/rest/ping.view'),
           (Map<String, dynamic> e) => e,
         ),
-        throwsA(isA<UnauthorizedError>()),
+        throwsA(isA<NavidromeAuthError>()),
       );
     });
 
@@ -341,7 +341,8 @@ void main() {
       );
     });
 
-    test('unknown code (e.g. 10) → HttpStatusError carrying that code', () async {
+    test('unknown code (e.g. 10) → NavidromeServerError carrying that code',
+        () async {
       final _FakeAdapter adapter = _FakeAdapter(
         (_) => _json(
           200,
@@ -361,9 +362,9 @@ void main() {
           (Map<String, dynamic> e) => e,
         ),
         throwsA(
-          isA<HttpStatusError>().having(
-            (HttpStatusError e) => e.statusCode,
-            'statusCode',
+          isA<NavidromeServerError>().having(
+            (NavidromeServerError e) => e.code,
+            'code',
             10,
           ),
         ),

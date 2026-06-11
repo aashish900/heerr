@@ -147,6 +147,50 @@ void main() {
       await _tapTrigger(tester);
       expect(find.text('500: request failed'), findsOneWidget);
     });
+
+    testWidgets(
+      'NavidromeAuthError → "wrong Navidrome username or password — check Settings"',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(_harness(
+          onPressed: (BuildContext c) =>
+              showApiError(c, const NavidromeAuthError(detail: 'Wrong')),
+        ));
+        await _tapTrigger(tester);
+        expect(
+          find.text('wrong Navidrome username or password — check Settings'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'NavidromeServerError with detail → "Navidrome server error: <code> <detail>"',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(_harness(
+          onPressed: (BuildContext c) => showApiError(
+            c,
+            const NavidromeServerError(code: 30, detail: 'parameter missing'),
+          ),
+        ));
+        await _tapTrigger(tester);
+        expect(
+          find.text('Navidrome server error: 30 parameter missing'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'NavidromeServerError without detail → "Navidrome server error: <code>"',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(_harness(
+          onPressed: (BuildContext c) =>
+              showApiError(c, const NavidromeServerError(code: 30)),
+        ));
+        await _tapTrigger(tester);
+        expect(find.text('Navidrome server error: 30'), findsOneWidget);
+      },
+    );
   });
 
   group('showApiError — 401 side-effect', () {
@@ -201,6 +245,45 @@ void main() {
       await _tapTrigger(tester);
       expect(find.text('auth failed — re-paste your token'), findsOneWidget);
       // No exception thrown — test passes if we get here.
+    });
+
+    testWidgets('NavidromeAuthError redirects to /settings/servers',
+        (WidgetTester tester) async {
+      final GoRouter router = GoRouter(
+        initialLocation: '/',
+        routes: <RouteBase>[
+          GoRoute(
+            path: '/',
+            builder: (_, _) => Scaffold(
+              body: Builder(
+                builder: (BuildContext c) => Center(
+                  child: ElevatedButton(
+                    onPressed: () =>
+                        showApiError(c, const NavidromeAuthError()),
+                    child: const Text('go'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: Routes.servers,
+            builder: (_, _) => const Scaffold(body: Text('SERVERS')),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(ProviderScope(
+        child: MaterialApp.router(routerConfig: router),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('go'));
+      await tester.pump();
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('SERVERS'), findsOneWidget);
     });
   });
 }

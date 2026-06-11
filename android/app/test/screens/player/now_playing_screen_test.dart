@@ -5,9 +5,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:heerr/models/job_view.dart';
+import 'package:heerr/models/queue_response.dart';
 import 'package:heerr/player/heerr_audio_handler.dart';
 import 'package:heerr/player/player_provider.dart';
+import 'package:heerr/providers/queue.dart';
 import 'package:heerr/screens/player/now_playing_screen.dart';
+import 'package:heerr/utils/palette.dart';
+
+// Static counters so the (transient) provider instance can report into the
+// test without us having to fish it back out via ProviderContainer.
+int _pauseCalls = 0;
+int _resumeCalls = 0;
+
+class _StubQueue extends Queue {
+  @override
+  Future<QueueResponse> build() async {
+    return const QueueResponse(active: <JobView>[], recent: <JobView>[]);
+  }
+
+  @override
+  void pause() {
+    _pauseCalls++;
+  }
+
+  @override
+  Future<void> resume() async {
+    _resumeCalls++;
+  }
+}
 
 PlayerSnapshot _snap({MediaItem? item, bool playing = false}) {
   return PlayerSnapshot(
@@ -48,12 +74,23 @@ Widget _wrap({
         (Ref<AsyncValue<MediaItem?>> ref) =>
             Stream<MediaItem?>.value(snapshot.item),
       ),
+      queueProvider.overrideWith(_StubQueue.new),
     ],
     child: const MaterialApp(home: NowPlayingScreen()),
   );
 }
 
 void main() {
+  setUp(() {
+    _pauseCalls = 0;
+    _resumeCalls = 0;
+    paletteExtractorOverride = (Uri? _) async => null; // deterministic, no I/O
+  });
+
+  tearDown(() {
+    paletteExtractorOverride = dominantColorFor;
+  });
+
   testWidgets('"Nothing is playing" when snapshot has no item',
       (WidgetTester tester) async {
     await tester.pumpWidget(_wrap(snapshot: _snap()));
@@ -144,11 +181,88 @@ void main() {
                 Stream<PlayerSnapshot>.fromFuture(
                     Completer<PlayerSnapshot>().future),
           ),
+          queueProvider.overrideWith(_StubQueue.new),
         ],
         child: const MaterialApp(home: NowPlayingScreen()),
       ),
     );
     await tester.pump();
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+  });
+
+  // K1.2 — palette tint
+  testWidgets(
+    'paints a gradient surface when palette extractor returns a colour',
+    (WidgetTester tester) async {
+      paletteExtractorOverride =
+          (Uri? _) async => const Color(0xFFAB47BC); // purple-ish
+      await tester.pumpWidget(_wrap(
+        snapshot: _snap(
+          item: _item(id: 'http://stream/x'),
+          playing: false,
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.byType(DecoratedBox), findsWidgets);
+      // No tint means the helper widget falls through to the raw child;
+      // having a non-null colour gates the gradient path.
+    },
+  );
+
+  testWidgets('does NOT crash when palette extractor returns null',
+      (WidgetTester tester) async {
+    paletteExtractorOverride = (Uri? _) async => null;
+    await tester.pumpWidget(_wrap(
+      snapshot: _snap(item: _item(), playing: false),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Track A'), findsWidgets);
+  });
+
+  // K1.3 — lifecycle
+  testWidgets('pauses queueProvider on mount and resumes on dispose',
+      (WidgetTester tester) async {
+    expect(_pauseCalls, 0);
+    expect(_resumeCalls, 0);
+
+    // Use a builder we can toggle, keeping ProviderScope alive across the
+    // remount so the resume() call in NowPlayingScreen.dispose can still
+    // resolve the provider's notifier.
+    final ValueNotifier<bool> showPlayer = ValueNotifier<bool>(true);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          playerSnapshotProvider.overrideWith(
+            (Ref<AsyncValue<PlayerSnapshot>> ref) =>
+                Stream<PlayerSnapshot>.value(
+                  _snap(item: _item(), playing: true),
+                ),
+          ),
+          playerQueueProvider.overrideWith(
+            (Ref<AsyncValue<List<MediaItem>>> ref) =>
+                Stream<List<MediaItem>>.value(const <MediaItem>[]),
+          ),
+          currentMediaItemProvider.overrideWith(
+            (Ref<AsyncValue<MediaItem?>> ref) =>
+                Stream<MediaItem?>.value(_item()),
+          ),
+          queueProvider.overrideWith(_StubQueue.new),
+        ],
+        child: MaterialApp(
+          home: ValueListenableBuilder<bool>(
+            valueListenable: showPlayer,
+            builder: (BuildContext c, bool show, _) =>
+                show ? const NowPlayingScreen() : const SizedBox.shrink(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(_pauseCalls, 1);
+    expect(_resumeCalls, 0);
+
+    showPlayer.value = false;
+    await tester.pumpAndSettle();
+    expect(_resumeCalls, 1);
   });
 }

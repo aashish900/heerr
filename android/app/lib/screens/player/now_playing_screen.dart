@@ -6,6 +6,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../player/heerr_audio_handler.dart';
 import '../../player/player_provider.dart';
+import '../../providers/queue.dart';
+import '../../utils/palette.dart';
+
+/// Injection point for tests — swap `dominantColorFor` with a deterministic
+/// fake (e.g. `(_) async => Colors.purple`) so widget tests don't hit the
+/// network and don't depend on `package:palette_generator`'s decode path.
+typedef PaletteExtractor = Future<Color?> Function(Uri? artUri);
+
+@visibleForTesting
+PaletteExtractor paletteExtractorOverride = dominantColorFor;
 
 /// Full-screen Now Playing surface. Cover art on top, title/artist, scrubber
 /// bound to the live position, transport controls, and the queue list at the
@@ -32,18 +42,63 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   Timer? _ticker;
   Duration? _scrubOverride;
 
+  // Cover-art-derived tint colour. Recomputed when the current MediaItem's
+  // artUri changes. Null while loading or when extraction fails — the body
+  // falls back to the default surface in that case.
+  Uri? _tintArtUri;
+  Color? _tintColor;
+
+  // Cached queue notifier so dispose() doesn't have to read it through `ref`
+  // (Riverpod invalidates the ref before State.dispose runs — caching here
+  // means resume() can fire even during teardown).
+  Queue? _queueNotifier;
+
   @override
   void initState() {
     super.initState();
     _ticker = Timer.periodic(const Duration(milliseconds: 250), (_) {
       if (mounted) setState(() {});
     });
+    // K1 lifecycle: pause the /queue poller while Now Playing is foreground.
+    // The queue + reactive-promotion logic stays paused; the user can't see
+    // it from here. Resumed in dispose().
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        final Queue q = ref.read(queueProvider.notifier);
+        _queueNotifier = q;
+        q.pause();
+      } catch (_) {
+        // Provider may not be initialised yet (rare); ignore.
+      }
+    });
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
+    // Use the cached notifier so we don't have to touch `ref` — Riverpod
+    // invalidates it before this dispose runs.
+    try {
+      _queueNotifier?.resume();
+    } catch (_) {
+      // Notifier may already be disposed; ignore.
+    }
     super.dispose();
+  }
+
+  void _maybeRefreshTint(Uri? artUri) {
+    if (artUri == _tintArtUri) return;
+    _tintArtUri = artUri;
+    final Uri? captured = artUri;
+    paletteExtractorOverride(captured).then((Color? c) {
+      if (!mounted) return;
+      // Stale-response guard: another item may have started while we were
+      // extracting; only apply this colour if the current artUri still
+      // matches the one we kicked off the extraction for.
+      if (_tintArtUri != captured) return;
+      setState(() => _tintColor = c);
+    });
   }
 
   @override
@@ -54,6 +109,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Now playing'),
+        backgroundColor: _tintColor?.withValues(alpha: 0.6),
       ),
       body: snap.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -61,20 +117,55 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         data: (PlayerSnapshot s) {
           final MediaItem? item = s.item;
           if (item == null) {
+            _maybeRefreshTint(null);
             return const Center(child: Text('Nothing is playing.'));
           }
-          return _Body(
-            snapshot: s,
-            scrubOverride: _scrubOverride,
-            onSeekStart: (Duration d) => setState(() => _scrubOverride = d),
-            onSeekUpdate: (Duration d) => setState(() => _scrubOverride = d),
-            onSeekEnd: (Duration d) {
-              ref.read(audioHandlerProvider).seek(d);
-              setState(() => _scrubOverride = null);
-            },
+          _maybeRefreshTint(item.artUri);
+          return _TintedBackground(
+            color: _tintColor,
+            child: _Body(
+              snapshot: s,
+              scrubOverride: _scrubOverride,
+              onSeekStart: (Duration d) => setState(() => _scrubOverride = d),
+              onSeekUpdate: (Duration d) => setState(() => _scrubOverride = d),
+              onSeekEnd: (Duration d) {
+                ref.read(audioHandlerProvider).seek(d);
+                setState(() => _scrubOverride = null);
+              },
+            ),
           );
         },
       ),
+    );
+  }
+}
+
+/// Vertical gradient from [color] (top, at low opacity) to the default M3
+/// surface (bottom). Null [color] → no gradient applied.
+class _TintedBackground extends StatelessWidget {
+  const _TintedBackground({required this.color, required this.child});
+
+  final Color? color;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color? c = color;
+    if (c == null) return child;
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[
+            c.withValues(alpha: 0.45),
+            cs.surface,
+          ],
+          stops: const <double>[0.0, 0.65],
+        ),
+      ),
+      child: child,
     );
   }
 }

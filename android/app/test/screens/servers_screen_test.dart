@@ -171,12 +171,10 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      // Default Unauthorized copy is "auth failed — re-paste your token";
-      // K1 customises this for Subsonic. For H1 just assert that some auth
-      // snackbar is on screen (and NOT the success copy).
+      // K1 maps Subsonic code 40 to NavidromeAuthError with dedicated copy.
       expect(find.text('Connection OK'), findsNothing);
       expect(
-        find.text('auth failed — re-paste your token'),
+        find.text('wrong Navidrome username or password — check Settings'),
         findsOneWidget,
       );
     },

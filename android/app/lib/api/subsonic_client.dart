@@ -243,8 +243,9 @@ Future<T> subsonicCall<T>(
 }
 
 /// Map a Subsonic error code (per the Subsonic API docs) to an [ApiError]
-/// variant. Only the codes we expect to handle distinctly are translated;
-/// everything else falls through to [HttpStatusError] carrying the code.
+/// variant. Subsonic-specific variants exist for auth (40/41) and the
+/// generic server-error case so the snackbar copy can point the user to
+/// the Navidrome creds rather than the heerr bearer token.
 ///
 /// References:
 /// - 40: Wrong username or password.
@@ -255,12 +256,12 @@ ApiError mapSubsonicErrorToApiError(int code, String? message) {
   switch (code) {
     case 40:
     case 41:
-      return UnauthorizedError(detail: message);
+      return NavidromeAuthError(detail: message);
     case 50:
       return ForbiddenError(detail: message);
     case 70:
       return NotFoundError(detail: message);
     default:
-      return HttpStatusError(statusCode: code, detail: message);
+      return NavidromeServerError(code: code, detail: message);
   }
 }

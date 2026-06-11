@@ -76,6 +76,34 @@ final class HttpStatusError extends ApiError {
   String get message => '$statusCode: ${detail ?? "request failed"}';
 }
 
+/// Subsonic 40/41 — wrong username/password against the Navidrome server.
+/// Distinct from [UnauthorizedError] because the user-facing copy + the
+/// 401-redirect target differ: heerr backend auth redirects to /settings
+/// for the bearer token; Navidrome auth redirects to /settings/servers
+/// for the per-server creds.
+final class NavidromeAuthError extends ApiError {
+  const NavidromeAuthError({super.detail});
+  @override
+  String get message =>
+      'wrong Navidrome username or password — check Settings';
+}
+
+/// Any other non-success Subsonic error envelope (codes other than 40/41/50/70).
+/// Distinct from [HttpStatusError] because the wire is HTTP 200 — the
+/// failure is inside the envelope, so the generic "HTTP 200: …" copy would
+/// be misleading.
+final class NavidromeServerError extends ApiError {
+  const NavidromeServerError({required this.code, super.detail});
+  final int code;
+  @override
+  String get message {
+    final String d = (detail ?? '').trim();
+    return d.isEmpty
+        ? 'Navidrome server error: $code'
+        : 'Navidrome server error: $code $d';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Mapping: DioException → ApiError. Pure function; no I/O, easy to unit-test.
 // ---------------------------------------------------------------------------

@@ -631,3 +631,53 @@ Second Phase-J milestone. Wires every "tap a thing in the library → audio play
 - **Test gate:** `dart run build_runner build --delete-conflicting-outputs` clean (1 new `.g.dart` output for `playerQueueProvider`). `flutter analyze` clean — **zero** issues (was 1 info pre-J2; the `withOpacity` cleanup eliminated it). `flutter test` **200/200** pass (was 187 + 6 mini-player + 7 now-playing = +13).
 - `pubspec.yaml` version bump: `0.4.0+5` → `0.4.1+6`.
 - **On-device verification deferred to K2 smoke** (alongside the J2-touched paths): tap library song → audio plays + mini-player appears across all three tabs; tap mini-player → `/player` opens with cover/title/artist/scrubber/transport/queue; back → mini-player still present; lock-screen controls work; scrubber moves in real time; skip-next plays the next song; tap a done queue job → audio plays.
+
+## 2026-06-11 — J2 follow-up: queue done-job play prefers displayName over basename
+
+User-reported regression: tapping the play icon on a `done` queue tile always surfaced "Not in library yet — try again in a minute," even for songs already in Navidrome (and findable via the Library search field). Root cause: `playJobDoneFromSubsonic` derived its `search3` query from the **filesystem basename** (extension stripped). Filenames can include track prefixes (`01 - Title.mp3`), accent stripping, or other backend-side sanitisation that Subsonic's tokenizer can't reconcile with the indexed song title. Compounding it, the code required `result.song.length == 1` exactly — even when the title was indexed, Subsonic's fuzzy matcher returned multiple hits, tripping the guard.
+
+- **`android/app/lib/player/playback_actions.dart`:** rewrote `playJobDoneFromSubsonic` around a candidate list. `_jobSearchCandidates(job)` returns `[displayName, basename-without-extension]` (de-duped, empties dropped). For each candidate we hit `search3` once and accept the first `Song` hit. The strict `length == 1` guard is gone — Subsonic returns results ranked by relevance, so the first hit is the user's intent. Only when **every** candidate yields zero hits do we surface "Not in library yet."
+- **On-device:** verified by user — done jobs now play correctly, including older ones that previously always failed.
+- **No test changes**: this path didn't have unit tests at J2 (handler / Subsonic-wire integration), and the fix is verified by on-device smoke. Adding a `_FakeAdapter`-based test for `playJobDoneFromSubsonic`'s candidate ordering is in scope for K1 (tracked there).
+
+## 2026-06-11 — K1: Subsonic error UX + Now Playing palette + lifecycle polish
+
+Final polish milestone before the K2 e2e smoke. Three independent threads:
+1. Distinct Subsonic-side `ApiError` variants so the snackbar copy points the user at the right config screen (Navidrome creds, not the heerr bearer token).
+2. Cover-art dominant-colour tint on the Now Playing surface.
+3. Pause `/queue` polling while Now Playing is the foreground route — saves a request every 3s and reduces Navidrome chatter on the device.
+
+### Error UX
+- **`android/app/lib/api/api_error.dart`:** two new sealed-class variants.
+  - `NavidromeAuthError extends ApiError` — message: `"wrong Navidrome username or password — check Settings"`. Distinct from `UnauthorizedError` (heerr bearer token) so the snackbar copy doesn't confuse the user about which credential is wrong.
+  - `NavidromeServerError extends ApiError { final int code; }` — message: `"Navidrome server error: <code> [<detail>]"`. Distinct from `HttpStatusError` because the wire-level HTTP status is `200` (Subsonic puts failures inside the envelope), so an "HTTP 200: …" surface would be misleading.
+- **`android/app/lib/api/subsonic_client.dart`:** `mapSubsonicErrorToApiError` now returns `NavidromeAuthError` for Subsonic 40/41 and `NavidromeServerError` for the default branch (was `UnauthorizedError` and `HttpStatusError`).
+- **`android/app/lib/widgets/error_snackbar.dart`:** new switch cases for the two variants. `showApiError`'s 401-redirect logic gets a sibling branch: `NavidromeAuthError` redirects to `/settings/servers` (where Navidrome creds live), not `/settings` (heerr bearer token).
+- **Tests:**
+  - `test/widgets/error_snackbar_test.dart` (+4 cases): NavidromeAuthError copy, NavidromeServerError with detail, NavidromeServerError without detail, NavidromeAuthError redirect to `/settings/servers`.
+  - `test/api/subsonic_client_test.dart` (3 case updates): the 40 / 41 / "unknown code" tests now assert against `NavidromeAuthError` / `NavidromeServerError` instead of `UnauthorizedError` / `HttpStatusError`.
+  - `test/screens/servers_screen_test.dart` (1 case update): the "Test Navidrome with bad creds" snackbar copy assertion now targets `"wrong Navidrome username or password — check Settings"`.
+
+### Palette tint
+- New dep `palette_generator: ^0.3.0` in `pubspec.yaml`.
+- **`android/app/lib/utils/palette.dart`** (new): `Future<Color?> dominantColorFor(Uri? artUri)`. Uses `PaletteGenerator.fromImageProvider(NetworkImage(artUri), size: 80x80, maximumColorCount: 12)`. Preference order is `vibrantColor → dominantColor → null`. Wraps the call in try/catch — any failure (no URL, 404, decode error, no usable swatch) returns null so the screen falls back to the default M3 dark surface. Fail-soft is the right UX here; a broken tint would be worse than no tint.
+- **`android/app/lib/screens/player/now_playing_screen.dart`:**
+  - `_NowPlayingScreenState` tracks the current `_tintArtUri` and the extracted `_tintColor`. `_maybeRefreshTint(artUri)` kicks off a new extraction when the artUri changes, with a stale-response guard so a slow extraction for a previous track can't override a newer track's tint.
+  - `AppBar.backgroundColor` is set to `_tintColor.withValues(alpha: 0.6)` when available (subtle).
+  - The body wraps in a new `_TintedBackground` widget that paints a vertical `LinearGradient` from `tint @ 0.45` → `cs.surface @ 0.65`. Top of the screen (AppBar + cover area) carries the tint; bottom (queue list) stays the default surface for legibility.
+  - Test-injection seam: `paletteExtractorOverride` is a top-level `@visibleForTesting` `typedef` defaulting to `dominantColorFor`. Tests overwrite it with a deterministic stub `(Uri? _) async => null` (or a specific colour) so widget tests don't hit the network or depend on the `palette_generator` decode pipeline.
+
+### Lifecycle (queue polling pause)
+- **`android/app/lib/screens/player/now_playing_screen.dart`:**
+  - `_NowPlayingScreenState` caches the `Queue` notifier in initState (via a `WidgetsBinding.instance.addPostFrameCallback` so the read isn't during the build phase). On the first frame it calls `queueNotifier.pause()`. In `dispose()` it calls the cached `_queueNotifier?.resume()`. **Cached** because Riverpod invalidates `ref` *before* `State.dispose()` runs — reading `ref.read(queueProvider.notifier)` from dispose throws `Bad state: Cannot use "ref" after the widget was disposed`. Capturing the notifier earlier is the supported pattern.
+  - `job_status` is intentionally untouched: it's `@riverpod` (auto-dispose, family-keyed by jobId) and only kept alive by the Job Detail screen's `ref.watch`. Navigating to `/player` doesn't tear down the Job Detail screen (it's outside the ShellRoute), but the volume is bounded — at most one job-detail screen is in the back-stack at a time and the polling stops as soon as the job hits a terminal state. Pausing it from Now Playing would require similar notifier-caching plumbing per active job-detail screen and isn't worth the complexity for v1.
+- **Tests:**
+  - `test/screens/player/now_playing_screen_test.dart`: new `_StubQueue` (subclass of `Queue`) that increments static `_pauseCalls` / `_resumeCalls` counters on `pause()` / `resume()`. New lifecycle test pumps `NowPlayingScreen` inside a `ValueListenableBuilder` so the ProviderScope stays alive when the screen is unmounted; asserts `_pauseCalls == 1` after mount, `_resumeCalls == 1` after unmount.
+  - +2 palette test cases: gradient is painted when extractor returns a colour; no crash when extractor returns null. `setUp` resets the static counters + sets the extractor stub to `(_) async => null` (no-tint default); `tearDown` restores the production extractor.
+
+### Test gate + version
+- `dart run build_runner build --delete-conflicting-outputs`: not re-run (no annotation changes).
+- `flutter analyze` clean.
+- `flutter test` **207/207** pass (was 200 + 4 new error-snackbar + 3 NowPlaying = +7; net is **+7**).
+- `pubspec.yaml` version bump: `0.4.1+6` → `0.4.2+7`.
+- On-device verification deferred to K2 (the e2e smoke milestone) — bad-creds snackbar, Now Playing tint on a colourful album cover, queue-poll pause check via network log.

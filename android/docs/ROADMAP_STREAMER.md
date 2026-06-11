@@ -161,7 +161,7 @@ Widget tests:
 
 ## Phase K — Polish + smoke
 
-### [ ] K1. Polish + Subsonic error UX + lifecycle + Now Playing tint
+### [x] K1. Polish + Subsonic error UX + lifecycle + Now Playing tint
 **Files:**
 - Modified: `android/app/pubspec.yaml` (add `palette_generator: ^0.3`).
 - Modified: `android/app/lib/widgets/error_snackbar.dart` — Subsonic auth-error copy ("wrong Navidrome username or password — check Settings"); Subsonic generic-server-error copy ("Navidrome server error: <code> <message>").

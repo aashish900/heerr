@@ -37,6 +37,22 @@ SnackBar buildApiErrorSnackBar(ApiError error, {String? action}) {
     NotFoundError(detail: final String? detail) => SnackBar(
         content: Text(detail ?? 'not found'),
       ),
+    NavidromeAuthError() => const SnackBar(
+        content: Text(
+          'wrong Navidrome username or password — check Settings',
+        ),
+      ),
+    NavidromeServerError(code: final int code, detail: final String? detail) =>
+      SnackBar(
+        content: Text(
+          () {
+            final String d = (detail ?? '').trim();
+            return d.isEmpty
+                ? 'Navidrome server error: $code'
+                : 'Navidrome server error: $code $d';
+          }(),
+        ),
+      ),
     HttpStatusError(
       statusCode: final int statusCode,
       detail: final String? detail,
@@ -72,6 +88,14 @@ void showApiError(
       final GoRouter? router = GoRouter.maybeOf(context);
       if (router == null) return;
       router.go(Routes.settings);
+    });
+  } else if (error is NavidromeAuthError) {
+    // Navidrome creds live on the Servers screen, not Settings root.
+    Future<void>.microtask(() {
+      if (!context.mounted) return;
+      final GoRouter? router = GoRouter.maybeOf(context);
+      if (router == null) return;
+      router.go(Routes.servers);
     });
   }
 }

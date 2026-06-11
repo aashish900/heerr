@@ -2,7 +2,7 @@ name: heerr
 description: heerr Android client — thin REST client for the heerr FastAPI backend.
 publish_to: 'none'
 
-version: 0.4.1+6
+version: 0.4.2+7
 
 environment:
   sdk: ^3.12.0
@@ -45,6 +45,11 @@ dependencies:
   # at J2). rxdart is already a transitive dep via audio_service; listing
   # it explicitly avoids the `depend_on_referenced_packages` lint.
   rxdart: ^0.28.0
+
+  # Dominant-colour extraction from cover art (K1). Used by Now Playing to
+  # tint the surface based on the current track's album art. Fail-soft:
+  # extraction errors fall back to the default M3 dark surface.
+  palette_generator: ^0.3.0
 
   # Material Icons font is enabled in the `flutter:` section below; no extra
   # font deps needed for the dark M3 theme.
