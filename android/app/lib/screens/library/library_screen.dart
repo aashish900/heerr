@@ -12,6 +12,7 @@ import '../../models/subsonic/playlist.dart';
 import '../../models/subsonic/search_result3.dart';
 import '../../models/subsonic/song.dart';
 import '../../player/playback_actions.dart';
+import '../../player/player_provider.dart';
 import '../../providers/download.dart';
 import '../../providers/library/combined_search.dart';
 import '../../providers/library/library_albums.dart';
@@ -186,6 +187,13 @@ class _CombinedResultsBody extends ConsumerWidget {
           .select((Set<String> s) => s.contains(query)),
     );
 
+    // K-polish: heerrGreen indicator for the song row whose subsonicId
+    // matches the active MediaItem. Null when nothing is playing.
+    final String? currentSubsonicId = ref
+        .watch(currentMediaItemProvider)
+        .valueOrNull
+        ?.extras?['subsonicId'] as String?;
+
     return library.when(
       loading: () => const SkeletonList(count: 6),
       error: (Object e, _) => _ErrorView(error: e),
@@ -225,6 +233,7 @@ class _CombinedResultsBody extends ConsumerWidget {
                     title: s.title,
                     subtitle: _songSubtitle(s),
                     coverArtId: s.coverArt,
+                    isCurrentlyPlaying: s.id == currentSubsonicId,
                     onTap: () => playSongFromSubsonic(ref, context, s),
                   ),
               ],

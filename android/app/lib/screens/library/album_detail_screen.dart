@@ -5,7 +5,9 @@ import '../../api/api_error.dart';
 import '../../models/subsonic/album.dart';
 import '../../models/subsonic/song.dart';
 import '../../player/playback_actions.dart';
+import '../../player/player_provider.dart';
 import '../../providers/library/library_album.dart';
+import '../../theme.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/library_cover_art.dart';
 import '../../widgets/skeleton.dart';
@@ -65,25 +67,42 @@ class _Body extends ConsumerWidget {
         subtitle: 'This album has no tracks.',
       );
     }
+    final String? currentSubsonicId = ref
+        .watch(currentMediaItemProvider)
+        .valueOrNull
+        ?.extras?['subsonicId'] as String?;
     return ListView.builder(
       itemCount: album.song.length + 1,
       itemBuilder: (BuildContext c, int i) {
         if (i == 0) return _AlbumHeader(album: album);
         final int idx = i - 1;
         final Song s = album.song[idx];
+        final bool isCurrent = s.id == currentSubsonicId;
         return ListTile(
           leading: Text(
             s.track == null ? '' : '${s.track}',
-            style: Theme.of(c).textTheme.bodyMedium,
+            style: Theme.of(c).textTheme.bodyMedium?.copyWith(
+                  color: isCurrent ? heerrGreen : null,
+                  fontWeight: isCurrent ? FontWeight.w600 : null,
+                ),
           ),
           title: Text(
             s.title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            style: isCurrent
+                ? const TextStyle(
+                    color: heerrGreen,
+                    fontWeight: FontWeight.w600,
+                  )
+                : null,
           ),
           subtitle: s.duration == null
               ? null
               : Text(_formatDuration(s.duration!)),
+          trailing: isCurrent
+              ? const Icon(Icons.play_arrow, color: heerrGreen)
+              : null,
           onTap: () => playAllSongsFromSubsonic(
             ref,
             context,

@@ -97,6 +97,10 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
   late final TextEditingController _navidromePassController;
   bool _testingHeerr = false;
   bool _testingNavidrome = false;
+  // Secret-field visibility toggles. Default = obscured; tap eye to reveal
+  // so the user can verify they typed the secret correctly without re-entry.
+  bool _tokenObscured = true;
+  bool _navPassObscured = true;
 
   bool get _anyTesting => _testingHeerr || _testingNavidrome;
 
@@ -308,12 +312,23 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _tokenController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Bearer token',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    tooltip:
+                        _tokenObscured ? 'Show token' : 'Hide token',
+                    icon: Icon(
+                      _tokenObscured
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                    onPressed: () =>
+                        setState(() => _tokenObscured = !_tokenObscured),
+                  ),
                 ),
                 autocorrect: false,
-                obscureText: true,
+                obscureText: _tokenObscured,
                 validator: _required,
               ),
               const SizedBox(height: 24),
@@ -350,12 +365,24 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _navidromePassController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Navidrome password',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    tooltip: _navPassObscured
+                        ? 'Show password'
+                        : 'Hide password',
+                    icon: Icon(
+                      _navPassObscured
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                    onPressed: () => setState(
+                        () => _navPassObscured = !_navPassObscured),
+                  ),
                 ),
                 autocorrect: false,
-                obscureText: true,
+                obscureText: _navPassObscured,
               ),
               const SizedBox(height: 24),
               FilledButton(

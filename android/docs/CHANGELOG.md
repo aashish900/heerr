@@ -717,3 +717,28 @@ Two unrelated UX changes driven by on-device feedback after the K1 install. Not 
 - `pubspec.yaml` version not bumped — these are polish tweaks between K1 (`0.4.2+7`) and the K2 e2e smoke. Next milestone will carry the bump.
 - No `DECISIONLOG.md` entry — neither change reverses a prior decision; both are surface-level UX dials.
 
+## 2026-06-11 — "currently playing" indicator in library lists + secret-field eye toggle
+
+Two more user-driven UX polish items between K1 and K2. Pure visual / form ergonomics; no provider or backend changes.
+
+### `heerrGreen` "this is playing" indicator
+- Currently-playing track now highlights itself in every library list it appears in: title turns `heerrGreen` + bold, trailing `Icons.play_arrow` appears in `heerrGreen`.
+- Identity match is via `MediaItem.extras['subsonicId']` (the field `songToMediaItem` already stuffs in for J2's reverse-mapping) compared against each row's `Song.id`. Watching `currentMediaItemProvider` per list rebuilds the indicator on every track change with no extra plumbing.
+- **`android/app/lib/widgets/library_result_tile.dart`:** new `isCurrentlyPlaying` flag. When true the trailing affordance becomes a `heerrGreen` `Icons.play_arrow` (overrides `trailingPlay`) and the title text gets `color: heerrGreen, fontWeight: FontWeight.w600`.
+- **`android/app/lib/screens/library/library_screen.dart`:** `_CombinedResultsBody.build` watches `currentMediaItemProvider`, extracts `subsonicId` from extras, passes `isCurrentlyPlaying: s.id == currentSubsonicId` to each song's `LibraryResultTile` in the search-results "Songs" subsection.
+- **`android/app/lib/screens/library/album_detail_screen.dart`:** `_Body.build` watches the same provider. The current track's row gets a `heerrGreen` track number, a `heerrGreen` bold title, and a trailing `heerrGreen` play_arrow. The duration subtitle stays default-styled (legibility).
+- **`android/app/lib/screens/library/playlist_detail_screen.dart`:** same treatment, minus the track-number column (playlists don't render one).
+- **Not changed:** the Now Playing screen's own queue list — that already has a K1-era `Icons.equalizer` indicator (different glyph, same intent). Leaving as-is so the in-player surface stays visually distinct from the library lists.
+
+### Secret-field eye toggle (`android/app/lib/screens/servers_screen.dart`)
+- The "Bearer token" and "Navidrome password" inputs were hidden with `obscureText: true` and no way to verify — a typo would only surface as "Connection failed".
+- Added two `bool` state fields (`_tokenObscured`, `_navPassObscured`) defaulting to `true`. Each field now renders a `suffixIcon: IconButton` showing `Icons.visibility_outlined` when hidden and `Icons.visibility_off_outlined` when revealed. Tap flips the bool via `setState`; tooltip flips accordingly ("Show token" / "Hide token", "Show password" / "Hide password"). Default behaviour is unchanged (secret hidden on screen open).
+
+### Test gate
+- `flutter analyze` clean.
+- `flutter test` **207/207** pass (no test changes — the indicator additions are purely visual on tiles whose existing tests don't assert trailing-icon presence, and the eye-toggle is form ergonomics not covered by widget tests).
+- On-device verification deferred to K2.
+
+### Not done in this commit
+- `pubspec.yaml` version not bumped — K2 will carry the 1.0.0 bump.
+

@@ -5,7 +5,9 @@ import '../../api/api_error.dart';
 import '../../models/subsonic/playlist.dart';
 import '../../models/subsonic/song.dart';
 import '../../player/playback_actions.dart';
+import '../../player/player_provider.dart';
 import '../../providers/library/library_playlist.dart';
+import '../../theme.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/library_cover_art.dart';
 import '../../widgets/skeleton.dart';
@@ -66,24 +68,38 @@ class _Body extends ConsumerWidget {
         subtitle: 'No tracks added yet.',
       );
     }
+    final String? currentSubsonicId = ref
+        .watch(currentMediaItemProvider)
+        .valueOrNull
+        ?.extras?['subsonicId'] as String?;
     return ListView.builder(
       itemCount: playlist.entry.length + 1,
       itemBuilder: (BuildContext c, int i) {
         if (i == 0) return _PlaylistHeader(playlist: playlist);
         final int idx = i - 1;
         final Song s = playlist.entry[idx];
+        final bool isCurrent = s.id == currentSubsonicId;
         return ListTile(
           leading: LibraryCoverArt(coverArtId: s.coverArt, size: 40),
           title: Text(
             s.title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            style: isCurrent
+                ? const TextStyle(
+                    color: heerrGreen,
+                    fontWeight: FontWeight.w600,
+                  )
+                : null,
           ),
           subtitle: Text(
             s.artist ?? '',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
+          trailing: isCurrent
+              ? const Icon(Icons.play_arrow, color: heerrGreen)
+              : null,
           onTap: () => playAllSongsFromSubsonic(
             ref,
             context,
