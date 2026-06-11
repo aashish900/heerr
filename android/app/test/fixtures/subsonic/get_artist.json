@@ -1,0 +1,37 @@
+{
+  "subsonic-response": {
+    "status": "ok",
+    "version": "1.16.1",
+    "artist": {
+      "id": "ar-002",
+      "name": "Tame Impala",
+      "coverArt": "ar-002",
+      "albumCount": 2,
+      "album": [
+        {
+          "id": "al-101",
+          "name": "Currents",
+          "artist": "Tame Impala",
+          "artistId": "ar-002",
+          "coverArt": "al-101",
+          "songCount": 13,
+          "duration": 3140,
+          "year": 2015,
+          "genre": "Psychedelic Rock",
+          "created": "2024-01-15T08:30:00Z"
+        },
+        {
+          "id": "al-102",
+          "name": "Lonerism",
+          "artist": "Tame Impala",
+          "artistId": "ar-002",
+          "coverArt": "al-102",
+          "songCount": 12,
+          "duration": 3270,
+          "year": 2012,
+          "genre": "Psychedelic Rock"
+        }
+      ]
+    }
+  }
+}

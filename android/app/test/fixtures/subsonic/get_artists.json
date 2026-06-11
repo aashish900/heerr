@@ -1,0 +1,42 @@
+{
+  "subsonic-response": {
+    "status": "ok",
+    "version": "1.16.1",
+    "type": "navidrome",
+    "serverVersion": "0.55.0",
+    "artists": {
+      "ignoredArticles": "The El La Los Las Le Les",
+      "index": [
+        {
+          "name": "A",
+          "artist": [
+            {
+              "id": "ar-001",
+              "name": "Arctic Monkeys",
+              "coverArt": "ar-001",
+              "albumCount": 6,
+              "artistImageUrl": "https://example.test/ar-001.jpg"
+            }
+          ]
+        },
+        {
+          "name": "T",
+          "artist": [
+            {
+              "id": "ar-002",
+              "name": "Tame Impala",
+              "coverArt": "ar-002",
+              "albumCount": 4
+            },
+            {
+              "id": "ar-003",
+              "name": "The Strokes",
+              "coverArt": "ar-003",
+              "albumCount": 7
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

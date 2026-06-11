@@ -1,0 +1,47 @@
+{
+  "subsonic-response": {
+    "status": "ok",
+    "version": "1.16.1",
+    "searchResult3": {
+      "artist": [
+        {
+          "id": "ar-002",
+          "name": "Tame Impala",
+          "coverArt": "ar-002",
+          "albumCount": 4
+        }
+      ],
+      "album": [
+        {
+          "id": "al-101",
+          "name": "Currents",
+          "artist": "Tame Impala",
+          "artistId": "ar-002",
+          "coverArt": "al-101",
+          "songCount": 13,
+          "duration": 3140,
+          "year": 2015,
+          "genre": "Psychedelic Rock"
+        }
+      ],
+      "song": [
+        {
+          "id": "so-1001",
+          "title": "Let It Happen",
+          "artist": "Tame Impala",
+          "artistId": "ar-002",
+          "album": "Currents",
+          "albumId": "al-101",
+          "coverArt": "al-101",
+          "duration": 467,
+          "track": 1,
+          "year": 2015,
+          "suffix": "mp3",
+          "contentType": "audio/mpeg",
+          "bitRate": 320,
+          "isVideo": false
+        }
+      ]
+    }
+  }
+}

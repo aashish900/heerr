@@ -1,0 +1,68 @@
+{
+  "subsonic-response": {
+    "status": "ok",
+    "version": "1.16.1",
+    "album": {
+      "id": "al-101",
+      "name": "Currents",
+      "artist": "Tame Impala",
+      "artistId": "ar-002",
+      "coverArt": "al-101",
+      "songCount": 3,
+      "duration": 720,
+      "year": 2015,
+      "genre": "Psychedelic Rock",
+      "song": [
+        {
+          "id": "so-1001",
+          "title": "Let It Happen",
+          "artist": "Tame Impala",
+          "artistId": "ar-002",
+          "album": "Currents",
+          "albumId": "al-101",
+          "coverArt": "al-101",
+          "duration": 467,
+          "track": 1,
+          "year": 2015,
+          "genre": "Psychedelic Rock",
+          "suffix": "mp3",
+          "contentType": "audio/mpeg",
+          "bitRate": 320,
+          "path": "Tame Impala/Currents/01 - Let It Happen.mp3",
+          "isVideo": false,
+          "size": 18674231
+        },
+        {
+          "id": "so-1002",
+          "title": "Nangs",
+          "artist": "Tame Impala",
+          "artistId": "ar-002",
+          "album": "Currents",
+          "albumId": "al-101",
+          "coverArt": "al-101",
+          "duration": 108,
+          "track": 2,
+          "year": 2015,
+          "suffix": "mp3",
+          "contentType": "audio/mpeg",
+          "bitRate": 320,
+          "isVideo": false
+        },
+        {
+          "id": "so-1003",
+          "title": "The Moment",
+          "artist": "Tame Impala",
+          "artistId": "ar-002",
+          "album": "Currents",
+          "albumId": "al-101",
+          "coverArt": "al-101",
+          "duration": 145,
+          "track": 3,
+          "year": 2015,
+          "suffix": "mp3",
+          "isVideo": false
+        }
+      ]
+    }
+  }
+}

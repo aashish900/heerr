@@ -40,7 +40,7 @@ See `PLAN.md` for the locked v1 contract on the existing ingestion client. See t
 
 ---
 
-### [ ] H2. Subsonic models + read-only library providers
+### [x] H2. Subsonic models + read-only library providers
 **Files:**
 - New: `android/app/lib/models/subsonic/*.dart` — freezed models (`subsonic_response_wrapper.dart`, `artist.dart`, `artist_index.dart`, `album.dart`, `song.dart`, `playlist.dart`, `search_result3.dart`). Each annotated for `json_serializable`; reuse the snake-case rename from `android/app/build.yaml`.
 - New: `android/app/lib/providers/library/library_artists.dart`, `library_artist.dart`, `library_album.dart`, `library_playlists.dart`, `library_playlist.dart`, `library_search.dart`.

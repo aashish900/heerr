@@ -1,0 +1,32 @@
+{
+  "subsonic-response": {
+    "status": "ok",
+    "version": "1.16.1",
+    "playlists": {
+      "playlist": [
+        {
+          "id": "pl-01",
+          "name": "Morning Coffee",
+          "comment": "wake up tracks",
+          "songCount": 25,
+          "duration": 5400,
+          "owner": "phone",
+          "public": false,
+          "created": "2025-08-04T07:11:00Z",
+          "changed": "2026-05-21T07:11:00Z",
+          "coverArt": "pl-01"
+        },
+        {
+          "id": "pl-02",
+          "name": "Workout",
+          "songCount": 40,
+          "duration": 10200,
+          "owner": "phone",
+          "public": false,
+          "created": "2025-03-12T17:30:00Z",
+          "changed": "2026-04-02T17:30:00Z"
+        }
+      ]
+    }
+  }
+}

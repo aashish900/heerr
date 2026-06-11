@@ -1,0 +1,52 @@
+{
+  "subsonic-response": {
+    "status": "ok",
+    "version": "1.16.1",
+    "playlist": {
+      "id": "pl-01",
+      "name": "Morning Coffee",
+      "comment": "wake up tracks",
+      "songCount": 2,
+      "duration": 575,
+      "owner": "phone",
+      "public": false,
+      "created": "2025-08-04T07:11:00Z",
+      "changed": "2026-05-21T07:11:00Z",
+      "coverArt": "pl-01",
+      "entry": [
+        {
+          "id": "so-1001",
+          "title": "Let It Happen",
+          "artist": "Tame Impala",
+          "artistId": "ar-002",
+          "album": "Currents",
+          "albumId": "al-101",
+          "coverArt": "al-101",
+          "duration": 467,
+          "track": 1,
+          "year": 2015,
+          "suffix": "mp3",
+          "contentType": "audio/mpeg",
+          "bitRate": 320,
+          "isVideo": false
+        },
+        {
+          "id": "so-1002",
+          "title": "Nangs",
+          "artist": "Tame Impala",
+          "artistId": "ar-002",
+          "album": "Currents",
+          "albumId": "al-101",
+          "coverArt": "al-101",
+          "duration": 108,
+          "track": 2,
+          "year": 2015,
+          "suffix": "mp3",
+          "contentType": "audio/mpeg",
+          "bitRate": 320,
+          "isVideo": false
+        }
+      ]
+    }
+  }
+}
