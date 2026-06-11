@@ -119,7 +119,7 @@ Widget tests:
 
 ## Phase J — Audio playback
 
-### [ ] J1. Audio playback skeleton — just_audio + audio_service
+### [x] J1. Audio playback skeleton — just_audio + audio_service
 **Files:**
 - Modified: `android/app/pubspec.yaml` (add `just_audio: ^0.10`, `audio_service: ^0.18`, `audio_session: ^0.2`).
 - Modified: `android/app/android/app/src/main/AndroidManifest.xml` — add `<service>` entry for `audio_service`'s `MediaButtonReceiver`, `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MEDIA_PLAYBACK` + `POST_NOTIFICATIONS` permissions. Source of truth: the `audio_service` package's current README; **expect manifest iteration** — the test gate doesn't catch manifest mistakes.

@@ -527,3 +527,48 @@ Second I-phase milestone. Wires the search field into the Library tab AppBar and
   - `test/screens/library/library_screen_test.dart` — original 8 browse-mode cases preserved; 6 new search-mode cases: search icon swaps in TextField; library hits + manual button rendered; tap manual button → YT results render; empty library → YT auto-fires with results; both empty → "No matches" EmptyState; back arrow exits search mode. Added a `_StubQueue` override in `_wrap` so `combinedSearchProvider`'s `ref.read(queueProvider)` doesn't trigger a real `/queue` fetch through the un-overridden `dioClientProvider`.
 - **Test gate:** `dart run build_runner build --delete-conflicting-outputs` clean (4 new `.g.dart` outputs for the 4 new providers). `flutter analyze` clean (still the 3 pre-existing `queue_screen.dart` infos; no new warnings). `flutter test` **181/181** pass (was 167 after I1: +5 new ytm_search tests + 3 query tests + 8 combined_search tests + 6 library_screen search-mode tests − 8 deleted SearchQuery / type-toggle / rapid-retype tests for a net `+14`).
 - `pubspec.yaml` version bump: `0.3.2+3` → `0.3.3+4`.
+
+## 2026-06-11 — J1: Audio playback skeleton (just_audio + audio_service)
+
+First Phase-J milestone. Wires the audio stack: `just_audio` for the decode/buffer/stream, `audio_service` for the Android MediaSession + foreground notification + lock-screen controls, `audio_session` for OS audio-focus. **No UI integration yet** — verification is a temporary "Debug play" FAB on the Library tab that plays the first song of the first album end-to-end. The Now Playing screen + mini-player + library tap-to-play wiring land at J2; the debug FAB is removed there.
+
+- **New deps** (`android/app/pubspec.yaml`):
+  - `just_audio: ^0.10.0` (resolved to 0.10.5).
+  - `audio_service: ^0.18.0`.
+  - `audio_session: ^0.2.0`.
+  - `rxdart: ^0.28.0` (already a transitive dep via audio_service; listed explicitly to avoid the `depend_on_referenced_packages` lint on the `Rx.combineLatest2` import inside the handler).
+- **AndroidManifest** (`android/app/android/app/src/main/AndroidManifest.xml`):
+  - New permissions: `WAKE_LOCK`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK` (required Android 14+), `POST_NOTIFICATIONS` (Android 13+).
+  - New `<service>` entry for `com.ryanheise.audioservice.AudioService` with `android:foregroundServiceType="mediaPlayback"` and the `MediaBrowserService` intent-filter so the audio_service plugin can bind it.
+  - New `<receiver>` entry for `com.ryanheise.audioservice.MediaButtonReceiver` so Bluetooth-headset / car-infotainment / wired-remote media buttons reach the handler.
+- **Stream URL helper** (`android/app/lib/api/subsonic_client.dart`):
+  - New public `buildSubsonicStreamUrl({baseUrl, username, password, songId, saltGenerator?})` — composes `/rest/stream.view?id=…&u=…&s=…&t=md5(password+salt)&v=1.16.1&c=heerr`. `just_audio.AudioPlayer` fetches the audio URL directly (no dio interceptor on that path), so the auth params have to live in the URL — same constraint as cover art.
+- **MediaItem conversion** (`android/app/lib/player/song_to_media_item.dart`):
+  - Pure function `songToMediaItem({song, navidromeBaseUrl, …})` → `audio_service.MediaItem`. Sets `id` to the stream URL (that's what `AudioSource.uri` opens), `title` / `artist` / `album` / `duration` straight from the Subsonic Song, `artUri` to the `getCoverArt.view` URL when `coverArt` is set (null otherwise), and stashes the Subsonic song id under `extras['subsonicId']` so J2 can map an active MediaItem back to its library identity.
+  - Pure function so it's unit-testable without standing up `just_audio` or `audio_service`'s platform channels.
+- **Audio handler** (`android/app/lib/player/heerr_audio_handler.dart`):
+  - `class HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler`. Accepts an optional `AudioPlayer` in the constructor (defaults to `AudioPlayer()`); the injection point exists for J2's tests + future swap-outs but production callers don't pass anything.
+  - Wires `player.playbackEventStream` → translates `just_audio.ProcessingState` to `AudioProcessingState`, drives `playbackState` with the platform Media controls (skipToPrevious / play|pause / stop / skipToNext + seek system actions + compact-action indices `[0,1,3]` — skip-prev, play-pause, skip-next).
+  - Wires `player.currentIndexStream` → emits the matching `MediaItem` from `queue` so the lock-screen tile + Now Playing always reflect the actually-current song.
+  - Queue management uses `just_audio` 0.10's new `setAudioSources(List<AudioSource>)` directly (the older `ConcatenatingAudioSource` is deprecated in 0.10). `updateQueue` replaces the queue + reloads the player at index 0. `addQueueItem` appends + preserves the current position. `playSong(item)` and `playAll(items, {startIndex})` are UI convenience wrappers; `playAll` will be wired to album / playlist "Play all" at J2.
+  - Transport methods (`play` / `pause` / `stop` / `seek` / `skipToNext` / `skipToPrevious` / `skipToQueueItem`) delegate to the player. `skipToPrevious` rewinds the current track if there's no previous track in the queue — standard mobile-music-app behaviour.
+  - Public `snapshotStream()` returns a `PlayerSnapshot { MediaItem? item, PlaybackState state }` via `Rx.combineLatest2(mediaItem.stream, playbackState.stream, …)`. J2's mini-player + Now Playing screens drive off this single stream.
+- **Player providers** (`android/app/lib/player/player_provider.dart`):
+  - `@Riverpod(keepAlive: true) HeerrAudioHandler audioHandler(…)` — **throws by default** with an explanatory message. `main()` is responsible for overriding it with the singleton handler from `AudioService.init`. Throwing rather than constructing a fallback ensures we never accidentally spawn a real `just_audio.AudioPlayer` in a test (or before `AudioService.init` has run, which would leave the foreground notification + MediaSession unregistered).
+  - `playerSnapshotProvider` (keepAlive) — wraps `handler.snapshotStream()` so any widget that just wants "what's playing now" can `ref.watch` it without caring about the handler API.
+  - `currentMediaItemProvider` — `Stream<MediaItem?>` straight from `handler.mediaItem.stream`. Convenience for components that only need the current item (mini-player tile content, e.g.).
+- **main.dart**:
+  - Made async; calls `WidgetsFlutterBinding.ensureInitialized()`, then `await AudioService.init(builder: HeerrAudioHandler.new, config: AudioServiceConfig(androidNotificationChannelId: 'com.aashish.heerr.audio', androidNotificationChannelName: 'heerr playback', androidNotificationOngoing: true, androidStopForegroundOnPause: false))` before `runApp`.
+  - `runApp` wraps `HeerrApp` in a `ProviderScope` with the `audioHandlerProvider.overrideWithValue(handler)` override — this is the override the provider's `UnimplementedError` references.
+- **Debug FAB on Library tab** (`android/app/lib/screens/library/library_screen.dart`):
+  - `_DebugPlayFirstSongFab` ConsumerWidget added as `floatingActionButton` in browse-mode (search-mode scaffold is unaffected). On tap: reads settings → validates Navidrome creds → reads `libraryAlbumsProvider.future` → first album → `libraryAlbumProvider(id).future` → first song → `songToMediaItem(…)` → `handler.playSong(item)`. Reports each step's failure mode via a distinct snackbar (creds missing, library empty, first album has no songs, ApiError surface). Removed at J2 once the real tap-to-play wiring lands on song tiles.
+- **Tests:**
+  - `test/player/song_to_media_item_test.dart` — 6 cases: stream URL contains `id=`/`u=`/`s=`/`t=`/`v=1.16.1`/`c=heerr`, title/artist/album/duration round-trip unchanged, `artUri` set when `coverArt` non-empty, `artUri` null when `coverArt` missing or empty, `duration` null when source has none, `extras['subsonicId']` carries the Subsonic id for J2's reverse-lookup.
+  - **No handler unit tests at J1.** `just_audio.AudioPlayer` is platform-channel-backed; mocking it requires non-trivial scaffolding (subclassing or `audio_service`'s test harness) and the J1 deliverable is verified end-to-end on the device, not in a unit test. The `songToMediaItem` tests cover the only pure logic in the player layer; handler queue-management tests land at J2 alongside Now Playing widget tests.
+- **Test gate:** `dart run build_runner build --delete-conflicting-outputs` clean (3 new `.g.dart` outputs for the new player providers). `flutter analyze` clean (still the 3 pre-existing `queue_screen.dart` infos). `flutter test` **187/187** pass (was 181 + 6 new song_to_media_item tests). `flutter build apk --debug` succeeds — validates the AndroidManifest changes don't break the Android compile (the audio_service plugin's KGP warning is an upstream issue and doesn't fail the build).
+- **On-device verification (manual; the J1 gate):** on the Pixel 7 with a populated Navidrome library:
+  1. Tap "Debug play" FAB → snackbar "Playing: <song title>".
+  2. Foreground notification renders with title + artist + play/pause/skip controls.
+  3. Lock the phone → playback continues; lock-screen controls work.
+  4. Tap pause from notification → audio pauses + the notification's play/pause toggle flips.
+- `pubspec.yaml` version bump: `0.3.3+4` → `0.4.0+5` (J phase opens the `0.4.x` band per the roadmap's version scheme).

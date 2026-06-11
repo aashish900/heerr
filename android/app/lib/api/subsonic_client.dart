@@ -117,6 +117,42 @@ String buildSubsonicCoverArtUrl({
       .toString();
 }
 
+/// Build a `stream.view` URL for an audio file by song id, with Subsonic
+/// auth params embedded as query string. Needed because the audio player
+/// (just_audio) fetches the stream URL directly via HTTP range requests —
+/// it doesn't flow through the dio interceptor, so auth has to live in the
+/// URL the framework opens.
+///
+/// Same salt-per-call caveat as [buildSubsonicCoverArtUrl]: the salt rotates
+/// per render, defeating any URL-keyed caching the player might do. That's
+/// not a real concern for audio streams (each track is opened once per
+/// playback), but worth knowing.
+String buildSubsonicStreamUrl({
+  required String baseUrl,
+  required String username,
+  required String password,
+  required String songId,
+  String Function()? saltGenerator,
+}) {
+  final String salt = (saltGenerator ?? _randomHexSalt)();
+  final String token =
+      md5.convert(utf8.encode(password + salt)).toString();
+  final Map<String, String> params = <String, String>{
+    'id': songId,
+    'u': username,
+    's': salt,
+    't': token,
+    'v': _subsonicApiVersion,
+    'c': _subsonicClientName,
+  };
+  return Uri.parse(baseUrl)
+      .replace(
+        path: '/rest/stream.view',
+        queryParameters: params,
+      )
+      .toString();
+}
+
 /// Builds a `Dio` for Subsonic calls against the user-configured Navidrome
 /// base URL. Depends on [settingsProvider] so a saved credential change
 /// invalidates and rebuilds with the new auth.

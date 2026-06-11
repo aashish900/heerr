@@ -1,12 +1,36 @@
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'player/heerr_audio_handler.dart';
+import 'player/player_provider.dart';
 import 'router.dart';
 import 'theme.dart';
 
-void main() {
-  runApp(const ProviderScope(child: HeerrApp()));
+Future<void> main() async {
+  // AudioService.init has to run after the binding is up and before the
+  // first widget tree mounts. It registers the foreground service and
+  // wires hardware media buttons to the handler.
+  WidgetsFlutterBinding.ensureInitialized();
+  final HeerrAudioHandler handler = await AudioService.init(
+    builder: HeerrAudioHandler.new,
+    config: AudioServiceConfig(
+      androidNotificationChannelId: 'com.aashish.heerr.audio',
+      androidNotificationChannelName: 'heerr playback',
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: false,
+    ),
+  );
+
+  runApp(
+    ProviderScope(
+      overrides: <Override>[
+        audioHandlerProvider.overrideWithValue(handler),
+      ],
+      child: const HeerrApp(),
+    ),
+  );
 }
 
 class HeerrApp extends StatelessWidget {
