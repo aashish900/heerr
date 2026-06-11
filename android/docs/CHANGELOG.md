@@ -742,3 +742,28 @@ Two more user-driven UX polish items between K1 and K2. Pure visual / form ergon
 ### Not done in this commit
 - `pubspec.yaml` version not bumped — K2 will carry the 1.0.0 bump.
 
+## 2026-06-11 — K2 e2e smoke verified + streaming MVP ships (1.0.0+8)
+
+Closes the streamer roadmap (H1 → K2). Phone is now a first-class find / download / play client against the live home server over Tailscale.
+
+### What was verified
+Seven manual on-device steps against the live home server (full log: `android/docs/smoke_streamer.md`):
+1. Settings smoke — heerr + Navidrome both reachable; creds persist across app restart.
+2. Library browse — artists → albums → songs render with cover art.
+3. Playback — tap-to-play, scrubber, skip-next, notification pause/resume, lock-screen controls all work.
+4. Combined search (library hit) — library results render, YT auto-fire suppressed, "Search more" button present.
+5. Combined search (library miss → YT fallback) — library empty + YT auto-fires + tap YT result → "queued" snackbar.
+6. Combined search (manual YT) — "Search more on YouTube Music" button renders YT results below library section.
+7. Reactive promotion — done download appears in "In your library" within ~60s without re-typing.
+
+All seven passed.
+
+### Files
+- `android/app/pubspec.yaml` — version bump `0.4.2+7` → `1.0.0+8`. First major-version build; marks "streaming MVP" as the shipping baseline.
+- `android/docs/ROADMAP_STREAMER.md` — K2 checkbox ticked.
+- `android/docs/smoke_streamer.md` (new) — verification log mirroring the G1 smoke style. Captures device, build, per-step pass-with-detail, and the caveats deliberately left out of scope (cache key for rotating salt URL, discontinued `palette_generator`, single-user posture).
+
+### Not done in this commit
+- No code change — this is the smoke-verified version-bump commit, nothing else.
+- No `DECISIONLOG.md` entry — K2 doesn't change any architectural decision; it confirms the existing ones survived contact with reality.
+

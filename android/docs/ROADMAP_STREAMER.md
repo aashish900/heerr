@@ -180,7 +180,7 @@ Widget tests:
 
 ---
 
-### [ ] K2. End-to-end smoke against the home server
+### [x] K2. End-to-end smoke against the home server
 **Files:** optional `android/docs/smoke_streamer.md` capturing the verification log.
 
 **Deliverable:** Real APK on the Pixel 7 reaches both heerr backend AND Navidrome over Tailscale. The full Spotify-style journey works end-to-end.
