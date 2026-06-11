@@ -490,3 +490,40 @@ First milestone of Phase I (Library tab + combined search) and the largest UI ch
 - **Test gate:** `dart run build_runner build --delete-conflicting-outputs` clean (1 new `.g.dart` for the new provider). `flutter analyze` clean (the 3 pre-existing `queue_screen.dart` infos predate H1). `flutter test` **167/167** pass (was 159 after H2: +20 new I1 tests, –12 from the deleted `search_screen_test.dart` for a net `+8` — actual count is 159 + 8 = 167).
 - **ADR appended:** "Combined library + YouTube Music search; standalone Search tab removed" (`DECISIONLOG.md`).
 - `pubspec.yaml` version bump: `0.3.1+2` → `0.3.2+3`.
+
+## 2026-06-11 — I2: Combined search inside Library tab (library-first + YT fallback + reactive promotion)
+
+Second I-phase milestone. Wires the search field into the Library tab AppBar and orchestrates two sources — Subsonic `search3` (local library) and the existing heerr-backend YouTube-Music search — behind a single combined-search provider. The YT half is gated: it auto-fires when the library half comes back empty (so the user instantly sees a downloadable fallback) and is manual-button-gated otherwise (so non-empty library searches don't burn YouTube-Music quota on every keystroke). Reactive promotion closes the loop: when a download completes, the library half re-fetches after a 60s Navidrome-reindex grace, and the song auto-moves from the YT section into the library section.
+
+- **YouTube-Music search provider refactor** (`android/app/lib/providers/search.dart`):
+  - `searchResultsProvider` renamed to **`ytmSearchProvider`** and converted from a singleton (reading state from `searchQueryProvider`) to a **family keyed by `String query`**. Lets the combined-search orchestrator pull a specific query's YT result by family-key rather than via a shared SearchQuery notifier. Content type is fixed to `ContentType.song` (no longer toggleable — the Library combined search is song-focused; if we ever want album/playlist YT search inside Library, lift the type into the family key).
+  - `SearchQuery` + `SearchQueryState` notifier deleted. Sole consumer was the now-removed standalone Search tab.
+  - `searchDebounceProvider` (300ms default) kept — still wraps both source providers' debounce.
+- **New `librarySearchQueryProvider`** (`android/app/lib/providers/library/library_search_query.dart`):
+  - `@Riverpod(keepAlive: true)` notifier holding the Library search field's current text. Set via `set(String)`, cleared via `clear()`. Survives tab switches (Library → Queue → Library) so a half-typed query isn't dropped.
+- **New `combinedSearchProvider(query)`** (`android/app/lib/providers/library/combined_search.dart`):
+  - Family-keyed `@riverpod` (auto-dispose) returning a `CombinedSearchResult` struct (`{query, library: AsyncValue<SearchResult3>, ytm: AsyncValue<SearchResponse>?}`).
+  - Always `ref.watch`'s `librarySearchProvider(query)`. Watches `ytmSearchProvider(query)` only when **(a)** the library half resolved as empty, OR **(b)** the user has tapped "Search more on YouTube Music" for this query (tracked in the new `ytmManualTriggerProvider`, a keepAlive `Set<String>`).
+  - **Reactive promotion:** seeds a `Set<String> seenDoneJobIds` from `ref.read(queueProvider)` at build time, then `ref.listen<AsyncValue<QueueResponse>>(queueProvider, ...)` for new `state == done` transitions. Each newly-done job schedules a `Timer(kReindexGrace, () => ref.invalidate(librarySearchProvider(query)))`. All pending timers are cancelled via `ref.onDispose`. Re-seeding existing done jobs (rather than blindly invalidating on the first `ref.listen` callback) prevents the orchestrator from firing 60s timers for downloads that finished long before the user even searched.
+  - Reindex grace is exposed as `reindexGraceProvider` (default 60s) so tests can shrink it.
+- **Library AppBar + combined results screen** (`android/app/lib/screens/library/library_screen.dart`):
+  - Converted to `ConsumerStatefulWidget` to hold a `TextEditingController` and a `_searching` flag.
+  - Idle Library shows the original three sub-tabs (Artists / Albums / Playlists) with a new search-icon action in the AppBar.
+  - Tapping the search icon swaps the AppBar title for a `TextField` (autofocus + close-icon clear). The body becomes the combined-results view, driven by `combinedSearchProvider(query)`.
+  - Combined-results layout:
+    - **"In your library"** section: when library has hits, renders three subsections (Songs / Albums / Artists) using `LibraryResultTile`. Library Song tap pushes the song's album route (J2 will replace this with a play call); Album/Artist tiles tap-navigate to their existing detail screens. When library is empty, renders "Not in your library." copy.
+    - **"On YouTube Music"** section: renders a `FilledButton.tonal` ("Search more on YouTube Music") when library has results AND the user hasn't manually triggered yet. When auto-fired (empty library) or manually triggered, renders the YT results using the existing `ResultTile` widget; tile tap → `downloadDispatcherProvider.dispatch(...)` + snackbar.
+  - Both library + YT empty (auto-fire case) → single `EmptyState` ("No matches"). Library loading → `SkeletonList`. Library error → centered error text.
+  - Back arrow in search-mode AppBar exits search-mode and clears the query.
+- **Tests:**
+  - `test/providers/search_test.dart` — rewritten for the new `ytmSearchProvider(query)` family. 5 cases: empty / whitespace short-circuit (no network), non-empty POSTs `/search` with correct body, two different family keys produce independent requests, dispose mid-debounce cancels the request. SearchQuery state tests deleted (notifier no longer exists).
+  - `test/providers/library/library_search_query_test.dart` — 3 cases (initial empty, set updates, clear resets).
+  - `test/providers/library/combined_search_test.dart` — 8 cases across two groups:
+    - `ytmManualTriggerProvider`: starts empty, trigger / isTriggered, whitespace ignored.
+    - `combinedSearchProvider` auto-fire/manual: library has results → no auto YT (button shown); empty library → YT auto-fires; manual trigger fires YT despite library hits; empty/whitespace query never fires YT.
+    - `combinedSearchProvider` reactive promotion: new done transition → librarySearch invalidates after grace; seed done jobs at subscription time do NOT schedule a promotion (false-positive guard).
+    - Uses a `_SplitAdapter` that routes by URL path (`search3.view` → Subsonic responder, everything else → heerr responder), a `_StubQueue` notifier that lets tests emit `AsyncValue<QueueResponse>` transitions, and a `_settle(c, query, pred)` polling helper to avoid racing the orchestrator's async reactions.
+    - `reindexGraceProvider` overridden to 50ms so each promotion case finishes in <250ms.
+  - `test/screens/library/library_screen_test.dart` — original 8 browse-mode cases preserved; 6 new search-mode cases: search icon swaps in TextField; library hits + manual button rendered; tap manual button → YT results render; empty library → YT auto-fires with results; both empty → "No matches" EmptyState; back arrow exits search mode. Added a `_StubQueue` override in `_wrap` so `combinedSearchProvider`'s `ref.read(queueProvider)` doesn't trigger a real `/queue` fetch through the un-overridden `dioClientProvider`.
+- **Test gate:** `dart run build_runner build --delete-conflicting-outputs` clean (4 new `.g.dart` outputs for the 4 new providers). `flutter analyze` clean (still the 3 pre-existing `queue_screen.dart` infos; no new warnings). `flutter test` **181/181** pass (was 167 after I1: +5 new ytm_search tests + 3 query tests + 8 combined_search tests + 6 library_screen search-mode tests − 8 deleted SearchQuery / type-toggle / rapid-retype tests for a net `+14`).
+- `pubspec.yaml` version bump: `0.3.2+3` → `0.3.3+4`.

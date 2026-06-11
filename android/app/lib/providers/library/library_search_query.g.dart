@@ -1,0 +1,35 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'library_search_query.dart';
+
+// **************************************************************************
+// RiverpodGenerator
+// **************************************************************************
+
+String _$librarySearchQueryHash() =>
+    r'ecd18e21e3c5a9d4a3bfd5f0e8085f89f59fb22f';
+
+/// Current text of the Library tab's search field. `keepAlive: true` so the
+/// last query survives tab switches (Library → Queue → Library), mirroring
+/// the old standalone-Search-tab UX that this query state replaces.
+///
+/// The combined-search orchestrator [combinedSearchProvider] watches this
+/// value and family-keys both [librarySearchProvider] and [ytmSearchProvider]
+/// off it.
+///
+/// Copied from [LibrarySearchQuery].
+@ProviderFor(LibrarySearchQuery)
+final librarySearchQueryProvider =
+    NotifierProvider<LibrarySearchQuery, String>.internal(
+      LibrarySearchQuery.new,
+      name: r'librarySearchQueryProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$librarySearchQueryHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$LibrarySearchQuery = Notifier<String>;
+// ignore_for_file: type=lint
+// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

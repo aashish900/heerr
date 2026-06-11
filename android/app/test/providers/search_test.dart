@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:heerr/api/client.dart';
-import 'package:heerr/models/enums.dart';
 import 'package:heerr/models/search_response.dart';
 import 'package:heerr/providers/search.dart';
 
@@ -82,47 +81,16 @@ Map<String, dynamic> _stubSearchPayload({String title = 'Result'}) {
 // ---------------------------------------------------------------------------
 
 void main() {
-  group('SearchQuery state', () {
-    test('initial state: empty query + track type', () {
-      final ProviderContainer c = ProviderContainer();
-      addTearDown(c.dispose);
-
-      final SearchQueryState v = c.read(searchQueryProvider);
-      expect(v.query, '');
-      expect(v.type, ContentType.song);
-    });
-
-    test('setQuery updates query and preserves type', () {
-      final ProviderContainer c = ProviderContainer();
-      addTearDown(c.dispose);
-
-      c.read(searchQueryProvider.notifier).setQuery('tame impala');
-      final SearchQueryState v = c.read(searchQueryProvider);
-      expect(v.query, 'tame impala');
-      expect(v.type, ContentType.song);
-    });
-
-    test('setType updates type and preserves query', () {
-      final ProviderContainer c = ProviderContainer();
-      addTearDown(c.dispose);
-
-      c.read(searchQueryProvider.notifier).setQuery('q');
-      c.read(searchQueryProvider.notifier).setType(ContentType.album);
-      final SearchQueryState v = c.read(searchQueryProvider);
-      expect(v.query, 'q');
-      expect(v.type, ContentType.album);
-    });
-  });
-
-  group('searchResults', () {
-    test('empty query → returns empty results without hitting the network', () async {
+  group('ytmSearch(query)', () {
+    test('empty query → returns empty results without hitting the network',
+        () async {
       final _CountingAdapter adapter = _CountingAdapter(
         (_) => _json(500, <String, dynamic>{}), // would fail if called
       );
       final ProviderContainer c = _container(dio: _dioWith(adapter));
       addTearDown(c.dispose);
 
-      final SearchResponse r = await c.read(searchResultsProvider.future);
+      final SearchResponse r = await c.read(ytmSearchProvider('').future);
       expect(r.results, isEmpty);
       expect(adapter.requests, isEmpty);
     });
@@ -134,8 +102,7 @@ void main() {
       final ProviderContainer c = _container(dio: _dioWith(adapter));
       addTearDown(c.dispose);
 
-      c.read(searchQueryProvider.notifier).setQuery('   ');
-      final SearchResponse r = await c.read(searchResultsProvider.future);
+      final SearchResponse r = await c.read(ytmSearchProvider('   ').future);
       expect(r.results, isEmpty);
       expect(adapter.requests, isEmpty);
     });
@@ -150,10 +117,13 @@ void main() {
       // Listen to keep the provider alive across the await — autoDispose
       // would otherwise tear down our ref (and cancel the dio request) when
       // .read returns.
-      c.listen<AsyncValue<SearchResponse>>(searchResultsProvider, (_, _) {});
+      c.listen<AsyncValue<SearchResponse>>(
+        ytmSearchProvider('tame impala'),
+        (_, _) {},
+      );
 
-      c.read(searchQueryProvider.notifier).setQuery('tame impala');
-      final SearchResponse r = await c.read(searchResultsProvider.future);
+      final SearchResponse r =
+          await c.read(ytmSearchProvider('tame impala').future);
 
       expect(r.results, hasLength(1));
       expect(r.results.first.title, 'Found');
@@ -168,28 +138,37 @@ void main() {
       });
     });
 
-    test('type toggle re-issues the search with the new type', () async {
+    test('different queries produce independent family entries', () async {
       final _CountingAdapter adapter = _CountingAdapter(
         (_) => _json(200, _stubSearchPayload()),
       );
       final ProviderContainer c = _container(dio: _dioWith(adapter));
       addTearDown(c.dispose);
 
-      c.listen<AsyncValue<SearchResponse>>(searchResultsProvider, (_, _) {});
+      c.listen<AsyncValue<SearchResponse>>(
+        ytmSearchProvider('a'),
+        (_, _) {},
+      );
+      c.listen<AsyncValue<SearchResponse>>(
+        ytmSearchProvider('b'),
+        (_, _) {},
+      );
 
-      c.read(searchQueryProvider.notifier).setQuery('q');
-      await c.read(searchResultsProvider.future);
-      expect(adapter.requests.last.data, containsPair('type', 'song'));
+      await c.read(ytmSearchProvider('a').future);
+      await c.read(ytmSearchProvider('b').future);
 
-      c.read(searchQueryProvider.notifier).setType(ContentType.album);
-      await c.read(searchResultsProvider.future);
-      expect(adapter.requests.last.data, containsPair('type', 'album'));
       expect(adapter.requests, hasLength(2));
+      final Iterable<dynamic> queries =
+          adapter.requests.map((RequestOptions r) {
+        return (r.data as Map<String, dynamic>)['query'];
+      });
+      expect(queries, containsAll(<String>['a', 'b']));
     });
 
-    test('rapid retype cancels intermediate requests', () async {
-      // Use a real 100ms debounce so the cancellation has a chance to land
-      // between retypes.
+    test('disposing the provider mid-debounce cancels the in-flight request',
+        () async {
+      // Real 100ms debounce so the cancellation has a chance to land before
+      // the request fires.
       final _CountingAdapter adapter = _CountingAdapter(
         (_) => _json(200, _stubSearchPayload()),
       );
@@ -199,22 +178,18 @@ void main() {
       );
       addTearDown(c.dispose);
 
-      // Fire three rapid changes inside the debounce window — only the
-      // last query's request should reach the adapter.
-      c.read(searchQueryProvider.notifier).setQuery('a');
-      // Subscribe so the provider actually starts executing.
-      c.listen<AsyncValue<SearchResponse>>(searchResultsProvider, (_, _) {});
-      c.read(searchQueryProvider.notifier).setQuery('ab');
-      c.read(searchQueryProvider.notifier).setQuery('abc');
+      final ProviderSubscription<AsyncValue<SearchResponse>> sub =
+          c.listen<AsyncValue<SearchResponse>>(
+        ytmSearchProvider('abc'),
+        (_, _) {},
+      );
 
-      // Await the final result.
-      final SearchResponse r = await c.read(searchResultsProvider.future);
-      expect(r.results, hasLength(1));
+      // Tear down before the debounce expires.
+      sub.close();
 
-      // Only the last query's request actually hit the adapter (the others
-      // were cancelled during the debounce or via CancelToken).
-      expect(adapter.requests, hasLength(1));
-      expect(adapter.requests.single.data, containsPair('query', 'abc'));
+      // Wait past the debounce — no request should have fired.
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(adapter.requests, isEmpty);
     });
   });
 }

@@ -8,7 +8,10 @@ part of 'search.dart';
 
 String _$searchDebounceHash() => r'b299e6ddbcd847cd680232b2bdafb3bee0459ae6';
 
-/// See also [searchDebounce].
+/// Debounce applied to both the library and YouTube-Music search providers.
+/// Exposed so tests can override it (typically to `Duration.zero`).
+///
+/// Copied from [searchDebounce].
 @ProviderFor(searchDebounce)
 final searchDebounceProvider = Provider<Duration>.internal(
   searchDebounce,
@@ -23,48 +26,251 @@ final searchDebounceProvider = Provider<Duration>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef SearchDebounceRef = ProviderRef<Duration>;
-String _$searchResultsHash() => r'f268698a30f675d97d60dd71708f746b73788c2b';
+String _$ytmSearchHash() => r'b78720deab049defe27ed65e49af0cb67f920e10';
 
-/// `POST /search` results for the current query. Empty query short-circuits
-/// to an empty `SearchResponse` without hitting the network. Non-empty
-/// queries are debounced (default 300ms) and any in-flight request is
-/// cancelled when the query changes — via a `CancelToken` tied to
-/// `ref.onDispose`.
+/// Copied from Dart SDK
+class _SystemHash {
+  _SystemHash._();
+
+  static int combine(int hash, int value) {
+    // ignore: parameter_assignments
+    hash = 0x1fffffff & (hash + value);
+    // ignore: parameter_assignments
+    hash = 0x1fffffff & (hash + ((0x0007ffff & hash) << 10));
+    return hash ^ (hash >> 6);
+  }
+
+  static int finish(int hash) {
+    // ignore: parameter_assignments
+    hash = 0x1fffffff & (hash + ((0x03ffffff & hash) << 3));
+    // ignore: parameter_assignments
+    hash = hash ^ (hash >> 11);
+    return 0x1fffffff & (hash + ((0x00003fff & hash) << 15));
+  }
+}
+
+/// `POST /search` against the heerr backend (YouTube-Music search).
 ///
-/// Copied from [searchResults].
-@ProviderFor(searchResults)
-final searchResultsProvider =
-    AutoDisposeFutureProvider<SearchResponse>.internal(
-      searchResults,
-      name: r'searchResultsProvider',
-      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$searchResultsHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
+/// Family-keyed by the query string so the combined-search orchestrator can
+/// pull the result for the current query directly. The standalone Search tab
+/// no longer exists (subsumed by Library at I1/I2), so the old
+/// `searchQueryProvider` + singleton `searchResultsProvider` are gone — query
+/// is now an explicit parameter.
+///
+/// Empty / whitespace-only queries short-circuit to an empty `SearchResponse`
+/// without hitting the network. Non-empty queries are debounced (default
+/// 300ms via [searchDebounceProvider]) and any in-flight request is cancelled
+/// when the family key changes via a `CancelToken` tied to `ref.onDispose`.
+///
+/// Content type is fixed to [ContentType.song] for now — the combined search
+/// UI surfaces songs/albums/artists from the library half (via Subsonic
+/// search3) and matches the YT half on songs. If we ever want to search YT
+/// albums/playlists from the library tab, lift the type into the family key.
+///
+/// Copied from [ytmSearch].
+@ProviderFor(ytmSearch)
+const ytmSearchProvider = YtmSearchFamily();
+
+/// `POST /search` against the heerr backend (YouTube-Music search).
+///
+/// Family-keyed by the query string so the combined-search orchestrator can
+/// pull the result for the current query directly. The standalone Search tab
+/// no longer exists (subsumed by Library at I1/I2), so the old
+/// `searchQueryProvider` + singleton `searchResultsProvider` are gone — query
+/// is now an explicit parameter.
+///
+/// Empty / whitespace-only queries short-circuit to an empty `SearchResponse`
+/// without hitting the network. Non-empty queries are debounced (default
+/// 300ms via [searchDebounceProvider]) and any in-flight request is cancelled
+/// when the family key changes via a `CancelToken` tied to `ref.onDispose`.
+///
+/// Content type is fixed to [ContentType.song] for now — the combined search
+/// UI surfaces songs/albums/artists from the library half (via Subsonic
+/// search3) and matches the YT half on songs. If we ever want to search YT
+/// albums/playlists from the library tab, lift the type into the family key.
+///
+/// Copied from [ytmSearch].
+class YtmSearchFamily extends Family<AsyncValue<SearchResponse>> {
+  /// `POST /search` against the heerr backend (YouTube-Music search).
+  ///
+  /// Family-keyed by the query string so the combined-search orchestrator can
+  /// pull the result for the current query directly. The standalone Search tab
+  /// no longer exists (subsumed by Library at I1/I2), so the old
+  /// `searchQueryProvider` + singleton `searchResultsProvider` are gone — query
+  /// is now an explicit parameter.
+  ///
+  /// Empty / whitespace-only queries short-circuit to an empty `SearchResponse`
+  /// without hitting the network. Non-empty queries are debounced (default
+  /// 300ms via [searchDebounceProvider]) and any in-flight request is cancelled
+  /// when the family key changes via a `CancelToken` tied to `ref.onDispose`.
+  ///
+  /// Content type is fixed to [ContentType.song] for now — the combined search
+  /// UI surfaces songs/albums/artists from the library half (via Subsonic
+  /// search3) and matches the YT half on songs. If we ever want to search YT
+  /// albums/playlists from the library tab, lift the type into the family key.
+  ///
+  /// Copied from [ytmSearch].
+  const YtmSearchFamily();
+
+  /// `POST /search` against the heerr backend (YouTube-Music search).
+  ///
+  /// Family-keyed by the query string so the combined-search orchestrator can
+  /// pull the result for the current query directly. The standalone Search tab
+  /// no longer exists (subsumed by Library at I1/I2), so the old
+  /// `searchQueryProvider` + singleton `searchResultsProvider` are gone — query
+  /// is now an explicit parameter.
+  ///
+  /// Empty / whitespace-only queries short-circuit to an empty `SearchResponse`
+  /// without hitting the network. Non-empty queries are debounced (default
+  /// 300ms via [searchDebounceProvider]) and any in-flight request is cancelled
+  /// when the family key changes via a `CancelToken` tied to `ref.onDispose`.
+  ///
+  /// Content type is fixed to [ContentType.song] for now — the combined search
+  /// UI surfaces songs/albums/artists from the library half (via Subsonic
+  /// search3) and matches the YT half on songs. If we ever want to search YT
+  /// albums/playlists from the library tab, lift the type into the family key.
+  ///
+  /// Copied from [ytmSearch].
+  YtmSearchProvider call(String query) {
+    return YtmSearchProvider(query);
+  }
+
+  @override
+  YtmSearchProvider getProviderOverride(covariant YtmSearchProvider provider) {
+    return call(provider.query);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'ytmSearchProvider';
+}
+
+/// `POST /search` against the heerr backend (YouTube-Music search).
+///
+/// Family-keyed by the query string so the combined-search orchestrator can
+/// pull the result for the current query directly. The standalone Search tab
+/// no longer exists (subsumed by Library at I1/I2), so the old
+/// `searchQueryProvider` + singleton `searchResultsProvider` are gone — query
+/// is now an explicit parameter.
+///
+/// Empty / whitespace-only queries short-circuit to an empty `SearchResponse`
+/// without hitting the network. Non-empty queries are debounced (default
+/// 300ms via [searchDebounceProvider]) and any in-flight request is cancelled
+/// when the family key changes via a `CancelToken` tied to `ref.onDispose`.
+///
+/// Content type is fixed to [ContentType.song] for now — the combined search
+/// UI surfaces songs/albums/artists from the library half (via Subsonic
+/// search3) and matches the YT half on songs. If we ever want to search YT
+/// albums/playlists from the library tab, lift the type into the family key.
+///
+/// Copied from [ytmSearch].
+class YtmSearchProvider extends AutoDisposeFutureProvider<SearchResponse> {
+  /// `POST /search` against the heerr backend (YouTube-Music search).
+  ///
+  /// Family-keyed by the query string so the combined-search orchestrator can
+  /// pull the result for the current query directly. The standalone Search tab
+  /// no longer exists (subsumed by Library at I1/I2), so the old
+  /// `searchQueryProvider` + singleton `searchResultsProvider` are gone — query
+  /// is now an explicit parameter.
+  ///
+  /// Empty / whitespace-only queries short-circuit to an empty `SearchResponse`
+  /// without hitting the network. Non-empty queries are debounced (default
+  /// 300ms via [searchDebounceProvider]) and any in-flight request is cancelled
+  /// when the family key changes via a `CancelToken` tied to `ref.onDispose`.
+  ///
+  /// Content type is fixed to [ContentType.song] for now — the combined search
+  /// UI surfaces songs/albums/artists from the library half (via Subsonic
+  /// search3) and matches the YT half on songs. If we ever want to search YT
+  /// albums/playlists from the library tab, lift the type into the family key.
+  ///
+  /// Copied from [ytmSearch].
+  YtmSearchProvider(String query)
+    : this._internal(
+        (ref) => ytmSearch(ref as YtmSearchRef, query),
+        from: ytmSearchProvider,
+        name: r'ytmSearchProvider',
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+            ? null
+            : _$ytmSearchHash,
+        dependencies: YtmSearchFamily._dependencies,
+        allTransitiveDependencies: YtmSearchFamily._allTransitiveDependencies,
+        query: query,
+      );
+
+  YtmSearchProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.query,
+  }) : super.internal();
+
+  final String query;
+
+  @override
+  Override overrideWith(
+    FutureOr<SearchResponse> Function(YtmSearchRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: YtmSearchProvider._internal(
+        (ref) => create(ref as YtmSearchRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        query: query,
+      ),
     );
+  }
+
+  @override
+  AutoDisposeFutureProviderElement<SearchResponse> createElement() {
+    return _YtmSearchProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is YtmSearchProvider && other.query == query;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, query.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef SearchResultsRef = AutoDisposeFutureProviderRef<SearchResponse>;
-String _$searchQueryHash() => r'b41337bb28c511be75dc7c5c51074a42173a5b98';
+mixin YtmSearchRef on AutoDisposeFutureProviderRef<SearchResponse> {
+  /// The parameter `query` of this provider.
+  String get query;
+}
 
-/// Search bar state. `keepAlive: true` because the user's last query should
-/// survive tab switches (Search → Queue → Search).
-///
-/// Copied from [SearchQuery].
-@ProviderFor(SearchQuery)
-final searchQueryProvider =
-    NotifierProvider<SearchQuery, SearchQueryState>.internal(
-      SearchQuery.new,
-      name: r'searchQueryProvider',
-      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$searchQueryHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
+class _YtmSearchProviderElement
+    extends AutoDisposeFutureProviderElement<SearchResponse>
+    with YtmSearchRef {
+  _YtmSearchProviderElement(super.provider);
 
-typedef _$SearchQuery = Notifier<SearchQueryState>;
+  @override
+  String get query => (origin as YtmSearchProvider).query;
+}
+
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

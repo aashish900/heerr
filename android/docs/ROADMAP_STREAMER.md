@@ -77,7 +77,7 @@ See `PLAN.md` for the locked v1 contract on the existing ingestion client. See t
 
 ---
 
-### [ ] I2. Combined search inside Library tab (library-first + YT fallback + reactive promotion)
+### [x] I2. Combined search inside Library tab (library-first + YT fallback + reactive promotion)
 **Files:**
 - New: `android/app/lib/providers/library/combined_search.dart` (orchestrates library + YT), `android/app/lib/screens/library/library_search_results.dart` (the results widget rendered below the search field).
 - Modified: `android/app/lib/providers/search.dart` (rename `searchResultsProvider` → `ytmSearchProvider`; update all call sites — the rename is a deliberate clarification since YT is no longer the *only* search), `android/app/lib/screens/library/library_screen.dart` (search field in AppBar that swaps the body between the TabBar browse view and the search-results view).
