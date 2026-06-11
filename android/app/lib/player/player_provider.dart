@@ -6,33 +6,29 @@ import 'heerr_audio_handler.dart';
 part 'player_provider.g.dart';
 
 /// Riverpod handle on the singleton [HeerrAudioHandler] created by
-/// `AudioService.init` at app start. This provider has no default value —
-/// `main()` must override it before mounting the widget tree, and tests
-/// must override it with a stub before pumping any widget that consumes it.
+/// `AudioService.init` in `main()` and injected via
+/// `audioHandlerProvider.overrideWithValue(handler)` on the root
+/// ProviderScope.
 ///
-/// Throwing here (rather than constructing a default handler) ensures we
-/// never accidentally spawn a `just_audio.AudioPlayer` in a test or before
-/// `AudioService.init` has run.
+/// Throws by default so tests and accidental reads before init blow up
+/// loudly rather than silently spawning a rogue AudioPlayer.
 @Riverpod(keepAlive: true)
 HeerrAudioHandler audioHandler(AudioHandlerRef ref) {
   throw UnimplementedError(
-    'audioHandlerProvider was not overridden. main() must initialize it via '
-    'AudioService.init and override the provider before mounting the app.',
+    'audioHandlerProvider was not overridden. '
+    'main() must call AudioService.init and override this provider.',
   );
 }
 
-/// Stream of "what's playing right now" — current item + playback state.
-/// Backed by [HeerrAudioHandler.snapshotStream]. UI widgets watch this to
-/// render mini-player + Now Playing at J2.
+/// Stream of "what is playing right now" — current MediaItem + PlaybackState.
+/// J2 mini-player and Now Playing screens drive off this.
 @Riverpod(keepAlive: true)
 Stream<PlayerSnapshot> playerSnapshot(PlayerSnapshotRef ref) {
-  final HeerrAudioHandler handler = ref.watch(audioHandlerProvider);
-  return handler.snapshotStream();
+  return ref.watch(audioHandlerProvider).snapshotStream();
 }
 
-/// Convenience: just the current MediaItem (or null when nothing's playing).
+/// Convenience: just the current MediaItem (null when nothing queued).
 @riverpod
 Stream<MediaItem?> currentMediaItem(CurrentMediaItemRef ref) {
-  final HeerrAudioHandler handler = ref.watch(audioHandlerProvider);
-  return handler.mediaItem.stream;
+  return ref.watch(audioHandlerProvider).mediaItem.stream;
 }

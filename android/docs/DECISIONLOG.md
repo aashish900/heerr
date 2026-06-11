@@ -169,3 +169,25 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **Combined search, but YT only on manual tap (no auto-fire).** Slower UX when the library is empty — the user has to type, see "nothing in your library", then tap a button to discover what YT has. Rejected after the user explicitly preferred the auto-fire-on-empty rule.
 
 **Trade-off:** `lib/screens/search_screen.dart` + its widget test are deleted at I1. `lib/providers/search.dart`, `lib/providers/download.dart`, and `lib/widgets/result_tile.dart` survive — they're consumed by `combinedSearchProvider` at I2 (with `searchResultsProvider` renamed to `ytmSearchProvider` for naming clarity once it's no longer the *only* search). Between I1 and I2 the YT-search providers are technically unused by any screen; the lint suite doesn't flag this, and the gap is one milestone wide. (`/CLAUDE.md` staleness rule: this ADR will be revisited at I2 if the combined-search behaviour materially diverges from this description.)
+
+---
+
+## 2026-06-11 — Host Activity must extend `AudioServiceFragmentActivity`
+
+**Context:** J1 wired `just_audio` + `audio_service` and the unit-test gate passed, but the first on-device launch threw `PlatformException(The Activity class declared in your AndroidManifest.xml is wrong or has not provided the correct FlutterEngine...)` from `AudioService.init`. `MainActivity` was the default `FlutterActivity` subclass that `flutter create` ships, and intermediate fixes (switching to `FlutterFragmentActivity`; manually caching the engine in `configureFlutterEngine`) failed to silence the error.
+
+**Decision:** `MainActivity` extends `com.ryanheise.audioservice.AudioServiceFragmentActivity` (provided by the `audio_service` package) rather than any flavour of `FlutterActivity` / `FlutterFragmentActivity`.
+
+**Why:**
+- The `audio_service` Android plugin's `onAttachedToActivity` calls `getFlutterEngine(activity)`, which reads `FlutterEngineCache.getInstance().get("audio_service_engine")` (`~/.pub-cache/hosted/pub.dev/audio_service-0.18.18/android/src/main/java/com/ryanheise/audioservice/AudioServicePlugin.java:315`). If the engine cached under that id is not the same instance attached to the host Activity, the plugin sets `wrongEngineDetected = true` and throws — because the plugin's MediaSession / foreground-service code path must communicate over the Activity's `BinaryMessenger`, not a parallel one.
+- `AudioServiceFragmentActivity` overrides `provideFlutterEngine`, `getCachedEngineId`, and `shouldDestroyEngineWithHost` so the Activity *is* the plugin's cached engine. Self-rolling those overrides is feasible but every audio_service upgrade becomes a manifest review.
+- Extending the package-provided base class is the upstream-recommended path (`audio_service` README "Android setup") and tracks future audio_service changes for free.
+
+**Alternatives considered:**
+- **Stay on `FlutterActivity` with a manual `configureFlutterEngine` override** that puts the activity's engine into `FlutterEngineCache` under id `"audio_service_engine"`. Rejected: the plugin checks the cache *before* `configureFlutterEngine` runs in some lifecycle paths (verified by re-hitting the same exception with the override in place), and the override is missing the `provideFlutterEngine` / `getCachedEngineId` / `shouldDestroyEngineWithHost` hooks the plugin actually depends on. Effectively a re-implementation of `AudioServiceFragmentActivity`, with maintenance cost.
+- **Switch to plain `FlutterFragmentActivity`.** Required for some audio plugins (Fragment-based dialogs), but not sufficient on its own — the engine-cache wiring is the failure, not the Activity subclass tree. Verified by direct test.
+- **Pin to an older audio_service major that didn't enforce the engine-cache check.** Rejected: the check exists because shipping with two engines silently breaks MediaSession on certain Android versions. Down-versioning to avoid a check is hiding a real bug.
+
+**Trade-off:** `MainActivity` is now bound to `audio_service`'s base class. If we ever swap `audio_service` for a different platform-channel media stack, `MainActivity.kt` needs editing. Acceptable — the file is two lines and the swap is unlikely while audio_service remains the de-facto Flutter media-session library.
+
+**Related:** `androidStopForegroundOnPause` was flipped `false` → `true` in the same fix. `audio_service` asserts the two booleans satisfy `notificationOngoing ⇒ stopForegroundOnPause`; otherwise the foreground service can leak past pause. Not a separate decision — a contract enforced by the package.

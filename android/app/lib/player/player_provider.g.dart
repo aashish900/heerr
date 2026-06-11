@@ -6,16 +6,15 @@ part of 'player_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$audioHandlerHash() => r'399d0f117871fe07aa20b8a151218ddf22ba1a5f';
+String _$audioHandlerHash() => r'7455955023fd24cad9b5d49e2543e8f87b7617e9';
 
 /// Riverpod handle on the singleton [HeerrAudioHandler] created by
-/// `AudioService.init` at app start. This provider has no default value —
-/// `main()` must override it before mounting the widget tree, and tests
-/// must override it with a stub before pumping any widget that consumes it.
+/// `AudioService.init` in `main()` and injected via
+/// `audioHandlerProvider.overrideWithValue(handler)` on the root
+/// ProviderScope.
 ///
-/// Throwing here (rather than constructing a default handler) ensures we
-/// never accidentally spawn a `just_audio.AudioPlayer` in a test or before
-/// `AudioService.init` has run.
+/// Throws by default so tests and accidental reads before init blow up
+/// loudly rather than silently spawning a rogue AudioPlayer.
 ///
 /// Copied from [audioHandler].
 @ProviderFor(audioHandler)
@@ -32,11 +31,10 @@ final audioHandlerProvider = Provider<HeerrAudioHandler>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef AudioHandlerRef = ProviderRef<HeerrAudioHandler>;
-String _$playerSnapshotHash() => r'43590e8e4face2645b14929cd8f792011cdff00f';
+String _$playerSnapshotHash() => r'0ce86cf42a6814f015c59a4fe006cc429f0a8dad';
 
-/// Stream of "what's playing right now" — current item + playback state.
-/// Backed by [HeerrAudioHandler.snapshotStream]. UI widgets watch this to
-/// render mini-player + Now Playing at J2.
+/// Stream of "what is playing right now" — current MediaItem + PlaybackState.
+/// J2 mini-player and Now Playing screens drive off this.
 ///
 /// Copied from [playerSnapshot].
 @ProviderFor(playerSnapshot)
@@ -53,9 +51,9 @@ final playerSnapshotProvider = StreamProvider<PlayerSnapshot>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef PlayerSnapshotRef = StreamProviderRef<PlayerSnapshot>;
-String _$currentMediaItemHash() => r'6a85681af60e56e2ca23389c386c4f4d2e2da632';
+String _$currentMediaItemHash() => r'85f41226ab32ab0cc235d4d6356878fcd9e9dfb8';
 
-/// Convenience: just the current MediaItem (or null when nothing's playing).
+/// Convenience: just the current MediaItem (null when nothing queued).
 ///
 /// Copied from [currentMediaItem].
 @ProviderFor(currentMediaItem)

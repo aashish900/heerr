@@ -572,3 +572,18 @@ First Phase-J milestone. Wires the audio stack: `just_audio` for the decode/buff
   3. Lock the phone → playback continues; lock-screen controls work.
   4. Tap pause from notification → audio pauses + the notification's play/pause toggle flips.
 - `pubspec.yaml` version bump: `0.3.3+4` → `0.4.0+5` (J phase opens the `0.4.x` band per the roadmap's version scheme).
+
+## 2026-06-11 — J1 follow-up: AudioServiceFragmentActivity + on-device smoke pass
+
+Post-J1-merge on-device test reproduced `PlatformException(The Activity class declared in your AndroidManifest.xml is wrong or has not provided the correct FlutterEngine...)` on app start. Root cause: the host Activity (`MainActivity : FlutterActivity`) was constructing its own `FlutterEngine`, while the `audio_service` plugin's `onAttachedToActivity` looks up the engine cached under id `"audio_service_engine"` (see `~/.pub-cache/hosted/pub.dev/audio_service-0.18.18/android/src/main/java/com/ryanheise/audioservice/AudioServicePlugin.java:315`). The two engines have different `BinaryMessenger`s → the plugin trips its `wrongEngineDetected` guard during `AudioService.init` → `PlatformException`.
+
+- **`android/app/android/app/src/main/kotlin/com/aashish/heerr/MainActivity.kt`**: now extends `com.ryanheise.audioservice.AudioServiceFragmentActivity` (provided by the audio_service package). That base class overrides `provideFlutterEngine`, `getCachedEngineId`, and `shouldDestroyEngineWithHost` to share the plugin's cached engine — verified against the upstream source at `~/.pub-cache/hosted/pub.dev/audio_service-0.18.18/android/src/main/java/com/ryanheise/audioservice/AudioServiceFragmentActivity.java`. No AndroidManifest change required — `.MainActivity` still resolves to the same class.
+- **`android/app/lib/main.dart`**: flipped `androidStopForegroundOnPause: false` → `true`. The audio_service plugin asserts `stopForegroundOnPause == true` whenever `notificationOngoing == true` (channel-ongoing + non-stoppable notification would leak the foreground service). Doc comments above `main()` trimmed.
+- **`android/app/lib/player/player_provider.dart`** + generated `.g.dart`: doc-comment tidy-up only — semantics unchanged. The provider still throws by default and is overridden via `audioHandlerProvider.overrideWithValue(handler)` from `main()`.
+- **On-device smoke (Pixel 7, populated Navidrome library) — all four J1 acceptance checks pass:**
+  1. App launches without `PlatformException`.
+  2. "Debug play" FAB → audio plays through device speaker.
+  3. Foreground notification with play / pause / skip / stop controls renders and pause toggles correctly.
+  4. Lock-screen media controls render (Android per-channel lock-screen visibility had to be enabled in system Settings — not a code config, surfaced for future docs).
+- **Known limitation, by design:** the notification's "skip forward" button is a no-op at J1 because the debug FAB only queues a single song. Real album / playlist queueing lands at J2.
+- **No test changes.** This is a platform-channel + base-class fix; covered by manual device smoke, not unit tests.

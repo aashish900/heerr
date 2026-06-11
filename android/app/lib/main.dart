@@ -9,17 +9,14 @@ import 'router.dart';
 import 'theme.dart';
 
 Future<void> main() async {
-  // AudioService.init has to run after the binding is up and before the
-  // first widget tree mounts. It registers the foreground service and
-  // wires hardware media buttons to the handler.
   WidgetsFlutterBinding.ensureInitialized();
   final HeerrAudioHandler handler = await AudioService.init(
     builder: HeerrAudioHandler.new,
-    config: AudioServiceConfig(
+    config: const AudioServiceConfig(
       androidNotificationChannelId: 'com.aashish.heerr.audio',
       androidNotificationChannelName: 'heerr playback',
       androidNotificationOngoing: true,
-      androidStopForegroundOnPause: false,
+      androidStopForegroundOnPause: true,
     ),
   );
 
