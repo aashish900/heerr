@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'screens/job_detail_screen.dart';
+import 'screens/library/album_detail_screen.dart';
+import 'screens/library/artist_detail_screen.dart';
+import 'screens/library/library_screen.dart';
+import 'screens/library/playlist_detail_screen.dart';
 import 'screens/queue_screen.dart';
-import 'screens/search_screen.dart';
 import 'screens/servers_screen.dart';
 import 'screens/settings_screen.dart';
 
@@ -11,10 +14,16 @@ import 'screens/settings_screen.dart';
 // drift apart. Settings is exposed via `/settings`; routing redirects to
 // it when the bearer token is missing (wired at B1/B3 — not here).
 class Routes {
-  static const String search = '/';
+  static const String library = '/';
   static const String queue = '/queue';
   static const String settings = '/settings';
   static const String servers = '/settings/servers';
+
+  // Library detail (Subsonic via Navidrome). Nested under the library
+  // route so the URL shape and the navigation hierarchy match.
+  static String libraryArtist(String id) => '/library/artist/$id';
+  static String libraryAlbum(String id) => '/library/album/$id';
+  static String libraryPlaylist(String id) => '/library/playlist/$id';
 
   // Job-detail lands at D3; route shape defined here to lock the URL.
   static String job(String id) => '/job/$id';
@@ -24,7 +33,7 @@ class Routes {
 /// reuse the exact router config the app boots with.
 GoRouter buildHeerrRouter() {
   return GoRouter(
-    initialLocation: Routes.search,
+    initialLocation: Routes.library,
     routes: <RouteBase>[
       ShellRoute(
         builder: (BuildContext context, GoRouterState state, Widget child) {
@@ -32,9 +41,27 @@ GoRouter buildHeerrRouter() {
         },
         routes: <RouteBase>[
           GoRoute(
-            path: Routes.search,
+            path: Routes.library,
             builder: (BuildContext context, GoRouterState state) =>
-                const SearchScreen(),
+                const LibraryScreen(),
+            routes: <RouteBase>[
+              GoRoute(
+                path: 'library/artist/:id',
+                builder: (BuildContext context, GoRouterState state) =>
+                    ArtistDetailScreen(artistId: state.pathParameters['id']!),
+              ),
+              GoRoute(
+                path: 'library/album/:id',
+                builder: (BuildContext context, GoRouterState state) =>
+                    AlbumDetailScreen(albumId: state.pathParameters['id']!),
+              ),
+              GoRoute(
+                path: 'library/playlist/:id',
+                builder: (BuildContext context, GoRouterState state) =>
+                    PlaylistDetailScreen(
+                        playlistId: state.pathParameters['id']!),
+              ),
+            ],
           ),
           GoRoute(
             path: Routes.queue,
@@ -76,10 +103,10 @@ class _ShellScaffold extends StatelessWidget {
 
   static const List<_NavTab> _tabs = <_NavTab>[
     _NavTab(
-      path: Routes.search,
-      label: 'Search',
-      icon: Icons.search_outlined,
-      selectedIcon: Icons.search,
+      path: Routes.library,
+      label: 'Library',
+      icon: Icons.library_music_outlined,
+      selectedIcon: Icons.library_music,
     ),
     _NavTab(
       path: Routes.queue,
@@ -96,9 +123,12 @@ class _ShellScaffold extends StatelessWidget {
   ];
 
   int _indexFor(String loc) {
-    for (int i = 0; i < _tabs.length; i++) {
-      if (loc == _tabs[i].path) return i;
-    }
+    // Nested routes (e.g. /library/album/xxx, /settings/servers) belong
+    // under their parent tab so the selected indicator stays in the right
+    // place when the user drills into a detail screen.
+    if (loc.startsWith('/library') || loc == Routes.library) return 0;
+    if (loc.startsWith(Routes.queue)) return 1;
+    if (loc.startsWith(Routes.settings)) return 2;
     return 0;
   }
 

@@ -18,6 +18,12 @@ class SubsonicEndpoints {
   /// Album detail (songs for an album). `id` query param required.
   static const String getAlbum = '/rest/getAlbum.view';
 
+  /// Flat list of albums. Required `type` (e.g. `alphabeticalByName`,
+  /// `newest`, `byYear`). Optional `size` (default 10, max 500), `offset`.
+  /// Used by the Library tab's Albums sub-tab — the per-artist album list
+  /// inside `getArtist` is unsuitable for an A-Z global view.
+  static const String getAlbumList2 = '/rest/getAlbumList2.view';
+
   /// All playlists visible to the authenticated user.
   static const String getPlaylists = '/rest/getPlaylists.view';
 

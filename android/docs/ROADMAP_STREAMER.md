@@ -59,7 +59,7 @@ See `PLAN.md` for the locked v1 contract on the existing ingestion client. See t
 
 ## Phase I — Library tab + combined search
 
-### [ ] I1. Library tab + Artists / Albums / Playlists screens (+ drop Search tab)
+### [x] I1. Library tab + Artists / Albums / Playlists screens (+ drop Search tab)
 **Files:**
 - Modified: `android/app/lib/router.dart` (drop `/search`; add `/library`, `/library/artist/:id`, `/library/album/:id`, `/library/playlist/:id`; keep `/queue`, `/settings`, `/servers`), `android/app/lib/screens/_shell_scaffold.dart` (3 tabs: Library / Queue / Settings; Library icon `library_music`), `android/app/test/router_test.dart` (update assertions to 3 tabs + Library boots by default).
 - Removed: `android/app/lib/screens/search_screen.dart`, `android/app/test/screens/search_screen_test.dart`.

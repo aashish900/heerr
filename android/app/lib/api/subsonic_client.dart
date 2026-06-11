@@ -78,6 +78,45 @@ String _randomHexSalt() {
       .join();
 }
 
+/// Build a `getCoverArt.view` URL with Subsonic auth params embedded as
+/// query string. Needed because Flutter's `Image.network` does not flow
+/// through the dio interceptor — the auth params have to be baked into the
+/// URL the framework fetches directly.
+///
+/// [saltGenerator] is injectable for deterministic tests; production callers
+/// pass nothing and let the cryptographically-strong default fire.
+///
+/// Note: the salt rotates on every call, which means the URL changes per
+/// render — this defeats the framework's URL-keyed image cache. For v1
+/// (I1) that's acceptable; cover-art caching is a K1+ optimisation.
+String buildSubsonicCoverArtUrl({
+  required String baseUrl,
+  required String username,
+  required String password,
+  required String coverArtId,
+  int? size,
+  String Function()? saltGenerator,
+}) {
+  final String salt = (saltGenerator ?? _randomHexSalt)();
+  final String token =
+      md5.convert(utf8.encode(password + salt)).toString();
+  final Map<String, String> params = <String, String>{
+    'id': coverArtId,
+    if (size != null) 'size': size.toString(),
+    'u': username,
+    's': salt,
+    't': token,
+    'v': _subsonicApiVersion,
+    'c': _subsonicClientName,
+  };
+  return Uri.parse(baseUrl)
+      .replace(
+        path: '/rest/getCoverArt.view',
+        queryParameters: params,
+      )
+      .toString();
+}
+
 /// Builds a `Dio` for Subsonic calls against the user-configured Navidrome
 /// base URL. Depends on [settingsProvider] so a saved credential change
 /// invalidates and rebuilds with the new auth.
