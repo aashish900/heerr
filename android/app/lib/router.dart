@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import 'offline/offline_sync.dart';
@@ -135,8 +136,11 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
     _NavTab(
       path: Routes.library,
       label: 'Library',
-      icon: Icons.library_music_outlined,
-      selectedIcon: Icons.library_music,
+      // Custom 3D-stack icon (`assets/icons/library.svg`, sourced from
+      // the brand-feeling Spotify-style mark). `null` icon fields mark
+      // that this tab renders via [_buildLibraryIcon] / -selected.
+      icon: null,
+      selectedIcon: null,
     ),
     _NavTab(
       path: Routes.downloads,
@@ -157,6 +161,25 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
       selectedIcon: Icons.settings,
     ),
   ];
+
+  /// Renders the Library tab icon from the bundled SVG. Tinted to match
+  /// the active NavigationBar icon-theme color so it follows the M3
+  /// selected / unselected states without hard-coding a palette.
+  Widget _buildLibraryIcon(BuildContext context, {required bool selected}) {
+    final IconThemeData theme = selected
+        ? NavigationBarTheme.of(context).iconTheme?.resolve(<WidgetState>{
+              WidgetState.selected,
+            }) ??
+            IconTheme.of(context)
+        : IconTheme.of(context);
+    final Color tint = theme.color ?? Theme.of(context).colorScheme.onSurface;
+    return SvgPicture.asset(
+      'assets/icons/library.svg',
+      width: 24,
+      height: 24,
+      colorFilter: ColorFilter.mode(tint, BlendMode.srcIn),
+    );
+  }
 
   @override
   void initState() {
@@ -225,8 +248,12 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
             destinations: <NavigationDestination>[
               for (final _NavTab t in _tabs)
                 NavigationDestination(
-                  icon: Icon(t.icon),
-                  selectedIcon: Icon(t.selectedIcon),
+                  icon: t.icon != null
+                      ? Icon(t.icon)
+                      : _buildLibraryIcon(context, selected: false),
+                  selectedIcon: t.selectedIcon != null
+                      ? Icon(t.selectedIcon)
+                      : _buildLibraryIcon(context, selected: true),
                   label: t.label,
                 ),
             ],
@@ -247,6 +274,9 @@ class _NavTab {
 
   final String path;
   final String label;
-  final IconData icon;
-  final IconData selectedIcon;
+
+  /// `null` opts into a custom-drawn widget for this tab — see the
+  /// `_buildLibraryIcon` branch in `_ShellScaffoldState.build`.
+  final IconData? icon;
+  final IconData? selectedIcon;
 }
