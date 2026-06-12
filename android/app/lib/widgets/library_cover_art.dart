@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/subsonic_client.dart';
+import '../offline/library_cache.dart';
 import '../offline/offline_downloader.dart';
 import '../offline/offline_paths.dart';
 import '../providers/settings.dart';
@@ -82,6 +83,16 @@ class _LibraryCoverArtState extends ConsumerState<LibraryCoverArt> {
           pass == null || pass.isEmpty) {
         return;
       }
+      // L5-followup: skip the network entirely when offline. Without
+      // this, every visible tile fans out a Dio request that waits the
+      // full connectTimeout — N tiles × 10s freezes the Library scroll
+      // even though we already know the carrier is gone.
+      try {
+        final OnlineCheck check = ref.read(onlineCheckProvider);
+        if (!await check.isLikelyOnline()) return;
+      } catch (_) {
+        // Probe broken → fall through and try the fetch (bounded below).
+      }
       final String url = buildSubsonicCoverArtUrl(
         baseUrl: baseUrl,
         username: user,
@@ -90,10 +101,14 @@ class _LibraryCoverArtState extends ConsumerState<LibraryCoverArt> {
         size: widget.size.toInt(),
       );
       final Dio dio = ref.read(offlineDownloadDioProvider);
-      final Response<List<int>> resp = await dio.get<List<int>>(
-        url,
-        options: Options(responseType: ResponseType.bytes),
-      );
+      // Hard cap the cover fetch — placeholder is fine, a frozen tile
+      // is not. The next online visit retries.
+      final Response<List<int>> resp = await dio
+          .get<List<int>>(
+            url,
+            options: Options(responseType: ResponseType.bytes),
+          )
+          .timeout(const Duration(seconds: 4));
       final List<int>? data = resp.data;
       if (data == null || data.isEmpty) return;
       await file.parent.create(recursive: true);

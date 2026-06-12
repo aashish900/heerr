@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -32,10 +33,16 @@ class _ConnectivityPlusOnlineCheck implements OnlineCheck {
   Future<bool> isLikelyOnline() async {
     final List<ConnectivityResult> results =
         await Connectivity().checkConnectivity();
+    // Deliberately exclude `ConnectivityResult.vpn`: Tailscale (our only
+    // transport) registers a VPN interface that can remain "up" in the
+    // OS view even when its underlying carrier (wifi / cellular) is
+    // gone — so trusting vpn-alone leads us to attempt the network and
+    // burn the full Dio connect timeout. Treating Tailscale as
+    // "reachable iff there is an underlying carrier" matches the
+    // physical reality of the home-server setup.
     return results.contains(ConnectivityResult.wifi) ||
         results.contains(ConnectivityResult.mobile) ||
-        results.contains(ConnectivityResult.ethernet) ||
-        results.contains(ConnectivityResult.vpn);
+        results.contains(ConnectivityResult.ethernet);
   }
 }
 
@@ -181,8 +188,27 @@ Future<T> cacheAware<T>({
     }
   }
 
+  // Defense-in-depth: even on the "online" path, cap the network call at
+  // a few seconds when there is a cached value to fall back to. Without
+  // this, an OnlineCheck false positive (e.g. Wi-Fi connected but the
+  // home server is unreachable on the LAN) burns the full Dio
+  // connectTimeout (~10s) per call, and with several library tabs
+  // loading in succession the UI feels frozen. With a cached payload
+  // already on disk, we'd rather show last-known-good data quickly.
+  Future<T> bounded(Future<T> Function() body, {required bool haveCache}) {
+    if (!haveCache) return body();
+    return body().timeout(
+      const Duration(seconds: 4),
+      onTimeout: () => throw TimeoutException(
+        'library_cache: networkCall for $cacheKey exceeded 4s with cache present',
+      ),
+    );
+  }
+
+  final bool haveCache = cache != null && settings != null;
+
   try {
-    final T value = await networkCall();
+    final T value = await bounded(networkCall, haveCache: haveCache);
     if (cache != null && settings != null) {
       try {
         await cache.write(settings, cacheKey, encode(value));
