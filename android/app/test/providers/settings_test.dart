@@ -38,7 +38,7 @@ ProviderContainer _makeContainer(_FakeSecureStorage fake) {
 
 void main() {
   group('Settings provider', () {
-    test('fresh storage → all fields null', () async {
+    test('fresh storage → all cred fields null + offline defaults', () async {
       final _FakeSecureStorage fake = _FakeSecureStorage();
       final ProviderContainer c = _makeContainer(fake);
       addTearDown(c.dispose);
@@ -50,6 +50,11 @@ void main() {
       expect(v.navidromeBaseUrl, isNull);
       expect(v.navidromeUsername, isNull);
       expect(v.navidromePassword, isNull);
+      // L1 defaults: master OFF, sync-all OFF, WiFi-only ON, 15-min poll.
+      expect(v.offlineEnabled, isFalse);
+      expect(v.offlineSyncAll, isFalse);
+      expect(v.offlineWifiOnly, isTrue);
+      expect(v.offlinePollIntervalMin, 15);
     });
 
     test('pre-seeded storage → values are loaded (heerr + navidrome)', () async {
@@ -209,6 +214,89 @@ void main() {
         'navidrome_username': 'me',
         'navidrome_password': 'pw',
       });
+    });
+
+    test('save(offline fields) round-trip through storage', () async {
+      final _FakeSecureStorage fake = _FakeSecureStorage();
+      final ProviderContainer c = _makeContainer(fake);
+      addTearDown(c.dispose);
+
+      await c.read(settingsProvider.future);
+      await c.read(settingsProvider.notifier).save(
+            offlineEnabled: true,
+            offlineSyncAll: true,
+            offlineWifiOnly: false,
+            offlinePollIntervalMin: 30,
+          );
+
+      final SettingsValue v = await c.read(settingsProvider.future);
+      expect(v.offlineEnabled, isTrue);
+      expect(v.offlineSyncAll, isTrue);
+      expect(v.offlineWifiOnly, isFalse);
+      expect(v.offlinePollIntervalMin, 30);
+      expect(fake.snapshot, <String, String>{
+        'offline_enabled': 'true',
+        'offline_sync_all': 'true',
+        'offline_wifi_only': 'false',
+        'offline_poll_interval_min': '30',
+      });
+    });
+
+    test('save(offlineEnabled only) preserves other offline keys + defaults',
+        () async {
+      final _FakeSecureStorage fake = _FakeSecureStorage(<String, String>{
+        'offline_wifi_only': 'false',
+        'offline_poll_interval_min': '60',
+      });
+      final ProviderContainer c = _makeContainer(fake);
+      addTearDown(c.dispose);
+
+      await c.read(settingsProvider.future);
+      await c.read(settingsProvider.notifier).save(offlineEnabled: true);
+
+      final SettingsValue v = await c.read(settingsProvider.future);
+      expect(v.offlineEnabled, isTrue);
+      // Untouched seed values stay; sync-all wasn't seeded, so it
+      // falls back to the L1 default (false).
+      expect(v.offlineWifiOnly, isFalse);
+      expect(v.offlinePollIntervalMin, 60);
+      expect(v.offlineSyncAll, isFalse);
+    });
+
+    test('clear() wipes offline keys too and re-emits defaults', () async {
+      final _FakeSecureStorage fake = _FakeSecureStorage(<String, String>{
+        'offline_enabled': 'true',
+        'offline_sync_all': 'true',
+        'offline_wifi_only': 'false',
+        'offline_poll_interval_min': '60',
+      });
+      final ProviderContainer c = _makeContainer(fake);
+      addTearDown(c.dispose);
+
+      await c.read(settingsProvider.future);
+      await c.read(settingsProvider.notifier).clear();
+
+      final SettingsValue v = await c.read(settingsProvider.future);
+      expect(v.offlineEnabled, isFalse);
+      expect(v.offlineSyncAll, isFalse);
+      expect(v.offlineWifiOnly, isTrue);
+      expect(v.offlinePollIntervalMin, 15);
+      expect(fake.snapshot, isEmpty);
+    });
+
+    test('corrupt offline value in storage → falls back to default', () async {
+      // Seeded keys that aren't 'true' / 'false' / int — the value parser
+      // must not crash; it returns the L1 default.
+      final _FakeSecureStorage fake = _FakeSecureStorage(<String, String>{
+        'offline_enabled': 'maybe',
+        'offline_poll_interval_min': 'fifteen',
+      });
+      final ProviderContainer c = _makeContainer(fake);
+      addTearDown(c.dispose);
+
+      final SettingsValue v = await c.read(settingsProvider.future);
+      expect(v.offlineEnabled, isFalse);
+      expect(v.offlinePollIntervalMin, 15);
     });
 
     test('save(navidromeUsername only) updates just that key', () async {

@@ -2,7 +2,7 @@ name: heerr
 description: heerr Android client — thin REST client for the heerr FastAPI backend.
 publish_to: 'none'
 
-version: 1.0.0+8
+version: 1.1.0-pre+9
 
 environment:
   sdk: ^3.12.0
@@ -51,6 +51,15 @@ dependencies:
   # extraction errors fall back to the default M3 dark surface.
   palette_generator: ^0.3.0
 
+  # Local filesystem paths for the offline-download feature (L1+). Used by
+  # offline/offline_paths.dart to resolve the app-private documents dir.
+  path_provider: ^2.1.0
+
+  # WiFi-only gate for the offline sync (L2 actually uses it; landed at L1
+  # so deps churn is one commit). Permission ACCESS_NETWORK_STATE is
+  # implicit on Android — no AndroidManifest edit needed.
+  connectivity_plus: ^6.0.0
+
   # Material Icons font is enabled in the `flutter:` section below; no extra
   # font deps needed for the dark M3 theme.
 
@@ -81,8 +90,8 @@ flutter:
   uses-material-design: true
 
 flutter_launcher_icons:
+  image_path: "assets/icon.png"
   android: true
   ios: false
-  image_path: "assets/icon.png"
   adaptive_icon_background: "#0f140f"
   adaptive_icon_foreground: "assets/icon.png"
