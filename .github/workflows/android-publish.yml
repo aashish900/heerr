@@ -61,6 +61,17 @@ jobs:
           channel: stable
           cache: true
 
+      # lib/dev_defaults.dart is gitignored (holds Tailnet IPs / personal
+      # username on the developer's machine). servers_screen.dart imports
+      # it directly, so CI needs a copy to compile. The committed
+      # dev_defaults.example.dart has all-null fields — same surface, no
+      # secrets — so dropping it in here is safe.
+      - name: Seed dev_defaults.dart from example (CI-only)
+        run: |
+          if [ ! -f lib/dev_defaults.dart ]; then
+            cp lib/dev_defaults.example.dart lib/dev_defaults.dart
+          fi
+
       - name: Install dependencies
         run: flutter pub get
 
