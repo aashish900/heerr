@@ -77,18 +77,22 @@ class _AlbumsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<OfflineManifest> manifestAsync =
-        ref.watch(offlineManifestProvider);
-    return manifestAsync.when(
+    // Use the union provider — markedAlbums plus every album reached
+    // through a markedArtists expansion. Without this, marking an
+    // artist would download the songs but the Albums / Songs tabs
+    // would stay empty until the user also individually marked each
+    // album under the artist.
+    final AsyncValue<List<String>> idsAsync =
+        ref.watch(downloadedAlbumIdsProvider);
+    return idsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (Object e, _) => _ErrorView(message: 'Manifest error: $e'),
-      data: (OfflineManifest m) {
-        final List<String> ids = m.markedAlbums.toList()..sort();
+      error: (Object e, _) => _ErrorView(message: 'Downloads error: $e'),
+      data: (List<String> ids) {
         if (ids.isEmpty) {
           return const _EmptyView(
             icon: Icons.album_outlined,
             message: 'No albums marked for offline.\n'
-                'Mark an album from Library, or enable\n'
+                'Mark an album or artist from Library, or enable\n'
                 '"Sync entire library" in Settings.',
           );
         }
