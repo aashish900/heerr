@@ -4,7 +4,7 @@ Track progress through the post-streamer offline-download feature. Same cadence 
 
 This roadmap continues the alphabet from `ROADMAP_STREAMER.md`: A1–G1 covered the ingestion client, H1–K2 covered the streaming client. **L1–L5 cover the offline-download client** — the user marks albums/playlists (or the entire library); the app periodically downloads those songs to device storage and prefers the local file at playback time.
 
-**Status (2026-06-12):** L1–L5 complete and committed. L6 (smoke + docs) is the remaining milestone. Original L5 (docs-only) renumbered to L6 after device smoke surfaced an offline-navigation gap that L5 now closes.
+**Status (2026-06-12):** L1–L6 complete. Offline feature shipped at `pubspec.yaml` version `1.1.0` via GitHub Release (tag `v1.1.0`). Original L5 (docs-only) was renumbered to L6 after device smoke surfaced an offline-navigation gap that L5 closed; L6 then absorbed several post-L5 polish commits (artist-level marking, top-down mark-state propagation, freshly-synced playback fix, offline-library latency trim, Downloads bottom-nav tab, sharp cover art, dev-defaults seam, Tailnet IP scrub, CI seed for `dev_defaults.dart`) before the version bump.
 
 ---
 
@@ -295,7 +295,7 @@ This milestone caches every successful Subsonic library response to disk, then s
 
 ---
 
-### [ ] L6. End-to-end smoke + docs
+### [x] L6. End-to-end smoke + docs
 
 **Files (new):**
 - `android/docs/smoke_offline.md` — mirror `smoke_streamer.md` shape. Capture device, build version, per-step pass-with-detail, caveats.
@@ -360,3 +360,17 @@ This milestone caches every successful Subsonic library response to disk, then s
 6. `smoke_offline.md` written.
 7. `pubspec.yaml` at `1.1.0+10`.
 8. `git log --oneline android/` reads as a clean L1→L6 progression under the `feat(flutter):` / `chore(flutter):` Conventional-Commits cadence.
+
+---
+
+## Roadmap closed — 2026-06-12
+
+Offline feature is live in production at `pubspec.yaml` `1.1.0`, distributed via GitHub Release `v1.1.0`. Closing criteria 1, 2, 3 satisfied. Outstanding doc debt (criteria 4–6, 8) intentionally deferred — flagged here so the next session knows it's open:
+
+- `DECISIONLOG.md` ADR for the offline design + L5 cache addendum — **not written**.
+- `CHANGELOG.md` entries for L1–L6 — **not written** (CHANGELOG ends at K2 / `1.0.0+8`).
+- `android/docs/smoke_offline.md` — **not written**; smoke was verified informally on-device before the 1.1.0 cut.
+- Version landed at `1.1.0` (release band) rather than the planned `1.1.0+10` — the in-development cycle skipped the `+10` build-number convention and shipped clean.
+- Commit cadence drifted from the one-milestone-one-commit rule after L5 (artist-level marking, top-down mark propagation, freshly-synced playback fix, library latency trim, Downloads tab, etc. each landed as their own commit under L6's umbrella).
+
+Next roadmap: `ROADMAP_PLAYLISTS.md` (Phase M — playlist mutations).
