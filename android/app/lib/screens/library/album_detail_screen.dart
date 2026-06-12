@@ -28,8 +28,17 @@ class AlbumDetailScreen extends ConsumerWidget {
 
     final OfflineManifest? manifest =
         ref.watch(offlineManifestProvider).valueOrNull;
-    final bool isMarked =
-        manifest?.markedAlbums.contains(albumId) ?? false;
+    // Album AppBar lights up green when the album is marked directly OR
+    // when its parent artist is marked. We can only know the artist id
+    // once the album has loaded; before then `isMarked` is conservative
+    // (just `markedAlbums`). Tapping the IconButton always toggles the
+    // **album-level** mark — unmarking via the parent artist is done
+    // from the artist screen, which matches "flow top-down".
+    final String? artistId = async.valueOrNull?.artistId;
+    final bool isMarked = (manifest?.markedAlbums.contains(albumId) ??
+            false) ||
+        (artistId != null &&
+            (manifest?.markedArtists.contains(artistId) ?? false));
 
     return Scaffold(
       appBar: AppBar(
@@ -99,6 +108,14 @@ class _Body extends ConsumerWidget {
         ?.extras?['subsonicId'] as String?;
     final OfflineManifest? manifest =
         ref.watch(offlineManifestProvider).valueOrNull;
+    // "Marked via container" — sync hasn't downloaded the song yet, but
+    // the album or its parent artist is already marked. We surface that
+    // as a soft scheduled badge so the user gets immediate top-down
+    // visual feedback after marking the artist / album.
+    final bool containerMarked =
+        (manifest?.markedAlbums.contains(album.id) ?? false) ||
+            (album.artistId != null &&
+                (manifest?.markedArtists.contains(album.artistId!) ?? false));
     return ListView.builder(
       itemCount: album.song.length + 1,
       itemBuilder: (BuildContext c, int i) {
@@ -129,7 +146,7 @@ class _Body extends ConsumerWidget {
           subtitle: s.duration == null
               ? null
               : Text(_formatDuration(s.duration!)),
-          trailing: _buildSongTrailing(isCurrent, offline),
+          trailing: _buildSongTrailing(isCurrent, offline, containerMarked),
           onTap: () => playAllSongsFromSubsonic(
             ref,
             context,
@@ -143,13 +160,30 @@ class _Body extends ConsumerWidget {
 
   /// Per-song trailing affordance precedence:
   ///   isCurrent wins → playing indicator;
-  ///   else offline state visible (ready/downloading/failed);
+  ///   else offline state visible (ready/downloading/failed/queued);
+  ///   else container-marked → soft scheduled badge;
   ///   else null.
-  Widget? _buildSongTrailing(bool isCurrent, OfflineSongEntry? offline) {
+  Widget? _buildSongTrailing(
+    bool isCurrent,
+    OfflineSongEntry? offline,
+    bool containerMarked,
+  ) {
     if (isCurrent) {
       return const Icon(Icons.play_arrow, color: heerrGreen);
     }
-    if (offline == null) return null;
+    if (offline == null) {
+      if (containerMarked) {
+        // Top-down propagation: container is marked, sync just hasn't
+        // produced a manifest entry yet. Mirror the AppBar's outlined
+        // download glyph so the user sees a consistent "will be
+        // downloaded" signal from artist → album → song.
+        return const Icon(
+          Icons.download_for_offline_outlined,
+          size: 18,
+        );
+      }
+      return null;
+    }
     switch (offline.state) {
       case OfflineSongState.ready:
         return const Icon(

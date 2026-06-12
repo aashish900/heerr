@@ -100,6 +100,11 @@ class _Body extends ConsumerWidget {
         ?.extras?['subsonicId'] as String?;
     final OfflineManifest? manifest =
         ref.watch(offlineManifestProvider).valueOrNull;
+    // Top-down propagation: when the playlist itself is marked, every
+    // entry shows the soft "scheduled" badge until sync produces a
+    // real manifest entry. Mirrors the album-detail behavior.
+    final bool containerMarked =
+        manifest?.markedPlaylists.contains(playlist.id) ?? false;
     return ListView.builder(
       itemCount: playlist.entry.length + 1,
       itemBuilder: (BuildContext c, int i) {
@@ -126,7 +131,7 @@ class _Body extends ConsumerWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          trailing: _buildSongTrailing(isCurrent, offline),
+          trailing: _buildSongTrailing(isCurrent, offline, containerMarked),
           onTap: () => playAllSongsFromSubsonic(
             ref,
             context,
@@ -138,11 +143,23 @@ class _Body extends ConsumerWidget {
     );
   }
 
-  Widget? _buildSongTrailing(bool isCurrent, OfflineSongEntry? offline) {
+  Widget? _buildSongTrailing(
+    bool isCurrent,
+    OfflineSongEntry? offline,
+    bool containerMarked,
+  ) {
     if (isCurrent) {
       return const Icon(Icons.play_arrow, color: heerrGreen);
     }
-    if (offline == null) return null;
+    if (offline == null) {
+      if (containerMarked) {
+        return const Icon(
+          Icons.download_for_offline_outlined,
+          size: 18,
+        );
+      }
+      return null;
+    }
     switch (offline.state) {
       case OfflineSongState.ready:
         return const Icon(

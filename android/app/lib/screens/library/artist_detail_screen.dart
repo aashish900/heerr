@@ -85,11 +85,19 @@ class ArtistDetailScreen extends ConsumerWidget {
             itemCount: a.album.length,
             itemBuilder: (BuildContext c, int i) {
               final Album album = a.album[i];
+              // Propagate the artist-level mark downward: when the user
+              // marks the artist every album below shows the same green
+              // badge, even before sync has actually downloaded it. The
+              // OR with `markedAlbums` keeps individually-marked albums
+              // visually consistent.
+              final bool albumMarked = isMarked ||
+                  (manifest?.markedAlbums.contains(album.id) ?? false);
               return LibraryResultTile(
                 title: album.name,
                 subtitle: album.year == null ? null : '${album.year}',
                 coverArtId: album.coverArt,
                 trailingPlay: true,
+                isMarkedForOffline: albumMarked,
                 onPlay: () =>
                     playAlbumFromSubsonic(ref, context, album.id),
                 onTap: () => context.push(Routes.libraryAlbum(album.id)),
