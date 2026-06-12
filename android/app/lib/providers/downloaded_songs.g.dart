@@ -6,7 +6,7 @@ part of 'downloaded_songs.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$downloadedSongsHash() => r'd0a6f6b87b6294aa4d93faa950d5979c9c7fff07';
+String _$downloadedSongsHash() => r'4dbf61c4ef468bba15d711e0b922bae9027dfd16';
 
 /// All songs that have a `ready` entry in the offline manifest, resolved
 /// to their full `Song` metadata via the marked albums + playlists.

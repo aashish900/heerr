@@ -55,12 +55,31 @@ class OfflineMarker extends _$OfflineMarker {
         ));
   }
 
+  Future<void> markArtist(String artistId) async {
+    await _mutate((OfflineManifest m) => m.copyWith(
+          markedArtists: <String>{...m.markedArtists, artistId},
+          estimatedTotalBytes: null,
+          estimatedAt: null,
+        ));
+  }
+
+  Future<void> unmarkArtist(String artistId) async {
+    await _mutate((OfflineManifest m) => m.copyWith(
+          markedArtists: <String>{...m.markedArtists}..remove(artistId),
+          estimatedTotalBytes: null,
+          estimatedAt: null,
+        ));
+  }
+
   /// Selector helpers — UI calls these directly via `ref.watch`.
   bool isMarkedAlbum(OfflineManifest m, String albumId) =>
       m.markedAlbums.contains(albumId);
 
   bool isMarkedPlaylist(OfflineManifest m, String playlistId) =>
       m.markedPlaylists.contains(playlistId);
+
+  bool isMarkedArtist(OfflineManifest m, String artistId) =>
+      m.markedArtists.contains(artistId);
 
   Future<void> _mutate(
     OfflineManifest Function(OfflineManifest) transform,

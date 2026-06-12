@@ -23,6 +23,13 @@ class OfflineManifest with _$OfflineManifest {
   const factory OfflineManifest({
     @Default(<String>{}) Set<String> markedAlbums,
     @Default(<String>{}) Set<String> markedPlaylists,
+    // L7: marker for "everything under this artist". On each sync tick
+    // `OfflineSync` expands the set via `libraryArtistProvider` →
+    // `Artist.album[].id`, so the union with `markedAlbums` is the real
+    // download target. Stored separately (rather than fanning out at
+    // mark time) so a new album from a marked artist is picked up
+    // automatically on the next sync — no manual re-mark.
+    @Default(<String>{}) Set<String> markedArtists,
     @Default(<String, OfflineSongEntry>{})
     Map<String, OfflineSongEntry> songs,
     int? estimatedTotalBytes,

@@ -9,11 +9,13 @@ import '../api/subsonic_client.dart';
 import '../api/subsonic_endpoints.dart';
 import '../models/job_view.dart';
 import '../models/subsonic/album.dart';
+import '../models/subsonic/artist.dart';
 import '../models/subsonic/playlist.dart';
 import '../models/subsonic/search_result3.dart';
 import '../models/subsonic/song.dart';
 import '../offline/local_uri.dart';
 import '../providers/library/library_album.dart';
+import '../providers/library/library_artist.dart';
 import '../providers/library/library_playlist.dart';
 import '../providers/settings.dart';
 import '../widgets/error_snackbar.dart';
@@ -146,6 +148,45 @@ Future<void> playAlbumFromSubsonic(
     final Album album = await ref.read(libraryAlbumProvider(albumId).future);
     if (!context.mounted) return;
     await playAllSongsFromSubsonic(ref, context, album.song);
+  } catch (e) {
+    if (context.mounted) _errSnack(context, e);
+  }
+}
+
+/// Resolve an Artist by id and play every song from every album, in the
+/// artist's album order (Subsonic's `getArtist` returns them most-recent
+/// first by default; we keep that order so "Play all" feels like a
+/// chronological walk-through of the artist's catalog without us
+/// imposing an opinion on track ordering).
+///
+/// Album resolution fans out in parallel — for an artist with 20 albums
+/// the serial walk would otherwise multiply the latency by 20.
+Future<void> playArtistFromSubsonic(
+  WidgetRef ref,
+  BuildContext context,
+  String artistId,
+) async {
+  try {
+    final Artist artist =
+        await ref.read(libraryArtistProvider(artistId).future);
+    if (artist.album.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          duration: kSnackBarDuration,
+          content: Text('No albums for this artist.'),
+        ));
+      }
+      return;
+    }
+    final List<Album> resolved = await Future.wait<Album>(
+      artist.album
+          .map((Album a) => ref.read(libraryAlbumProvider(a.id).future)),
+    );
+    final List<Song> songs = <Song>[
+      for (final Album a in resolved) ...a.song,
+    ];
+    if (!context.mounted) return;
+    await playAllSongsFromSubsonic(ref, context, songs);
   } catch (e) {
     if (context.mounted) _errSnack(context, e);
   }

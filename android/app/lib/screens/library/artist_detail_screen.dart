@@ -5,9 +5,12 @@ import 'package:go_router/go_router.dart';
 import '../../api/api_error.dart';
 import '../../models/subsonic/album.dart';
 import '../../models/subsonic/artist.dart';
+import '../../offline/offline_manifest.dart';
+import '../../offline/offline_marker.dart';
 import '../../player/playback_actions.dart';
 import '../../providers/library/library_artist.dart';
 import '../../router.dart';
+import '../../theme.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/library_result_tile.dart';
 import '../../widgets/skeleton.dart';
@@ -25,12 +28,45 @@ class ArtistDetailScreen extends ConsumerWidget {
     final AsyncValue<Artist> async =
         ref.watch(libraryArtistProvider(artistId));
 
+    final OfflineManifest? manifest =
+        ref.watch(offlineManifestProvider).valueOrNull;
+    final bool isMarked =
+        manifest?.markedArtists.contains(artistId) ?? false;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(async.maybeWhen<String>(
           data: (Artist a) => a.name,
           orElse: () => 'Artist',
         )),
+        actions: <Widget>[
+          IconButton(
+            icon: Icon(
+              isMarked
+                  ? Icons.download_for_offline
+                  : Icons.download_for_offline_outlined,
+              color: isMarked ? heerrGreen : null,
+            ),
+            tooltip: isMarked
+                ? 'Unmark artist for offline'
+                : 'Mark every album for offline',
+            onPressed: () {
+              final OfflineMarker n =
+                  ref.read(offlineMarkerProvider.notifier);
+              if (isMarked) {
+                n.unmarkArtist(artistId);
+              } else {
+                n.markArtist(artistId);
+              }
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.play_arrow_outlined),
+            tooltip: 'Play every song',
+            onPressed: () =>
+                playArtistFromSubsonic(ref, context, artistId),
+          ),
+        ],
       ),
       body: async.when(
         loading: () => const SkeletonList(count: 4),

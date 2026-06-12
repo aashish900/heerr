@@ -22,7 +22,14 @@ OfflineManifest _$OfflineManifestFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$OfflineManifest {
   Set<String> get markedAlbums => throw _privateConstructorUsedError;
-  Set<String> get markedPlaylists => throw _privateConstructorUsedError;
+  Set<String> get markedPlaylists =>
+      throw _privateConstructorUsedError; // L7: marker for "everything under this artist". On each sync tick
+  // `OfflineSync` expands the set via `libraryArtistProvider` →
+  // `Artist.album[].id`, so the union with `markedAlbums` is the real
+  // download target. Stored separately (rather than fanning out at
+  // mark time) so a new album from a marked artist is picked up
+  // automatically on the next sync — no manual re-mark.
+  Set<String> get markedArtists => throw _privateConstructorUsedError;
   Map<String, OfflineSongEntry> get songs => throw _privateConstructorUsedError;
   int? get estimatedTotalBytes => throw _privateConstructorUsedError;
   DateTime? get estimatedAt => throw _privateConstructorUsedError;
@@ -47,6 +54,7 @@ abstract class $OfflineManifestCopyWith<$Res> {
   $Res call({
     Set<String> markedAlbums,
     Set<String> markedPlaylists,
+    Set<String> markedArtists,
     Map<String, OfflineSongEntry> songs,
     int? estimatedTotalBytes,
     DateTime? estimatedAt,
@@ -70,6 +78,7 @@ class _$OfflineManifestCopyWithImpl<$Res, $Val extends OfflineManifest>
   $Res call({
     Object? markedAlbums = null,
     Object? markedPlaylists = null,
+    Object? markedArtists = null,
     Object? songs = null,
     Object? estimatedTotalBytes = freezed,
     Object? estimatedAt = freezed,
@@ -83,6 +92,10 @@ class _$OfflineManifestCopyWithImpl<$Res, $Val extends OfflineManifest>
             markedPlaylists: null == markedPlaylists
                 ? _value.markedPlaylists
                 : markedPlaylists // ignore: cast_nullable_to_non_nullable
+                      as Set<String>,
+            markedArtists: null == markedArtists
+                ? _value.markedArtists
+                : markedArtists // ignore: cast_nullable_to_non_nullable
                       as Set<String>,
             songs: null == songs
                 ? _value.songs
@@ -114,6 +127,7 @@ abstract class _$$OfflineManifestImplCopyWith<$Res>
   $Res call({
     Set<String> markedAlbums,
     Set<String> markedPlaylists,
+    Set<String> markedArtists,
     Map<String, OfflineSongEntry> songs,
     int? estimatedTotalBytes,
     DateTime? estimatedAt,
@@ -136,6 +150,7 @@ class __$$OfflineManifestImplCopyWithImpl<$Res>
   $Res call({
     Object? markedAlbums = null,
     Object? markedPlaylists = null,
+    Object? markedArtists = null,
     Object? songs = null,
     Object? estimatedTotalBytes = freezed,
     Object? estimatedAt = freezed,
@@ -149,6 +164,10 @@ class __$$OfflineManifestImplCopyWithImpl<$Res>
         markedPlaylists: null == markedPlaylists
             ? _value._markedPlaylists
             : markedPlaylists // ignore: cast_nullable_to_non_nullable
+                  as Set<String>,
+        markedArtists: null == markedArtists
+            ? _value._markedArtists
+            : markedArtists // ignore: cast_nullable_to_non_nullable
                   as Set<String>,
         songs: null == songs
             ? _value._songs
@@ -175,12 +194,14 @@ class _$OfflineManifestImpl
   const _$OfflineManifestImpl({
     final Set<String> markedAlbums = const <String>{},
     final Set<String> markedPlaylists = const <String>{},
+    final Set<String> markedArtists = const <String>{},
     final Map<String, OfflineSongEntry> songs =
         const <String, OfflineSongEntry>{},
     this.estimatedTotalBytes,
     this.estimatedAt,
   }) : _markedAlbums = markedAlbums,
        _markedPlaylists = markedPlaylists,
+       _markedArtists = markedArtists,
        _songs = songs;
 
   factory _$OfflineManifestImpl.fromJson(Map<String, dynamic> json) =>
@@ -204,6 +225,27 @@ class _$OfflineManifestImpl
     return EqualUnmodifiableSetView(_markedPlaylists);
   }
 
+  // L7: marker for "everything under this artist". On each sync tick
+  // `OfflineSync` expands the set via `libraryArtistProvider` →
+  // `Artist.album[].id`, so the union with `markedAlbums` is the real
+  // download target. Stored separately (rather than fanning out at
+  // mark time) so a new album from a marked artist is picked up
+  // automatically on the next sync — no manual re-mark.
+  final Set<String> _markedArtists;
+  // L7: marker for "everything under this artist". On each sync tick
+  // `OfflineSync` expands the set via `libraryArtistProvider` →
+  // `Artist.album[].id`, so the union with `markedAlbums` is the real
+  // download target. Stored separately (rather than fanning out at
+  // mark time) so a new album from a marked artist is picked up
+  // automatically on the next sync — no manual re-mark.
+  @override
+  @JsonKey()
+  Set<String> get markedArtists {
+    if (_markedArtists is EqualUnmodifiableSetView) return _markedArtists;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableSetView(_markedArtists);
+  }
+
   final Map<String, OfflineSongEntry> _songs;
   @override
   @JsonKey()
@@ -220,7 +262,7 @@ class _$OfflineManifestImpl
 
   @override
   String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) {
-    return 'OfflineManifest(markedAlbums: $markedAlbums, markedPlaylists: $markedPlaylists, songs: $songs, estimatedTotalBytes: $estimatedTotalBytes, estimatedAt: $estimatedAt)';
+    return 'OfflineManifest(markedAlbums: $markedAlbums, markedPlaylists: $markedPlaylists, markedArtists: $markedArtists, songs: $songs, estimatedTotalBytes: $estimatedTotalBytes, estimatedAt: $estimatedAt)';
   }
 
   @override
@@ -230,6 +272,7 @@ class _$OfflineManifestImpl
       ..add(DiagnosticsProperty('type', 'OfflineManifest'))
       ..add(DiagnosticsProperty('markedAlbums', markedAlbums))
       ..add(DiagnosticsProperty('markedPlaylists', markedPlaylists))
+      ..add(DiagnosticsProperty('markedArtists', markedArtists))
       ..add(DiagnosticsProperty('songs', songs))
       ..add(DiagnosticsProperty('estimatedTotalBytes', estimatedTotalBytes))
       ..add(DiagnosticsProperty('estimatedAt', estimatedAt));
@@ -248,6 +291,10 @@ class _$OfflineManifestImpl
               other._markedPlaylists,
               _markedPlaylists,
             ) &&
+            const DeepCollectionEquality().equals(
+              other._markedArtists,
+              _markedArtists,
+            ) &&
             const DeepCollectionEquality().equals(other._songs, _songs) &&
             (identical(other.estimatedTotalBytes, estimatedTotalBytes) ||
                 other.estimatedTotalBytes == estimatedTotalBytes) &&
@@ -261,6 +308,7 @@ class _$OfflineManifestImpl
     runtimeType,
     const DeepCollectionEquality().hash(_markedAlbums),
     const DeepCollectionEquality().hash(_markedPlaylists),
+    const DeepCollectionEquality().hash(_markedArtists),
     const DeepCollectionEquality().hash(_songs),
     estimatedTotalBytes,
     estimatedAt,
@@ -287,6 +335,7 @@ abstract class _OfflineManifest implements OfflineManifest {
   const factory _OfflineManifest({
     final Set<String> markedAlbums,
     final Set<String> markedPlaylists,
+    final Set<String> markedArtists,
     final Map<String, OfflineSongEntry> songs,
     final int? estimatedTotalBytes,
     final DateTime? estimatedAt,
@@ -298,7 +347,14 @@ abstract class _OfflineManifest implements OfflineManifest {
   @override
   Set<String> get markedAlbums;
   @override
-  Set<String> get markedPlaylists;
+  Set<String> get markedPlaylists; // L7: marker for "everything under this artist". On each sync tick
+  // `OfflineSync` expands the set via `libraryArtistProvider` →
+  // `Artist.album[].id`, so the union with `markedAlbums` is the real
+  // download target. Stored separately (rather than fanning out at
+  // mark time) so a new album from a marked artist is picked up
+  // automatically on the next sync — no manual re-mark.
+  @override
+  Set<String> get markedArtists;
   @override
   Map<String, OfflineSongEntry> get songs;
   @override

@@ -19,6 +19,11 @@ _$OfflineManifestImpl _$$OfflineManifestImplFromJson(
           ?.map((e) => e as String)
           .toSet() ??
       const <String>{},
+  markedArtists:
+      (json['marked_artists'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toSet() ??
+      const <String>{},
   songs:
       (json['songs'] as Map<String, dynamic>?)?.map(
         (k, e) =>
@@ -36,6 +41,7 @@ Map<String, dynamic> _$$OfflineManifestImplToJson(
 ) => <String, dynamic>{
   'marked_albums': instance.markedAlbums.toList(),
   'marked_playlists': instance.markedPlaylists.toList(),
+  'marked_artists': instance.markedArtists.toList(),
   'songs': instance.songs.map((k, e) => MapEntry(k, e.toJson())),
   if (instance.estimatedTotalBytes case final value?)
     'estimated_total_bytes': value,

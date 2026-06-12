@@ -7,10 +7,12 @@ import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/subsonic/album.dart';
+import '../models/subsonic/artist.dart';
 import '../models/subsonic/playlist.dart';
 import '../models/subsonic/song.dart';
 import '../providers/library/library_album.dart';
 import '../providers/library/library_albums.dart';
+import '../providers/library/library_artist.dart';
 import '../providers/library/library_playlist.dart';
 import '../providers/library/library_playlists.dart';
 import '../providers/settings.dart';
@@ -314,6 +316,22 @@ class OfflineSync extends _$OfflineSync {
     // Union marker ids with the full-library enumeration when sync-all is on.
     final Set<String> albumIds = <String>{...manifest.markedAlbums};
     final Set<String> playlistIds = <String>{...manifest.markedPlaylists};
+
+    // L7: a `markedArtist` expands to every album the artist currently
+    // has. New albums released by a marked artist get picked up on the
+    // next tick — that's the entire reason artists are tracked as their
+    // own set rather than fanned out at mark time.
+    for (final String artistId in manifest.markedArtists) {
+      try {
+        final Artist artist =
+            await ref.read(libraryArtistProvider(artistId).future);
+        for (final Album a in artist.album) {
+          albumIds.add(a.id);
+        }
+      } catch (e) {
+        debugPrint('offline_sync: resolve artist $artistId failed: $e');
+      }
+    }
 
     if (offline.syncAll) {
       try {
