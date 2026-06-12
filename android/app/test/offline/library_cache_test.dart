@@ -1,5 +1,3 @@
-import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -243,6 +241,126 @@ void main() {
       await expectLater(c.read(p.future), throwsA(isA<FormatException>()));
     });
 
+    test(
+        'offline (OnlineCheck=false) + cache hit → returns cached, never calls network',
+        () async {
+      final ProviderContainer c = ProviderContainer(
+        overrides: <Override>[
+          secureStorageProvider.overrideWith(
+            (Ref<SecureStorage> ref) => _FakeStorage(_kCredsA),
+          ),
+          applicationDocumentsDirectoryProvider
+              .overrideWith((ApplicationDocumentsDirectoryRef ref) async => tmp),
+          onlineCheckProvider
+              .overrideWith((OnlineCheckRef ref) => _StubOnlineCheck(false)),
+        ],
+      );
+      addTearDown(c.dispose);
+
+      // Seed the cache as if a prior online browse populated it.
+      final LibraryCache cache = await c.read(libraryCacheProvider.future);
+      final SettingsValue settings = await c.read(settingsProvider.future);
+      await cache.write(
+        settings,
+        'sample',
+        const _Sample(id: 'cached', n: 99).toJson(),
+      );
+
+      int networkCalls = 0;
+      final FutureProvider<_Sample> p = FutureProvider<_Sample>(
+        (Ref<AsyncValue<_Sample>> ref) async => cacheAware<_Sample>(
+          ref: ref,
+          cacheKey: 'sample',
+          networkCall: () async {
+            networkCalls += 1;
+            throw StateError('networkCall must not run when offline + cached');
+          },
+          encode: (_Sample s) => s.toJson(),
+          decode: (Map<String, dynamic> json) => _Sample.fromJson(json),
+        ),
+      );
+
+      final _Sample v = await c.read(p.future);
+      expect(v, const _Sample(id: 'cached', n: 99));
+      expect(networkCalls, 0);
+    });
+
+    test(
+        'offline (OnlineCheck=false) + no cache → throws fast without calling network',
+        () async {
+      final ProviderContainer c = ProviderContainer(
+        overrides: <Override>[
+          secureStorageProvider.overrideWith(
+            (Ref<SecureStorage> ref) => _FakeStorage(_kCredsA),
+          ),
+          applicationDocumentsDirectoryProvider
+              .overrideWith((ApplicationDocumentsDirectoryRef ref) async => tmp),
+          onlineCheckProvider
+              .overrideWith((OnlineCheckRef ref) => _StubOnlineCheck(false)),
+        ],
+      );
+      addTearDown(c.dispose);
+
+      int networkCalls = 0;
+      final FutureProvider<_Sample> p = FutureProvider<_Sample>(
+        (Ref<AsyncValue<_Sample>> ref) async => cacheAware<_Sample>(
+          ref: ref,
+          cacheKey: 'sample',
+          networkCall: () async {
+            networkCalls += 1;
+            throw StateError('networkCall must not run when offline + no cache');
+          },
+          encode: (_Sample s) => s.toJson(),
+          decode: (Map<String, dynamic> json) => _Sample.fromJson(json),
+        ),
+      );
+
+      await expectLater(c.read(p.future), throwsA(anything));
+      expect(networkCalls, 0);
+    });
+
+    test('online (OnlineCheck=true) → calls network and writes cache',
+        () async {
+      final ProviderContainer c = ProviderContainer(
+        overrides: <Override>[
+          secureStorageProvider.overrideWith(
+            (Ref<SecureStorage> ref) => _FakeStorage(_kCredsA),
+          ),
+          applicationDocumentsDirectoryProvider
+              .overrideWith((ApplicationDocumentsDirectoryRef ref) async => tmp),
+          onlineCheckProvider
+              .overrideWith((OnlineCheckRef ref) => _StubOnlineCheck(true)),
+        ],
+      );
+      addTearDown(c.dispose);
+
+      int networkCalls = 0;
+      final FutureProvider<_Sample> p = FutureProvider<_Sample>(
+        (Ref<AsyncValue<_Sample>> ref) async => cacheAware<_Sample>(
+          ref: ref,
+          cacheKey: 'sample',
+          networkCall: () async {
+            networkCalls += 1;
+            return const _Sample(id: 'live', n: 42);
+          },
+          encode: (_Sample s) => s.toJson(),
+          decode: (Map<String, dynamic> json) => _Sample.fromJson(json),
+        ),
+      );
+
+      final _Sample v = await c.read(p.future);
+      expect(v, const _Sample(id: 'live', n: 42));
+      expect(networkCalls, 1);
+
+      // Cache was written by the wrapper.
+      final LibraryCache cache = await c.read(libraryCacheProvider.future);
+      final SettingsValue settings = await c.read(settingsProvider.future);
+      final Map<String, dynamic>? cached =
+          await cache.read(settings, 'sample');
+      expect(cached, isNotNull);
+      expect(cached!['id'], 'live');
+    });
+
     test('infra unavailable bypass: still returns network value', () async {
       final ProviderContainer c = ProviderContainer(
         overrides: <Override>[
@@ -271,6 +389,13 @@ void main() {
       expect(v.id, 'live');
     });
   });
+}
+
+class _StubOnlineCheck implements OnlineCheck {
+  _StubOnlineCheck(this._online);
+  final bool _online;
+  @override
+  Future<bool> isLikelyOnline() async => _online;
 }
 
 class _Sample {

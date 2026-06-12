@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -9,6 +10,37 @@ import '../providers/settings.dart';
 import 'offline_paths.dart';
 
 part 'library_cache.g.dart';
+
+/// Lightweight connectivity probe used by [cacheAware] to short-circuit
+/// the network call when the device is clearly offline — without it, the
+/// wrapper would wait the full Dio connection timeout (~30–60s) before
+/// falling through to the on-disk cache, which makes offline Library
+/// navigation feel broken even when every screen has a cached payload.
+///
+/// Production impl maps `connectivity_plus` to a single boolean: wifi,
+/// mobile, or ethernet → online. Tests can override
+/// [onlineCheckProvider] with a fake — the abstraction is a one-method
+/// interface so they don't have to mock the full Connectivity class. When
+/// the probe itself throws (no platform binding in flutter_tester), the
+/// wrapper assumes online so existing tests keep their behaviour.
+abstract class OnlineCheck {
+  Future<bool> isLikelyOnline();
+}
+
+class _ConnectivityPlusOnlineCheck implements OnlineCheck {
+  @override
+  Future<bool> isLikelyOnline() async {
+    final List<ConnectivityResult> results =
+        await Connectivity().checkConnectivity();
+    return results.contains(ConnectivityResult.wifi) ||
+        results.contains(ConnectivityResult.mobile) ||
+        results.contains(ConnectivityResult.ethernet) ||
+        results.contains(ConnectivityResult.vpn);
+  }
+}
+
+@Riverpod(keepAlive: true)
+OnlineCheck onlineCheck(OnlineCheckRef ref) => _ConnectivityPlusOnlineCheck();
 
 /// Per-server JSON-on-disk cache for Subsonic library responses (L5).
 ///
@@ -82,12 +114,22 @@ Future<LibraryCache> libraryCache(LibraryCacheRef ref) async {
 /// without forcing every caller to write boilerplate.
 ///
 /// Contract:
-/// - call `networkCall`; if it succeeds, encode + write the cache, return.
-/// - on any exception, attempt to read + decode the cache. Cache hit →
-///   return cached value (and log it). Cache miss → rethrow the original.
+/// 1. Probe [onlineCheckProvider]. If it reports offline AND we have a
+///    cached value, return the cached value immediately — no network
+///    call. This is the load-bearing change: without it, an offline
+///    Library tap waits the full Dio connection timeout before
+///    falling through to the cache, which feels broken (~1 minute per
+///    screen on the user's Pixel).
+/// 2. If online, call `networkCall`. On success → encode + write the
+///    cache + return. On failure → fall through to the cache (same as
+///    before).
+/// 3. If offline AND no cache, throw immediately — don't burn 30s on a
+///    network call that has no chance of succeeding.
 ///
-/// Tests can override the cache via `libraryCacheProvider.overrideWith` or
-/// drive both happy + degraded paths by toggling the `networkCall` body.
+/// The probe itself is best-effort. Any exception from
+/// [OnlineCheck.isLikelyOnline] (e.g. no platform binding under
+/// flutter_tester) is treated as "assume online" so the wrapper
+/// degrades to the pre-fast-path behaviour.
 Future<T> cacheAware<T>({
   required Ref<Object?> ref,
   required String cacheKey,
@@ -106,6 +148,37 @@ Future<T> cacheAware<T>({
     cache = await ref.read(libraryCacheProvider.future);
   } catch (e) {
     debugPrint('library_cache: infra unavailable, bypassing for $cacheKey: $e');
+  }
+
+  // Connectivity probe. Default to "online" on any failure so existing
+  // tests + the edge case where connectivity_plus refuses to answer don't
+  // silently break navigation.
+  bool likelyOnline = true;
+  try {
+    final OnlineCheck check = ref.read(onlineCheckProvider);
+    likelyOnline = await check.isLikelyOnline();
+  } catch (e) {
+    debugPrint('library_cache: online probe failed, assuming online: $e');
+  }
+
+  // Offline fast path: serve cached → instant. No cached → fail fast so
+  // the UI surfaces an error in ms, not after a 30s Dio timeout.
+  if (!likelyOnline && cache != null && settings != null) {
+    final Map<String, dynamic>? cached = await cache.read(settings, cacheKey);
+    if (cached != null) {
+      try {
+        final T value = decode(cached);
+        debugPrint('library_cache: offline → cache hit for $cacheKey');
+        return value;
+      } catch (decodeErr) {
+        debugPrint(
+          'library_cache: offline → cached $cacheKey failed to decode '
+          '($decodeErr); falling through to network attempt',
+        );
+      }
+    } else {
+      throw const _OfflineNoCacheException();
+    }
   }
 
   try {
@@ -135,4 +208,15 @@ Future<T> cacheAware<T>({
     }
     rethrow;
   }
+}
+
+/// Thrown when the device is offline and no cached value exists for the
+/// requested key. Library providers surface this as a normal error — the
+/// UI's existing API-error handlers render it the same way as a real
+/// network failure, just without the multi-second hang.
+class _OfflineNoCacheException implements Exception {
+  const _OfflineNoCacheException();
+  @override
+  String toString() =>
+      'OfflineNoCache: device is offline and nothing is cached yet';
 }

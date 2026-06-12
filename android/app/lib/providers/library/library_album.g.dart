@@ -6,7 +6,7 @@ part of 'library_album.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$libraryAlbumHash() => r'f3c0a2fb1297e3efa719756b5b8ea40ac2acedcc';
+String _$libraryAlbumHash() => r'ad38efc1f439322943c97ae9a70217e7f8e44f4b';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -32,6 +32,9 @@ class _SystemHash {
 /// Wraps `GET /rest/getAlbum.view?id=<id>`. Returns one [Album] with its
 /// `song` list populated. Family-keyed by album id.
 ///
+/// L5: cache-aware. On success the response is persisted to the per-server
+/// library cache; on failure the cached copy is returned silently.
+///
 /// Copied from [libraryAlbum].
 @ProviderFor(libraryAlbum)
 const libraryAlbumProvider = LibraryAlbumFamily();
@@ -39,16 +42,25 @@ const libraryAlbumProvider = LibraryAlbumFamily();
 /// Wraps `GET /rest/getAlbum.view?id=<id>`. Returns one [Album] with its
 /// `song` list populated. Family-keyed by album id.
 ///
+/// L5: cache-aware. On success the response is persisted to the per-server
+/// library cache; on failure the cached copy is returned silently.
+///
 /// Copied from [libraryAlbum].
 class LibraryAlbumFamily extends Family<AsyncValue<Album>> {
   /// Wraps `GET /rest/getAlbum.view?id=<id>`. Returns one [Album] with its
   /// `song` list populated. Family-keyed by album id.
+  ///
+  /// L5: cache-aware. On success the response is persisted to the per-server
+  /// library cache; on failure the cached copy is returned silently.
   ///
   /// Copied from [libraryAlbum].
   const LibraryAlbumFamily();
 
   /// Wraps `GET /rest/getAlbum.view?id=<id>`. Returns one [Album] with its
   /// `song` list populated. Family-keyed by album id.
+  ///
+  /// L5: cache-aware. On success the response is persisted to the per-server
+  /// library cache; on failure the cached copy is returned silently.
   ///
   /// Copied from [libraryAlbum].
   LibraryAlbumProvider call(String id) {
@@ -80,10 +92,16 @@ class LibraryAlbumFamily extends Family<AsyncValue<Album>> {
 /// Wraps `GET /rest/getAlbum.view?id=<id>`. Returns one [Album] with its
 /// `song` list populated. Family-keyed by album id.
 ///
+/// L5: cache-aware. On success the response is persisted to the per-server
+/// library cache; on failure the cached copy is returned silently.
+///
 /// Copied from [libraryAlbum].
 class LibraryAlbumProvider extends AutoDisposeFutureProvider<Album> {
   /// Wraps `GET /rest/getAlbum.view?id=<id>`. Returns one [Album] with its
   /// `song` list populated. Family-keyed by album id.
+  ///
+  /// L5: cache-aware. On success the response is persisted to the per-server
+  /// library cache; on failure the cached copy is returned silently.
   ///
   /// Copied from [libraryAlbum].
   LibraryAlbumProvider(String id)

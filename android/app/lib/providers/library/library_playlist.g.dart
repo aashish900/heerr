@@ -6,7 +6,7 @@ part of 'library_playlist.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$libraryPlaylistHash() => r'514a27e6dd8fc96de20f3935956a513885786724';
+String _$libraryPlaylistHash() => r'549031db9f14e89bdf9f482541445a82143cfefc';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -32,6 +32,8 @@ class _SystemHash {
 /// Wraps `GET /rest/getPlaylist.view?id=<id>`. Returns one [Playlist] with
 /// its `entry` list populated (each entry is a song).
 ///
+/// L5: cache-aware. See [libraryAlbum] for the contract.
+///
 /// Copied from [libraryPlaylist].
 @ProviderFor(libraryPlaylist)
 const libraryPlaylistProvider = LibraryPlaylistFamily();
@@ -39,16 +41,22 @@ const libraryPlaylistProvider = LibraryPlaylistFamily();
 /// Wraps `GET /rest/getPlaylist.view?id=<id>`. Returns one [Playlist] with
 /// its `entry` list populated (each entry is a song).
 ///
+/// L5: cache-aware. See [libraryAlbum] for the contract.
+///
 /// Copied from [libraryPlaylist].
 class LibraryPlaylistFamily extends Family<AsyncValue<Playlist>> {
   /// Wraps `GET /rest/getPlaylist.view?id=<id>`. Returns one [Playlist] with
   /// its `entry` list populated (each entry is a song).
+  ///
+  /// L5: cache-aware. See [libraryAlbum] for the contract.
   ///
   /// Copied from [libraryPlaylist].
   const LibraryPlaylistFamily();
 
   /// Wraps `GET /rest/getPlaylist.view?id=<id>`. Returns one [Playlist] with
   /// its `entry` list populated (each entry is a song).
+  ///
+  /// L5: cache-aware. See [libraryAlbum] for the contract.
   ///
   /// Copied from [libraryPlaylist].
   LibraryPlaylistProvider call(String id) {
@@ -80,10 +88,14 @@ class LibraryPlaylistFamily extends Family<AsyncValue<Playlist>> {
 /// Wraps `GET /rest/getPlaylist.view?id=<id>`. Returns one [Playlist] with
 /// its `entry` list populated (each entry is a song).
 ///
+/// L5: cache-aware. See [libraryAlbum] for the contract.
+///
 /// Copied from [libraryPlaylist].
 class LibraryPlaylistProvider extends AutoDisposeFutureProvider<Playlist> {
   /// Wraps `GET /rest/getPlaylist.view?id=<id>`. Returns one [Playlist] with
   /// its `entry` list populated (each entry is a song).
+  ///
+  /// L5: cache-aware. See [libraryAlbum] for the contract.
   ///
   /// Copied from [libraryPlaylist].
   LibraryPlaylistProvider(String id)

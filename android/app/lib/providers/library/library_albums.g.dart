@@ -6,12 +6,14 @@ part of 'library_albums.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$libraryAlbumsHash() => r'a5c74ead2f29c834d01690da45b615e15756d791';
+String _$libraryAlbumsHash() => r'1da883ae5cbce4516381b4e389ccf577808c2fed';
 
 /// Wraps `GET /rest/getAlbumList2.view?type=alphabeticalByName&size=500`.
 /// Returns a flat A-Z album list for the Library tab's Albums sub-tab.
 /// `getArtist(id)` gives per-artist albums but the Albums sub-tab needs a
 /// global view, which Subsonic only exposes through `getAlbumList2`.
+///
+/// L5: cache-aware. List responses encode as `{'items': [a.toJson(), ...]}`.
 ///
 /// Copied from [libraryAlbums].
 @ProviderFor(libraryAlbums)

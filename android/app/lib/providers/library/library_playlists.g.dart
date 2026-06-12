@@ -6,11 +6,13 @@ part of 'library_playlists.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$libraryPlaylistsHash() => r'9e04168dad629c1c039230699021bfaf45195b48';
+String _$libraryPlaylistsHash() => r'd2d54f7774731da5efb42bb145781fb38b1ccf2d';
 
 /// Wraps `GET /rest/getPlaylists.view`. Returns the user's playlists as a
 /// flat list. Each [Playlist] here has no `entry` populated — the detail
 /// payload comes from `libraryPlaylist(id)`.
+///
+/// L5: cache-aware. See [libraryAlbums] for the list-encoding shape.
 ///
 /// Copied from [libraryPlaylists].
 @ProviderFor(libraryPlaylists)

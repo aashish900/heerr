@@ -6,7 +6,7 @@ part of 'library_artist.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$libraryArtistHash() => r'7e2fe551308d98e8d9d6da6a7173b0eaa685e790';
+String _$libraryArtistHash() => r'eb34fd5f3f063ac796f3693622afb36866d22dd0';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -33,6 +33,8 @@ class _SystemHash {
 /// `album` list populated. Family-keyed by artist id so the album-detail
 /// route can subscribe directly.
 ///
+/// L5: cache-aware. See [libraryAlbum] for the contract.
+///
 /// Copied from [libraryArtist].
 @ProviderFor(libraryArtist)
 const libraryArtistProvider = LibraryArtistFamily();
@@ -41,11 +43,15 @@ const libraryArtistProvider = LibraryArtistFamily();
 /// `album` list populated. Family-keyed by artist id so the album-detail
 /// route can subscribe directly.
 ///
+/// L5: cache-aware. See [libraryAlbum] for the contract.
+///
 /// Copied from [libraryArtist].
 class LibraryArtistFamily extends Family<AsyncValue<Artist>> {
   /// Wraps `GET /rest/getArtist.view?id=<id>`. Returns one [Artist] with its
   /// `album` list populated. Family-keyed by artist id so the album-detail
   /// route can subscribe directly.
+  ///
+  /// L5: cache-aware. See [libraryAlbum] for the contract.
   ///
   /// Copied from [libraryArtist].
   const LibraryArtistFamily();
@@ -53,6 +59,8 @@ class LibraryArtistFamily extends Family<AsyncValue<Artist>> {
   /// Wraps `GET /rest/getArtist.view?id=<id>`. Returns one [Artist] with its
   /// `album` list populated. Family-keyed by artist id so the album-detail
   /// route can subscribe directly.
+  ///
+  /// L5: cache-aware. See [libraryAlbum] for the contract.
   ///
   /// Copied from [libraryArtist].
   LibraryArtistProvider call(String id) {
@@ -85,11 +93,15 @@ class LibraryArtistFamily extends Family<AsyncValue<Artist>> {
 /// `album` list populated. Family-keyed by artist id so the album-detail
 /// route can subscribe directly.
 ///
+/// L5: cache-aware. See [libraryAlbum] for the contract.
+///
 /// Copied from [libraryArtist].
 class LibraryArtistProvider extends AutoDisposeFutureProvider<Artist> {
   /// Wraps `GET /rest/getArtist.view?id=<id>`. Returns one [Artist] with its
   /// `album` list populated. Family-keyed by artist id so the album-detail
   /// route can subscribe directly.
+  ///
+  /// L5: cache-aware. See [libraryAlbum] for the contract.
   ///
   /// Copied from [libraryArtist].
   LibraryArtistProvider(String id)
