@@ -119,5 +119,79 @@ void main() {
       expect(item.extras, isNotNull);
       expect(item.extras!['subsonicId'], 'so-42');
     });
+
+    test('localFilePath produces a file:// MediaItem.id (offline playback)',
+        () {
+      const Song s = Song(
+        id: 'so-1',
+        title: 'Let It Happen',
+        artist: 'Tame Impala',
+        album: 'Currents',
+        duration: 467,
+      );
+
+      final MediaItem item = songToMediaItem(
+        song: s,
+        navidromeBaseUrl: base,
+        navidromeUsername: user,
+        navidromePassword: pass,
+        localFilePath: '/data/user/0/heerr/files/offline/x/songs/so-1.mp3',
+        saltGenerator: fixedSalt,
+      );
+
+      expect(item.id, startsWith('file://'));
+      expect(item.id, contains('/songs/so-1.mp3'));
+      // No Subsonic auth params should leak into the file:// URI.
+      expect(item.id, isNot(contains('stream.view')));
+      expect(item.id, isNot(contains('t=')));
+    });
+
+    test('localFilePath: extras still carry subsonicId (reverse mapping)', () {
+      const Song s = Song(id: 'so-42', title: 't');
+      final MediaItem item = songToMediaItem(
+        song: s,
+        navidromeBaseUrl: base,
+        navidromeUsername: user,
+        navidromePassword: pass,
+        localFilePath: '/tmp/songs/so-42.mp3',
+      );
+      expect(item.extras, isNotNull);
+      expect(item.extras!['subsonicId'], 'so-42');
+    });
+
+    test('localFilePath: title/artist/album/duration flow through unchanged',
+        () {
+      const Song s = Song(
+        id: 'so-1',
+        title: 'Let It Happen',
+        artist: 'Tame Impala',
+        album: 'Currents',
+        duration: 467,
+      );
+      final MediaItem item = songToMediaItem(
+        song: s,
+        navidromeBaseUrl: base,
+        navidromeUsername: user,
+        navidromePassword: pass,
+        localFilePath: '/tmp/songs/so-1.mp3',
+      );
+      expect(item.title, 'Let It Happen');
+      expect(item.artist, 'Tame Impala');
+      expect(item.album, 'Currents');
+      expect(item.duration, const Duration(seconds: 467));
+    });
+
+    test('empty localFilePath falls back to the stream URL', () {
+      const Song s = Song(id: 'so-1', title: 't');
+      final MediaItem item = songToMediaItem(
+        song: s,
+        navidromeBaseUrl: base,
+        navidromeUsername: user,
+        navidromePassword: pass,
+        localFilePath: '',
+        saltGenerator: fixedSalt,
+      );
+      expect(item.id, startsWith('$base/rest/stream.view?'));
+    });
   });
 }

@@ -12,6 +12,7 @@ import '../models/subsonic/album.dart';
 import '../models/subsonic/playlist.dart';
 import '../models/subsonic/search_result3.dart';
 import '../models/subsonic/song.dart';
+import '../offline/local_uri.dart';
 import '../providers/library/library_album.dart';
 import '../providers/library/library_playlist.dart';
 import '../providers/settings.dart';
@@ -58,12 +59,26 @@ void _errSnack(BuildContext context, Object e) {
   ));
 }
 
-MediaItem _toMediaItem(Song s, _Creds c) => songToMediaItem(
-      song: s,
-      navidromeBaseUrl: c.url,
-      navidromeUsername: c.user,
-      navidromePassword: c.pass,
-    );
+MediaItem _toMediaItem(WidgetRef ref, Song s, _Creds c) {
+  // Single chokepoint: ask the offline layer if we have a local file for
+  // this song id; pass it through to songToMediaItem so MediaItem.id becomes
+  // file://… instead of the Subsonic stream URL. Null = stream.
+  final String? localUri = ref.read(localUriForProvider(s.id));
+  String? localPath;
+  if (localUri != null) {
+    final Uri parsed = Uri.parse(localUri);
+    if (parsed.scheme == 'file') {
+      localPath = parsed.toFilePath();
+    }
+  }
+  return songToMediaItem(
+    song: s,
+    navidromeBaseUrl: c.url,
+    navidromeUsername: c.user,
+    navidromePassword: c.pass,
+    localFilePath: localPath,
+  );
+}
 
 /// Play a single Subsonic [Song]. Replaces the queue with just this song.
 Future<void> playSongFromSubsonic(
@@ -78,7 +93,7 @@ Future<void> playSongFromSubsonic(
       if (context.mounted) _credsMissingSnack(context);
       return;
     }
-    final MediaItem item = _toMediaItem(song, creds);
+    final MediaItem item = _toMediaItem(ref, song, creds);
     await ref.read(audioHandlerProvider).playSong(item);
     messenger.showSnackBar(SnackBar(
       duration: kSnackBarDuration,
@@ -111,7 +126,7 @@ Future<void> playAllSongsFromSubsonic(
       return;
     }
     final List<MediaItem> items =
-        songs.map((Song s) => _toMediaItem(s, creds)).toList();
+        songs.map((Song s) => _toMediaItem(ref, s, creds)).toList();
     await ref
         .read(audioHandlerProvider)
         .playAll(items, startIndex: startIndex);

@@ -6,10 +6,18 @@ import '../models/subsonic/song.dart';
 /// Convert a Subsonic [Song] into an `audio_service` [MediaItem] suitable
 /// for [HeerrAudioHandler]'s queue.
 ///
-/// `id` is the **stream URL** — that's what `just_audio.AudioPlayer` opens
-/// when this item becomes the current track. Auth params live in the URL
-/// because the player fetches raw bytes outside the dio interceptor (same
-/// constraint as cover art — see `buildSubsonicCoverArtUrl`).
+/// `id` is the **playback URI** — what `just_audio.AudioPlayer` opens when
+/// this item becomes the current track. Two flavours:
+///
+/// 1. When [localFilePath] is non-null (offline-download feature, L2), `id`
+///    is `file://<localFilePath>` and `just_audio` reads the local file.
+///    Auth is irrelevant; the bytes are already on the device.
+/// 2. Otherwise `id` is the Subsonic `stream.view` URL with auth params
+///    embedded (same constraint as cover art — see
+///    `buildSubsonicCoverArtUrl`).
+///
+/// Cover art always comes from the Subsonic URL regardless of source; we
+/// don't cache art locally in v1 (deferred — out of scope for L2).
 ///
 /// Pure function so it's testable without standing up `just_audio` or
 /// `audio_service`'s platform channels. All Navidrome creds must be
@@ -23,15 +31,21 @@ MediaItem songToMediaItem({
   required String navidromeBaseUrl,
   required String navidromeUsername,
   required String navidromePassword,
+  String? localFilePath,
   String Function()? saltGenerator,
 }) {
-  final String streamUrl = buildSubsonicStreamUrl(
-    baseUrl: navidromeBaseUrl,
-    username: navidromeUsername,
-    password: navidromePassword,
-    songId: song.id,
-    saltGenerator: saltGenerator,
-  );
+  final String mediaId;
+  if (localFilePath != null && localFilePath.isNotEmpty) {
+    mediaId = Uri.file(localFilePath).toString();
+  } else {
+    mediaId = buildSubsonicStreamUrl(
+      baseUrl: navidromeBaseUrl,
+      username: navidromeUsername,
+      password: navidromePassword,
+      songId: song.id,
+      saltGenerator: saltGenerator,
+    );
+  }
 
   Uri? artUri;
   final String? coverArt = song.coverArt;
@@ -49,7 +63,7 @@ MediaItem songToMediaItem({
 
   final int? duration = song.duration;
   return MediaItem(
-    id: streamUrl,
+    id: mediaId,
     title: song.title,
     artist: song.artist,
     album: song.album,
