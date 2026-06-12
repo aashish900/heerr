@@ -49,3 +49,8 @@ android/key.properties
 android/keystore.jks
 android/app/key.properties
 **/*.jks
+
+# Local-only defaults used to pre-fill the Add-Server form (Tailnet IPs +
+# personal usernames). The committed `dev_defaults.example.dart` is the
+# template; the real values live only on the developer's machine.
+lib/dev_defaults.dart

@@ -52,7 +52,7 @@ void main() {
     expect(_activeTitle(tester), 'Library');
   });
 
-  testWidgets('bottom nav has exactly three tabs', (
+  testWidgets('bottom nav has Library, Downloads, Queue, Settings tabs', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(_bootApp());
@@ -61,19 +61,22 @@ void main() {
     final NavigationBar nav = tester.widget<NavigationBar>(
       find.byType(NavigationBar),
     );
-    expect(nav.destinations, hasLength(3));
-    expect(
-      find.descendant(of: find.byType(NavigationBar), matching: find.text('Library')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: find.byType(NavigationBar), matching: find.text('Queue')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: find.byType(NavigationBar), matching: find.text('Settings')),
-      findsOneWidget,
-    );
+    expect(nav.destinations, hasLength(4));
+    for (final String label in <String>[
+      'Library',
+      'Downloads',
+      'Queue',
+      'Settings',
+    ]) {
+      expect(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text(label),
+        ),
+        findsOneWidget,
+        reason: 'expected "$label" in bottom nav',
+      );
+    }
   });
 
   testWidgets('Library tab renders the Artists / Albums / Playlists sub-tabs', (

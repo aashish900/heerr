@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'offline/offline_sync.dart';
+import 'screens/downloads_screen.dart';
 import 'screens/job_detail_screen.dart';
 import 'screens/library/album_detail_screen.dart';
 import 'screens/library/artist_detail_screen.dart';
@@ -19,6 +20,7 @@ import 'widgets/mini_player.dart';
 // it when the bearer token is missing (wired at B1/B3 — not here).
 class Routes {
   static const String library = '/';
+  static const String downloads = '/downloads';
   static const String queue = '/queue';
   static const String settings = '/settings';
   static const String servers = '/settings/servers';
@@ -66,6 +68,11 @@ GoRouter buildHeerrRouter() {
                         playlistId: state.pathParameters['id']!),
               ),
             ],
+          ),
+          GoRoute(
+            path: Routes.downloads,
+            builder: (BuildContext context, GoRouterState state) =>
+                const DownloadsScreen(),
           ),
           GoRoute(
             path: Routes.queue,
@@ -132,6 +139,12 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
       selectedIcon: Icons.library_music,
     ),
     _NavTab(
+      path: Routes.downloads,
+      label: 'Downloads',
+      icon: Icons.download_for_offline_outlined,
+      selectedIcon: Icons.download_for_offline,
+    ),
+    _NavTab(
       path: Routes.queue,
       label: 'Queue',
       icon: Icons.queue_music_outlined,
@@ -191,8 +204,9 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
 
   int _indexFor(String loc) {
     if (loc.startsWith('/library') || loc == Routes.library) return 0;
-    if (loc.startsWith(Routes.queue)) return 1;
-    if (loc.startsWith(Routes.settings)) return 2;
+    if (loc.startsWith(Routes.downloads)) return 1;
+    if (loc.startsWith(Routes.queue)) return 2;
+    if (loc.startsWith(Routes.settings)) return 3;
     return 0;
   }
 

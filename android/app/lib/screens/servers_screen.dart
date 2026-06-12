@@ -7,6 +7,7 @@ import '../api/client.dart';
 import '../api/endpoints.dart';
 import '../api/subsonic_client.dart';
 import '../api/subsonic_endpoints.dart';
+import '../dev_defaults.dart';
 import '../providers/settings.dart';
 import '../theme.dart';
 import '../widgets/error_snackbar.dart';
@@ -107,16 +108,33 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
   @override
   void initState() {
     super.initState();
-    _nameController =
-        TextEditingController(text: widget.existing?.name ?? '');
-    _urlController =
-        TextEditingController(text: widget.existing?.backendBaseUrl ?? '');
+    // For an **add** flow (no `existing`), pre-fill the four non-secret
+    // fields from `DevDefaults` so reinstalls don't require retyping the
+    // Tailnet URLs / username. The bearer token + Navidrome password are
+    // never defaulted — they're the actual secrets. `DevDefaults` lives
+    // in a gitignored file (see lib/dev_defaults.example.dart for the
+    // template); on a fresh clone the fields stay blank.
+    final bool isAdd = widget.existing == null;
+    _nameController = TextEditingController(
+      text: widget.existing?.name ?? (isAdd ? DevDefaults.serverName : null) ?? '',
+    );
+    _urlController = TextEditingController(
+      text: widget.existing?.backendBaseUrl ??
+          (isAdd ? DevDefaults.backendBaseUrl : null) ??
+          '',
+    );
     _tokenController =
         TextEditingController(text: widget.existing?.bearerToken ?? '');
-    _navidromeUrlController =
-        TextEditingController(text: widget.existing?.navidromeBaseUrl ?? '');
-    _navidromeUserController =
-        TextEditingController(text: widget.existing?.navidromeUsername ?? '');
+    _navidromeUrlController = TextEditingController(
+      text: widget.existing?.navidromeBaseUrl ??
+          (isAdd ? DevDefaults.navidromeBaseUrl : null) ??
+          '',
+    );
+    _navidromeUserController = TextEditingController(
+      text: widget.existing?.navidromeUsername ??
+          (isAdd ? DevDefaults.navidromeUsername : null) ??
+          '',
+    );
     _navidromePassController =
         TextEditingController(text: widget.existing?.navidromePassword ?? '');
   }
