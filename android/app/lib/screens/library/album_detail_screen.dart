@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/api_error.dart';
 import '../../models/subsonic/album.dart';
 import '../../models/subsonic/song.dart';
+import '../../offline/offline_manifest.dart';
+import '../../offline/offline_marker.dart';
 import '../../player/playback_actions.dart';
 import '../../player/player_provider.dart';
 import '../../providers/library/library_album.dart';
@@ -24,6 +26,11 @@ class AlbumDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<Album> async = ref.watch(libraryAlbumProvider(albumId));
 
+    final OfflineManifest? manifest =
+        ref.watch(offlineManifestProvider).valueOrNull;
+    final bool isMarked =
+        manifest?.markedAlbums.contains(albumId) ?? false;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(async.maybeWhen<String>(
@@ -31,6 +38,25 @@ class AlbumDetailScreen extends ConsumerWidget {
           orElse: () => 'Album',
         )),
         actions: <Widget>[
+          IconButton(
+            icon: Icon(
+              isMarked
+                  ? Icons.download_for_offline
+                  : Icons.download_for_offline_outlined,
+              color: isMarked ? heerrGreen : null,
+            ),
+            tooltip:
+                isMarked ? 'Unmark for offline' : 'Mark for offline',
+            onPressed: () {
+              final OfflineMarker n =
+                  ref.read(offlineMarkerProvider.notifier);
+              if (isMarked) {
+                n.unmarkAlbum(albumId);
+              } else {
+                n.markAlbum(albumId);
+              }
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.play_arrow_outlined),
             tooltip: 'Play all',
@@ -71,6 +97,8 @@ class _Body extends ConsumerWidget {
         .watch(currentMediaItemProvider)
         .valueOrNull
         ?.extras?['subsonicId'] as String?;
+    final OfflineManifest? manifest =
+        ref.watch(offlineManifestProvider).valueOrNull;
     return ListView.builder(
       itemCount: album.song.length + 1,
       itemBuilder: (BuildContext c, int i) {
@@ -78,6 +106,7 @@ class _Body extends ConsumerWidget {
         final int idx = i - 1;
         final Song s = album.song[idx];
         final bool isCurrent = s.id == currentSubsonicId;
+        final OfflineSongEntry? offline = manifest?.songs[s.id];
         return ListTile(
           leading: Text(
             s.track == null ? '' : '${s.track}',
@@ -100,9 +129,7 @@ class _Body extends ConsumerWidget {
           subtitle: s.duration == null
               ? null
               : Text(_formatDuration(s.duration!)),
-          trailing: isCurrent
-              ? const Icon(Icons.play_arrow, color: heerrGreen)
-              : null,
+          trailing: _buildSongTrailing(isCurrent, offline),
           onTap: () => playAllSongsFromSubsonic(
             ref,
             context,
@@ -112,6 +139,45 @@ class _Body extends ConsumerWidget {
         );
       },
     );
+  }
+
+  /// Per-song trailing affordance precedence:
+  ///   isCurrent wins → playing indicator;
+  ///   else offline state visible (ready/downloading/failed);
+  ///   else null.
+  Widget? _buildSongTrailing(bool isCurrent, OfflineSongEntry? offline) {
+    if (isCurrent) {
+      return const Icon(Icons.play_arrow, color: heerrGreen);
+    }
+    if (offline == null) return null;
+    switch (offline.state) {
+      case OfflineSongState.ready:
+        return const Icon(
+          Icons.download_done,
+          color: heerrGreen,
+          size: 18,
+        );
+      case OfflineSongState.downloading:
+        return const SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        );
+      case OfflineSongState.queued:
+        return const Icon(
+          Icons.schedule,
+          size: 18,
+        );
+      case OfflineSongState.failed:
+        return Tooltip(
+          message: offline.lastError ?? 'Download failed',
+          child: const Icon(
+            Icons.error_outline,
+            color: Colors.redAccent,
+            size: 18,
+          ),
+        );
+    }
   }
 
   String _formatDuration(int seconds) {

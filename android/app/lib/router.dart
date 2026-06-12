@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'offline/offline_sync.dart';
 import 'screens/job_detail_screen.dart';
 import 'screens/library/album_detail_screen.dart';
 import 'screens/library/artist_detail_screen.dart';
@@ -105,12 +107,23 @@ GoRouter buildHeerrRouter() {
 // tab switches don't tear down state inside the surrounding scaffold. The
 // mini-player sits above the NavigationBar; it hides itself when nothing is
 // queued.
-class _ShellScaffold extends StatelessWidget {
+//
+// L3: also the lifecycle host for `offlineSyncProvider`. The shell is
+// always mounted while the app is foregrounded — Settings is a child
+// route, not a peer — so this is the right place to forward
+// AppLifecycleState changes into pause()/resume() on the sync provider.
+class _ShellScaffold extends ConsumerStatefulWidget {
   const _ShellScaffold({required this.location, required this.child});
 
   final String location;
   final Widget child;
 
+  @override
+  ConsumerState<_ShellScaffold> createState() => _ShellScaffoldState();
+}
+
+class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
+    with WidgetsBindingObserver {
   static const List<_NavTab> _tabs = <_NavTab>[
     _NavTab(
       path: Routes.library,
@@ -132,10 +145,51 @@ class _ShellScaffold extends StatelessWidget {
     ),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Kick the offline sync provider so it builds + auto-syncs on app
+    // launch. We don't watch it (would rebuild the shell on every status
+    // change) — just trigger the build.
+    Future<void>.microtask(() {
+      if (!mounted) return;
+      // ignore: unused_local_variable
+      final dynamic _ = ref.read(offlineSyncProvider);
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Forward foreground/background transitions to the sync provider's
+    // Timer. Matches the QueueScreen lifecycle pattern.
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+        ref.read(offlineSyncProvider.notifier).pause();
+      case AppLifecycleState.resumed:
+        unawaitedResume();
+      case AppLifecycleState.detached:
+        // App is fully detaching; the provider's onDispose will cancel the
+        // timer when the container tears down.
+        break;
+    }
+  }
+
+  void unawaitedResume() {
+    // Fire-and-forget — resume() ticks immediately, but we don't need to
+    // await it; failures land in the manifest's lastError.
+    ref.read(offlineSyncProvider.notifier).resume();
+  }
+
   int _indexFor(String loc) {
-    // Nested routes (e.g. /library/album/xxx, /settings/servers) belong
-    // under their parent tab so the selected indicator stays in the right
-    // place when the user drills into a detail screen.
     if (loc.startsWith('/library') || loc == Routes.library) return 0;
     if (loc.startsWith(Routes.queue)) return 1;
     if (loc.startsWith(Routes.settings)) return 2;
@@ -144,9 +198,9 @@ class _ShellScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int currentIndex = _indexFor(location);
+    final int currentIndex = _indexFor(widget.location);
     return Scaffold(
-      body: child,
+      body: widget.child,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[

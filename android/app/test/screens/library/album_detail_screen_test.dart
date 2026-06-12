@@ -102,4 +102,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Error'), findsOneWidget);
   });
+
+  testWidgets(
+    'AppBar shows outlined download icon when album not marked',
+    (WidgetTester tester) async {
+      const Album a = Album(id: 'al-1', name: 'X', song: <Song>[
+        Song(id: 'so-1', title: 'a'),
+      ]);
+      await tester.pumpWidget(_wrap('al-1', <Override>[
+        _albumValue('al-1', const AsyncData<Album>(a)),
+      ]));
+      await tester.pumpAndSettle();
+      expect(
+        find.byIcon(Icons.download_for_offline_outlined),
+        findsOneWidget,
+      );
+    },
+  );
 }

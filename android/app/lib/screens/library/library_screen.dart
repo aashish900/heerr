@@ -11,6 +11,7 @@ import '../../models/subsonic/artist_index.dart';
 import '../../models/subsonic/playlist.dart';
 import '../../models/subsonic/search_result3.dart';
 import '../../models/subsonic/song.dart';
+import '../../offline/offline_manifest.dart';
 import '../../player/playback_actions.dart';
 import '../../player/player_provider.dart';
 import '../../providers/download.dart';
@@ -245,6 +246,12 @@ class _CombinedResultsBody extends ConsumerWidget {
                     subtitle: a.artist,
                     coverArtId: a.coverArt,
                     trailingPlay: true,
+                    isMarkedForOffline: ref
+                            .watch(offlineManifestProvider)
+                            .valueOrNull
+                            ?.markedAlbums
+                            .contains(a.id) ??
+                        false,
                     onPlay: () =>
                         playAlbumFromSubsonic(ref, context, a.id),
                     onTap: () => context.push(Routes.libraryAlbum(a.id)),
@@ -435,6 +442,11 @@ class _AlbumsTab extends ConsumerWidget {
                 'Library is empty. Download something via the queue or search.',
           );
         }
+        final Set<String> markedAlbums = ref
+                .watch(offlineManifestProvider)
+                .valueOrNull
+                ?.markedAlbums ??
+            const <String>{};
         return ListView.builder(
           itemCount: albums.length,
           itemBuilder: (BuildContext c, int i) {
@@ -444,6 +456,7 @@ class _AlbumsTab extends ConsumerWidget {
               subtitle: a.artist,
               coverArtId: a.coverArt,
               trailingPlay: true,
+              isMarkedForOffline: markedAlbums.contains(a.id),
               onPlay: () => playAlbumFromSubsonic(ref, context, a.id),
               onTap: () => context.push(Routes.libraryAlbum(a.id)),
             );
@@ -474,6 +487,11 @@ class _PlaylistsTab extends ConsumerWidget {
             subtitle: 'Create a playlist on Navidrome to see it here.',
           );
         }
+        final Set<String> markedPlaylists = ref
+                .watch(offlineManifestProvider)
+                .valueOrNull
+                ?.markedPlaylists ??
+            const <String>{};
         return ListView.builder(
           itemCount: playlists.length,
           itemBuilder: (BuildContext c, int i) {
@@ -483,6 +501,7 @@ class _PlaylistsTab extends ConsumerWidget {
               subtitle: p.songCount == null ? null : '${p.songCount} songs',
               coverArtId: p.coverArt,
               trailingPlay: true,
+              isMarkedForOffline: markedPlaylists.contains(p.id),
               onPlay: () => playPlaylistFromSubsonic(ref, context, p.id),
               onTap: () => context.push(Routes.libraryPlaylist(p.id)),
             );

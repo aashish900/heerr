@@ -98,4 +98,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Error'), findsOneWidget);
   });
+
+  testWidgets(
+    'AppBar shows outlined download icon when playlist not marked',
+    (WidgetTester tester) async {
+      const Playlist p = Playlist(id: 'pl-1', name: 'X', entry: <Song>[
+        Song(id: 'so-1', title: 'a'),
+      ]);
+      await tester.pumpWidget(_wrap('pl-1', <Override>[
+        _playlistValue('pl-1', const AsyncData<Playlist>(p)),
+      ]));
+      await tester.pumpAndSettle();
+      expect(
+        find.byIcon(Icons.download_for_offline_outlined),
+        findsOneWidget,
+      );
+    },
+  );
 }

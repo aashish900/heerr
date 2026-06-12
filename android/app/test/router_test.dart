@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:heerr/offline/offline_sync.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/router.dart';
 import 'package:heerr/theme.dart';
@@ -171,4 +173,105 @@ void main() {
     expect(Routes.libraryAlbum('al-2'), '/library/album/al-2');
     expect(Routes.libraryPlaylist('pl-3'), '/library/playlist/pl-3');
   });
+
+  group('_ShellScaffold lifecycle wiring', () {
+    Future<void> sendLifecycle(WidgetTester tester, String state) async {
+      final ByteData? msg = const StringCodec().encodeMessage(state);
+      await tester.binding.defaultBinaryMessenger
+          .handlePlatformMessage('flutter/lifecycle', msg, (_) {});
+    }
+
+    testWidgets('paused → calls pause() on OfflineSync', (
+      WidgetTester tester,
+    ) async {
+      final _StubSync stub = _StubSync();
+      await tester.pumpWidget(ProviderScope(
+        overrides: <Override>[
+          secureStorageProvider
+              .overrideWith((Ref<SecureStorage> _) => _NoopStorage()),
+          offlineSyncProvider.overrideWith(() => stub),
+        ],
+        child: MaterialApp.router(
+          theme: heerrDarkTheme(),
+          routerConfig: buildHeerrRouter(),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      // The microtask in _ShellScaffoldState may pre-touch the provider —
+      // we only care about counts AFTER the lifecycle event.
+      stub.resetCounts();
+
+      await sendLifecycle(tester,'AppLifecycleState.paused');
+      await tester.pumpAndSettle();
+
+      expect(stub.pauseCalls, greaterThanOrEqualTo(1));
+      expect(stub.resumeCalls, 0);
+    });
+
+    testWidgets('resumed → calls resume() on OfflineSync', (
+      WidgetTester tester,
+    ) async {
+      final _StubSync stub = _StubSync();
+      await tester.pumpWidget(ProviderScope(
+        overrides: <Override>[
+          secureStorageProvider
+              .overrideWith((Ref<SecureStorage> _) => _NoopStorage()),
+          offlineSyncProvider.overrideWith(() => stub),
+        ],
+        child: MaterialApp.router(
+          theme: heerrDarkTheme(),
+          routerConfig: buildHeerrRouter(),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      stub.resetCounts();
+
+      await sendLifecycle(tester,'AppLifecycleState.resumed');
+      await tester.pumpAndSettle();
+
+      expect(stub.resumeCalls, greaterThanOrEqualTo(1));
+    });
+  });
+}
+
+class _StubSync extends OfflineSync {
+  int pauseCalls = 0;
+  int resumeCalls = 0;
+
+  void resetCounts() {
+    pauseCalls = 0;
+    resumeCalls = 0;
+  }
+
+  @override
+  Future<OfflineSyncStatus> build() async {
+    return (
+      running: false,
+      targetCount: 0,
+      readyCount: 0,
+      failedCount: 0,
+      lastError: null,
+      lastTickAt: null,
+    );
+  }
+
+  @override
+  void pause() {
+    pauseCalls += 1;
+  }
+
+  @override
+  Future<void> resume() async {
+    resumeCalls += 1;
+  }
+
+  @override
+  Future<OfflineSyncResult> syncNow() async {
+    return (
+      downloadedCount: 0,
+      failedCount: 0,
+      sweptCount: 0,
+      error: null,
+    );
+  }
 }

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/api_error.dart';
 import '../../models/subsonic/playlist.dart';
 import '../../models/subsonic/song.dart';
+import '../../offline/offline_manifest.dart';
+import '../../offline/offline_marker.dart';
 import '../../player/playback_actions.dart';
 import '../../player/player_provider.dart';
 import '../../providers/library/library_playlist.dart';
@@ -25,6 +27,11 @@ class PlaylistDetailScreen extends ConsumerWidget {
     final AsyncValue<Playlist> async =
         ref.watch(libraryPlaylistProvider(playlistId));
 
+    final OfflineManifest? manifest =
+        ref.watch(offlineManifestProvider).valueOrNull;
+    final bool isMarked =
+        manifest?.markedPlaylists.contains(playlistId) ?? false;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(async.maybeWhen<String>(
@@ -32,6 +39,25 @@ class PlaylistDetailScreen extends ConsumerWidget {
           orElse: () => 'Playlist',
         )),
         actions: <Widget>[
+          IconButton(
+            icon: Icon(
+              isMarked
+                  ? Icons.download_for_offline
+                  : Icons.download_for_offline_outlined,
+              color: isMarked ? heerrGreen : null,
+            ),
+            tooltip:
+                isMarked ? 'Unmark for offline' : 'Mark for offline',
+            onPressed: () {
+              final OfflineMarker n =
+                  ref.read(offlineMarkerProvider.notifier);
+              if (isMarked) {
+                n.unmarkPlaylist(playlistId);
+              } else {
+                n.markPlaylist(playlistId);
+              }
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.play_arrow_outlined),
             tooltip: 'Play all',
@@ -72,6 +98,8 @@ class _Body extends ConsumerWidget {
         .watch(currentMediaItemProvider)
         .valueOrNull
         ?.extras?['subsonicId'] as String?;
+    final OfflineManifest? manifest =
+        ref.watch(offlineManifestProvider).valueOrNull;
     return ListView.builder(
       itemCount: playlist.entry.length + 1,
       itemBuilder: (BuildContext c, int i) {
@@ -79,6 +107,7 @@ class _Body extends ConsumerWidget {
         final int idx = i - 1;
         final Song s = playlist.entry[idx];
         final bool isCurrent = s.id == currentSubsonicId;
+        final OfflineSongEntry? offline = manifest?.songs[s.id];
         return ListTile(
           leading: LibraryCoverArt(coverArtId: s.coverArt, size: 40),
           title: Text(
@@ -97,9 +126,7 @@ class _Body extends ConsumerWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          trailing: isCurrent
-              ? const Icon(Icons.play_arrow, color: heerrGreen)
-              : null,
+          trailing: _buildSongTrailing(isCurrent, offline),
           onTap: () => playAllSongsFromSubsonic(
             ref,
             context,
@@ -109,6 +136,38 @@ class _Body extends ConsumerWidget {
         );
       },
     );
+  }
+
+  Widget? _buildSongTrailing(bool isCurrent, OfflineSongEntry? offline) {
+    if (isCurrent) {
+      return const Icon(Icons.play_arrow, color: heerrGreen);
+    }
+    if (offline == null) return null;
+    switch (offline.state) {
+      case OfflineSongState.ready:
+        return const Icon(
+          Icons.download_done,
+          color: heerrGreen,
+          size: 18,
+        );
+      case OfflineSongState.downloading:
+        return const SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        );
+      case OfflineSongState.queued:
+        return const Icon(Icons.schedule, size: 18);
+      case OfflineSongState.failed:
+        return Tooltip(
+          message: offline.lastError ?? 'Download failed',
+          child: const Icon(
+            Icons.error_outline,
+            color: Colors.redAccent,
+            size: 18,
+          ),
+        );
+    }
   }
 }
 
