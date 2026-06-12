@@ -93,12 +93,24 @@ class _LibraryCoverArtState extends ConsumerState<LibraryCoverArt> {
       } catch (_) {
         // Probe broken → fall through and try the fetch (bounded below).
       }
+      // Always fetch + cache at a fixed high resolution rather than the
+      // widget's current render size. Two reasons:
+      // 1. The cache file is keyed by coverArtId only, so a small first
+      //    request would freeze a low-quality bitmap on disk that every
+      //    later (larger) render of the same id reuses.
+      // 2. The tile renders at widget.size dp; on a 3x device that is
+      //    3x more physical pixels. Asking Subsonic for 56px and then
+      //    upscaling visibly blurs the artwork.
+      // 512 is a generous fixed ceiling: sharp at any tile size the app
+      // currently uses (LibraryResultTile, the now-playing strip, etc.)
+      // while keeping the per-cover disk cost under ~50 KB.
+      const int kCoverFetchSize = 512;
       final String url = buildSubsonicCoverArtUrl(
         baseUrl: baseUrl,
         username: user,
         password: pass,
         coverArtId: id,
-        size: widget.size.toInt(),
+        size: kCoverFetchSize,
       );
       final Dio dio = ref.read(offlineDownloadDioProvider);
       // Hard cap the cover fetch — placeholder is fine, a frozen tile
@@ -128,6 +140,12 @@ class _LibraryCoverArtState extends ConsumerState<LibraryCoverArt> {
 
     final File? file = _file;
     if (file != null) {
+      // The on-disk JPEG is fixed at 512px; tell Flutter to decode at
+      // the actual physical pixel count this tile occupies. Without
+      // this the framework decodes the full 512px bitmap for every
+      // visible tile (50 tiles ≈ 50 MB of RGBA in memory).
+      final double dpr = MediaQuery.devicePixelRatioOf(context);
+      final int decodePx = (widget.size * dpr).round();
       return ClipRRect(
         borderRadius: BorderRadius.circular(widget.borderRadius),
         child: Image.file(
@@ -135,6 +153,8 @@ class _LibraryCoverArtState extends ConsumerState<LibraryCoverArt> {
           width: widget.size,
           height: widget.size,
           fit: BoxFit.cover,
+          cacheWidth: decodePx,
+          cacheHeight: decodePx,
           errorBuilder: (BuildContext c, _, _) => _placeholder(c),
         ),
       );

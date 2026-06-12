@@ -96,7 +96,13 @@ class OfflinePaths {
   Directory? coversDir(SettingsValue settings) {
     final Directory? root = serverRoot(settings);
     if (root == null) return null;
-    return Directory('${root.path}/covers');
+    // `_hi` is a one-time cache-bust: covers were originally fetched at
+    // the widget's render size (~56px) and cached under `covers/`. We
+    // now request a fixed 512px so old files would freeze the lo-res
+    // bitmap into every later render. Pointing at a fresh directory
+    // ignores the stale set; the orphaned `covers/` dir is harmless and
+    // gets wiped by "Clear all downloads" alongside everything else.
+    return Directory('${root.path}/covers_hi');
   }
 
   File? coverFile(SettingsValue settings, String coverArtId) {

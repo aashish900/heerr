@@ -51,10 +51,22 @@ Future<List<Song>> downloadedSongs(DownloadedSongsRef ref) async {
     } catch (_) {/* skip */}
   }
 
+  // Subsonic's `getAlbum.view` often leaves `Song.coverArt` empty and
+  // expects the client to inherit from the parent album. `getPlaylist`
+  // usually populates the per-song coverArt because playlist entries
+  // span multiple albums — keep whatever it sent.
+  Song withCover(Song s, String? fallback) {
+    if (s.coverArt != null && s.coverArt!.isNotEmpty) return s;
+    if (fallback == null || fallback.isEmpty) return s;
+    return s.copyWith(coverArt: fallback);
+  }
+
   final Map<String, Song> bySongId = <String, Song>{};
   for (final Album a in albums) {
     for (final Song s in a.song) {
-      if (readyIds.contains(s.id)) bySongId[s.id] = s;
+      if (readyIds.contains(s.id)) {
+        bySongId[s.id] = withCover(s, a.coverArt ?? a.id);
+      }
     }
   }
   for (final Playlist p in playlists) {
