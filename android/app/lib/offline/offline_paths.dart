@@ -74,6 +74,39 @@ class OfflinePaths {
     final String ext = suffix.startsWith('.') ? suffix.substring(1) : suffix;
     return File('${dir.path}/$songId.$ext');
   }
+
+  /// L5: directory holding JSON snapshots of Subsonic library responses.
+  /// One file per logical key (`albums.json`, `album_<id>.json`, etc).
+  Directory? libraryCacheDir(SettingsValue settings) {
+    final Directory? root = serverRoot(settings);
+    if (root == null) return null;
+    return Directory('${root.path}/library_cache');
+  }
+
+  File? libraryCacheFile(SettingsValue settings, String key) {
+    final Directory? dir = libraryCacheDir(settings);
+    if (dir == null) return null;
+    return File('${dir.path}/$key.json');
+  }
+
+  /// L5: directory holding cached cover-art JPGs. Filename is the
+  /// Subsonic `coverArtId` (NOT the album id — Navidrome surfaces the
+  /// cover id separately so the same cover can be shared by multiple
+  /// albums).
+  Directory? coversDir(SettingsValue settings) {
+    final Directory? root = serverRoot(settings);
+    if (root == null) return null;
+    return Directory('${root.path}/covers');
+  }
+
+  File? coverFile(SettingsValue settings, String coverArtId) {
+    final Directory? dir = coversDir(settings);
+    if (dir == null) return null;
+    // coverArtId can contain forbidden filesystem chars on edge cases. Most
+    // Subsonic IDs are short alphanumerics so a basic sanitization suffices.
+    final String safe = coverArtId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    return File('${dir.path}/$safe.jpg');
+  }
 }
 
 /// Resolves the app-private documents directory once and caches it.

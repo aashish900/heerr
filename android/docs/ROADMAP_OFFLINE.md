@@ -4,7 +4,7 @@ Track progress through the post-streamer offline-download feature. Same cadence 
 
 This roadmap continues the alphabet from `ROADMAP_STREAMER.md`: A1–G1 covered the ingestion client, H1–K2 covered the streaming client. **L1–L5 cover the offline-download client** — the user marks albums/playlists (or the entire library); the app periodically downloads those songs to device storage and prefers the local file at playback time.
 
-**Status (2026-06-12):** L1–L4 complete and committed. L5 queued.
+**Status (2026-06-12):** L1–L5 complete and committed. L6 (smoke + docs) is the remaining milestone. Original L5 (docs-only) renumbered to L6 after device smoke surfaced an offline-navigation gap that L5 now closes.
 
 ---
 
@@ -253,27 +253,70 @@ Before writing new code, confirm these still exist and have the signatures liste
 
 ---
 
-### [ ] L5. End-to-end smoke + docs
+### [x] L5. Offline library metadata cache
+
+**Why this exists (added 2026-06-12 after device smoke):** L1–L4 covered offline *playback* but assumed the library, album-detail, and playlist-detail screens stayed online-driven. On real-device smoke (WiFi off + Tailscale unreachable) the user found that:
+- the Library tabs error out (`libraryAlbumsProvider` etc. fail),
+- album / playlist detail pages can't load,
+- so the downloaded songs are unreachable — they exist on disk but there's no way to navigate to them.
+
+This milestone caches every successful Subsonic library response to disk, then serves the cached copy when the network call fails. Same "prefer-live, fall-back-to-cache" shape as the playback contract.
+
+**Files (new):**
+- `android/app/lib/offline/library_cache.dart` — per-server JSON-on-disk cache for Subsonic library responses. Keys are `endpoint_<id?>` (e.g. `albums`, `album_al-1`, `playlists`, `playlist_pl-2`). `LibraryCache` wraps load / save with atomic tmp-file + rename. Corrupt JSON falls back to a cache miss. Storage layout: `<offlineRoot>/<server-key>/library_cache/<key>.json`. A `@riverpod` `libraryCache` provider gives consumers a typed handle.
+- `android/app/lib/offline/library_cache_helpers.dart` — small generic `cacheAware<T>(...)` helper that the library providers call. Encapsulates the try-network-then-cache pattern + the encode/decode hop so each provider stays one-liner-ish.
+
+**Files (modify):**
+- `android/app/lib/providers/library/library_artists.dart` + `library_albums.dart` + `library_playlists.dart` — wrap the existing `subsonicCall<T>` body in `cacheAware`. On success: write cache. On failure: return cache if any, otherwise rethrow. Logs a `debugPrint('library_cache: serving <key> from cache: <error>')` on cache hits.
+- `android/app/lib/providers/library/library_artist.dart` + `library_album.dart` + `library_playlist.dart` — same shape; cache key includes the `id` param.
+- `android/app/lib/widgets/library_cover_art.dart` — when offline is enabled, persist successful cover-art bytes to `<offlineRoot>/<server-key>/covers/<coverArtId>.<suffix>` once. On render, prefer `Image.file` if the cached file exists; otherwise fall through to the existing `CachedNetworkImage`-style path. Cleared by the L3 "Clear all downloads" action (recursive delete already handles this).
+
+**No** changes to:
+- `OfflineSync` — caching is decoupled from sync; cache populates as a side effect of normal library browsing while online.
+- `OfflineMarker` / `OfflineManifest` — separate concern (markers track *playback* targets, cache tracks *navigation* metadata).
+- `settings_screen.dart` — no new UI; offline navigation Just Works™ when the user has previously browsed online.
+
+**Deliverable:** turn WiFi off → open the app → Library → Albums tab renders the previously seen albums. Tap any album previously viewed online → detail loads from cache → marked songs play from disk (existing L2 path), unmarked songs surface the existing stream-failure snackbar. Cover art renders from disk where cached, else shows the placeholder.
+
+**Edge cases:**
+- First-time install + immediately offline → no cache yet → Library tabs show their normal error state ("cannot reach backend — check Tailscale"). Documented limitation, not a bug.
+- Server-key change (user re-signs in) → fresh cache dir, prior cache stays scoped to its server-key. No cross-contamination.
+- Stale cache: cached entries are served indefinitely (no TTL in v1). The next successful online render overwrites them. This is intentional — TTL adds complexity for negligible gain when the home server is the only source.
+
+**Test gate (new + extended tests):**
+- `test/offline/library_cache_test.dart` (new) — round-trip a list/map through write+read; corrupt JSON on disk returns a cache miss (not a crash); per-server scoping isolates two keys with the same name across server profiles.
+- `test/providers/library/library_albums_test.dart` (new or extend) — happy path writes the cache; subsequent failure of the network call returns the cached value; no cache + network failure rethrows.
+- Mirror for `library_artists_test.dart`, `library_playlists_test.dart`, `library_album_test.dart` (per-id), `library_artist_test.dart`, `library_playlist_test.dart`. Same shape — three cases each: cache populated on success, cache served on failure, propagates error when both empty.
+- `test/widgets/library_cover_art_test.dart` (extend or new) — persists bytes to disk on first fetch; on second render after going offline, the widget renders `Image.file` not a network image.
+
+**Done when:** `flutter analyze` clean; `flutter test` green. Device sanity (no full smoke): turn WiFi off on Pixel 7, open the app, navigate Library → Album → tap a synced song. Plays. (Full 6-step smoke lives in L6.)
+
+**Commit:** `feat(flutter): offline library metadata cache + cache-aware providers`
+
+---
+
+### [ ] L6. End-to-end smoke + docs
 
 **Files (new):**
 - `android/docs/smoke_offline.md` — mirror `smoke_streamer.md` shape. Capture device, build version, per-step pass-with-detail, caveats.
-- New ADR appended to `android/docs/DECISIONLOG.md`: "Offline downloads — prefer-local-fallback-to-stream; manual + periodic-foreground + auto-on-launch triggers; app-private storage; no WorkManager in v1." Cover the rationale + alternatives considered + the deferred-WorkManager trade-off.
-- New entry in `android/docs/CHANGELOG.md` summarising L1–L5 (per existing pattern — list affected files, key behaviors, version bumps).
+- New ADR appended to `android/docs/DECISIONLOG.md`: "Offline downloads — prefer-local-fallback-to-stream; manual + periodic-foreground + auto-on-launch triggers; app-private storage; no WorkManager in v1." Also cover the L5 library-cache addendum: cache-only-on-success, served-when-network-fails, no TTL.
+- New entry in `android/docs/CHANGELOG.md` summarising L1–L6 (per existing pattern — list affected files, key behaviors, version bumps).
 
 **Files (modify):**
 - `android/app/pubspec.yaml` — version bump to `1.1.0+10`. First release-band build with offline shipping.
-- This roadmap — tick the boxes for L1–L5 and append a "Roadmap closed" line at the bottom.
+- This roadmap — tick the boxes for L1–L6 and append a "Roadmap closed" line at the bottom.
 
 **Test gate:** manual on Pixel 7 against the live home server — six steps, all must pass:
 
 1. **Settings smoke:** Offline downloads OFF baseline. App functions identically to pre-L (stream-only). Then ON, WiFi-only ON, interval 5 min.
 2. **Mark an album:** Library → open an album → tap AppBar download icon. Manifest stores the album id. Within one tick, rows show progress indicators, then settle on the green filled icon. Storage line updates in Settings.
 3. **Offline playback:** turn the phone's WiFi off (or stop Tailscale). Tap a synced song → audio plays. `adb shell` shows no `/rest/stream.view` request. Mini-player + Now Playing render normally.
-4. **Fallback to stream:** with the album partially synced, tap an unsynced song. Playback fails the local path, falls back to stream. With WiFi off → snackbar "cannot reach backend — check Tailscale" via existing `reactToApiError`. Re-enable WiFi → song streams. Proves the prefer-local-fallback-to-stream contract.
-5. **Unmark + sweep:** unmark the album → next tick deletes the files. Storage line shrinks. Re-tap the same song → streams.
-6. **Sync-all toggle:** flip "Sync entire library" ON → confirmation dialog shows estimated size → confirm → sync runs over the whole library. Allow it to settle, then turn WiFi off and verify any random library song plays from disk. Flip OFF → manifest + files clear back to the marker-only set.
+4. **Offline navigation (L5):** with WiFi still off, navigate Library → Albums / Playlists / Artists → tap into a previously viewed album. Library tabs render from cache; cover art shows from disk where cached. Tap a synced song from the cached detail screen → plays from disk.
+5. **Fallback to stream:** with the album partially synced, tap an unsynced song. Playback fails the local path, falls back to stream. With WiFi off → snackbar "cannot reach backend — check Tailscale" via existing `reactToApiError`. Re-enable WiFi → song streams. Proves the prefer-local-fallback-to-stream contract.
+6. **Unmark + sweep:** unmark the album → next tick deletes the files. Storage line shrinks. Re-tap the same song → streams.
+7. **Sync-all toggle:** flip "Sync entire library" ON → confirmation dialog shows estimated size → confirm → sync runs over the whole library. Allow it to settle, then turn WiFi off and verify any random library song plays from disk. Flip OFF → manifest + files clear back to the marker-only set.
 
-**Done when:** all six steps pass. `flutter analyze` clean. `flutter test` green. CHANGELOG + DECISIONLOG + smoke_offline.md committed. `pubspec.yaml` bumped to `1.1.0+10`.
+**Done when:** all seven steps pass. `flutter analyze` clean. `flutter test` green. CHANGELOG + DECISIONLOG + smoke_offline.md committed. `pubspec.yaml` bumped to `1.1.0+10`.
 
 **Commit:** `chore(flutter): offline e2e smoke verified`
 
@@ -309,11 +352,11 @@ Before writing new code, confirm these still exist and have the signatures liste
 
 ## Roadmap complete when
 
-1. All 5 milestone boxes checked (L1–L5).
+1. All 6 milestone boxes checked (L1–L6).
 2. Every test gate green at its milestone.
-3. L5 smoke succeeds against the real home stack (6/6 steps).
+3. L6 smoke succeeds against the real home stack (7/7 steps).
 4. `DECISIONLOG.md` entry written.
 5. `CHANGELOG.md` entries exist for each milestone group.
 6. `smoke_offline.md` written.
 7. `pubspec.yaml` at `1.1.0+10`.
-8. `git log --oneline android/` reads as a clean L1→L5 progression under the `feat(flutter):` / `chore(flutter):` Conventional-Commits cadence.
+8. `git log --oneline android/` reads as a clean L1→L6 progression under the `feat(flutter):` / `chore(flutter):` Conventional-Commits cadence.
