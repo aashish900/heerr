@@ -15,7 +15,9 @@ import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/offline/offline_settings.dart';
 import 'package:heerr/offline/offline_sync.dart';
 import 'package:heerr/providers/library/library_album.dart';
+import 'package:heerr/providers/library/library_albums.dart';
 import 'package:heerr/providers/library/library_playlist.dart';
+import 'package:heerr/providers/library/library_playlists.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/providers/settings.dart';
 
@@ -115,18 +117,32 @@ _Env _buildEnv({
   bool wifi = true,
   bool offlineEnabled = true,
   bool wifiOnly = true,
+  bool syncAll = false,
+  // When syncAll is on, these drive `libraryAlbumsProvider` /
+  // `libraryPlaylistsProvider`. Default: derive from the per-id stubs so
+  // tests can opt into sync-all without enumerating the library twice.
+  List<Album>? libraryAlbumList,
+  List<Playlist>? libraryPlaylistList,
 }) {
   final _FakeSecureStorage store = _FakeSecureStorage(<String, String>{
     'navidrome_base_url': 'http://navi:4533',
     'navidrome_username': 'me',
     'navidrome_password': 'pw',
     'offline_enabled': offlineEnabled.toString(),
+    'offline_sync_all': syncAll.toString(),
     'offline_wifi_only': wifiOnly.toString(),
     'offline_poll_interval_min': '15',
   });
 
   final _CountingAdapter adapter = _CountingAdapter();
   final _FakeWifi fakeWifi = _FakeWifi(wifi);
+
+  final List<Album> defaultAlbumList = <Album>[
+    for (final String id in albumStubs.keys) Album(id: id, name: id),
+  ];
+  final List<Playlist> defaultPlaylistList = <Playlist>[
+    for (final String id in playlistStubs.keys) Playlist(id: id, name: id),
+  ];
 
   final List<Override> overrides = <Override>[
     secureStorageProvider.overrideWith((Ref<SecureStorage> ref) => store),
@@ -136,6 +152,14 @@ _Env _buildEnv({
       (OfflineDownloadDioRef ref) => _dio(adapter),
     ),
     wifiCheckProvider.overrideWith((WifiCheckRef ref) => fakeWifi),
+    libraryAlbumsProvider.overrideWith(
+      (Ref<AsyncValue<List<Album>>> ref) async =>
+          libraryAlbumList ?? defaultAlbumList,
+    ),
+    libraryPlaylistsProvider.overrideWith(
+      (Ref<AsyncValue<List<Playlist>>> ref) async =>
+          libraryPlaylistList ?? defaultPlaylistList,
+    ),
     for (final MapEntry<String, List<Song>> e in albumStubs.entries)
       libraryAlbumProvider(e.key).overrideWith(
         (Ref<AsyncValue<Album>> ref) async =>
@@ -443,6 +467,127 @@ void main() {
       expect(s.targetCount, 0);
       expect(env.adapter.requests, isEmpty);
     });
+  });
+
+  group('OfflineSync — sync-all', () {
+    test('syncAll on + empty markers → downloads every album song', () async {
+      // Library has 2 albums; user has marked neither. Sync-all should pull
+      // both albums' songs.
+      final _Env env = _buildEnv(
+        tmp: tmp,
+        syncAll: true,
+        albumStubs: <String, List<Song>>{
+          'al-1': <Song>[_s1, _s2],
+          'al-2': <Song>[_s3],
+        },
+      );
+      addTearDown(env.container.dispose);
+
+      await env.container.read(offlineSettingsProvider.future);
+      // No markers seeded — pure sync-all path.
+
+      final OfflineSyncResult r = await env.container
+          .read(offlineSyncProvider.notifier)
+          .syncNow();
+
+      expect(r.downloadedCount, 3);
+      expect(r.failedCount, 0);
+      expect(env.adapter.requests.length, 3);
+
+      final OfflineManifest m =
+          await env.container.read(offlineManifestProvider.future);
+      expect(m.songs['so-1']!.state, OfflineSongState.ready);
+      expect(m.songs['so-2']!.state, OfflineSongState.ready);
+      expect(m.songs['so-3']!.state, OfflineSongState.ready);
+    });
+
+    test('syncAll on + marked album overlap → no double-download', () async {
+      // Library has al-1 (s1, s2) AND user has marked al-1 explicitly.
+      // Should fire exactly 2 downloads (not 4) — the set union dedupes.
+      final _Env env = _buildEnv(
+        tmp: tmp,
+        syncAll: true,
+        albumStubs: <String, List<Song>>{
+          'al-1': <Song>[_s1, _s2],
+        },
+      );
+      addTearDown(env.container.dispose);
+
+      await env.container.read(offlineSettingsProvider.future);
+      await _seedMarkers(env.container, albums: <String>{'al-1'});
+
+      final OfflineSyncResult r = await env.container
+          .read(offlineSyncProvider.notifier)
+          .syncNow();
+
+      expect(r.downloadedCount, 2);
+      expect(env.adapter.requests.length, 2);
+    });
+
+    test('syncAll on covers playlists from libraryPlaylistsProvider too',
+        () async {
+      // Library albums empty; sync-all should still pull playlist songs.
+      final _Env env = _buildEnv(
+        tmp: tmp,
+        syncAll: true,
+        playlistStubs: <String, List<Song>>{
+          'pl-1': <Song>[_s1, _s2],
+        },
+      );
+      addTearDown(env.container.dispose);
+
+      await env.container.read(offlineSettingsProvider.future);
+
+      final OfflineSyncResult r = await env.container
+          .read(offlineSyncProvider.notifier)
+          .syncNow();
+      expect(r.downloadedCount, 2);
+    });
+
+    test(
+      'syncAll flipped OFF sweeps only songs no longer covered by markers',
+      () async {
+        // Phase 1: sync-all ON, 2 albums in the library. Both download.
+        final _Env env = _buildEnv(
+          tmp: tmp,
+          syncAll: true,
+          albumStubs: <String, List<Song>>{
+            'al-1': <Song>[_s1, _s2],
+            'al-2': <Song>[_s3],
+          },
+        );
+        addTearDown(env.container.dispose);
+
+        await env.container.read(offlineSettingsProvider.future);
+        // Mark al-1 — when sync-all flips off, al-1 stays; al-2 sweeps.
+        await _seedMarkers(env.container, albums: <String>{'al-1'});
+
+        await env.container.read(offlineSyncProvider.notifier).syncNow();
+
+        OfflineManifest m =
+            await env.container.read(offlineManifestProvider.future);
+        expect(m.songs.length, 3);
+        final String al2Path = m.songs['so-3']!.localPath!;
+        expect(await File(al2Path).exists(), isTrue);
+
+        // Phase 2: flip sync-all off via the settings notifier.
+        await env.container
+            .read(offlineSettingsProvider.notifier)
+            .setSyncAll(false);
+
+        final OfflineSyncResult r = await env.container
+            .read(offlineSyncProvider.notifier)
+            .syncNow();
+
+        // al-1's songs (so-1, so-2) stay; al-2's so-3 sweeps.
+        expect(r.sweptCount, greaterThanOrEqualTo(1));
+        m = await env.container.read(offlineManifestProvider.future);
+        expect(m.songs.containsKey('so-1'), isTrue);
+        expect(m.songs.containsKey('so-2'), isTrue);
+        expect(m.songs.containsKey('so-3'), isFalse);
+        expect(await File(al2Path).exists(), isFalse);
+      },
+    );
   });
 
   group('OfflineSync — lifecycle', () {

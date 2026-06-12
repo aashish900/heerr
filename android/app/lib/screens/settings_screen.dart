@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../offline/offline_manifest.dart';
 import '../offline/offline_paths.dart';
 import '../offline/offline_settings.dart';
+import '../offline/offline_size_estimator.dart';
 import '../offline/offline_sync.dart';
 import '../providers/settings.dart';
 import '../router.dart';
@@ -104,6 +105,7 @@ class _OfflineSection extends ConsumerWidget {
                       .read(offlineSettingsProvider.notifier)
                       .setWifiOnly(v),
                 ),
+                _SyncAllTile(syncAll: s.syncAll),
                 ListTile(
                   title: const Text('Sync interval'),
                   subtitle: const Text(
@@ -312,6 +314,70 @@ class _ClearAllActionState extends ConsumerState<_ClearAllAction> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+}
+
+/// "Sync entire library" toggle (L4). Subtitle shows the preflight estimate
+/// from [offlineSizeEstimateProvider]. OFF → ON opens a confirmation dialog
+/// quoting the size; cancel keeps the switch off; confirm flips it.
+class _SyncAllTile extends ConsumerWidget {
+  const _SyncAllTile({required this.syncAll});
+
+  final bool syncAll;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AsyncValue<int?> estimate = ref.watch(offlineSizeEstimateProvider);
+    return SwitchListTile(
+      title: const Text('Sync entire library'),
+      subtitle: Text(_subtitleFor(estimate)),
+      value: syncAll,
+      onChanged: (bool v) async {
+        if (v) {
+          await _confirmAndEnable(context, ref, estimate);
+        } else {
+          await ref.read(offlineSettingsProvider.notifier).setSyncAll(false);
+        }
+      },
+    );
+  }
+
+  String _subtitleFor(AsyncValue<int?> estimate) {
+    return estimate.when(
+      loading: () => 'Calculating…',
+      error: (Object _, StackTrace _) => 'Size unknown',
+      data: (int? v) => v == null ? 'Size unknown' : '≈ ${_humanBytes(v)}',
+    );
+  }
+
+  Future<void> _confirmAndEnable(
+    BuildContext context,
+    WidgetRef ref,
+    AsyncValue<int?> estimate,
+  ) async {
+    final int? size = estimate.valueOrNull;
+    final String sizeStr = size == null ? 'the entire library' : _humanBytes(size);
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: const Text('Sync entire library?'),
+        content: Text(
+          'This will download ~$sizeStr and may take a while. Continue?',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Sync'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await ref.read(offlineSettingsProvider.notifier).setSyncAll(true);
   }
 }
 

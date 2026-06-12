@@ -1,13 +1,31 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/offline/offline_settings.dart';
+import 'package:heerr/offline/offline_size_estimator.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/providers/settings.dart';
 import 'package:heerr/screens/servers_screen.dart';
 import 'package:heerr/screens/settings_screen.dart';
+
+/// Stub estimator that returns a fixed byte count without walking the
+/// library — keeps the offline-section widget tree synchronous and avoids
+/// the real provider's Subsonic / HTTP dependencies.
+class _StubEstimate extends OfflineSizeEstimate {
+  _StubEstimate(this._bytes);
+  final int? _bytes;
+
+  @override
+  Future<int?> build() async => _bytes;
+
+  @override
+  Future<int?> refresh() async => _bytes;
+}
 
 class _InMemoryStorage implements SecureStorage {
   _InMemoryStorage([Map<String, String>? seed])
@@ -32,7 +50,11 @@ class _InMemoryStorage implements SecureStorage {
   }
 }
 
-Widget _wrap(List<Override> overrides) {
+Widget _wrap(
+  List<Override> overrides, {
+  int? estimateBytes = 0,
+  Directory? appDocsDir,
+}) {
   final GoRouter router = GoRouter(
     initialLocation: '/settings',
     routes: <RouteBase>[
@@ -48,8 +70,20 @@ Widget _wrap(List<Override> overrides) {
       ),
     ],
   );
+  // path_provider isn't available in widget tests — every place the offline
+  // module touches `getApplicationDocumentsDirectory()` would hang without
+  // this override. Default to the test's systemTemp if the caller didn't
+  // provide one.
+  final Directory docs = appDocsDir ??
+      Directory.systemTemp.createTempSync('heerr-settings-test-');
   return ProviderScope(
-    overrides: overrides,
+    overrides: <Override>[
+      ...overrides,
+      applicationDocumentsDirectoryProvider
+          .overrideWith((ApplicationDocumentsDirectoryRef ref) async => docs),
+      offlineSizeEstimateProvider
+          .overrideWith(() => _StubEstimate(estimateBytes)),
+    ],
     child: MaterialApp.router(routerConfig: router),
   );
 }
@@ -65,10 +99,21 @@ Future<void> _pumpForBuild(WidgetTester tester) async {
   }
 }
 
+/// Settings is a ListView with several rows; on the default test surface
+/// (~800px tall) lazy rendering hides the tail of the list. Bumping the
+/// surface ensures every section is in the tree and findable in one shot.
+Future<void> _useTallSurface(WidgetTester tester) async {
+  await tester.binding.setSurfaceSize(const Size(800, 2400));
+  addTearDown(() async {
+    await tester.binding.setSurfaceSize(null);
+  });
+}
+
 void main() {
   testWidgets('Settings screen lists a "Servers" entry', (
     WidgetTester tester,
   ) async {
+    await _useTallSurface(tester);
     final SecureStorage store = _InMemoryStorage();
     await tester.pumpWidget(_wrap(<Override>[
       secureStorageProvider.overrideWithValue(store),
@@ -81,6 +126,7 @@ void main() {
     testWidgets('renders master switch + sub-controls', (
       WidgetTester tester,
     ) async {
+      await _useTallSurface(tester);
       await tester.pumpWidget(_wrap(<Override>[
         secureStorageProvider.overrideWithValue(_InMemoryStorage()),
       ]));
@@ -90,11 +136,13 @@ void main() {
       expect(find.text('Sync interval'), findsOneWidget);
       expect(find.text('Sync now'), findsOneWidget);
       expect(find.text('Clear all downloads'), findsOneWidget);
+      expect(find.text('Sync entire library'), findsOneWidget);
     });
 
     testWidgets('master switch toggle persists to settings', (
       WidgetTester tester,
     ) async {
+      await _useTallSurface(tester);
       final _InMemoryStorage store = _InMemoryStorage();
       await tester.pumpWidget(_wrap(<Override>[
         secureStorageProvider.overrideWithValue(store),
@@ -108,9 +156,88 @@ void main() {
       expect(store.snapshot['offline_enabled'], 'true');
     });
 
+    testWidgets('sync-all OFF→ON opens confirmation dialog with size', (
+      WidgetTester tester,
+    ) async {
+      await _useTallSurface(tester);
+      await tester.pumpWidget(_wrap(
+        <Override>[
+          secureStorageProvider.overrideWithValue(_InMemoryStorage(
+            <String, String>{'offline_enabled': 'true'},
+          )),
+        ],
+        // 2 MB so the human-readable formatting hits the MB branch.
+        estimateBytes: 2 * 1024 * 1024,
+      ));
+      await _pumpForBuild(tester);
+
+      // Tap the "Sync entire library" switch — it's the SwitchListTile whose
+      // title matches that exact string.
+      await tester.tap(find.widgetWithText(SwitchListTile, 'Sync entire library'));
+      await _pumpForBuild(tester);
+
+      expect(find.text('Sync entire library?'), findsOneWidget);
+      // Dialog content quotes the size in the warning sentence.
+      expect(
+        find.text('This will download ~2.0 MB and may take a while. Continue?'),
+        findsOneWidget,
+      );
+      expect(find.text('Cancel'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Sync'), findsOneWidget);
+    });
+
+    testWidgets('sync-all dialog Cancel keeps the switch off', (
+      WidgetTester tester,
+    ) async {
+      await _useTallSurface(tester);
+      final _InMemoryStorage store = _InMemoryStorage(
+        <String, String>{'offline_enabled': 'true'},
+      );
+      await tester.pumpWidget(_wrap(
+        <Override>[secureStorageProvider.overrideWithValue(store)],
+        estimateBytes: 1024,
+      ));
+      await _pumpForBuild(tester);
+
+      await tester.tap(find.widgetWithText(SwitchListTile, 'Sync entire library'));
+      await _pumpForBuild(tester);
+      await tester.tap(find.text('Cancel'));
+      await _pumpForBuild(tester);
+
+      // No write to offline_sync_all means the key is absent (default false).
+      expect(store.snapshot['offline_sync_all'], isNot('true'));
+    });
+
+    testWidgets('sync-all dialog Confirm flips offline_sync_all true', (
+      WidgetTester tester,
+    ) async {
+      await _useTallSurface(tester);
+      final _InMemoryStorage store = _InMemoryStorage(
+        <String, String>{'offline_enabled': 'true'},
+      );
+      await tester.pumpWidget(_wrap(
+        <Override>[secureStorageProvider.overrideWithValue(store)],
+        estimateBytes: 1024,
+      ));
+      await _pumpForBuild(tester);
+
+      await tester.tap(find.widgetWithText(SwitchListTile, 'Sync entire library'));
+      await _pumpForBuild(tester);
+      await tester.tap(find.widgetWithText(FilledButton, 'Sync'));
+      // The OFF→ON confirm path is longer than other taps: dialog pop +
+      // animation + setSyncAll's multi-await chain (settings save → manifest
+      // cache clear). Give it extra pump cycles before asserting.
+      for (int i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+
+      expect(store.snapshot['offline_sync_all'], 'true');
+    });
+
     testWidgets('Clear all opens confirmation dialog with Cancel/Clear', (
       WidgetTester tester,
     ) async {
+      await _useTallSurface(tester);
       await tester.pumpWidget(_wrap(<Override>[
         secureStorageProvider.overrideWithValue(_InMemoryStorage(
           <String, String>{'offline_enabled': 'true'},

@@ -4,7 +4,7 @@ Track progress through the post-streamer offline-download feature. Same cadence 
 
 This roadmap continues the alphabet from `ROADMAP_STREAMER.md`: A1–G1 covered the ingestion client, H1–K2 covered the streaming client. **L1–L5 cover the offline-download client** — the user marks albums/playlists (or the entire library); the app periodically downloads those songs to device storage and prefers the local file at playback time.
 
-**Status (2026-06-12):** L1–L3 complete and committed. L4–L5 queued.
+**Status (2026-06-12):** L1–L4 complete and committed. L5 queued.
 
 ---
 
@@ -235,7 +235,7 @@ Before writing new code, confirm these still exist and have the signatures liste
 
 ---
 
-### [ ] L4. Sync-all + estimated-size preflight
+### [x] L4. Sync-all + estimated-size preflight
 
 **Files (modify):**
 - `android/app/lib/offline/offline_sync.dart` — implement the `syncAll == true` branch fully: walk `libraryAlbumsProvider`, fan out via `libraryAlbumProvider(id)`, union with markers. Walk `libraryPlaylistsProvider` + `libraryPlaylistProvider(id)` for playlist coverage when the user has none marked. (When `syncAll == false`, this branch is unreachable.)

@@ -10,7 +10,9 @@ import '../models/subsonic/album.dart';
 import '../models/subsonic/playlist.dart';
 import '../models/subsonic/song.dart';
 import '../providers/library/library_album.dart';
+import '../providers/library/library_albums.dart';
 import '../providers/library/library_playlist.dart';
+import '../providers/library/library_playlists.dart';
 import '../providers/settings.dart';
 import 'offline_downloader.dart';
 import 'offline_manifest.dart';
@@ -184,14 +186,25 @@ class OfflineSync extends _$OfflineSync {
           await ref.read(offlineManifestStoreProvider.future);
       final OfflineManifest currentManifest = await store.load(settings);
 
-      // Resolve target song set.
+      // Offline-settings snapshot used by both target resolution (syncAll)
+      // and the WiFi gate below.
+      final OfflineSettingsValue offline =
+          ref.read(offlineSettingsProvider).valueOrNull ??
+              (
+                enabled: false,
+                syncAll: false,
+                wifiOnly: true,
+                pollIntervalMinutes: 15,
+              );
+
+      // Resolve target song set. Markers + (optionally) sync-all enumeration.
       final Map<String, Song> targets =
-          await _resolveTargets(currentManifest);
+          await _resolveTargets(currentManifest, offline);
       final Set<String> targetIds = targets.keys.toSet();
 
       // Sweep first — removes stale files even if downloads are gated on
-      // WiFi later in the tick. The user wants unmarks to take effect even
-      // without WiFi.
+      // WiFi later in the tick. The user wants unmarks (or sync-all OFF) to
+      // take effect even without WiFi.
       final ({Map<String, OfflineSongEntry> songs, int sweptCount}) swept =
           await _sweepUnreferenced(
         paths: paths,
@@ -202,14 +215,6 @@ class OfflineSync extends _$OfflineSync {
       Map<String, OfflineSongEntry> songsState = swept.songs;
 
       // WiFi gate.
-      final OfflineSettingsValue offline =
-          ref.read(offlineSettingsProvider).valueOrNull ??
-              (
-                enabled: false,
-                syncAll: false,
-                wifiOnly: true,
-                pollIntervalMinutes: 15,
-              );
       if (offline.wifiOnly) {
         final bool wifi = await ref.read(wifiCheckProvider).isOnWifi();
         if (!wifi) {
@@ -296,13 +301,45 @@ class OfflineSync extends _$OfflineSync {
     }
   }
 
-  /// Resolve marker ids into the full Song objects we need to download.
-  /// At L2 this only handles the marker path; sync-all is L4 and lives in
-  /// the same provider, gated by `offlineSettings.syncAll`.
-  Future<Map<String, Song>> _resolveTargets(OfflineManifest manifest) async {
+  /// Resolve marker ids (and — when `offline.syncAll` is on — every library
+  /// album + playlist) into the full Song objects we need to download.
+  ///
+  /// Dedup is by the returned map's key (`song.id`), so a song that lives in
+  /// both a marked album and a marked playlist (or in the full-library walk
+  /// when sync-all is on) lands in `out` exactly once.
+  Future<Map<String, Song>> _resolveTargets(
+    OfflineManifest manifest,
+    OfflineSettingsValue offline,
+  ) async {
+    // Union marker ids with the full-library enumeration when sync-all is on.
+    final Set<String> albumIds = <String>{...manifest.markedAlbums};
+    final Set<String> playlistIds = <String>{...manifest.markedPlaylists};
+
+    if (offline.syncAll) {
+      try {
+        final List<Album> all =
+            await ref.read(libraryAlbumsProvider.future);
+        for (final Album a in all) {
+          albumIds.add(a.id);
+        }
+      } catch (e) {
+        // A library-list failure shouldn't strand individually-marked items.
+        debugPrint('offline_sync: enumerate library albums failed: $e');
+      }
+      try {
+        final List<Playlist> all =
+            await ref.read(libraryPlaylistsProvider.future);
+        for (final Playlist p in all) {
+          playlistIds.add(p.id);
+        }
+      } catch (e) {
+        debugPrint('offline_sync: enumerate library playlists failed: $e');
+      }
+    }
+
     final Map<String, Song> out = <String, Song>{};
 
-    for (final String albumId in manifest.markedAlbums) {
+    for (final String albumId in albumIds) {
       try {
         final Album album =
             await ref.read(libraryAlbumProvider(albumId).future);
@@ -315,7 +352,7 @@ class OfflineSync extends _$OfflineSync {
       }
     }
 
-    for (final String playlistId in manifest.markedPlaylists) {
+    for (final String playlistId in playlistIds) {
       try {
         final Playlist p =
             await ref.read(libraryPlaylistProvider(playlistId).future);

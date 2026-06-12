@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/offline/offline_settings.dart';
 import 'package:heerr/providers/secure_storage.dart';
 
@@ -28,9 +31,16 @@ class _FakeSecureStorage implements SecureStorage {
 }
 
 ProviderContainer _makeContainer(_FakeSecureStorage fake) {
+  // setSyncAll touches the offline manifest store (L4 cache invalidation),
+  // which transitively needs `applicationDocumentsDirectoryProvider`. Use
+  // systemTemp so the path resolves without a platform channel.
+  final Directory tmp =
+      Directory.systemTemp.createTempSync('heerr-offline-settings-test-');
   return ProviderContainer(
     overrides: <Override>[
       secureStorageProvider.overrideWith((Ref<SecureStorage> ref) => fake),
+      applicationDocumentsDirectoryProvider
+          .overrideWith((ApplicationDocumentsDirectoryRef ref) async => tmp),
     ],
   );
 }

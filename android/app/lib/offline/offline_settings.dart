@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../providers/settings.dart';
+import 'offline_manifest.dart';
 
 part 'offline_settings.g.dart';
 
@@ -34,7 +35,20 @@ class OfflineSettings extends _$OfflineSettings {
   }
 
   Future<void> setSyncAll(bool value) async {
+    // Snapshot settings + the manifest store BEFORE the save. Otherwise the
+    // save invalidates settingsProvider, this notifier (which watches it) is
+    // marked for rebuild, and any further `ref.read` here trips the
+    // "dependency changed before rebuild" assertion. Server-key fields
+    // (navidromeBaseUrl/Username) don't change, so the snapshot is safe.
+    final SettingsValue settings =
+        await ref.read(settingsProvider.future);
+    final OfflineManifestStore store =
+        await ref.read(offlineManifestStoreProvider.future);
     await ref.read(settingsProvider.notifier).save(offlineSyncAll: value);
+    // Per L4 spec: flipping syncAll invalidates the preflight estimate cache
+    // even though the estimate value itself doesn't depend on syncAll. Keeps
+    // the cache rule uniform with marker mutations.
+    await _clearEstimateCacheFor(settings, store);
   }
 
   Future<void> setWifiOnly(bool value) async {
@@ -45,5 +59,21 @@ class OfflineSettings extends _$OfflineSettings {
     await ref
         .read(settingsProvider.notifier)
         .save(offlinePollIntervalMin: minutes);
+  }
+
+  Future<void> _clearEstimateCacheFor(
+    SettingsValue settings,
+    OfflineManifestStore store,
+  ) async {
+    if (settings.navidromeBaseUrl == null) return;
+    final OfflineManifest m = await store.load(settings);
+    if (m.estimatedTotalBytes == null && m.estimatedAt == null) return;
+    await store.save(
+      settings,
+      m.copyWith(estimatedTotalBytes: null, estimatedAt: null),
+    );
+    // ref.invalidate is safe here — invalidate doesn't trip the
+    // "dependency-outdated" assertion (it just marks a sibling provider).
+    ref.invalidate(offlineManifestProvider);
   }
 }
