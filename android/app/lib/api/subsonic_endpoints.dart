@@ -1,5 +1,5 @@
 /// Subsonic API path constants. Joined onto the user-supplied
-/// `navidromeBaseUrl` (e.g. `http://100.106.120.121:4533`). All methods
+/// `navidromeBaseUrl` (e.g. `http://100.x.y.z:4533`). All methods
 /// live under `/rest/<method>.view`; auth params (u/s/t/v/c/f) are injected
 /// by `SubsonicAuthInterceptor`.
 class SubsonicEndpoints {

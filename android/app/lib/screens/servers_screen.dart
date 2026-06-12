@@ -320,7 +320,7 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
                 controller: _urlController,
                 decoration: const InputDecoration(
                   labelText: 'Backend URL',
-                  helperText: 'e.g. http://100.106.120.121:8000/api/v1',
+                  helperText: 'e.g. http://100.x.y.z:8000/api/v1',
                   border: OutlineInputBorder(),
                 ),
                 autocorrect: false,
@@ -364,7 +364,7 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
                 controller: _navidromeUrlController,
                 decoration: const InputDecoration(
                   labelText: 'Navidrome URL',
-                  helperText: 'e.g. http://100.106.120.121:4533',
+                  helperText: 'e.g. http://100.x.y.z:4533',
                   border: OutlineInputBorder(),
                 ),
                 autocorrect: false,

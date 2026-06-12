@@ -60,7 +60,7 @@ class ServerProfile {
   final String backendBaseUrl;
   final String bearerToken;
 
-  /// Navidrome (Subsonic) base URL — e.g. `http://100.106.120.121:4533`.
+  /// Navidrome (Subsonic) base URL — e.g. `http://100.x.y.z:4533`.
   /// Optional: a user that only uses ingestion need not configure it.
   final String? navidromeBaseUrl;
   final String? navidromeUsername;

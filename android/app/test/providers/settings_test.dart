@@ -59,9 +59,9 @@ void main() {
 
     test('pre-seeded storage → values are loaded (heerr + navidrome)', () async {
       final _FakeSecureStorage fake = _FakeSecureStorage(<String, String>{
-        'backend_base_url': 'http://100.106.120.121:8000/api/v1',
+        'backend_base_url': 'http://100.x.y.z:8000/api/v1',
         'bearer_token': 'raw-token-xyz',
-        'navidrome_base_url': 'http://100.106.120.121:4533',
+        'navidrome_base_url': 'http://100.x.y.z:4533',
         'navidrome_username': 'me',
         'navidrome_password': 'navi-pw',
       });
@@ -70,9 +70,9 @@ void main() {
 
       final SettingsValue v = await c.read(settingsProvider.future);
 
-      expect(v.backendBaseUrl, 'http://100.106.120.121:8000/api/v1');
+      expect(v.backendBaseUrl, 'http://100.x.y.z:8000/api/v1');
       expect(v.bearerToken, 'raw-token-xyz');
-      expect(v.navidromeBaseUrl, 'http://100.106.120.121:4533');
+      expect(v.navidromeBaseUrl, 'http://100.x.y.z:4533');
       expect(v.navidromeUsername, 'me');
       expect(v.navidromePassword, 'navi-pw');
     });
