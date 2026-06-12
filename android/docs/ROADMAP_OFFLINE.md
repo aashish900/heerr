@@ -4,7 +4,7 @@ Track progress through the post-streamer offline-download feature. Same cadence 
 
 This roadmap continues the alphabet from `ROADMAP_STREAMER.md`: A1–G1 covered the ingestion client, H1–K2 covered the streaming client. **L1–L5 cover the offline-download client** — the user marks albums/playlists (or the entire library); the app periodically downloads those songs to device storage and prefers the local file at playback time.
 
-**Status (2026-06-12):** planning round complete (this file). **No offline Dart code exists yet.** Execution begins at L1.
+**Status (2026-06-12):** L1–L3 complete and committed. L4–L5 queued.
 
 ---
 
@@ -143,7 +143,7 @@ Before writing new code, confirm these still exist and have the signatures liste
 
 ## Phase L — Offline downloads
 
-### [ ] L1. Foundation — settings extension + paths + manifest
+### [x] L1. Foundation — settings extension + paths + manifest
 
 **Files (new):**
 - `android/app/lib/offline/offline_paths.dart` — pure functions: `Future<Directory> offlineRoot()` (uses `path_provider.getApplicationDocumentsDirectory()`), `String serverKey({required String navidromeBaseUrl, required String navidromeUsername})` (sha256 → 16 hex chars), `Future<Directory> serverRoot(SettingsValue)`, `Future<File> manifestFile(SettingsValue)`, `Future<File> songFile(SettingsValue, String songId, String suffix)`. Return null gracefully when Navidrome creds are missing (don't throw — sync will be no-op'd by the caller).
@@ -169,7 +169,7 @@ Before writing new code, confirm these still exist and have the signatures liste
 
 ---
 
-### [ ] L2. Downloader + Sync + Playback integration
+### [x] L2. Downloader + Sync + Playback integration
 
 **Files (new):**
 - `android/app/lib/offline/offline_downloader.dart` — `Future<OfflineSongEntry> downloadSong({required Song song, required SettingsValue settings, required OfflinePaths paths, required Dio downloadDio})`. Uses `buildSubsonicStreamUrl` for the URL and `dio.download(url, dest)` (NOT through the Subsonic interceptor — pass a separate `Dio` whose `BaseOptions` are unbound and which has no interceptors; the auth lives in the URL). Writes to a `.partial` file first, renames to the final path on success, verifies `file.length() == song.size` if size is provided, deletes the partial on any error, returns a `ready` or `failed` entry. Catches `DioException` and maps via `mapDioErrorToApiError`; the `failed` entry's `lastError` carries `ApiError.message`.
@@ -206,7 +206,7 @@ Before writing new code, confirm these still exist and have the signatures liste
 
 ---
 
-### [ ] L3. UI — markers + Settings section + lifecycle wiring
+### [x] L3. UI — markers + Settings section + lifecycle wiring
 
 **Files (modify):**
 - `android/app/lib/widgets/library_result_tile.dart` — new optional `bool isMarkedForOffline` + `VoidCallback? onMarkToggle` + `double? offlineProgress` (0..1, nullable when not downloading). Trailing-slot rules: `isCurrentlyPlaying` icon (existing) wins; else `onMarkToggle != null` shows `Icons.download_for_offline_outlined` (not marked) or `Icons.download_for_offline` filled `heerrGreen` (marked); else falls back to existing `trailingPlay` logic. When `offlineProgress != null`, render a thin `LinearProgressIndicator` under the subtitle.
