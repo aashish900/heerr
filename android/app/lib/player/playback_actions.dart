@@ -61,11 +61,16 @@ void _errSnack(BuildContext context, Object e) {
   ));
 }
 
-MediaItem _toMediaItem(WidgetRef ref, Song s, _Creds c) {
+Future<MediaItem> _toMediaItem(WidgetRef ref, Song s, _Creds c) async {
   // Single chokepoint: ask the offline layer if we have a local file for
   // this song id; pass it through to songToMediaItem so MediaItem.id becomes
   // file://… instead of the Subsonic stream URL. Null = stream.
-  final String? localUri = ref.read(localUriForProvider(s.id));
+  // Awaits the `.future` so the manifest provider has fully rebuilt after
+  // a recent sync — without this, a fresh download would be invisible to
+  // the player until the next time the manifest cache happens to refresh
+  // (the "have to download twice to play offline" bug).
+  final String? localUri =
+      await ref.read(localUriForProvider(s.id).future);
   String? localPath;
   if (localUri != null) {
     final Uri parsed = Uri.parse(localUri);
@@ -95,7 +100,7 @@ Future<void> playSongFromSubsonic(
       if (context.mounted) _credsMissingSnack(context);
       return;
     }
-    final MediaItem item = _toMediaItem(ref, song, creds);
+    final MediaItem item = await _toMediaItem(ref, song, creds);
     await ref.read(audioHandlerProvider).playSong(item);
     messenger.showSnackBar(SnackBar(
       duration: kSnackBarDuration,
@@ -127,8 +132,9 @@ Future<void> playAllSongsFromSubsonic(
       if (context.mounted) _credsMissingSnack(context);
       return;
     }
-    final List<MediaItem> items =
-        songs.map((Song s) => _toMediaItem(ref, s, creds)).toList();
+    final List<MediaItem> items = await Future.wait<MediaItem>(
+      songs.map((Song s) => _toMediaItem(ref, s, creds)),
+    );
     await ref
         .read(audioHandlerProvider)
         .playAll(items, startIndex: startIndex);

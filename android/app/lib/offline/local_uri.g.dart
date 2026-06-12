@@ -6,7 +6,7 @@ part of 'local_uri.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$localUriForHash() => r'1268ebca78a386c52bf2c4930fdf18fb7e14dd65';
+String _$localUriForHash() => r'7053cc9775a9a33a0e267e5916d961fb8099869c';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -38,10 +38,22 @@ class _SystemHash {
 /// - `null` when the entry exists but state is not [OfflineSongState.ready].
 /// - A `file://` URI string when the entry is `ready` with a `localPath`.
 ///
-/// `playback_actions._toMediaItem` reads this and forwards the result to
-/// `songToMediaItem(localFilePath: ...)`. Every play surface funnels through
-/// that helper, so this provider is the only place that decides local vs.
-/// stream.
+/// **Async on purpose.** Earlier this was a sync provider that read
+/// `manifest.valueOrNull`. That gave a real bug: right after a sync
+/// `ref.invalidate(offlineManifestProvider)` puts the manifest into a
+/// loading state with the *previous* AsyncData snapshot attached. A
+/// playback action that called `ref.read(localUriForProvider(songId))`
+/// in that window saw the stale pre-sync manifest, didn't find a
+/// `ready` entry, and quietly fell back to the stream URL — which then
+/// failed offline. The user observed "I have to download twice for it
+/// to play." Awaiting `manifest.future` blocks until the rebuild
+/// completes (manifest is a disk read, fast even offline), so the
+/// playback layer always sees the freshly persisted entry.
+///
+/// `playback_actions._toMediaItem` awaits this and forwards the result
+/// to `songToMediaItem(localFilePath: ...)`. Every play surface funnels
+/// through that helper, so this provider is the only place that decides
+/// local vs. stream.
 ///
 /// Copied from [localUriFor].
 @ProviderFor(localUriFor)
@@ -56,13 +68,25 @@ const localUriForProvider = LocalUriForFamily();
 /// - `null` when the entry exists but state is not [OfflineSongState.ready].
 /// - A `file://` URI string when the entry is `ready` with a `localPath`.
 ///
-/// `playback_actions._toMediaItem` reads this and forwards the result to
-/// `songToMediaItem(localFilePath: ...)`. Every play surface funnels through
-/// that helper, so this provider is the only place that decides local vs.
-/// stream.
+/// **Async on purpose.** Earlier this was a sync provider that read
+/// `manifest.valueOrNull`. That gave a real bug: right after a sync
+/// `ref.invalidate(offlineManifestProvider)` puts the manifest into a
+/// loading state with the *previous* AsyncData snapshot attached. A
+/// playback action that called `ref.read(localUriForProvider(songId))`
+/// in that window saw the stale pre-sync manifest, didn't find a
+/// `ready` entry, and quietly fell back to the stream URL — which then
+/// failed offline. The user observed "I have to download twice for it
+/// to play." Awaiting `manifest.future` blocks until the rebuild
+/// completes (manifest is a disk read, fast even offline), so the
+/// playback layer always sees the freshly persisted entry.
+///
+/// `playback_actions._toMediaItem` awaits this and forwards the result
+/// to `songToMediaItem(localFilePath: ...)`. Every play surface funnels
+/// through that helper, so this provider is the only place that decides
+/// local vs. stream.
 ///
 /// Copied from [localUriFor].
-class LocalUriForFamily extends Family<String?> {
+class LocalUriForFamily extends Family<AsyncValue<String?>> {
   /// Single chokepoint that the playback layer queries to decide whether to
   /// open a local file or stream over the network.
   ///
@@ -72,10 +96,22 @@ class LocalUriForFamily extends Family<String?> {
   /// - `null` when the entry exists but state is not [OfflineSongState.ready].
   /// - A `file://` URI string when the entry is `ready` with a `localPath`.
   ///
-  /// `playback_actions._toMediaItem` reads this and forwards the result to
-  /// `songToMediaItem(localFilePath: ...)`. Every play surface funnels through
-  /// that helper, so this provider is the only place that decides local vs.
-  /// stream.
+  /// **Async on purpose.** Earlier this was a sync provider that read
+  /// `manifest.valueOrNull`. That gave a real bug: right after a sync
+  /// `ref.invalidate(offlineManifestProvider)` puts the manifest into a
+  /// loading state with the *previous* AsyncData snapshot attached. A
+  /// playback action that called `ref.read(localUriForProvider(songId))`
+  /// in that window saw the stale pre-sync manifest, didn't find a
+  /// `ready` entry, and quietly fell back to the stream URL — which then
+  /// failed offline. The user observed "I have to download twice for it
+  /// to play." Awaiting `manifest.future` blocks until the rebuild
+  /// completes (manifest is a disk read, fast even offline), so the
+  /// playback layer always sees the freshly persisted entry.
+  ///
+  /// `playback_actions._toMediaItem` awaits this and forwards the result
+  /// to `songToMediaItem(localFilePath: ...)`. Every play surface funnels
+  /// through that helper, so this provider is the only place that decides
+  /// local vs. stream.
   ///
   /// Copied from [localUriFor].
   const LocalUriForFamily();
@@ -89,10 +125,22 @@ class LocalUriForFamily extends Family<String?> {
   /// - `null` when the entry exists but state is not [OfflineSongState.ready].
   /// - A `file://` URI string when the entry is `ready` with a `localPath`.
   ///
-  /// `playback_actions._toMediaItem` reads this and forwards the result to
-  /// `songToMediaItem(localFilePath: ...)`. Every play surface funnels through
-  /// that helper, so this provider is the only place that decides local vs.
-  /// stream.
+  /// **Async on purpose.** Earlier this was a sync provider that read
+  /// `manifest.valueOrNull`. That gave a real bug: right after a sync
+  /// `ref.invalidate(offlineManifestProvider)` puts the manifest into a
+  /// loading state with the *previous* AsyncData snapshot attached. A
+  /// playback action that called `ref.read(localUriForProvider(songId))`
+  /// in that window saw the stale pre-sync manifest, didn't find a
+  /// `ready` entry, and quietly fell back to the stream URL — which then
+  /// failed offline. The user observed "I have to download twice for it
+  /// to play." Awaiting `manifest.future` blocks until the rebuild
+  /// completes (manifest is a disk read, fast even offline), so the
+  /// playback layer always sees the freshly persisted entry.
+  ///
+  /// `playback_actions._toMediaItem` awaits this and forwards the result
+  /// to `songToMediaItem(localFilePath: ...)`. Every play surface funnels
+  /// through that helper, so this provider is the only place that decides
+  /// local vs. stream.
   ///
   /// Copied from [localUriFor].
   LocalUriForProvider call(String songId) {
@@ -130,13 +178,25 @@ class LocalUriForFamily extends Family<String?> {
 /// - `null` when the entry exists but state is not [OfflineSongState.ready].
 /// - A `file://` URI string when the entry is `ready` with a `localPath`.
 ///
-/// `playback_actions._toMediaItem` reads this and forwards the result to
-/// `songToMediaItem(localFilePath: ...)`. Every play surface funnels through
-/// that helper, so this provider is the only place that decides local vs.
-/// stream.
+/// **Async on purpose.** Earlier this was a sync provider that read
+/// `manifest.valueOrNull`. That gave a real bug: right after a sync
+/// `ref.invalidate(offlineManifestProvider)` puts the manifest into a
+/// loading state with the *previous* AsyncData snapshot attached. A
+/// playback action that called `ref.read(localUriForProvider(songId))`
+/// in that window saw the stale pre-sync manifest, didn't find a
+/// `ready` entry, and quietly fell back to the stream URL — which then
+/// failed offline. The user observed "I have to download twice for it
+/// to play." Awaiting `manifest.future` blocks until the rebuild
+/// completes (manifest is a disk read, fast even offline), so the
+/// playback layer always sees the freshly persisted entry.
+///
+/// `playback_actions._toMediaItem` awaits this and forwards the result
+/// to `songToMediaItem(localFilePath: ...)`. Every play surface funnels
+/// through that helper, so this provider is the only place that decides
+/// local vs. stream.
 ///
 /// Copied from [localUriFor].
-class LocalUriForProvider extends AutoDisposeProvider<String?> {
+class LocalUriForProvider extends AutoDisposeFutureProvider<String?> {
   /// Single chokepoint that the playback layer queries to decide whether to
   /// open a local file or stream over the network.
   ///
@@ -146,10 +206,22 @@ class LocalUriForProvider extends AutoDisposeProvider<String?> {
   /// - `null` when the entry exists but state is not [OfflineSongState.ready].
   /// - A `file://` URI string when the entry is `ready` with a `localPath`.
   ///
-  /// `playback_actions._toMediaItem` reads this and forwards the result to
-  /// `songToMediaItem(localFilePath: ...)`. Every play surface funnels through
-  /// that helper, so this provider is the only place that decides local vs.
-  /// stream.
+  /// **Async on purpose.** Earlier this was a sync provider that read
+  /// `manifest.valueOrNull`. That gave a real bug: right after a sync
+  /// `ref.invalidate(offlineManifestProvider)` puts the manifest into a
+  /// loading state with the *previous* AsyncData snapshot attached. A
+  /// playback action that called `ref.read(localUriForProvider(songId))`
+  /// in that window saw the stale pre-sync manifest, didn't find a
+  /// `ready` entry, and quietly fell back to the stream URL — which then
+  /// failed offline. The user observed "I have to download twice for it
+  /// to play." Awaiting `manifest.future` blocks until the rebuild
+  /// completes (manifest is a disk read, fast even offline), so the
+  /// playback layer always sees the freshly persisted entry.
+  ///
+  /// `playback_actions._toMediaItem` awaits this and forwards the result
+  /// to `songToMediaItem(localFilePath: ...)`. Every play surface funnels
+  /// through that helper, so this provider is the only place that decides
+  /// local vs. stream.
   ///
   /// Copied from [localUriFor].
   LocalUriForProvider(String songId)
@@ -178,7 +250,9 @@ class LocalUriForProvider extends AutoDisposeProvider<String?> {
   final String songId;
 
   @override
-  Override overrideWith(String? Function(LocalUriForRef provider) create) {
+  Override overrideWith(
+    FutureOr<String?> Function(LocalUriForRef provider) create,
+  ) {
     return ProviderOverride(
       origin: this,
       override: LocalUriForProvider._internal(
@@ -194,7 +268,7 @@ class LocalUriForProvider extends AutoDisposeProvider<String?> {
   }
 
   @override
-  AutoDisposeProviderElement<String?> createElement() {
+  AutoDisposeFutureProviderElement<String?> createElement() {
     return _LocalUriForProviderElement(this);
   }
 
@@ -214,12 +288,13 @@ class LocalUriForProvider extends AutoDisposeProvider<String?> {
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-mixin LocalUriForRef on AutoDisposeProviderRef<String?> {
+mixin LocalUriForRef on AutoDisposeFutureProviderRef<String?> {
   /// The parameter `songId` of this provider.
   String get songId;
 }
 
-class _LocalUriForProviderElement extends AutoDisposeProviderElement<String?>
+class _LocalUriForProviderElement
+    extends AutoDisposeFutureProviderElement<String?>
     with LocalUriForRef {
   _LocalUriForProviderElement(super.provider);
 

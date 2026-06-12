@@ -61,7 +61,7 @@ void main() {
       await c.read(offlineSettingsProvider.future);
       await c.read(offlineManifestProvider.future);
 
-      expect(c.read(localUriForProvider('so-1')), isNull);
+      expect(await c.read(localUriForProvider('so-1').future), isNull);
     });
 
     test('returns null when no manifest entry for songId', () async {
@@ -72,7 +72,7 @@ void main() {
       addTearDown(c.dispose);
       await c.read(offlineSettingsProvider.future);
       await c.read(offlineManifestProvider.future);
-      expect(c.read(localUriForProvider('so-1')), isNull);
+      expect(await c.read(localUriForProvider('so-1').future), isNull);
     });
 
     test('returns null when entry state is queued / downloading / failed',
@@ -97,7 +97,7 @@ void main() {
         await c.read(offlineSettingsProvider.future);
         await c.read(offlineManifestProvider.future);
         expect(
-          c.read(localUriForProvider('so-1')),
+          await c.read(localUriForProvider('so-1').future),
           isNull,
           reason: 'state=$state should be stream-only',
         );
@@ -120,7 +120,7 @@ void main() {
       await c.read(offlineSettingsProvider.future);
       await c.read(offlineManifestProvider.future);
 
-      final String? uri = c.read(localUriForProvider('so-1'));
+      final String? uri = await c.read(localUriForProvider('so-1').future);
       expect(uri, isNotNull);
       expect(uri, startsWith('file:///'));
       expect(uri, endsWith('/songs/so-1.mp3'));
@@ -139,7 +139,7 @@ void main() {
       addTearDown(c.dispose);
       await c.read(offlineSettingsProvider.future);
       await c.read(offlineManifestProvider.future);
-      expect(c.read(localUriForProvider('so-1')), isNull);
+      expect(await c.read(localUriForProvider('so-1').future), isNull);
     });
   });
 }
