@@ -18,6 +18,7 @@ import 'package:heerr/providers/library/library_albums.dart';
 import 'package:heerr/providers/library/library_artists.dart';
 import 'package:heerr/providers/library/library_playlists.dart';
 import 'package:heerr/providers/library/library_search.dart';
+import 'package:heerr/providers/library/playlist_mutations.dart';
 import 'package:heerr/providers/queue.dart';
 import 'package:heerr/providers/search.dart';
 import 'package:heerr/providers/secure_storage.dart';
@@ -78,6 +79,37 @@ class _StubQueue extends Queue {
   @override
   Future<QueueResponse> build() async =>
       const QueueResponse(active: <JobView>[], recent: <JobView>[]);
+}
+
+/// Stub for the M1 PlaylistMutations notifier. Records `createPlaylist`
+/// invocations for the FAB-driven flow at M2 — instance state is exposed
+/// through static fields because Riverpod owns the notifier lifetime and
+/// the test only needs the call count, not a handle to the instance.
+class _StubPlaylistMutations extends PlaylistMutations {
+  static int createCalls = 0;
+  static String? lastCreateName;
+  static Playlist Function(String name)? createBuilder;
+
+  static void reset() {
+    createCalls = 0;
+    lastCreateName = null;
+    createBuilder = null;
+  }
+
+  @override
+  void build() {}
+
+  @override
+  Future<Playlist> createPlaylist({
+    required String name,
+    List<String> songIds = const <String>[],
+  }) async {
+    createCalls++;
+    lastCreateName = name;
+    final Playlist Function(String)? b = createBuilder;
+    if (b != null) return b(name);
+    return Playlist(id: 'new-pl', name: name);
+  }
 }
 
 Widget _wrap(List<Override> overrides) {
@@ -232,7 +264,67 @@ void main() {
       ));
       await tester.pumpAndSettle();
       expect(find.text('No playlists yet'), findsOneWidget);
+      // M2 empty-state copy nudges the user toward the FAB.
+      expect(find.text('Tap + New playlist to create one.'), findsOneWidget);
     });
+
+    testWidgets(
+      'FAB is rendered on the Playlists sub-tab',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(_wrap(_defaultsExcept(
+          playlists:
+              _playlistsValue(const AsyncData<List<Playlist>>(<Playlist>[])),
+        )));
+        await tester.pumpAndSettle();
+        await tester.tap(find.descendant(
+          of: find.byType(TabBar),
+          matching: find.text('Playlists'),
+        ));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(FloatingActionButton), findsOneWidget);
+        expect(find.text('New playlist'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'tapping FAB + entering name calls createPlaylist once with the name',
+      (WidgetTester tester) async {
+        _StubPlaylistMutations.reset();
+        addTearDown(_StubPlaylistMutations.reset);
+
+        await tester.pumpWidget(_wrap(
+          <Override>[
+            ..._defaultsExcept(
+              playlists: _playlistsValue(
+                const AsyncData<List<Playlist>>(<Playlist>[]),
+              ),
+            ),
+            playlistMutationsProvider.overrideWith(_StubPlaylistMutations.new),
+          ],
+        ));
+        await tester.pumpAndSettle();
+        await tester.tap(find.descendant(
+          of: find.byType(TabBar),
+          matching: find.text('Playlists'),
+        ));
+        await tester.pumpAndSettle();
+
+        // Open the dialog via the FAB.
+        await tester.tap(find.byType(FloatingActionButton));
+        await tester.pumpAndSettle();
+
+        // Enter a name with surrounding whitespace to also assert the
+        // dialog's trim contract from M2.
+        await tester.enterText(find.byType(TextField), '  Workout  ');
+        await tester.pump();
+        await tester.tap(find.widgetWithText(FilledButton, 'Create'));
+        await tester.pumpAndSettle();
+
+        expect(_StubPlaylistMutations.createCalls, 1);
+        expect(_StubPlaylistMutations.lastCreateName, 'Workout');
+      },
+    );
   });
 
   group('Search mode', () {

@@ -807,3 +807,60 @@ Plumbing-only commit. Adds the Subsonic `createPlaylist` / `updatePlaylist` / `d
 - No `DECISIONLOG.md` entry — M1 is plumbing under the architecture pre-approved in `ROADMAP_PLAYLISTS.md`. New ADR lands at M5 covering the full playlist-mutations feature (no offline queue, owner-only edits, delete-all-and-re-add for reorder).
 - No UI wiring — M2 lands the Library FAB + playlist-detail overflow menu.
 - No `pubspec.yaml` deps added — M1 introduces no new packages.
+
+## 2026-06-13 — M2: Create / rename / delete playlists from the app
+
+UI layer for the M1 mutation notifier. Users can now create a playlist from the Library → Playlists sub-tab (FAB) and rename / delete a playlist they own from the playlist detail screen (AppBar overflow). Ownership is gated on `Playlist.owner == SettingsValue.navidromeUsername` so shared / read-only playlists never expose the destructive affordances.
+
+### New widgets (`android/app/lib/widgets/playlist_dialogs.dart`)
+- `CreatePlaylistDialog` (`ConsumerStatefulWidget`) — single auto-focused name field; Create button disabled while trimmed text is empty; submit pops trimmed `String`; cancel pops `null`.
+- `RenamePlaylistDialog` — same name-field contract plus a `CheckboxListTile` "Make playlist public" seeded from the current `Playlist.public`. Submit pops a `RenamePlaylistResult` record `({String name, bool makePublic})`; cancel pops `null`.
+- Both dialogs are intentionally side-effect-free: they do not touch Riverpod state and they do not call the mutation notifier. The owning screen drives the actual mutation so the dialogs stay easy to widget-test in isolation.
+- Static `show(context, ...)` factories wrap the `showDialog<T>` boilerplate so call sites stay terse.
+
+### Library FAB (`android/app/lib/screens/library/library_screen.dart`)
+- `_PlaylistsTab` is now wrapped in a transparent `Scaffold` so it can host a `FloatingActionButton.extended` (`Icons.add`, label "New playlist") without disrupting the outer Library scaffold.
+- `_PlaylistsTab._onCreatePressed`: opens `CreatePlaylistDialog`, on confirm calls `playlistMutationsProvider.notifier.createPlaylist(name: ...)`, then shows a "Playlist '<name>' created" snackbar via `kSnackBarDuration` and navigates to `Routes.libraryPlaylist(created.id)`.
+- Navigation hop uses `GoRouter.maybeOf(context)?.push(...)` (mirrors the fail-soft pattern in `showApiError`) so widget tests without a router ancestor don't crash on the post-create hop.
+- Failure modes go through `showApiError` (reuses the standard snackbar / 401 → /settings redirect).
+- Empty-state subtitle rewritten from "Create a playlist on Navidrome to see it here." → "Tap + New playlist to create one." now that creation is in-app.
+
+### Playlist-detail overflow (`android/app/lib/screens/library/playlist_detail_screen.dart`)
+- New AppBar `PopupMenuButton<_PlaylistAction>` with Rename… / Delete…, gated on `canEdit` where:
+  ```dart
+  canEdit = loaded != null
+      && settings != null
+      && loaded.owner != null
+      && loaded.owner == settings.navidromeUsername;
+  ```
+  Hides the entire menu (not just disables it) so non-owners get the same affordance set as the previous version of the screen.
+- `_onRename`: opens `RenamePlaylistDialog`, calls `renamePlaylist(playlistId, name, makePublic: result.makePublic)`, snackbar "Playlist updated". `ApiError` → `showApiError`.
+- `_onDelete`: shows a confirmation `AlertDialog` ("Delete '<name>'? This cannot be undone."), on confirm calls `deletePlaylist(current.id)`, snackbar "Playlist deleted", then `GoRouter.maybeOf(context)?.pop()` so the user returns to the Library list. Same fail-soft on the router as the create flow.
+- New `enum _PlaylistAction { rename, delete }` so the `PopupMenuButton`'s value is type-safe.
+
+### Tests
+- New `test/widgets/playlist_dialogs_test.dart` (9 tests):
+  - Create dialog: empty / whitespace-only name disables Create; submit trims; cancel returns `null`.
+  - Rename dialog: seeds the name field + checkbox from initials; toggling the checkbox flips `makePublic`; empty name disables Save; cancel returns `null`.
+- Extended `test/screens/library/library_screen_test.dart` (+2 tests):
+  - FAB renders on the Playlists sub-tab.
+  - FAB → dialog → Create calls `PlaylistMutations.createPlaylist` exactly once with the trimmed name (via a static-counter `_StubPlaylistMutations` overriding `playlistMutationsProvider`).
+- Extended `test/screens/library/playlist_detail_screen_test.dart` (+5 tests):
+  - Overflow menu hidden when `playlist.owner != navidromeUsername`.
+  - Overflow menu hidden when no `navidromeUsername` is configured.
+  - Overflow menu visible when `owner == navidromeUsername`.
+  - Rename submit calls `renamePlaylist` with the new name + `makePublic`.
+  - Delete shows the confirmation dialog; cancel does nothing; confirm calls `deletePlaylist` with the right id.
+- The detail-screen tests introduce a `_UserStorage` `SecureStorage` stub that returns a fixed value for `navidrome_username` so `settingsProvider` builds with the desired `navidromeUsername` without overriding `settingsProvider` directly.
+
+### Test gate + version
+- `dart run build_runner build --delete-conflicting-outputs`: not re-run (no annotation changes — no new `@riverpod` / `@freezed`).
+- `flutter analyze`: clean.
+- `flutter test`: **348/348** pass (was 332 + 16 new = +16 net).
+- `pubspec.yaml` version: stays at `1.2.0-pre+11` (the in-dev band carries M1–M4; M5 lands the release-band bump).
+
+### Not done in this commit
+- No `DECISIONLOG.md` entry — M2 stays within the architecture pre-approved in `ROADMAP_PLAYLISTS.md`. The combined ADR for playlist mutations lands at M5.
+- Add-to-playlist flow (long-press song row → sheet) — M3.
+- Reorder / remove-in-edit-mode UI — M4.
+- On-device verification — folds into the M5 smoke run.

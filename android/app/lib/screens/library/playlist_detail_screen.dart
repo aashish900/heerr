@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
 import '../../models/subsonic/playlist.dart';
@@ -9,9 +10,13 @@ import '../../offline/offline_marker.dart';
 import '../../player/playback_actions.dart';
 import '../../player/player_provider.dart';
 import '../../providers/library/library_playlist.dart';
+import '../../providers/library/playlist_mutations.dart';
+import '../../providers/settings.dart';
 import '../../theme.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/error_snackbar.dart';
 import '../../widgets/library_cover_art.dart';
+import '../../widgets/playlist_dialogs.dart';
 import '../../widgets/skeleton.dart';
 
 /// Playlist detail. Mirrors [AlbumDetailScreen]: header + song list. Tap a
@@ -31,6 +36,14 @@ class PlaylistDetailScreen extends ConsumerWidget {
         ref.watch(offlineManifestProvider).valueOrNull;
     final bool isMarked =
         manifest?.markedPlaylists.contains(playlistId) ?? false;
+
+    final SettingsValue? settings =
+        ref.watch(settingsProvider).valueOrNull;
+    final Playlist? loaded = async.valueOrNull;
+    final bool canEdit = loaded != null &&
+        settings != null &&
+        loaded.owner != null &&
+        loaded.owner == settings.navidromeUsername;
 
     return Scaffold(
       appBar: AppBar(
@@ -67,6 +80,30 @@ class PlaylistDetailScreen extends ConsumerWidget {
               playAllSongsFromSubsonic(ref, context, p.entry);
             },
           ),
+          if (canEdit)
+            PopupMenuButton<_PlaylistAction>(
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'Edit playlist',
+              onSelected: (_PlaylistAction a) async {
+                switch (a) {
+                  case _PlaylistAction.rename:
+                    await _onRename(context, ref, loaded);
+                  case _PlaylistAction.delete:
+                    await _onDelete(context, ref, loaded);
+                }
+              },
+              itemBuilder: (BuildContext c) =>
+                  const <PopupMenuEntry<_PlaylistAction>>[
+                PopupMenuItem<_PlaylistAction>(
+                  value: _PlaylistAction.rename,
+                  child: Text('Rename…'),
+                ),
+                PopupMenuItem<_PlaylistAction>(
+                  value: _PlaylistAction.delete,
+                  child: Text('Delete…'),
+                ),
+              ],
+            ),
         ],
       ),
       body: async.when(
@@ -78,7 +115,90 @@ class PlaylistDetailScreen extends ConsumerWidget {
       ),
     );
   }
+
+  Future<void> _onRename(
+    BuildContext context,
+    WidgetRef ref,
+    Playlist current,
+  ) async {
+    final RenamePlaylistResult? result = await RenamePlaylistDialog.show(
+      context,
+      initialName: current.name,
+      initialPublic: current.public ?? false,
+    );
+    if (result == null || !context.mounted) return;
+    try {
+      await ref.read(playlistMutationsProvider.notifier).renamePlaylist(
+        playlistId: current.id,
+        name: result.name,
+        makePublic: result.makePublic,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          duration: kSnackBarDuration,
+          content: Text('Playlist updated'),
+        ),
+      );
+    } on ApiError catch (e) {
+      if (!context.mounted) return;
+      showApiError(context, e);
+    }
+  }
+
+  Future<void> _onDelete(
+    BuildContext context,
+    WidgetRef ref,
+    Playlist current,
+  ) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext c) => AlertDialog(
+        title: const Text('Delete playlist?'),
+        content: Text(
+          "Delete '${current.name}'? This cannot be undone.",
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(c).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(c).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref
+          .read(playlistMutationsProvider.notifier)
+          .deletePlaylist(current.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          duration: kSnackBarDuration,
+          content: Text('Playlist deleted'),
+        ),
+      );
+      // Pop back to the Library if we can; otherwise stay (the list-tab
+      // refetch driven by invalidation will reflect the delete). Routed
+      // via GoRouter.maybeOf so widget tests without a router ancestor
+      // don't crash on the post-delete navigation (mirrors the create-
+      // flow fail-soft in `_PlaylistsTab._onCreatePressed`).
+      final GoRouter? router = GoRouter.maybeOf(context);
+      if (router != null && router.canPop()) {
+        router.pop();
+      }
+    } on ApiError catch (e) {
+      if (!context.mounted) return;
+      showApiError(context, e);
+    }
+  }
 }
+
+enum _PlaylistAction { rename, delete }
 
 class _Body extends ConsumerWidget {
   const _Body({required this.playlist});

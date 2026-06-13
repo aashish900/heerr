@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,10 +22,12 @@ import '../../providers/library/library_albums.dart';
 import '../../providers/library/library_artists.dart';
 import '../../providers/library/library_playlists.dart';
 import '../../providers/library/library_search_query.dart';
+import '../../providers/library/playlist_mutations.dart';
 import '../../router.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_snackbar.dart';
 import '../../widgets/library_result_tile.dart';
+import '../../widgets/playlist_dialogs.dart';
 import '../../widgets/result_tile.dart';
 import '../../widgets/skeleton.dart';
 
@@ -470,44 +474,79 @@ class _AlbumsTab extends ConsumerWidget {
 class _PlaylistsTab extends ConsumerWidget {
   const _PlaylistsTab();
 
+  Future<void> _onCreatePressed(BuildContext context, WidgetRef ref) async {
+    final String? name = await CreatePlaylistDialog.show(context);
+    if (name == null || !context.mounted) return;
+    try {
+      final Playlist created = await ref
+          .read(playlistMutationsProvider.notifier)
+          .createPlaylist(name: name);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: kSnackBarDuration,
+          content: Text('Playlist "${created.name}" created'),
+        ),
+      );
+      // GoRouter.maybeOf so widget tests without a router ancestor don't
+      // crash on the post-create navigation hop (same fail-soft pattern as
+      // showApiError's 401 redirect).
+      final GoRouter? router = GoRouter.maybeOf(context);
+      if (router != null) {
+        unawaited(router.push<dynamic>(Routes.libraryPlaylist(created.id)));
+      }
+    } on ApiError catch (e) {
+      if (!context.mounted) return;
+      showApiError(context, e);
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<List<Playlist>> async =
         ref.watch(libraryPlaylistsProvider);
-    return async.when(
-      loading: () => const SkeletonList(count: 6),
-      error: (Object e, _) => Center(
-        child: Text(e is ApiError ? e.message : 'Error: $e'),
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => unawaited(_onCreatePressed(context, ref)),
+        icon: const Icon(Icons.add),
+        label: const Text('New playlist'),
       ),
-      data: (List<Playlist> playlists) {
-        if (playlists.isEmpty) {
-          return const EmptyState(
-            icon: Icons.queue_music_outlined,
-            title: 'No playlists yet',
-            subtitle: 'Create a playlist on Navidrome to see it here.',
-          );
-        }
-        final Set<String> markedPlaylists = ref
-                .watch(offlineManifestProvider)
-                .valueOrNull
-                ?.markedPlaylists ??
-            const <String>{};
-        return ListView.builder(
-          itemCount: playlists.length,
-          itemBuilder: (BuildContext c, int i) {
-            final Playlist p = playlists[i];
-            return LibraryResultTile(
-              title: p.name,
-              subtitle: p.songCount == null ? null : '${p.songCount} songs',
-              coverArtId: p.coverArt,
-              trailingPlay: true,
-              isMarkedForOffline: markedPlaylists.contains(p.id),
-              onPlay: () => playPlaylistFromSubsonic(ref, context, p.id),
-              onTap: () => context.push(Routes.libraryPlaylist(p.id)),
+      body: async.when(
+        loading: () => const SkeletonList(count: 6),
+        error: (Object e, _) => Center(
+          child: Text(e is ApiError ? e.message : 'Error: $e'),
+        ),
+        data: (List<Playlist> playlists) {
+          if (playlists.isEmpty) {
+            return const EmptyState(
+              icon: Icons.queue_music_outlined,
+              title: 'No playlists yet',
+              subtitle: 'Tap + New playlist to create one.',
             );
-          },
-        );
-      },
+          }
+          final Set<String> markedPlaylists = ref
+                  .watch(offlineManifestProvider)
+                  .valueOrNull
+                  ?.markedPlaylists ??
+              const <String>{};
+          return ListView.builder(
+            itemCount: playlists.length,
+            itemBuilder: (BuildContext c, int i) {
+              final Playlist p = playlists[i];
+              return LibraryResultTile(
+                title: p.name,
+                subtitle: p.songCount == null ? null : '${p.songCount} songs',
+                coverArtId: p.coverArt,
+                trailingPlay: true,
+                isMarkedForOffline: markedPlaylists.contains(p.id),
+                onPlay: () => playPlaylistFromSubsonic(ref, context, p.id),
+                onTap: () => context.push(Routes.libraryPlaylist(p.id)),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
