@@ -912,3 +912,51 @@ Surfaces the M1 mutation notifier on every song-bearing screen: long-press a son
 - Now Playing → "Add current to playlist" — deferred to a polish pass post-M4 per the roadmap.
 - On-device verification — folds into the M5 smoke run.
 - No `DECISIONLOG.md` entry — M3 stays within the architecture pre-approved in `ROADMAP_PLAYLISTS.md`.
+
+## 2026-06-13 — M4: Playlist edit mode — remove + reorder
+
+In-app playlist editing is now feature-complete: songs can be added (M3), removed (M4), reordered (M4), and the playlist itself renamed / deleted (M2). The Edit toggle on the playlist detail screen flips the song list into a `ReorderableListView` with per-row delete handles + drag handles, and the Check (save) action commits via the M1 mutation notifier with the minimum number of `updatePlaylist` calls.
+
+### Screen rewrite (`android/app/lib/screens/library/playlist_detail_screen.dart`)
+- Converted `PlaylistDetailScreen` from `ConsumerWidget` → `ConsumerStatefulWidget`. The new `_PlaylistDetailScreenState` holds the edit-mode working set:
+  - `bool _isEditing` — current mode.
+  - `List<Song> _editOrder` — working copy of the song list; drag-reorder mutates it.
+  - `Set<String> _removedIds` — songs marked for removal (keyed by song id so reordering doesn't invalidate the set).
+  - `bool _committing` — guards the Save action against double-tap while the mutation is in flight.
+- AppBar surface:
+  - **View mode (owner)**: offline-toggle • Play all • new Edit `IconButton(Icons.edit_outlined)` • Rename/Delete overflow (unchanged from M2).
+  - **Edit mode**: only the Check `IconButton(Icons.check)`. Everything else is hidden so the user is focused on the edit operation.
+  - The Edit affordance is gated on `owner == settings.navidromeUsername` (same rule as M2). Non-owners never see it.
+- Edit body: `_PlaylistHeader` above an `Expanded(ReorderableListView.builder)`. Each row is a `ListTile` keyed by song id (required by `ReorderableListView`) with:
+  - Leading: delete-toggle `IconButton`. `Icons.delete_outline` when keep-state, flips to `Icons.add_circle_outline` once the song is in `_removedIds`. Tapping toggles. Rows marked for removal stay in place visually so the index space the user is working in doesn't shift mid-edit.
+  - Title / subtitle gain `TextDecoration.lineThrough` when removed.
+  - Trailing: `ReorderableDragStartListener` wrapping an `Icons.drag_handle`. The whole list also responds to long-press drag-and-hold by default.
+  - Uses the new `ReorderableListView.onReorderItem` callback (the historical `onReorder` is deprecated in Flutter 3.41+; the new variant auto-corrects the post-removal `newIndex` so the historical `if (newIndex > oldIndex) newIndex -= 1;` line is gone).
+- Save (`_onCommit`): computes the diff between `_editOrder` / `_removedIds` and the original `playlist.entry`, then fires the **smallest** mutation that captures the user's intent:
+  - **Nothing changed** → quiet exit, no network call.
+  - **Removes only, no reorder** → one `removeSongsAtIndices(playlistId, originalIndices)` call. Indices are in the *original* list's coordinate space because that's what `songIndexToRemove` is keyed against on the wire; the M1 notifier sorts descending internally.
+  - **Reorder (with or without removes)** → one `reorder(playlistId, survivingFromEdit)` call. The M1 `reorder()` issues a single `updatePlaylist` that deletes every index and re-adds the surviving songs in the new order. No separate `removeSongsAtIndices` / `addSongs` call from the UI layer.
+  - On success: exit edit mode, snackbar "Playlist updated". On `ApiError`: `showApiError` and leave the user in edit mode so they can retry.
+- Cancel via system back is handled by `PopScope`:
+  - View mode: back pops the route normally (`canPop: true`).
+  - Edit mode: back is intercepted (`canPop: false`). If `_hasPendingEdits(loaded)` is true the user gets a "Discard changes?" `AlertDialog`. "Discard" exits edit mode without applying any mutation; "Keep editing" leaves the screen alone. Edit mode without pending edits exits immediately on back, no dialog.
+
+### Tests (`android/app/test/screens/library/playlist_detail_screen_test.dart`, +7)
+- Edit button hidden when `owner != navidromeUsername`.
+- Edit button visible when `owner == navidromeUsername`.
+- Tap Edit → AppBar swaps in the Check icon; body renders a `ReorderableListView` with one drag handle + one delete handle per song.
+- Remove one row + Save → `removeSongsAtIndices` called once with `[2]` (the original index of the removed song); `reorder` / `addSongs` not called.
+- Reorder two rows (`onReorderItem(0, 2)`) + Save → `reorder` called once with the new id order `['so-b', 'so-c', 'so-a', 'so-d', 'so-e']`; `removeSongsAtIndices` / `addSongs` not called. The test invokes the `onReorderItem` callback directly via the widget instance because gesture-driven long-press-and-drag is brittle under `WidgetTester`'s hit-testing of `Draggable` feedback.
+- Back with pending edits → discard dialog → "Discard" → no mutation fired and view mode is restored. Drives the system back via `WidgetsBinding.instance.handlePopRoute()` (the same path system Android-back routes through the framework).
+- Save with no actual changes is a no-op (no mutation fired) and returns the user to view mode.
+- The shared `_StubPlaylistMutations` was extended with counters for `reorder` / `removeSongsAtIndices` / `addSongs` so the M4 tests can assert exact call counts.
+
+### Test gate + version
+- `dart run build_runner build --delete-conflicting-outputs`: not re-run (no annotations changed).
+- `flutter analyze`: clean.
+- `flutter test`: **366/366** pass (was 359 + 7 new = +7 net).
+- `pubspec.yaml` version: stays at `1.2.0-pre+11`.
+
+### Not done in this commit
+- On-device verification: M5.
+- `DECISIONLOG.md` entry: lands at M5 as the combined ADR covering all of M1–M4 + the smoke verification.
