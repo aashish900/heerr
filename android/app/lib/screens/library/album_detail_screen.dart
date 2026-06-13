@@ -14,6 +14,7 @@ import '../../widgets/add_to_playlist_sheet.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/library_cover_art.dart';
 import '../../widgets/skeleton.dart';
+import '../../widgets/song_row_actions.dart';
 
 /// Album detail. Header with cover + name + artist + year above the song
 /// list. Song row tap = play the album starting at that song. AppBar
@@ -174,7 +175,11 @@ class _Body extends ConsumerWidget {
           subtitle: s.duration == null
               ? null
               : Text(_formatDuration(s.duration!)),
-          trailing: _buildSongTrailing(isCurrent, offline, containerMarked),
+          trailing: SongRowActions(
+            song: s,
+            trailingStatus:
+                _buildSongTrailing(isCurrent, offline, containerMarked),
+          ),
           onTap: () => playAllSongsFromSubsonic(
             ref,
             context,

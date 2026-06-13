@@ -48,10 +48,9 @@ class AddToPlaylistSheet extends ConsumerWidget {
     );
   }
 
-  String _songCountLabel() {
-    final int n = songIds.length;
-    return n == 1 ? '1 song' : '$n songs';
-  }
+  String _songCountLabel() => _pluralise(songIds.length);
+
+  static String _pluralise(int n) => n == 1 ? '1 song' : '$n songs';
 
   Future<void> _onCreateNew(BuildContext sheetContext, WidgetRef ref) async {
     final String? name = await CreatePlaylistDialog.show(sheetContext);
@@ -84,7 +83,8 @@ class AddToPlaylistSheet extends ConsumerWidget {
     Playlist playlist,
   ) async {
     try {
-      await ref.read(playlistMutationsProvider.notifier).addSongs(
+      final int added =
+          await ref.read(playlistMutationsProvider.notifier).addSongs(
         playlistId: playlist.id,
         songIds: songIds,
       );
@@ -92,12 +92,20 @@ class AddToPlaylistSheet extends ConsumerWidget {
       final ScaffoldMessengerState messenger =
           ScaffoldMessenger.of(sheetContext);
       Navigator.of(sheetContext).pop();
+      final int skipped = songIds.length - added;
+      final String msg;
+      if (added == 0) {
+        msg = "Already in '${playlist.name}'";
+      } else if (skipped == 0) {
+        msg = "Added ${_pluralise(added)} to '${playlist.name}'";
+      } else {
+        msg =
+            "Added ${_pluralise(added)} to '${playlist.name}' ($skipped already there)";
+      }
       messenger.showSnackBar(
         SnackBar(
           duration: kSnackBarDuration,
-          content: Text(
-            "Added ${_songCountLabel()} to '${playlist.name}'",
-          ),
+          content: Text(msg),
         ),
       );
     } on ApiError catch (e) {

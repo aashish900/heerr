@@ -960,3 +960,77 @@ In-app playlist editing is now feature-complete: songs can be added (M3), remove
 ### Not done in this commit
 - On-device verification: M5.
 - `DECISIONLOG.md` entry: lands at M5 as the combined ADR covering all of M1–M4 + the smoke verification.
+
+## 2026-06-13 — User-driven polish: dedupe + Favourites + visible add-to-playlist icon
+
+Post-M4 feature work driven by direct user feedback. Four asks:
+1. Adding duplicate songs to a playlist was allowed — should not be.
+2. Single songs were only addable via the (undiscoverable) long-press; needed a visible affordance.
+3. A default "Favourites" playlist with a heart toggle.
+4. Heart turns red (border + fill) when the song is in Favourites.
+
+### `PlaylistMutations.addSongs` now dedupes (`android/app/lib/providers/library/playlist_mutations.dart`)
+- Signature: `Future<void>` → `Future<int>` (the number of songs actually added).
+- Internally fetches the playlist via the existing `getPlaylist.view` Subsonic endpoint (raw dio call, not through `libraryPlaylistProvider`, so the dedupe check sees a known-fresh entry list without perturbing provider-cache bookkeeping at the call site).
+- Builds an existing-id set, filters `songIds` against it, and:
+  - if filtered empty → returns 0 without firing `updatePlaylist` and without invalidating any provider;
+  - otherwise → fires `updatePlaylist` with only the new songs and invalidates list + detail.
+- Subsonic itself does NOT dedupe — pre-M4 code happily appended `songIdToAdd` even when the song was already in the playlist. The guarantee is now client-side.
+
+### Favourites playlist (`android/app/lib/providers/library/favourites.dart` + extension on `PlaylistMutations`)
+- New constant `kFavouritesPlaylistName = 'Favourites'` (UK spelling per user preference).
+- New `@riverpod Future<Playlist?> favouritesPlaylist(ref)` — matches `name == 'Favourites'` and `owner == settings.navidromeUsername` against `libraryPlaylistsProvider`. Returns `null` when the playlist hasn't been lazy-created yet or no Navidrome username is configured.
+- New `@riverpod Future<Set<String>> favouriteSongIds(ref)` — derived from `libraryPlaylistProvider(fav.id).entry`. Empty set when no Favourites playlist exists. UI watches this for the heart's filled-vs-outlined state, so heart toggling propagates through the existing mutation-invalidation chain without bespoke listening code.
+- New method `PlaylistMutations.toggleFavourite(Song song)`:
+  - No Favourites playlist yet → `createPlaylist(name: 'Favourites', songIds: [song.id])` (lazy creation).
+  - Favourites exists, song not in it → `addSongs(playlistId, [song.id])` (which now dedupes internally as a defense in depth).
+  - Favourites exists, song in it → `removeSongsAtIndices(playlistId, [songIdx])` after looking up the index in `libraryPlaylistProvider(favId).entry`.
+
+### Visible per-song actions (`android/app/lib/widgets/song_row_actions.dart`, new)
+- New `SongRowActions` `ConsumerWidget` factors the per-song trailing into one place. Renders a `Row(MainAxisSize.min, [heart, more, ?trailingStatus])` with:
+  - **Heart** — `IconButton(visualDensity: compact)` with `Icons.favorite_border` (default) → `Icons.favorite` filled `Colors.redAccent` when `favouriteSongIdsProvider` contains the song id. Tap → `PlaylistMutations.toggleFavourite(song)`; on `ApiError` falls through to `showApiError`.
+  - **`more_vert`** — opens `AddToPlaylistSheet.show(songIds: [song.id])`. This is the discoverable equivalent of the M3 long-press affordance (long-press still works; both call the same sheet).
+  - **`trailingStatus`** — optional existing status icon (now-playing, offline-state, scheduled badge) appended to the right of the actions.
+- Wired into both `album_detail_screen.dart` and `playlist_detail_screen.dart` view-mode song rows by replacing the previous bare `Icon?` `trailing` with `SongRowActions(song: s, trailingStatus: oldTrailing)`.
+- Edit-mode rows in `playlist_detail_screen.dart` are untouched — their leading is the delete-toggle and their trailing is the drag handle, which is the correct semantics during an edit batch.
+- Library-search "Songs" sub-section (`LibraryResultTile`) intentionally left out for now per the user's "Album + playlist detail" scope choice; long-press there still opens the sheet.
+
+### Sheet snackbar refinement (`android/app/lib/widgets/add_to_playlist_sheet.dart`)
+- `_onAddToExisting` now uses the `int` return from `addSongs`:
+  - `added == 0` → `"Already in '<name>'"`
+  - `added == requested` → `"Added N song(s) to '<name>'"`
+  - `added < requested` → `"Added N song(s) to '<name>' (M already there)"`
+- Same `_pluralise(int)` helper handles "1 song" vs "N songs" everywhere in the sheet.
+
+### Test updates
+- **`test/providers/library/playlist_mutations_test.dart`** (+5):
+  - addSongs happy path now asserts `added == 2` and `getPlaylist.view` count == 3 (prime + addSongs internal fetch + post-invalidate refetch).
+  - New: all-duplicates → returns 0 and `updatePlaylist` is never called.
+  - New: partial duplicates → only the new songs go to `songIdToAdd` in order.
+  - New: `toggleFavourite` no-favourites → `createPlaylist.view` with `name='Favourites'` + `songId='so-1'`.
+  - New: `toggleFavourite` song-not-in → `updatePlaylist.view` with `songIdToAdd=so-1`, no `songIndexToRemove`.
+  - New: `toggleFavourite` song-in → `updatePlaylist.view` with `songIndexToRemove=1`, no `songIdToAdd`.
+- **`test/widgets/add_to_playlist_sheet_test.dart`** (+2):
+  - All-duplicates → "Already in 'Morning'" snackbar.
+  - Partial duplicates → "Added 2 songs to 'Morning' (1 already there)".
+- **`test/widgets/song_row_actions_test.dart`** (new, 5 tests):
+  - Heart outlined when not in Favourites.
+  - Heart filled + `Colors.redAccent` when in Favourites.
+  - Tapping the heart calls `PlaylistMutations.toggleFavourite(song)`.
+  - `more_vert` opens `AddToPlaylistSheet` with this song id (the canonical signal is the sheet title rendering "Add 1 song to playlist").
+  - `trailingStatus` is rendered alongside the action icons.
+- **Existing finder scoping** — the new `more_vert` IconButton on every song row collides with the M2 AppBar overflow's `more_vert`. Updated:
+  - `test/screens/library/playlist_detail_screen_test.dart` — all M2 overflow tests now scope via `find.descendant(of: find.byType(AppBar), matching: find.byIcon(Icons.more_vert))`.
+  - `test/screens/library/album_detail_screen_test.dart` — same fix for the M3 "Add album to playlist…" test.
+- Stub `_StubPlaylistMutations` overrides updated for the new `Future<int>` signature on `addSongs` (return `songIds.length` by default; `AddToPlaylistSheet` sheet test gained an `addReturn` static so dedupe paths can be simulated).
+
+### Test gate + version
+- `dart run build_runner build --delete-conflicting-outputs`: clean; one new `.g.dart` written (`favourites.g.dart`).
+- `flutter analyze`: clean.
+- `flutter test`: **378/378** pass (was 366 + 12 new = +12 net).
+- `pubspec.yaml` version: stays at `1.2.0-pre+11` (still in the M1–M4 in-dev band; M5 will land the release-band bump).
+
+### Not done in this commit
+- Heart icon on `LibraryResultTile` (library-search "Songs" sub-section) — out of scope per the user's Q3 choice. Long-press there still opens the sheet.
+- "Add current to playlist" on Now Playing — still deferred per the M3 plan.
+- `DECISIONLOG.md` entry — Favourites + dedupe stay within the architecture pre-approved in `ROADMAP_PLAYLISTS.md`. M5 will roll an ADR covering the full playlist-mutations feature including these additions.

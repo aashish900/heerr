@@ -40,12 +40,13 @@ class _StubPlaylistMutations extends PlaylistMutations {
   void build() {}
 
   @override
-  Future<void> addSongs({
+  Future<int> addSongs({
     required String playlistId,
     required List<String> songIds,
   }) async {
     lastAddPlaylistId = playlistId;
     lastAddSongIds = List<String>.from(songIds);
+    return songIds.length;
   }
 }
 
@@ -254,7 +255,12 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        await tester.tap(find.byIcon(Icons.more_vert));
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AppBar),
+            matching: find.byIcon(Icons.more_vert),
+          ),
+        );
         await tester.pumpAndSettle();
         await tester.tap(find.text('Add album to playlist…'));
         await tester.pumpAndSettle();

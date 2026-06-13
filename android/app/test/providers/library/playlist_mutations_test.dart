@@ -9,6 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:heerr/api/api_error.dart';
 import 'package:heerr/api/subsonic_client.dart';
 import 'package:heerr/models/subsonic/playlist.dart';
+import 'package:heerr/models/subsonic/song.dart';
+import 'package:heerr/providers/library/favourites.dart';
 import 'package:heerr/providers/library/library_playlist.dart';
 import 'package:heerr/providers/library/library_playlists.dart';
 import 'package:heerr/providers/library/playlist_mutations.dart';
@@ -447,11 +449,15 @@ void main() {
         await c.read(libraryPlaylistsProvider.future);
         await c.read(libraryPlaylistProvider('pl-01').future);
 
-        await c.read(playlistMutationsProvider.notifier).addSongs(
+        final int added = await c
+            .read(playlistMutationsProvider.notifier)
+            .addSongs(
           playlistId: 'pl-01',
           songIds: <String>['a', 'b'],
         );
 
+        // Empty stub playlist → both songs are new → both added.
+        expect(added, 2);
         final RequestOptions req = adapter.lastFor(
           '/rest/updatePlaylist.view',
         )!;
@@ -461,7 +467,87 @@ void main() {
         await c.read(libraryPlaylistsProvider.future);
         await c.read(libraryPlaylistProvider('pl-01').future);
         expect(adapter.countFor('/rest/getPlaylists.view'), 2);
-        expect(adapter.countFor('/rest/getPlaylist.view'), 2);
+        // addSongs now does an internal getPlaylist fetch for the
+        // dedupe filter, so the per-test count is:
+        //   prime (1) + addSongs internal (1) + post-invalidate refetch (1) = 3
+        expect(adapter.countFor('/rest/getPlaylist.view'), 3);
+      },
+    );
+
+    test(
+      'all songs already in playlist → 0 added, no updatePlaylist call',
+      () async {
+        final _RouterAdapter adapter = _RouterAdapter(
+          <String, FutureOr<ResponseBody> Function(RequestOptions)>{
+            '/rest/getPlaylist.view': (_) => _ok(<String, dynamic>{
+              'playlist': <String, dynamic>{
+                'id': 'pl-01',
+                'name': 'Morning Coffee',
+                'songCount': 2,
+                'duration': 0,
+                'owner': 'phone',
+                'public': false,
+                'entry': <Map<String, dynamic>>[
+                  <String, dynamic>{'id': 'a', 'title': 'A'},
+                  <String, dynamic>{'id': 'b', 'title': 'B'},
+                ],
+              },
+            }),
+            '/rest/updatePlaylist.view': (_) => _emptyOk(),
+          },
+        );
+        final ProviderContainer c = _containerWith(adapter);
+        addTearDown(c.dispose);
+
+        final int added = await c
+            .read(playlistMutationsProvider.notifier)
+            .addSongs(
+          playlistId: 'pl-01',
+          songIds: <String>['a', 'b'],
+        );
+
+        expect(added, 0);
+        expect(adapter.countFor('/rest/updatePlaylist.view'), 0);
+      },
+    );
+
+    test(
+      'partial duplicates → only the new songs go to songIdToAdd',
+      () async {
+        final _RouterAdapter adapter = _RouterAdapter(
+          <String, FutureOr<ResponseBody> Function(RequestOptions)>{
+            '/rest/getPlaylist.view': (_) => _ok(<String, dynamic>{
+              'playlist': <String, dynamic>{
+                'id': 'pl-01',
+                'name': 'Morning Coffee',
+                'songCount': 1,
+                'duration': 0,
+                'owner': 'phone',
+                'public': false,
+                'entry': <Map<String, dynamic>>[
+                  <String, dynamic>{'id': 'a', 'title': 'A'},
+                ],
+              },
+            }),
+            '/rest/updatePlaylist.view': (_) => _emptyOk(),
+          },
+        );
+        final ProviderContainer c = _containerWith(adapter);
+        addTearDown(c.dispose);
+
+        final int added = await c
+            .read(playlistMutationsProvider.notifier)
+            .addSongs(
+          playlistId: 'pl-01',
+          songIds: <String>['a', 'b', 'c'],
+        );
+
+        expect(added, 2);
+        final RequestOptions req = adapter.lastFor(
+          '/rest/updatePlaylist.view',
+        )!;
+        // 'a' already in → filtered out; 'b' and 'c' added in order.
+        expect(_multi(req, 'songIdToAdd'), <String>['b', 'c']);
       },
     );
   });
@@ -594,5 +680,185 @@ void main() {
 
       expect(adapter.countFor('/rest/updatePlaylist.view'), 0);
     });
+  });
+
+  // ---------------------------------------------------------------------
+  // toggleFavourite — three branches: lazy-create, add, remove.
+  // ---------------------------------------------------------------------
+  group('PlaylistMutations.toggleFavourite', () {
+    const Song song = Song(id: 'so-1', title: 'A');
+
+    test(
+      'no Favourites playlist yet → lazy-creates with the song',
+      () async {
+        final _RouterAdapter adapter = _RouterAdapter(
+          <String, FutureOr<ResponseBody> Function(RequestOptions)>{
+            '/rest/createPlaylist.view': (_) => _ok(<String, dynamic>{
+              'playlist': <String, dynamic>{
+                'id': 'fav-1',
+                'name': 'Favourites',
+                'songCount': 1,
+                'duration': 0,
+                'owner': 'phone',
+                'public': false,
+                'entry': <Map<String, dynamic>>[],
+              },
+            }),
+          },
+        );
+        final ProviderContainer c = ProviderContainer(
+          overrides: <Override>[
+            subsonicDioClientProvider.overrideWith(
+              (Ref<AsyncValue<Dio>> ref) async {
+                final Dio dio = Dio(
+                  BaseOptions(baseUrl: 'http://navi.test'),
+                );
+                dio.httpClientAdapter = adapter;
+                return dio;
+              },
+            ),
+            favouritesPlaylistProvider.overrideWith(
+              (FavouritesPlaylistRef ref) async => null,
+            ),
+          ],
+        );
+        addTearDown(c.dispose);
+
+        await c
+            .read(playlistMutationsProvider.notifier)
+            .toggleFavourite(song);
+
+        final RequestOptions req =
+            adapter.lastFor('/rest/createPlaylist.view')!;
+        expect(req.queryParameters['name'], 'Favourites');
+        expect(_multi(req, 'songId'), <String>['so-1']);
+      },
+    );
+
+    test(
+      'Favourites exists and song is not in it → addSongs path',
+      () async {
+        const Playlist favPlaylist = Playlist(
+          id: 'fav-1',
+          name: 'Favourites',
+          owner: 'phone',
+          songCount: 0,
+        );
+        const Playlist favDetail = Playlist(
+          id: 'fav-1',
+          name: 'Favourites',
+          owner: 'phone',
+          songCount: 0,
+          entry: <Song>[],
+        );
+
+        final _RouterAdapter adapter = _RouterAdapter(
+          <String, FutureOr<ResponseBody> Function(RequestOptions)>{
+            '/rest/getPlaylist.view': (_) => _ok(<String, dynamic>{
+              'playlist': <String, dynamic>{
+                'id': 'fav-1',
+                'name': 'Favourites',
+                'songCount': 0,
+                'duration': 0,
+                'owner': 'phone',
+                'public': false,
+                'entry': <Map<String, dynamic>>[],
+              },
+            }),
+            '/rest/updatePlaylist.view': (_) => _emptyOk(),
+          },
+        );
+        final ProviderContainer c = ProviderContainer(
+          overrides: <Override>[
+            subsonicDioClientProvider.overrideWith(
+              (Ref<AsyncValue<Dio>> ref) async {
+                final Dio dio = Dio(
+                  BaseOptions(baseUrl: 'http://navi.test'),
+                );
+                dio.httpClientAdapter = adapter;
+                return dio;
+              },
+            ),
+            favouritesPlaylistProvider.overrideWith(
+              (FavouritesPlaylistRef ref) async => favPlaylist,
+            ),
+            libraryPlaylistProvider('fav-1').overrideWith(
+              (Ref<AsyncValue<Playlist>> ref) async => favDetail,
+            ),
+          ],
+        );
+        addTearDown(c.dispose);
+
+        await c
+            .read(playlistMutationsProvider.notifier)
+            .toggleFavourite(song);
+
+        final RequestOptions req =
+            adapter.lastFor('/rest/updatePlaylist.view')!;
+        expect(req.queryParameters['playlistId'], 'fav-1');
+        expect(_multi(req, 'songIdToAdd'), <String>['so-1']);
+        // Not the remove path.
+        expect(req.queryParameters.containsKey('songIndexToRemove'), isFalse);
+      },
+    );
+
+    test(
+      'Favourites exists and song already in it → removeSongsAtIndices path',
+      () async {
+        const Playlist favPlaylist = Playlist(
+          id: 'fav-1',
+          name: 'Favourites',
+          owner: 'phone',
+          songCount: 2,
+        );
+        const Playlist favDetail = Playlist(
+          id: 'fav-1',
+          name: 'Favourites',
+          owner: 'phone',
+          songCount: 2,
+          entry: <Song>[
+            Song(id: 'so-x', title: 'X'),
+            Song(id: 'so-1', title: 'A'),
+          ],
+        );
+
+        final _RouterAdapter adapter = _RouterAdapter(
+          <String, FutureOr<ResponseBody> Function(RequestOptions)>{
+            '/rest/updatePlaylist.view': (_) => _emptyOk(),
+          },
+        );
+        final ProviderContainer c = ProviderContainer(
+          overrides: <Override>[
+            subsonicDioClientProvider.overrideWith(
+              (Ref<AsyncValue<Dio>> ref) async {
+                final Dio dio = Dio(
+                  BaseOptions(baseUrl: 'http://navi.test'),
+                );
+                dio.httpClientAdapter = adapter;
+                return dio;
+              },
+            ),
+            favouritesPlaylistProvider.overrideWith(
+              (FavouritesPlaylistRef ref) async => favPlaylist,
+            ),
+            libraryPlaylistProvider('fav-1').overrideWith(
+              (Ref<AsyncValue<Playlist>> ref) async => favDetail,
+            ),
+          ],
+        );
+        addTearDown(c.dispose);
+
+        await c
+            .read(playlistMutationsProvider.notifier)
+            .toggleFavourite(song);
+
+        final RequestOptions req =
+            adapter.lastFor('/rest/updatePlaylist.view')!;
+        expect(req.queryParameters['playlistId'], 'fav-1');
+        // 'so-1' is at index 1 in favDetail.entry.
+        expect(_multi(req, 'songIndexToRemove'), <String>['1']);
+        expect(req.queryParameters.containsKey('songIdToAdd'), isFalse);
+      },
+    );
   });
 }

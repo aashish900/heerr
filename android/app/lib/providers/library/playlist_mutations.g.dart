@@ -6,7 +6,7 @@ part of 'playlist_mutations.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$playlistMutationsHash() => r'd6e0e2a376395c9afe52bae4bd0654ee3457c1cd';
+String _$playlistMutationsHash() => r'f98b4a63b28f719e8497eb2657a264af6a9e9415';
 
 /// Subsonic playlist-mutation notifier. Stateless: `build()` returns void
 /// and the six methods drive `createPlaylist` / `updatePlaylist` /

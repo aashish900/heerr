@@ -102,11 +102,12 @@ class _StubPlaylistMutations extends PlaylistMutations {
   }
 
   @override
-  Future<void> addSongs({
+  Future<int> addSongs({
     required String playlistId,
     required List<String> songIds,
   }) async {
     addCalls++;
+    return songIds.length;
   }
 }
 
@@ -249,7 +250,13 @@ void main() {
           username: 'someone-else',
         ));
         await tester.pumpAndSettle();
-        expect(find.byIcon(Icons.more_vert), findsNothing);
+        expect(
+          find.descendant(
+            of: find.byType(AppBar),
+            matching: find.byIcon(Icons.more_vert),
+          ),
+          findsNothing,
+        );
       },
     );
 
@@ -264,7 +271,13 @@ void main() {
           username: null,
         ));
         await tester.pumpAndSettle();
-        expect(find.byIcon(Icons.more_vert), findsNothing);
+        expect(
+          find.descendant(
+            of: find.byType(AppBar),
+            matching: find.byIcon(Icons.more_vert),
+          ),
+          findsNothing,
+        );
       },
     );
 
@@ -279,7 +292,13 @@ void main() {
           username: 'phone',
         ));
         await tester.pumpAndSettle();
-        expect(find.byIcon(Icons.more_vert), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(AppBar),
+            matching: find.byIcon(Icons.more_vert),
+          ),
+          findsOneWidget,
+        );
       },
     );
 
@@ -297,7 +316,12 @@ void main() {
         ));
         await tester.pumpAndSettle();
 
-        await tester.tap(find.byIcon(Icons.more_vert));
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AppBar),
+            matching: find.byIcon(Icons.more_vert),
+          ),
+        );
         await tester.pumpAndSettle();
         await tester.tap(find.text('Rename…'));
         await tester.pumpAndSettle();
@@ -329,7 +353,12 @@ void main() {
         ));
         await tester.pumpAndSettle();
 
-        await tester.tap(find.byIcon(Icons.more_vert));
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AppBar),
+            matching: find.byIcon(Icons.more_vert),
+          ),
+        );
         await tester.pumpAndSettle();
         await tester.tap(find.text('Delete…'));
         await tester.pumpAndSettle();
@@ -340,7 +369,12 @@ void main() {
         expect(_StubPlaylistMutations.deleteCalls, 0);
 
         // Reopen + confirm.
-        await tester.tap(find.byIcon(Icons.more_vert));
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AppBar),
+            matching: find.byIcon(Icons.more_vert),
+          ),
+        );
         await tester.pumpAndSettle();
         await tester.tap(find.text('Delete…'));
         await tester.pumpAndSettle();

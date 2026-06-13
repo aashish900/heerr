@@ -19,6 +19,7 @@ import '../../widgets/error_snackbar.dart';
 import '../../widgets/library_cover_art.dart';
 import '../../widgets/playlist_dialogs.dart';
 import '../../widgets/skeleton.dart';
+import '../../widgets/song_row_actions.dart';
 
 /// Playlist detail. Mirrors [AlbumDetailScreen] for the read path: header
 /// + song list, tap to play. M2 added rename / delete via the AppBar
@@ -408,7 +409,11 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          trailing: _buildSongTrailing(isCurrent, offline, containerMarked),
+          trailing: SongRowActions(
+            song: s,
+            trailingStatus:
+                _buildSongTrailing(isCurrent, offline, containerMarked),
+          ),
           onTap: () => playAllSongsFromSubsonic(
             ref,
             context,

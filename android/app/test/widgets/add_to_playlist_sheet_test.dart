@@ -33,6 +33,11 @@ class _StubPlaylistMutations extends PlaylistMutations {
   static String? lastAddPlaylistId;
   static List<String>? lastAddSongIds;
 
+  /// Optional override for the return value of `addSongs` — lets dedupe
+  /// tests simulate "M of N songs added" without rewiring the routing
+  /// adapter. Defaults to `songIds.length` (no dedupe).
+  static int Function(List<String>)? addReturn;
+
   static void reset() {
     createCalls = 0;
     addCalls = 0;
@@ -40,6 +45,7 @@ class _StubPlaylistMutations extends PlaylistMutations {
     lastCreateSongIds = null;
     lastAddPlaylistId = null;
     lastAddSongIds = null;
+    addReturn = null;
   }
 
   @override
@@ -57,13 +63,14 @@ class _StubPlaylistMutations extends PlaylistMutations {
   }
 
   @override
-  Future<void> addSongs({
+  Future<int> addSongs({
     required String playlistId,
     required List<String> songIds,
   }) async {
     addCalls++;
     lastAddPlaylistId = playlistId;
     lastAddSongIds = List<String>.from(songIds);
+    return addReturn?.call(songIds) ?? songIds.length;
   }
 }
 
@@ -331,6 +338,63 @@ void main() {
         expect(_StubPlaylistMutations.createCalls, 0);
         // Sheet is still up.
         expect(find.text('Create new playlist…'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'all duplicates (added == 0) → snackbar reads "Already in \'<name>\'"',
+      (WidgetTester tester) async {
+        _StubPlaylistMutations.addReturn = (List<String> _) => 0;
+        await _openSheet(
+          tester,
+          songIds: const <String>['so-1', 'so-2'],
+          overrides: <Override>[
+            _playlistsValue(
+              const AsyncData<List<Playlist>>(<Playlist>[owned1]),
+            ),
+            playlistMutationsProvider
+                .overrideWith(_StubPlaylistMutations.new),
+          ],
+          username: 'phone',
+        );
+
+        await tester.tap(find.text('Morning'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.textContaining("Already in 'Morning'"),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'partial duplicates → snackbar reports skipped count',
+      (WidgetTester tester) async {
+        // 3 requested, 2 added → 1 skipped.
+        _StubPlaylistMutations.addReturn = (List<String> _) => 2;
+        await _openSheet(
+          tester,
+          songIds: const <String>['so-1', 'so-2', 'so-3'],
+          overrides: <Override>[
+            _playlistsValue(
+              const AsyncData<List<Playlist>>(<Playlist>[owned1]),
+            ),
+            playlistMutationsProvider
+                .overrideWith(_StubPlaylistMutations.new),
+          ],
+          username: 'phone',
+        );
+
+        await tester.tap(find.text('Morning'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.textContaining(
+            "Added 2 songs to 'Morning' (1 already there)",
+          ),
+          findsOneWidget,
+        );
       },
     );
   });

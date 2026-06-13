@@ -4,6 +4,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../api/subsonic_client.dart';
 import '../../api/subsonic_endpoints.dart';
 import '../../models/subsonic/playlist.dart';
+import '../../models/subsonic/song.dart';
+import 'favourites.dart';
 import 'library_playlist.dart';
 import 'library_playlists.dart';
 
@@ -96,27 +98,62 @@ class PlaylistMutations extends _$PlaylistMutations {
   }
 
   /// Append [songIds] to [playlistId] via `updatePlaylist.view` with
-  /// `songIdToAdd` repeated in order. Empty [songIds] is a no-op (no
-  /// network call). Invalidates the list provider (songCount changed)
-  /// and the detail provider for [playlistId].
-  Future<void> addSongs({
+  /// `songIdToAdd` repeated in order. Deduplicates against the playlist's
+  /// current entry list — songs already in the playlist are silently
+  /// skipped (Subsonic happily appends duplicates if asked, so this is a
+  /// client-side guarantee). Returns the number of songs actually added.
+  /// Empty input or a fully-duplicate request is a no-op (no
+  /// `updatePlaylist` call, no provider invalidation, returns 0).
+  /// Invalidates the list provider (songCount changed) and the detail
+  /// provider for [playlistId] when at least one song is added.
+  Future<int> addSongs({
     required String playlistId,
     required List<String> songIds,
   }) async {
-    if (songIds.isEmpty) return;
+    if (songIds.isEmpty) return 0;
     final Dio dio = await ref.read(subsonicDioClientProvider.future);
+
+    // Fetch the playlist's current entry list directly through dio (not
+    // through `libraryPlaylistProvider`) so we get a known-fresh state
+    // before computing the dedupe filter — and so the call doesn't
+    // perturb provider-cache bookkeeping at the call site.
+    final Set<String> existingIds = await subsonicCall<Set<String>>(
+      () => dio.get<dynamic>(
+        SubsonicEndpoints.getPlaylist,
+        queryParameters: <String, dynamic>{'id': playlistId},
+      ),
+      (Map<String, dynamic> env) {
+        final dynamic playlist = env['playlist'];
+        if (playlist is! Map<String, dynamic>) return <String>{};
+        final dynamic entries = playlist['entry'];
+        if (entries is! List) return <String>{};
+        return <String>{
+          for (final dynamic e in entries)
+            if (e is Map<String, dynamic> && e['id'] is String)
+              e['id'] as String,
+        };
+      },
+    );
+
+    final List<String> toAdd = <String>[
+      for (final String id in songIds)
+        if (!existingIds.contains(id)) id,
+    ];
+    if (toAdd.isEmpty) return 0;
+
     await subsonicCall<void>(
       () => dio.get<dynamic>(
         SubsonicEndpoints.updatePlaylist,
         queryParameters: <String, dynamic>{
           'playlistId': playlistId,
-          'songIdToAdd': songIds,
+          'songIdToAdd': toAdd,
         },
       ),
       (_) {},
     );
     ref.invalidate(libraryPlaylistsProvider);
     ref.invalidate(libraryPlaylistProvider(playlistId));
+    return toAdd.length;
   }
 
   /// Remove the entries at the given 0-based [indices] from [playlistId]
@@ -146,6 +183,42 @@ class PlaylistMutations extends _$PlaylistMutations {
     );
     ref.invalidate(libraryPlaylistsProvider);
     ref.invalidate(libraryPlaylistProvider(playlistId));
+  }
+
+  /// Toggle [song]'s membership in the user's "Favourites" playlist.
+  /// Lazy-creates the Favourites playlist on first toggle if it doesn't
+  /// exist yet (with this song as the first entry); otherwise adds or
+  /// removes the song depending on its current membership.
+  ///
+  /// Delegates to [createPlaylist] / [addSongs] / [removeSongsAtIndices]
+  /// so the standard invalidation + ApiError contract still applies. The
+  /// derived [favouriteSongIdsProvider] picks up the change via its watch
+  /// chain to [libraryPlaylistProvider].
+  Future<void> toggleFavourite(Song song) async {
+    final Playlist? fav =
+        await ref.read(favouritesPlaylistProvider.future);
+    if (fav == null) {
+      await createPlaylist(
+        name: kFavouritesPlaylistName,
+        songIds: <String>[song.id],
+      );
+      return;
+    }
+    final Playlist detail =
+        await ref.read(libraryPlaylistProvider(fav.id).future);
+    final int idx =
+        detail.entry.indexWhere((Song s) => s.id == song.id);
+    if (idx >= 0) {
+      await removeSongsAtIndices(
+        playlistId: fav.id,
+        indices: <int>[idx],
+      );
+    } else {
+      await addSongs(
+        playlistId: fav.id,
+        songIds: <String>[song.id],
+      );
+    }
   }
 
   /// Reorder [playlistId] to match [newSongIdOrder]. Subsonic 1.16.1 has
