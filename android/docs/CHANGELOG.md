@@ -1034,3 +1034,41 @@ Post-M4 feature work driven by direct user feedback. Four asks:
 - Heart icon on `LibraryResultTile` (library-search "Songs" sub-section) — out of scope per the user's Q3 choice. Long-press there still opens the sheet.
 - "Add current to playlist" on Now Playing — still deferred per the M3 plan.
 - `DECISIONLOG.md` entry — Favourites + dedupe stay within the architecture pre-approved in `ROADMAP_PLAYLISTS.md`. M5 will roll an ADR covering the full playlist-mutations feature including these additions.
+
+## 2026-06-13 — M5: Playlists roadmap closed — v1.2.1 ships
+
+Docs-only close-out for the playlist-mutations roadmap (M1 → M5 + the user-driven Favourites/dedupe polish). No production-code changes in this commit.
+
+### `android/app/pubspec.yaml`
+- Version bump: `1.2.0-pre+11` → `1.2.1`. First release-band build with playlist editing shipping. Substitutes for the roadmap's originally-planned `1.2.0+12` because the M4-polish round added Favourites + dedupe + the visible add-to-playlist icon, which the user asked to ship under `v1.2.1`.
+
+### `android/docs/smoke_playlists.md` (new)
+- Mirrors the shape of `smoke_streamer.md`: test environment + result + per-step procedure + caveats + done line.
+- Eight on-device steps: create, add via long-press (or `more_vert`), add via album overflow, rename + publish, edit (reorder + remove), Favourites + heart toggle, delete + offline, dedupe sanity.
+- Marked **verification pending** — each step has a TBD placeholder for the user to fill in after the on-device run. The procedure prose stays accurate either way; the PASS lines + the top-level Result line get updated post-install.
+
+### `android/docs/DECISIONLOG.md`
+- New 2026-06-13 ADR rolling up M1–M4 + the polish round into one entry. Covers:
+  - Subsonic 1.16.1 endpoints directly, no backend coupling.
+  - `@Riverpod(keepAlive: true) PlaylistMutations` single chokepoint.
+  - Owner-only edit gate (`playlist.owner == settings.navidromeUsername`).
+  - No offline mutation queue in v1.
+  - Reorder via delete-all-and-re-add (Subsonic has no native reorder primitive).
+  - `addSongs` client-side dedupe, `Future<int>` return.
+  - Favourites as a regular lazy-created playlist named "Favourites" (not Subsonic's `star.view` primitive).
+- Alternatives considered + trade-offs captured per the standard ADR shape.
+
+### `android/docs/ROADMAP_PLAYLISTS.md`
+- M1 through M5 boxes all ticked.
+- Status line updated to "Roadmap closed (2026-06-13)" with pointers to the M1–polish commit shas (`d6635be` → `82b2654`).
+- "Roadmap complete when" checklist updated: pubspec target `1.2.1` (not `1.2.0+12` per the polish-round substitution), tag `v1.2.1`.
+- "Roadmap closed: 2026-06-13" line appended at the bottom.
+
+### Test gate + version
+- `dart run build_runner build --delete-conflicting-outputs`: not re-run (no annotations changed).
+- `flutter analyze`: clean.
+- `flutter test`: **378/378** pass (unchanged from the polish commit).
+- `pubspec.yaml` version: `1.2.0-pre+11` → `1.2.1`.
+
+### Not done in this commit
+- The on-device smoke run itself. `smoke_playlists.md` is the user's to fill in PASS lines after they install `v1.2.1` on the Pixel 7 against the live home server.

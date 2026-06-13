@@ -4,7 +4,7 @@ Track progress through the post-offline playlist-mutations feature. Same cadence
 
 This roadmap continues the alphabet from `ROADMAP_OFFLINE.md`: A1–G1 covered the ingestion client, H1–K2 covered the streaming client, L1–L6 covered offline downloads. **M1–M5 cover playlist mutations** — the user can create, rename, delete, add-to, remove-from, and reorder playlists directly from the app, against the Subsonic API exposed by Navidrome.
 
-**Status (2026-06-12):** planning. No code yet. Locked decisions below are proposed defaults — confirm before starting M1.
+**Status (2026-06-13):** **Roadmap closed.** M1–M4 shipped on `main` (commits `d6635be` → `4f1a74f`); user-driven polish (Favourites + heart toggle + `addSongs` client-side dedupe + visible `more_vert` add-to-playlist icon) shipped at `82b2654`. `pubspec.yaml` bumped to `1.2.1` and tagged `v1.2.1`. M5 docs + on-device smoke gate captured in `smoke_playlists.md` (verification PASS lines are filled in by the user after the post-tag install). Locked decisions immortalised in the 2026-06-13 ADR in `DECISIONLOG.md`.
 
 ---
 
@@ -148,7 +148,7 @@ Before writing new code, confirm these still exist and have the signatures liste
 
 ## Phase M — Playlist mutations
 
-### [ ] M1. Endpoints + mutation notifier (no UI)
+### [x] M1. Endpoints + mutation notifier (no UI)
 
 **Files (new):**
 - `android/app/lib/providers/library/playlist_mutations.dart` — the `PlaylistMutations` notifier described in **Architecture → Provider shape**. Six methods + their riverpod-codegen part file. Each method invalidates the relevant read providers on success and rethrows `ApiError` on failure.
@@ -180,7 +180,7 @@ Before writing new code, confirm these still exist and have the signatures liste
 
 ---
 
-### [ ] M2. Create + rename + delete UI
+### [x] M2. Create + rename + delete UI
 
 **Files (modify):**
 - `android/app/lib/screens/library/library_screen.dart` — `_PlaylistsTab` gets a floating `FloatingActionButton.extended` (`Icons.add, label: 'New playlist'`). Tap → opens `_CreatePlaylistDialog`. On confirm: `await ref.read(playlistMutationsProvider.notifier).createPlaylist(name: '<name>')` → snackbar "Playlist created" → `context.push(Routes.libraryPlaylist(newPlaylist.id))`. On failure: `showApiError`. The empty-state subtitle ("Create a playlist on Navidrome to see it here.") is rewritten to "Tap **+ New playlist** to create one." with a styled-up affordance.
@@ -205,7 +205,7 @@ Before writing new code, confirm these still exist and have the signatures liste
 
 ---
 
-### [ ] M3. Add-to-playlist UX
+### [x] M3. Add-to-playlist UX
 
 **Files (modify):**
 - `android/app/lib/widgets/library_result_tile.dart` — add optional `VoidCallback? onLongPress`. When non-null, `InkWell.onLongPress` calls it. Existing tap behaviour unchanged.
@@ -232,7 +232,7 @@ Before writing new code, confirm these still exist and have the signatures liste
 
 ---
 
-### [ ] M4. Edit mode — remove songs + reorder
+### [x] M4. Edit mode — remove songs + reorder
 
 **Files (modify):**
 - `android/app/lib/screens/library/playlist_detail_screen.dart` — add an "Edit" toggle action (top-right `IconButton(Icons.edit_outlined)` → `IconButton(Icons.check)` when active). Edit mode behaviour:
@@ -257,7 +257,7 @@ Before writing new code, confirm these still exist and have the signatures liste
 
 ---
 
-### [ ] M5. End-to-end smoke + docs
+### [x] M5. End-to-end smoke + docs
 
 **Files (new):**
 - `android/docs/smoke_playlists.md` — mirror `smoke_offline.md` / `smoke_streamer.md` shape. Device, build version, per-step pass-with-detail, caveats.
@@ -318,5 +318,10 @@ Before writing new code, confirm these still exist and have the signatures liste
 4. `DECISIONLOG.md` entry written.
 5. `CHANGELOG.md` entries exist for each milestone group.
 6. `smoke_playlists.md` written.
-7. `pubspec.yaml` at `1.2.0+12`.
+7. `pubspec.yaml` at `1.2.1` (release-band; substituted for the originally-planned `1.2.0+12` after the M4-polish round added Favourites + dedupe + the visible add-to-playlist icon — see CHANGELOG 2026-06-13). Tagged `v1.2.1`.
 8. `git log --oneline android/` reads as a clean M1→M5 progression under the `feat(flutter):` / `chore(flutter):` Conventional-Commits cadence.
+
+---
+
+**Roadmap closed: 2026-06-13.**
+
