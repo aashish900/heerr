@@ -24,6 +24,7 @@ import '../../providers/library/library_playlists.dart';
 import '../../providers/library/library_search_query.dart';
 import '../../providers/library/playlist_mutations.dart';
 import '../../router.dart';
+import '../../widgets/add_to_playlist_sheet.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_snackbar.dart';
 import '../../widgets/library_result_tile.dart';
@@ -240,6 +241,10 @@ class _CombinedResultsBody extends ConsumerWidget {
                     coverArtId: s.coverArt,
                     isCurrentlyPlaying: s.id == currentSubsonicId,
                     onTap: () => playSongFromSubsonic(ref, context, s),
+                    onLongPress: () => AddToPlaylistSheet.show(
+                      context: context,
+                      songIds: <String>[s.id],
+                    ),
                   ),
               ],
               if (lib.album.isNotEmpty) ...<Widget>[

@@ -10,6 +10,7 @@ import '../../player/playback_actions.dart';
 import '../../player/player_provider.dart';
 import '../../providers/library/library_album.dart';
 import '../../theme.dart';
+import '../../widgets/add_to_playlist_sheet.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/library_cover_art.dart';
 import '../../widgets/skeleton.dart';
@@ -75,6 +76,31 @@ class AlbumDetailScreen extends ConsumerWidget {
               playAllSongsFromSubsonic(ref, context, a.song);
             },
           ),
+          if (async.valueOrNull != null)
+            PopupMenuButton<_AlbumAction>(
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'More',
+              onSelected: (_AlbumAction a) {
+                switch (a) {
+                  case _AlbumAction.addAlbumToPlaylist:
+                    final Album? album = async.valueOrNull;
+                    if (album == null) return;
+                    AddToPlaylistSheet.show(
+                      context: context,
+                      songIds: <String>[
+                        for (final Song s in album.song) s.id,
+                      ],
+                    );
+                }
+              },
+              itemBuilder: (BuildContext c) =>
+                  const <PopupMenuEntry<_AlbumAction>>[
+                PopupMenuItem<_AlbumAction>(
+                  value: _AlbumAction.addAlbumToPlaylist,
+                  child: Text('Add album to playlist…'),
+                ),
+              ],
+            ),
         ],
       ),
       body: async.when(
@@ -87,6 +113,8 @@ class AlbumDetailScreen extends ConsumerWidget {
     );
   }
 }
+
+enum _AlbumAction { addAlbumToPlaylist }
 
 class _Body extends ConsumerWidget {
   const _Body({required this.album});
@@ -152,6 +180,10 @@ class _Body extends ConsumerWidget {
             context,
             album.song,
             startIndex: idx,
+          ),
+          onLongPress: () => AddToPlaylistSheet.show(
+            context: context,
+            songIds: <String>[s.id],
           ),
         );
       },

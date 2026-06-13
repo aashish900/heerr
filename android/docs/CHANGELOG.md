@@ -864,3 +864,51 @@ UI layer for the M1 mutation notifier. Users can now create a playlist from the 
 - Add-to-playlist flow (long-press song row → sheet) — M3.
 - Reorder / remove-in-edit-mode UI — M4.
 - On-device verification — folds into the M5 smoke run.
+
+## 2026-06-13 — M3: Add-to-playlist sheet — song row long-press + album-level entry
+
+Surfaces the M1 mutation notifier on every song-bearing screen: long-press a song row in album detail / playlist detail / library search → modal bottom sheet → pick an existing owned playlist OR create a new one. Album detail also gets an AppBar overflow "Add album to playlist…" that pre-loads the sheet with every song id from the album.
+
+### New widget (`android/app/lib/widgets/add_to_playlist_sheet.dart`)
+- `AddToPlaylistSheet` (`ConsumerWidget`) with `static show({context, songIds})` → `showModalBottomSheet` with `isScrollControlled: true` + `showDragHandle: true`. Sheet layout:
+  - Title row: "Add N song(s) to playlist" (singular / plural).
+  - "Create new playlist…" row at the top → opens `CreatePlaylistDialog` (reused from M2). On confirm: `PlaylistMutations.createPlaylist(name, songIds)` → snackbar `"Created '<name>' with N song(s)"`.
+  - Existing-playlist list from `libraryPlaylistsProvider`, filtered to `owner == settings.navidromeUsername`. Tap → `PlaylistMutations.addSongs(playlistId, songIds)` → snackbar `"Added N song(s) to '<name>'"`.
+  - Empty / no-Navidrome-username → nudge copy ("No editable playlists yet. Tap 'Create new playlist…' above.") so the FAB-less path still has a clear next step.
+- Sheet pop / snackbar policy:
+  - On success: capture `ScaffoldMessenger` from the sheet context, pop the sheet, then surface the confirmation snackbar on the captured messenger (the parent scaffold's). Capturing before pop is required because the sheet's `BuildContext` is deactivated by the time pop returns.
+  - On failure: leave the sheet open and route through `showApiError` so the user can retry without re-discovering the entry point. The "create-new dialog → cancel" path likewise leaves the sheet up.
+
+### Widget changes
+- **`android/app/lib/widgets/library_result_tile.dart`** — new optional `VoidCallback? onLongPress`, forwarded to `ListTile.onLongPress`. Null → no handler attached, long-press is a no-op.
+- **`android/app/lib/screens/library/album_detail_screen.dart`**:
+  - Each song row (`ListTile`) gains `onLongPress` → `AddToPlaylistSheet.show(songIds: [song.id])`.
+  - New AppBar `PopupMenuButton<_AlbumAction>` ("Add album to playlist…"), shown only once the album async has loaded. Value-typed via a private `enum _AlbumAction { addAlbumToPlaylist }`.
+- **`android/app/lib/screens/library/playlist_detail_screen.dart`** — each song row gains `onLongPress` → `AddToPlaylistSheet.show(songIds: [song.id])` so a song can be copied from one playlist to another.
+- **`android/app/lib/screens/library/library_screen.dart`** — the search-mode "In your library → Songs" sub-section threads `onLongPress` through `LibraryResultTile` to the same sheet.
+
+### Tests
+- **`test/widgets/library_result_tile_test.dart` (+2)** — long-press fires `onLongPress`; null `onLongPress` is a non-crashing no-op (the contract for tiles that don't opt in).
+- **`test/widgets/add_to_playlist_sheet_test.dart` (new, 7 tests)**:
+  - Renders title + Create-new row + owned playlists only (ownership filter excludes "Shared mix" owned by someone else).
+  - Pluralises "1 song" / "N songs" in the title and snackbar.
+  - No editable playlists → nudge copy at the bottom of the sheet.
+  - No Navidrome username configured → ownership filter zeroes the list.
+  - Tap existing playlist → `addSongs(playlistId, songIds)` called once; sheet pops; snackbar visible on host scaffold.
+  - Tap "Create new playlist…" → `CreatePlaylistDialog` opens; submit → `createPlaylist(name, songIds)` called with the trimmed name + the full song-id list.
+  - Create-new dialog Cancel leaves the sheet open and fires no mutation.
+- **`test/screens/library/album_detail_screen_test.dart` (+2)**:
+  - Long-press a song row → sheet opens; tapping a playlist in the sheet passes only that song's id to `addSongs`.
+  - AppBar overflow → "Add album to playlist…" passes the full song-id list (two-song album → `['so-1', 'so-2']`).
+
+### Test gate + version
+- `dart run build_runner build --delete-conflicting-outputs`: not re-run (no annotations changed).
+- `flutter analyze`: clean.
+- `flutter test`: **359/359** pass (was 348 + 11 new = +11 net).
+- `pubspec.yaml` version: stays at `1.2.0-pre+11`.
+
+### Not done in this commit
+- Reorder / edit mode — M4.
+- Now Playing → "Add current to playlist" — deferred to a polish pass post-M4 per the roadmap.
+- On-device verification — folds into the M5 smoke run.
+- No `DECISIONLOG.md` entry — M3 stays within the architecture pre-approved in `ROADMAP_PLAYLISTS.md`.

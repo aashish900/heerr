@@ -27,6 +27,7 @@ class LibraryResultTile extends StatelessWidget {
     required this.onTap,
     this.trailingPlay = false,
     this.onPlay,
+    this.onLongPress,
     this.isCurrentlyPlaying = false,
     this.isMarkedForOffline = false,
     this.onMarkToggle,
@@ -40,6 +41,13 @@ class LibraryResultTile extends StatelessWidget {
   final VoidCallback onTap;
   final bool trailingPlay;
   final VoidCallback? onPlay;
+
+  /// Optional long-press handler. M3 uses this on song rows to surface
+  /// the "Add to playlist…" sheet. Forwarded directly to
+  /// `ListTile.onLongPress` — `null` means no handler is registered, so
+  /// long-press becomes a no-op on tiles that don't opt in.
+  final VoidCallback? onLongPress;
+
   final bool isCurrentlyPlaying;
 
   /// Whether this album / playlist is currently marked for offline sync.
@@ -153,6 +161,7 @@ class LibraryResultTile extends StatelessWidget {
       subtitle: subtitleWithProgress,
       trailing: trailing,
       onTap: onTap,
+      onLongPress: onLongPress,
     );
   }
 }

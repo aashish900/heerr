@@ -166,4 +166,41 @@ void main() {
       expect(find.byType(LinearProgressIndicator), findsNothing);
     });
   });
+
+  group('LibraryResultTile — long-press (M3)', () {
+    testWidgets(
+      'long-press fires the onLongPress callback',
+      (WidgetTester tester) async {
+        int longPresses = 0;
+        await tester.pumpWidget(_wrap(LibraryResultTile(
+          title: 'X',
+          subtitle: 'sub',
+          coverArtId: null,
+          onTap: () {},
+          onLongPress: () => longPresses++,
+        )));
+        await tester.pump();
+        await tester.longPress(find.byType(LibraryResultTile));
+        await tester.pumpAndSettle();
+        expect(longPresses, 1);
+      },
+    );
+
+    testWidgets(
+      'null onLongPress does not crash on long-press',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(_wrap(LibraryResultTile(
+          title: 'X',
+          subtitle: 'sub',
+          coverArtId: null,
+          onTap: () {},
+        )));
+        await tester.pump();
+        await tester.longPress(find.byType(LibraryResultTile));
+        await tester.pumpAndSettle();
+        // If we get here without an exception, the no-op long-press
+        // contract holds.
+      },
+    );
+  });
 }

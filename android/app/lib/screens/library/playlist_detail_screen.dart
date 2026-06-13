@@ -13,6 +13,7 @@ import '../../providers/library/library_playlist.dart';
 import '../../providers/library/playlist_mutations.dart';
 import '../../providers/settings.dart';
 import '../../theme.dart';
+import '../../widgets/add_to_playlist_sheet.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_snackbar.dart';
 import '../../widgets/library_cover_art.dart';
@@ -257,6 +258,10 @@ class _Body extends ConsumerWidget {
             context,
             playlist.entry,
             startIndex: idx,
+          ),
+          onLongPress: () => AddToPlaylistSheet.show(
+            context: context,
+            songIds: <String>[s.id],
           ),
         );
       },
