@@ -767,3 +767,43 @@ All seven passed.
 - No code change — this is the smoke-verified version-bump commit, nothing else.
 - No `DECISIONLOG.md` entry — K2 doesn't change any architectural decision; it confirms the existing ones survived contact with reality.
 
+
+## 2026-06-13 — M1: Subsonic playlist mutations — endpoints + notifier
+
+Plumbing-only commit. Adds the Subsonic `createPlaylist` / `updatePlaylist` / `deletePlaylist` endpoint constants and a stateless `PlaylistMutations` notifier exposing the six mutation operations (`createPlaylist`, `renamePlaylist`, `deletePlaylist`, `addSongs`, `removeSongsAtIndices`, `reorder`). Nothing wired into the UI yet — that lands at M2 (create / rename / delete) and M3 (add-to-playlist sheet). See `android/docs/ROADMAP_PLAYLISTS.md` for the M1–M5 sequence.
+
+### Endpoints (`android/app/lib/api/subsonic_endpoints.dart`)
+- Three new constants: `createPlaylist`, `updatePlaylist`, `deletePlaylist`, each `/rest/<method>.view`. Dartdoc on each captures the multi-param semantics (e.g. `songIdToAdd` repeat-encoded, `songIndexToRemove` 0-based-and-descending) so the call sites at M3/M4 don't have to re-derive them from the Subsonic 1.16.1 spec.
+
+### Notifier (`android/app/lib/providers/library/playlist_mutations.dart` + `.g.dart`)
+- `@Riverpod(keepAlive: true) class PlaylistMutations extends _$PlaylistMutations` — stateless (`build()` returns void). `keepAlive` because dialog / snackbar callsites are short-lived but the notifier itself holds no per-instance state worth re-deriving per tap.
+- All six methods route through `subsonicDioClientProvider` so the existing `SubsonicAuthInterceptor` injects `u/s/t/v/c/f` — no new `Dio`. Envelope parsing + `ApiError` mapping reuses `subsonicCall`.
+- `createPlaylist(name, songIds?)` returns the new `Playlist`; on success invalidates `libraryPlaylistsProvider` so the list re-fetches.
+- `renamePlaylist(playlistId, name, makePublic?)` invalidates both `libraryPlaylistsProvider` (name shown in the list) and `libraryPlaylistProvider(playlistId)` (detail).
+- `deletePlaylist(playlistId)` invalidates `libraryPlaylistsProvider`.
+- `addSongs(playlistId, songIds)` — empty `songIds` is a no-op (no network call). Sends `songIdToAdd` as a `List<String>`, which dio encodes as repeated `songIdToAdd=<id>` pairs. Invalidates list + detail.
+- `removeSongsAtIndices(playlistId, indices)` — sorts indices descending before sending so an earlier remove doesn't shift later indices. Empty list = no-op. Invalidates list + detail.
+- `reorder(playlistId, newSongIdOrder)` — single `updatePlaylist` call: removes every index `[n-1..0]` and re-adds the songs in the new order via `songIdToAdd`. Navidrome processes removes before adds within one request. Empty input = no-op. Invalidates list + detail.
+
+### Tests (`android/app/test/providers/library/playlist_mutations_test.dart`)
+- New file, 14 tests covering all six methods.
+- Shared `_RouterAdapter` records every `RequestOptions` and dispatches by path so a single test can prime a read-provider AND fire the mutation through the same stub `Dio`.
+- Per-method coverage:
+  - `createPlaylist`: happy path (no songs / with songs preserves order), invalidates `libraryPlaylistsProvider` (asserted via second-fetch count after the mutation), Subsonic code-50 → `ForbiddenError` with no invalidation.
+  - `renamePlaylist`: happy path invalidates list + detail, `makePublic: true` → `public=true` query param, Subsonic code-70 → `NotFoundError`.
+  - `deletePlaylist`: happy path with `id=` query, code-50 → `ForbiddenError`.
+  - `addSongs`: `songIdToAdd` multi-param order preserved, invalidates list + detail.
+  - `removeSongsAtIndices`: `[1,3,5]` → sent as `5,3,1`, empty indices is a no-op.
+  - `reorder`: `['c','a','b']` produces one `updatePlaylist` call with `songIndexToRemove=2,1,0` + `songIdToAdd=c,a,b`; empty `newSongIdOrder` is a no-op.
+- Invalidation assertion: a `c.listen(...)` keeps the read provider alive so the mutation's `ref.invalidate` triggers a re-fetch; the test counts adapter hits for `getPlaylists.view` / `getPlaylist.view` before vs after (1 → 2). For the two tests that exercise only the detail provider's path, listening on both providers is necessary to avoid a transient `Future already completed` from the `cacheAware`-wrapped list provider being invalidated without a subscriber during container dispose.
+
+### Test gate + version
+- `dart run build_runner build --delete-conflicting-outputs`: clean; one new `.g.dart` written (`playlist_mutations.g.dart`).
+- `flutter analyze`: clean.
+- `flutter test`: **332/332** pass (was 318 + 14 new = +14 net).
+- `pubspec.yaml` version bump: `1.1.0` → `1.2.0-pre+11`. The "-pre" band signals the in-development M1–M4 cycle; M5 will land the release-band `1.2.0+12` bump. (Previous release was `1.1.0` without a build number; the M1 build number `+11` continues the conceptual sequence from `1.0.0+8`.)
+
+### Not done in this commit
+- No `DECISIONLOG.md` entry — M1 is plumbing under the architecture pre-approved in `ROADMAP_PLAYLISTS.md`. New ADR lands at M5 covering the full playlist-mutations feature (no offline queue, owner-only edits, delete-all-and-re-add for reorder).
+- No UI wiring — M2 lands the Library FAB + playlist-detail overflow menu.
+- No `pubspec.yaml` deps added — M1 introduces no new packages.

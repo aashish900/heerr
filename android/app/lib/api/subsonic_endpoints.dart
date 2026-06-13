@@ -41,4 +41,19 @@ class SubsonicEndpoints {
   /// Cover-art image bytes by id. `size` query param optional. Auth lives
   /// in URL query params so `Image.network(url)` works without headers.
   static const String getCoverArt = '/rest/getCoverArt.view';
+
+  /// Create a new playlist. Required `name`; optional `songId` (repeatable
+  /// multi-param to populate songs in order). Returns the new playlist in
+  /// the `playlist` envelope key. M1 plumbing for the Playlists feature.
+  static const String createPlaylist = '/rest/createPlaylist.view';
+
+  /// Mutate an existing playlist. Required `playlistId`. Optional `name`,
+  /// `comment`, `public` (bool), `songIdToAdd` (multi, append), and
+  /// `songIndexToRemove` (multi, 0-based against the *current* order —
+  /// callers must send indices descending so earlier removes don't shift
+  /// later ones). Empty envelope on success.
+  static const String updatePlaylist = '/rest/updatePlaylist.view';
+
+  /// Delete a playlist by `id`. Empty envelope on success.
+  static const String deletePlaylist = '/rest/deletePlaylist.view';
 }
