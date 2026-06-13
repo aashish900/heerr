@@ -38,3 +38,6 @@ graphify-out/
 android/graphify-out/
 backend/graphify-out/
 *graphify-out/
+
+# Claude
+*.claude/
