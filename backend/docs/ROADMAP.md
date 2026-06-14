@@ -204,7 +204,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 **Done when:** All test branches green; engine wired as default in factory.
 **Commit:** `feat(backend): I2 — ytmusicapi recommendation engine`
 
-### [ ] I3. Last.fm engine
+### [x] I3. Last.fm engine
 **Files:** `backend/app/services/recommenders/lastfm_engine.py`; updated `factory.py`; `.env.example` gains `LASTFM_API_KEY` and `LASTFM_USERNAME`.
 **Deliverable:**
 - `LastFMEngine` implements `RecommendationEngine`.
