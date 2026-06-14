@@ -21,17 +21,11 @@ _USER_TOP_PERIOD = "1month"
 
 
 class _LastFMClient(Protocol):
-    async def track_get_similar(
-        self, artist: str, title: str, limit: int
-    ) -> list[dict]: ...
+    async def track_get_similar(self, artist: str, title: str, limit: int) -> list[dict]: ...
 
-    async def artist_get_top_tracks(
-        self, artist: str, limit: int
-    ) -> list[dict]: ...
+    async def artist_get_top_tracks(self, artist: str, limit: int) -> list[dict]: ...
 
-    async def user_get_top_tracks(
-        self, user: str, period: str, limit: int
-    ) -> list[dict]: ...
+    async def user_get_top_tracks(self, user: str, period: str, limit: int) -> list[dict]: ...
 
 
 class LastFMHTTPClient:
@@ -64,28 +58,18 @@ class LastFMHTTPClient:
         data: dict = r.json()
         return data
 
-    async def track_get_similar(
-        self, artist: str, title: str, limit: int
-    ) -> list[dict]:
-        data = await self._call(
-            "track.getSimilar", artist=artist, track=title, limit=limit
-        )
+    async def track_get_similar(self, artist: str, title: str, limit: int) -> list[dict]:
+        data = await self._call("track.getSimilar", artist=artist, track=title, limit=limit)
         block = data.get("similartracks") or {}
         return block.get("track") or []
 
-    async def artist_get_top_tracks(
-        self, artist: str, limit: int
-    ) -> list[dict]:
+    async def artist_get_top_tracks(self, artist: str, limit: int) -> list[dict]:
         data = await self._call("artist.getTopTracks", artist=artist, limit=limit)
         block = data.get("toptracks") or {}
         return block.get("track") or []
 
-    async def user_get_top_tracks(
-        self, user: str, period: str, limit: int
-    ) -> list[dict]:
-        data = await self._call(
-            "user.getTopTracks", user=user, period=period, limit=limit
-        )
+    async def user_get_top_tracks(self, user: str, period: str, limit: int) -> list[dict]:
+        data = await self._call("user.getTopTracks", user=user, period=period, limit=limit)
         block = data.get("toptracks") or {}
         return block.get("track") or []
 
@@ -133,12 +117,8 @@ class LastFMEngine:
     ) -> None:
         if not api_key:
             raise RuntimeError("LastFMEngine requires LASTFM_API_KEY")
-        self._client: _LastFMClient = (
-            client if client is not None else LastFMHTTPClient(api_key)
-        )
-        self._resolver: YTResolver = (
-            resolver if resolver is not None else YTMusicResolver()
-        )
+        self._client: _LastFMClient = client if client is not None else LastFMHTTPClient(api_key)
+        self._resolver: YTResolver = resolver if resolver is not None else YTMusicResolver()
         self._username = username
 
     async def probe(self) -> bool:
@@ -155,9 +135,7 @@ class LastFMEngine:
     async def health_chain(self) -> list[tuple[str, bool]]:
         return [(self.name, await self.probe())]
 
-    async def recommend(
-        self, seeds: list[SeedTrack], limit: int
-    ) -> list[RecommendedTrack]:
+    async def recommend(self, seeds: list[SeedTrack], limit: int) -> list[RecommendedTrack]:
         all_seeds: list[SeedTrack] = list(seeds)
 
         if self._username:
@@ -216,16 +194,10 @@ class LastFMEngine:
             url = await self._resolver.resolve(artist, title)
             if url is None:
                 continue
-            out.append(
-                RecommendedTrack(
-                    title=title, artist=artist, source_url=url, score=match
-                )
-            )
+            out.append(RecommendedTrack(title=title, artist=artist, source_url=url, score=match))
         return out
 
-    async def _fetch_for_seed(
-        self, seed: SeedTrack
-    ) -> list[tuple[str, str, float]]:
+    async def _fetch_for_seed(self, seed: SeedTrack) -> list[tuple[str, str, float]]:
         async def _similar() -> list[dict]:
             try:
                 return await self._client.track_get_similar(
@@ -242,9 +214,7 @@ class LastFMEngine:
 
         async def _top() -> list[dict]:
             try:
-                return await self._client.artist_get_top_tracks(
-                    seed.artist, _ARTIST_TOP_LIMIT
-                )
+                return await self._client.artist_get_top_tracks(seed.artist, _ARTIST_TOP_LIMIT)
             except Exception as exc:
                 logger.warning(
                     "lastfm.artist_get_top_tracks failed for %s: %s",

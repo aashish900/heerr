@@ -20,10 +20,7 @@ async def recommend(
     engine: RecommendationEngine = Depends(get_recommendation_engine),
     _token: Token = Depends(require_scope("read")),
 ) -> RecommendResponse:
-    seeds = [
-        SeedTrack(title=s.title, artist=s.artist, source_url=s.source_url)
-        for s in req.seeds
-    ]
+    seeds = [SeedTrack(title=s.title, artist=s.artist, source_url=s.source_url) for s in req.seeds]
     results = await engine.recommend(seeds, req.limit)
     return RecommendResponse(
         results=[

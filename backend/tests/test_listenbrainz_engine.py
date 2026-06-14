@@ -24,9 +24,7 @@ class FakeListenBrainzClient:
             raise RuntimeError("validate boom")
         return self.username
 
-    async def get_user_recommendations(
-        self, username: str, count: int
-    ) -> list[dict]:
+    async def get_user_recommendations(self, username: str, count: int) -> list[dict]:
         self.recommendation_calls.append((username, count))
         if self.recommendations_raise:
             raise RuntimeError("recs boom")
@@ -180,17 +178,13 @@ async def test_unresolvable_results_skipped(client, resolver):
 
     results = await engine.recommend([], 20)
     assert [r.source_url for r in results] == [_yt("V2")]
-    assert (("A1", "T1") in resolver.calls)
-    assert (("A2", "T2") in resolver.calls)
+    assert ("A1", "T1") in resolver.calls
+    assert ("A2", "T2") in resolver.calls
 
 
 async def test_limit_caps_results(client, resolver):
-    client.recommendations = [
-        _mbid_item(f"MB{i}", 1.0 - i * 0.01) for i in range(10)
-    ]
-    client.metadata_response = {
-        f"MB{i}": _meta(f"T{i}", f"A{i}") for i in range(10)
-    }
+    client.recommendations = [_mbid_item(f"MB{i}", 1.0 - i * 0.01) for i in range(10)]
+    client.metadata_response = {f"MB{i}": _meta(f"T{i}", f"A{i}") for i in range(10)}
     resolver.map = {(f"A{i}", f"T{i}"): _yt(f"V{i}") for i in range(10)}
     engine = _engine(client, resolver)
 

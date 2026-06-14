@@ -8,9 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class _YTMusicLike(Protocol):
-    def search(
-        self, query: str, filter: str | None = None, limit: int = 20
-    ) -> list[dict]: ...
+    def search(self, query: str, filter: str | None = None, limit: int = 20) -> list[dict]: ...
 
 
 class YTResolver(Protocol):

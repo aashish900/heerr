@@ -16,9 +16,7 @@ def _engine_name() -> str:
 def _build_lastfm() -> LastFMEngine:
     api_key = os.environ.get("LASTFM_API_KEY", "").strip()
     if not api_key:
-        raise RuntimeError(
-            "RECOMMENDATION_ENGINE=lastfm requires LASTFM_API_KEY"
-        )
+        raise RuntimeError("RECOMMENDATION_ENGINE=lastfm requires LASTFM_API_KEY")
     username = os.environ.get("LASTFM_USERNAME", "").strip() or None
     return LastFMEngine(api_key=api_key, username=username)
 
@@ -26,9 +24,7 @@ def _build_lastfm() -> LastFMEngine:
 def _build_listenbrainz() -> ListenBrainzEngine:
     token = os.environ.get("LISTENBRAINZ_USER_TOKEN", "").strip()
     if not token:
-        raise RuntimeError(
-            "RECOMMENDATION_ENGINE=listenbrainz requires LISTENBRAINZ_USER_TOKEN"
-        )
+        raise RuntimeError("RECOMMENDATION_ENGINE=listenbrainz requires LISTENBRAINZ_USER_TOKEN")
     return ListenBrainzEngine(token=token)
 
 

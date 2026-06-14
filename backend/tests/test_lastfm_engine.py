@@ -15,9 +15,7 @@ class FakeLastFMClient:
         self.fail_track_similar_for: set[tuple[str, str]] = set()
         self.fail_user_top: bool = False
 
-    async def track_get_similar(
-        self, artist: str, title: str, limit: int
-    ) -> list[dict]:
+    async def track_get_similar(self, artist: str, title: str, limit: int) -> list[dict]:
         self.track_similar_calls.append((artist, title, limit))
         if (artist, title) in self.fail_track_similar_for:
             raise RuntimeError("track.getSimilar boom")
@@ -27,9 +25,7 @@ class FakeLastFMClient:
         self.artist_top_calls.append((artist, limit))
         return self.artist_top_responses.get(artist, [])
 
-    async def user_get_top_tracks(
-        self, user: str, period: str, limit: int
-    ) -> list[dict]:
+    async def user_get_top_tracks(self, user: str, period: str, limit: int) -> list[dict]:
         self.user_top_calls.append((user, period, limit))
         if self.fail_user_top:
             raise RuntimeError("user.getTopTracks boom")
@@ -71,9 +67,7 @@ def resolver() -> FakeResolver:
 def _engine(
     client: FakeLastFMClient, resolver: FakeResolver, username: str | None = None
 ) -> LastFMEngine:
-    return LastFMEngine(
-        api_key="test-key", username=username, client=client, resolver=resolver
-    )
+    return LastFMEngine(api_key="test-key", username=username, client=client, resolver=resolver)
 
 
 # ---------------------------------------------------------------------------
@@ -94,9 +88,7 @@ async def test_track_similar_results_ranked_by_match_weight(client, resolver):
     }
     engine = _engine(client, resolver)
 
-    results = await engine.recommend(
-        [SeedTrack(title="Seed Song", artist="Seed Artist")], limit=20
-    )
+    results = await engine.recommend([SeedTrack(title="Seed Song", artist="Seed Artist")], limit=20)
 
     assert [(r.title, r.score) for r in results] == [
         ("High", 0.9),
@@ -105,9 +97,7 @@ async def test_track_similar_results_ranked_by_match_weight(client, resolver):
     ]
 
 
-async def test_artist_top_tracks_merged_at_lower_weight_than_similar(
-    client, resolver
-):
+async def test_artist_top_tracks_merged_at_lower_weight_than_similar(client, resolver):
     client.track_similar_responses[("A1", "T1")] = [
         _similar("SimSong", "SimArtist", "0.50"),
     ]
@@ -120,9 +110,7 @@ async def test_artist_top_tracks_merged_at_lower_weight_than_similar(
     }
     engine = _engine(client, resolver)
 
-    results = await engine.recommend(
-        [SeedTrack(title="T1", artist="A1")], limit=20
-    )
+    results = await engine.recommend([SeedTrack(title="T1", artist="A1")], limit=20)
 
     titles = [r.title for r in results]
     assert titles == ["SimSong", "TopSong"]  # higher match first
@@ -141,9 +129,7 @@ async def test_seed_is_excluded_from_its_own_recommendations(client, resolver):
     }
     engine = _engine(client, resolver)
 
-    results = await engine.recommend(
-        [SeedTrack(title="Seed", artist="Artist")], limit=20
-    )
+    results = await engine.recommend([SeedTrack(title="Seed", artist="Artist")], limit=20)
     assert [r.title for r in results] == ["Other"]
 
 
@@ -176,9 +162,7 @@ async def test_unresolvable_results_skipped(client, resolver):
     resolver.map = {("R", "Resolvable"): _yt_url("R")}  # U missing
     engine = _engine(client, resolver)
 
-    results = await engine.recommend(
-        [SeedTrack(title="S", artist="A")], limit=20
-    )
+    results = await engine.recommend([SeedTrack(title="S", artist="A")], limit=20)
     assert [r.title for r in results] == ["Resolvable"]
     # Resolver was called for both
     assert ("R", "Resolvable") in resolver.calls
@@ -192,9 +176,7 @@ async def test_limit_caps_results(client, resolver):
     resolver.map = {(f"Ar{i}", f"T{i}"): _yt_url(f"V{i}") for i in range(10)}
     engine = _engine(client, resolver)
 
-    results = await engine.recommend(
-        [SeedTrack(title="S", artist="A")], limit=3
-    )
+    results = await engine.recommend([SeedTrack(title="S", artist="A")], limit=3)
     assert len(results) == 3
 
 
@@ -204,12 +186,8 @@ async def test_username_augments_seeds_with_user_top_tracks(client, resolver):
         _top("UserSong1", "UserArtist1"),
         _top("UserSong2", "UserArtist2"),
     ]
-    client.track_similar_responses[("UserArtist1", "UserSong1")] = [
-        _similar("RecA", "RA", "0.70")
-    ]
-    client.track_similar_responses[("UserArtist2", "UserSong2")] = [
-        _similar("RecB", "RB", "0.60")
-    ]
+    client.track_similar_responses[("UserArtist1", "UserSong1")] = [_similar("RecA", "RA", "0.70")]
+    client.track_similar_responses[("UserArtist2", "UserSong2")] = [_similar("RecB", "RB", "0.60")]
     resolver.map = {
         ("RA", "RecA"): _yt_url("A"),
         ("RB", "RecB"): _yt_url("B"),
@@ -223,23 +201,17 @@ async def test_username_augments_seeds_with_user_top_tracks(client, resolver):
 
 async def test_no_username_does_not_call_user_top_tracks(client, resolver):
     engine = _engine(client, resolver, username=None)
-    await engine.recommend(
-        [SeedTrack(title="t", artist="a")], limit=20
-    )
+    await engine.recommend([SeedTrack(title="t", artist="a")], limit=20)
     assert client.user_top_calls == []
 
 
 async def test_user_top_tracks_failure_does_not_kill_request(client, resolver):
     client.fail_user_top = True
-    client.track_similar_responses[("A", "S")] = [
-        _similar("R", "Ar", "0.50")
-    ]
+    client.track_similar_responses[("A", "S")] = [_similar("R", "Ar", "0.50")]
     resolver.map = {("Ar", "R"): _yt_url("R")}
     engine = _engine(client, resolver, username="aashish")
 
-    results = await engine.recommend(
-        [SeedTrack(title="S", artist="A")], limit=20
-    )
+    results = await engine.recommend([SeedTrack(title="S", artist="A")], limit=20)
     assert [r.title for r in results] == ["R"]
 
 
@@ -283,9 +255,7 @@ async def test_malformed_lastfm_response_tolerated(client, resolver):
     }
     engine = _engine(client, resolver)
 
-    results = await engine.recommend(
-        [SeedTrack(title="S", artist="A")], limit=20
-    )
+    results = await engine.recommend([SeedTrack(title="S", artist="A")], limit=20)
     # Keeper has higher match (0.5) than BadMatch (0.0). Both resolvable.
     assert [r.title for r in results] == ["Keeper", "BadMatch"]
 

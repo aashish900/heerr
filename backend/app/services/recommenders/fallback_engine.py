@@ -30,9 +30,7 @@ class FallbackEngine:
     def engines(self) -> list[RecommendationEngine]:
         return list(self._engines)
 
-    async def recommend(
-        self, seeds: list[SeedTrack], limit: int
-    ) -> list[RecommendedTrack]:
+    async def recommend(self, seeds: list[SeedTrack], limit: int) -> list[RecommendedTrack]:
         for engine in self._engines:
             try:
                 return await engine.recommend(seeds, limit)

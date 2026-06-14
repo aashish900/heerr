@@ -162,9 +162,7 @@ async def test_recommend_health_single_engine_ok(client, make_token, fake_engine
     }
 
 
-async def test_recommend_health_single_engine_degraded(
-    client, make_token, fake_engine
-):
+async def test_recommend_health_single_engine_degraded(client, make_token, fake_engine):
     fake_engine._health = [("lastfm", False)]
     raw = await make_token(scopes=("read",))
     resp = await client.get(
@@ -178,9 +176,7 @@ async def test_recommend_health_single_engine_degraded(
     }
 
 
-async def test_recommend_health_chain_primary_ok_no_fallback(
-    client, make_token, fake_engine
-):
+async def test_recommend_health_chain_primary_ok_no_fallback(client, make_token, fake_engine):
     fake_engine._health = [("lastfm", True), ("ytmusic", True)]
     raw = await make_token(scopes=("read",))
     resp = await client.get(
@@ -194,9 +190,7 @@ async def test_recommend_health_chain_primary_ok_no_fallback(
     }
 
 
-async def test_recommend_health_chain_primary_down_fallback_active(
-    client, make_token, fake_engine
-):
+async def test_recommend_health_chain_primary_down_fallback_active(client, make_token, fake_engine):
     fake_engine._health = [("lastfm", False), ("ytmusic", True)]
     raw = await make_token(scopes=("read",))
     resp = await client.get(

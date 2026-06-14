@@ -20,9 +20,7 @@ class FakeYTMusic:
             raise RuntimeError(f"watch failure for {videoId}")
         return self.watch_responses.get(videoId, {"tracks": []})
 
-    def search(
-        self, query: str, filter: str | None = None, limit: int = 20
-    ) -> list[dict]:
+    def search(self, query: str, filter: str | None = None, limit: int = 20) -> list[dict]:
         self.search_calls.append((query, filter, limit))
         return self.search_responses.get(query, [])
 
@@ -80,15 +78,11 @@ async def test_seed_without_url_resolves_via_search_first():
     }
     engine = YTMusicEngine(yt=yt)
 
-    results = await engine.recommend(
-        [SeedTrack(title="Title X", artist="Artist X")], limit=20
-    )
+    results = await engine.recommend([SeedTrack(title="Title X", artist="Artist X")], limit=20)
 
     assert yt.search_calls == [("Artist X Title X", "songs", 1)]
     assert yt.get_watch_playlist_calls == ["RESOLVED1"]
-    assert [r.source_url for r in results] == [
-        "https://music.youtube.com/watch?v=RECX"
-    ]
+    assert [r.source_url for r in results] == ["https://music.youtube.com/watch?v=RECX"]
 
 
 async def test_seed_without_url_no_search_match_skipped():
@@ -96,9 +90,7 @@ async def test_seed_without_url_no_search_match_skipped():
     # search returns empty for this query
     engine = YTMusicEngine(yt=yt)
 
-    results = await engine.recommend(
-        [SeedTrack(title="Unknown", artist="Nobody")], limit=20
-    )
+    results = await engine.recommend([SeedTrack(title="Unknown", artist="Nobody")], limit=20)
 
     assert yt.search_calls == [("Nobody Unknown", "songs", 1)]
     assert yt.get_watch_playlist_calls == []
@@ -124,12 +116,8 @@ async def test_deduplicates_across_seeds():
     engine = YTMusicEngine(yt=yt)
 
     seeds = [
-        SeedTrack(
-            title="t1", artist="a1", source_url="https://music.youtube.com/watch?v=S1"
-        ),
-        SeedTrack(
-            title="t2", artist="a2", source_url="https://music.youtube.com/watch?v=S2"
-        ),
+        SeedTrack(title="t1", artist="a1", source_url="https://music.youtube.com/watch?v=S1"),
+        SeedTrack(title="t2", artist="a2", source_url="https://music.youtube.com/watch?v=S2"),
     ]
     results = await engine.recommend(seeds, limit=20)
 
@@ -187,9 +175,7 @@ async def test_get_watch_playlist_failure_skips_seed_processes_next():
         ),
     ]
     results = await engine.recommend(seeds, limit=20)
-    assert [r.source_url for r in results] == [
-        "https://music.youtube.com/watch?v=REC_OK"
-    ]
+    assert [r.source_url for r in results] == ["https://music.youtube.com/watch?v=REC_OK"]
 
 
 async def test_search_failure_skips_seed_silently():
@@ -201,9 +187,7 @@ async def test_search_failure_skips_seed_silently():
     yt.search = _boom  # type: ignore[method-assign]
     engine = YTMusicEngine(yt=yt)
 
-    results = await engine.recommend(
-        [SeedTrack(title="x", artist="y")], limit=20
-    )
+    results = await engine.recommend([SeedTrack(title="x", artist="y")], limit=20)
     assert results == []
 
 
@@ -229,9 +213,7 @@ async def test_tracks_missing_required_fields_skipped():
         ],
         limit=20,
     )
-    assert [r.source_url for r in results] == [
-        "https://music.youtube.com/watch?v=KEEPER"
-    ]
+    assert [r.source_url for r in results] == ["https://music.youtube.com/watch?v=KEEPER"]
 
 
 async def test_empty_seeds_returns_empty():
@@ -263,9 +245,7 @@ async def test_non_youtube_source_url_falls_back_to_search():
     ]
     results = await engine.recommend(seeds, limit=20)
     assert yt.search_calls == [("Artist Title", "songs", 1)]
-    assert [r.source_url for r in results] == [
-        "https://music.youtube.com/watch?v=RECY"
-    ]
+    assert [r.source_url for r in results] == ["https://music.youtube.com/watch?v=RECY"]
 
 
 # --- factory tests ----------------------------------------------------------

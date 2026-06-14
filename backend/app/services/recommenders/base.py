@@ -20,9 +20,7 @@ class RecommendedTrack:
 class RecommendationEngine(Protocol):
     name: str
 
-    async def recommend(
-        self, seeds: list[SeedTrack], limit: int
-    ) -> list[RecommendedTrack]: ...
+    async def recommend(self, seeds: list[SeedTrack], limit: int) -> list[RecommendedTrack]: ...
 
     async def probe(self) -> bool:
         """Lightweight liveness probe. Should return True if the engine can

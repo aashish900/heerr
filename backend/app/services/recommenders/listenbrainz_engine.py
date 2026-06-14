@@ -14,15 +14,11 @@ class _ListenBrainzClient(Protocol):
         """Returns the user_name bound to the token, or None if invalid."""
         ...
 
-    async def get_user_recommendations(
-        self, username: str, count: int
-    ) -> list[dict]:
+    async def get_user_recommendations(self, username: str, count: int) -> list[dict]:
         """Returns `[{recording_mbid, score}, ...]` from the CF endpoint."""
         ...
 
-    async def get_recording_metadata(
-        self, mbids: list[str]
-    ) -> dict[str, dict]:
+    async def get_recording_metadata(self, mbids: list[str]) -> dict[str, dict]:
         """Returns `{mbid: {recording: {name}, artist: {name}}, ...}`."""
         ...
 
@@ -45,18 +41,14 @@ class ListenBrainzHTTPClient:
         return {"Authorization": f"Token {self._token}"}
 
     async def validate_token(self) -> str | None:
-        r = await self._http.get(
-            f"{self._BASE}/1/validate-token", headers=self._auth_headers()
-        )
+        r = await self._http.get(f"{self._BASE}/1/validate-token", headers=self._auth_headers())
         r.raise_for_status()
         data: dict[str, Any] = r.json()
         if data.get("valid") and isinstance(data.get("user_name"), str):
             return data["user_name"]
         return None
 
-    async def get_user_recommendations(
-        self, username: str, count: int
-    ) -> list[dict]:
+    async def get_user_recommendations(self, username: str, count: int) -> list[dict]:
         r = await self._http.get(
             f"{self._BASE}/1/cf/recommendation/user/{username}/recording",
             params={"count": count},
@@ -66,9 +58,7 @@ class ListenBrainzHTTPClient:
         payload = data.get("payload") or {}
         return payload.get("mbids") or []
 
-    async def get_recording_metadata(
-        self, mbids: list[str]
-    ) -> dict[str, dict]:
+    async def get_recording_metadata(self, mbids: list[str]) -> dict[str, dict]:
         if not mbids:
             return {}
         r = await self._http.get(
@@ -107,15 +97,11 @@ class ListenBrainzEngine:
         resolver: YTResolver | None = None,
     ) -> None:
         if not token:
-            raise RuntimeError(
-                "ListenBrainzEngine requires LISTENBRAINZ_USER_TOKEN"
-            )
+            raise RuntimeError("ListenBrainzEngine requires LISTENBRAINZ_USER_TOKEN")
         self._client: _ListenBrainzClient = (
             client if client is not None else ListenBrainzHTTPClient(token)
         )
-        self._resolver: YTResolver = (
-            resolver if resolver is not None else YTMusicResolver()
-        )
+        self._resolver: YTResolver = resolver if resolver is not None else YTMusicResolver()
         self._username_cache: str | None = None
 
     async def _resolve_username(self) -> str | None:
@@ -128,17 +114,13 @@ class ListenBrainzEngine:
             return None
         return self._username_cache
 
-    async def recommend(
-        self, seeds: list[SeedTrack], limit: int
-    ) -> list[RecommendedTrack]:
+    async def recommend(self, seeds: list[SeedTrack], limit: int) -> list[RecommendedTrack]:
         username = await self._resolve_username()
         if not username:
             return []
 
         try:
-            mbid_items = await self._client.get_user_recommendations(
-                username, limit
-            )
+            mbid_items = await self._client.get_user_recommendations(username, limit)
         except Exception as exc:
             logger.warning("listenbrainz recommendations failed: %s", exc)
             return []
@@ -170,11 +152,7 @@ class ListenBrainzEngine:
             recording = meta.get("recording") or {}
             artist_block = meta.get("artist") or {}
             title = recording.get("name") or ""
-            artist = (
-                artist_block.get("name", "")
-                if isinstance(artist_block, dict)
-                else ""
-            )
+            artist = artist_block.get("name", "") if isinstance(artist_block, dict) else ""
             if not title or not artist:
                 continue
 
@@ -184,9 +162,7 @@ class ListenBrainzEngine:
 
             raw_score = item.get("score")
             try:
-                score: float | None = (
-                    float(raw_score) if raw_score is not None else None
-                )
+                score: float | None = float(raw_score) if raw_score is not None else None
             except (TypeError, ValueError):
                 score = None
 

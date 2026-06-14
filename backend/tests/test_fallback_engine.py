@@ -21,9 +21,7 @@ class FakeEngine:
         self.recommend_calls = 0
         self.probe_calls = 0
 
-    async def recommend(
-        self, seeds: list[SeedTrack], limit: int
-    ) -> list[RecommendedTrack]:
+    async def recommend(self, seeds: list[SeedTrack], limit: int) -> list[RecommendedTrack]:
         self.recommend_calls += 1
         if self._recommend_raises:
             raise RuntimeError(f"{self.name} down")
@@ -80,10 +78,7 @@ async def test_primary_exception_falls_back_to_secondary(caplog):
     assert results == [_REC]
     assert primary.recommend_calls == 1
     assert secondary.recommend_calls == 1
-    assert any(
-        "primary" in r.getMessage() and "down" in r.getMessage()
-        for r in caplog.records
-    )
+    assert any("primary" in r.getMessage() and "down" in r.getMessage() for r in caplog.records)
 
 
 async def test_all_engines_fail_returns_empty(caplog):

@@ -12,9 +12,7 @@ logger = logging.getLogger(__name__)
 
 class _YTMusicLike(Protocol):
     def get_watch_playlist(self, videoId: str, **kwargs: Any) -> dict: ...
-    def search(
-        self, query: str, filter: str | None = None, limit: int = 20
-    ) -> list[dict]: ...
+    def search(self, query: str, filter: str | None = None, limit: int = 20) -> list[dict]: ...
 
 
 def _video_id_from_url(url: str | None) -> str | None:
@@ -58,9 +56,7 @@ class YTMusicEngine:
     async def health_chain(self) -> list[tuple[str, bool]]:
         return [(self.name, await self.probe())]
 
-    async def recommend(
-        self, seeds: list[SeedTrack], limit: int
-    ) -> list[RecommendedTrack]:
+    async def recommend(self, seeds: list[SeedTrack], limit: int) -> list[RecommendedTrack]:
         seen: set[str] = set()
         out: list[RecommendedTrack] = []
 
@@ -76,13 +72,9 @@ class YTMusicEngine:
             seen.add(video_id)
 
             try:
-                watch = await asyncio.to_thread(
-                    self._yt.get_watch_playlist, videoId=video_id
-                )
+                watch = await asyncio.to_thread(self._yt.get_watch_playlist, videoId=video_id)
             except Exception as exc:
-                logger.warning(
-                    "ytmusic.get_watch_playlist failed for %s: %s", video_id, exc
-                )
+                logger.warning("ytmusic.get_watch_playlist failed for %s: %s", video_id, exc)
                 continue
 
             for track in watch.get("tracks") or []:
@@ -94,9 +86,7 @@ class YTMusicEngine:
                 title = track.get("title") or ""
                 artists = track.get("artists") or []
                 artist_name = (
-                    artists[0].get("name", "")
-                    if artists and isinstance(artists[0], dict)
-                    else ""
+                    artists[0].get("name", "") if artists and isinstance(artists[0], dict) else ""
                 )
                 if not title or not artist_name:
                     continue
@@ -117,9 +107,7 @@ class YTMusicEngine:
         if not query:
             return None
         try:
-            results = await asyncio.to_thread(
-                self._yt.search, query, filter="songs", limit=1
-            )
+            results = await asyncio.to_thread(self._yt.search, query, filter="songs", limit=1)
         except Exception as exc:
             logger.warning("ytmusic.search failed for %r: %s", query, exc)
             return None
