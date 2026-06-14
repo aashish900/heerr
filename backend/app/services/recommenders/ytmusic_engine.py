@@ -42,8 +42,21 @@ class YTMusicEngine:
     at `limit`.
     """
 
+    name = "ytmusic"
+
     def __init__(self, yt: _YTMusicLike | None = None) -> None:
         self._yt: _YTMusicLike = yt if yt is not None else cast(_YTMusicLike, YTMusic())
+
+    async def probe(self) -> bool:
+        # ytmusicapi has no auth; the library is instantiable offline. There is
+        # no cheap network call that proves YouTube Music is reachable from the
+        # container that wouldn't add latency on every health poll, so we treat
+        # the engine as always-available and let actual recommend() calls
+        # surface upstream failures.
+        return True
+
+    async def health_chain(self) -> list[tuple[str, bool]]:
+        return [(self.name, await self.probe())]
 
     async def recommend(
         self, seeds: list[SeedTrack], limit: int

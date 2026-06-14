@@ -25,3 +25,9 @@ class RecommendResultItem(BaseModel):
 
 class RecommendResponse(BaseModel):
     results: list[RecommendResultItem]
+
+
+class RecommendHealthResponse(BaseModel):
+    engine: str
+    status: str  # "ok" | "degraded"
+    fallback_active: bool

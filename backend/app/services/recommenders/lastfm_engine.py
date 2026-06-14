@@ -122,6 +122,8 @@ class LastFMEngine:
     is capped at `limit`.
     """
 
+    name = "lastfm"
+
     def __init__(
         self,
         api_key: str,
@@ -138,6 +140,20 @@ class LastFMEngine:
             resolver if resolver is not None else YTMusicResolver()
         )
         self._username = username
+
+    async def probe(self) -> bool:
+        # Hit one cheap Last.fm endpoint to verify the API key is valid and
+        # the service is reachable. `track.getSimilar` for a guaranteed-popular
+        # song with limit=1 is the smallest documented call.
+        try:
+            await self._client.track_get_similar("The Beatles", "Hey Jude", 1)
+            return True
+        except Exception as exc:
+            logger.warning("lastfm probe failed: %s", exc)
+            return False
+
+    async def health_chain(self) -> list[tuple[str, bool]]:
+        return [(self.name, await self.probe())]
 
     async def recommend(
         self, seeds: list[SeedTrack], limit: int

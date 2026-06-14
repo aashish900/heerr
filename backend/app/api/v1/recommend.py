@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from app.api.deps import require_scope
 from app.models import Token
 from app.schemas.recommend import (
+    RecommendHealthResponse,
     RecommendRequest,
     RecommendResponse,
     RecommendResultItem,
@@ -34,4 +35,22 @@ async def recommend(
             )
             for r in results
         ]
+    )
+
+
+@router.get("/recommend/health", response_model=RecommendHealthResponse)
+async def recommend_health(
+    engine: RecommendationEngine = Depends(get_recommendation_engine),
+    _token: Token = Depends(require_scope("read")),
+) -> RecommendHealthResponse:
+    chain = await engine.health_chain()
+    # `engine` reports the configured primary; `status` reflects the primary's
+    # health; `fallback_active` is true when the primary is down AND a
+    # downstream engine in the chain reports OK.
+    primary_name, primary_ok = chain[0]
+    fallback_ok = any(ok for _, ok in chain[1:])
+    return RecommendHealthResponse(
+        engine=primary_name,
+        status="ok" if primary_ok else "degraded",
+        fallback_active=(not primary_ok) and fallback_ok,
     )

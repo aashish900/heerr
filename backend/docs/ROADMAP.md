@@ -217,7 +217,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 **Done when:** All test branches green; `mypy app/` clean.
 **Commit:** `feat(backend): I3 — Last.fm recommendation engine`
 
-### [ ] I4. Fallback chain + engine health endpoint
+### [x] I4. Fallback chain + engine health endpoint
 **Files:** `backend/app/services/recommenders/factory.py` (updated); `backend/app/services/recommenders/fallback_engine.py`; `backend/app/api/v1/recommend.py` (add health route).
 **Deliverable:**
 - `FallbackEngine` wrapper: tries engines left-to-right; on any exception falls back to the next; logs at `WARNING` with engine name + error.

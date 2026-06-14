@@ -9,8 +9,15 @@ from app.services.recommenders.factory import get_recommendation_engine
 
 
 class FakeEngine:
-    def __init__(self, results: list[RecommendedTrack] | None = None):
+    name = "fake"
+
+    def __init__(
+        self,
+        results: list[RecommendedTrack] | None = None,
+        health: list[tuple[str, bool]] | None = None,
+    ):
         self.results = results or []
+        self._health = health if health is not None else [("fake", True)]
         self.last_seeds = None
         self.last_limit: int | None = None
 
@@ -18,6 +25,12 @@ class FakeEngine:
         self.last_seeds = list(seeds)
         self.last_limit = limit
         return list(self.results)
+
+    async def probe(self):
+        return self._health[0][1] if self._health else True
+
+    async def health_chain(self):
+        return list(self._health)
 
 
 @pytest.fixture
@@ -118,6 +131,97 @@ async def test_recommend_stub_returns_empty_results(client, make_token, fake_eng
     assert fake_engine.last_seeds[0].title == "Song"
     assert fake_engine.last_seeds[0].artist == "Artist"
     assert fake_engine.last_seeds[0].source_url is None
+
+
+async def test_recommend_health_missing_auth_returns_401(client):
+    resp = await client.get("/api/v1/recommend/health")
+    assert resp.status_code == 401
+
+
+async def test_recommend_health_wrong_scope_returns_403(client, make_token):
+    raw = await make_token(scopes=("download",))
+    resp = await client.get(
+        "/api/v1/recommend/health",
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert resp.status_code == 403
+
+
+async def test_recommend_health_single_engine_ok(client, make_token, fake_engine):
+    fake_engine._health = [("ytmusic", True)]
+    raw = await make_token(scopes=("read",))
+    resp = await client.get(
+        "/api/v1/recommend/health",
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "engine": "ytmusic",
+        "status": "ok",
+        "fallback_active": False,
+    }
+
+
+async def test_recommend_health_single_engine_degraded(
+    client, make_token, fake_engine
+):
+    fake_engine._health = [("lastfm", False)]
+    raw = await make_token(scopes=("read",))
+    resp = await client.get(
+        "/api/v1/recommend/health",
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert resp.json() == {
+        "engine": "lastfm",
+        "status": "degraded",
+        "fallback_active": False,
+    }
+
+
+async def test_recommend_health_chain_primary_ok_no_fallback(
+    client, make_token, fake_engine
+):
+    fake_engine._health = [("lastfm", True), ("ytmusic", True)]
+    raw = await make_token(scopes=("read",))
+    resp = await client.get(
+        "/api/v1/recommend/health",
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert resp.json() == {
+        "engine": "lastfm",
+        "status": "ok",
+        "fallback_active": False,
+    }
+
+
+async def test_recommend_health_chain_primary_down_fallback_active(
+    client, make_token, fake_engine
+):
+    fake_engine._health = [("lastfm", False), ("ytmusic", True)]
+    raw = await make_token(scopes=("read",))
+    resp = await client.get(
+        "/api/v1/recommend/health",
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert resp.json() == {
+        "engine": "lastfm",
+        "status": "degraded",
+        "fallback_active": True,
+    }
+
+
+async def test_recommend_health_chain_all_down(client, make_token, fake_engine):
+    fake_engine._health = [("lastfm", False), ("ytmusic", False)]
+    raw = await make_token(scopes=("read",))
+    resp = await client.get(
+        "/api/v1/recommend/health",
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert resp.json() == {
+        "engine": "lastfm",
+        "status": "degraded",
+        "fallback_active": False,
+    }
 
 
 async def test_recommend_returns_engine_results(client, make_token, fake_engine):

@@ -1,6 +1,7 @@
 import os
 
 from app.services.recommenders.base import RecommendationEngine
+from app.services.recommenders.fallback_engine import FallbackEngine
 from app.services.recommenders.lastfm_engine import LastFMEngine
 from app.services.recommenders.ytmusic_engine import YTMusicEngine
 
@@ -21,10 +22,7 @@ def _build_lastfm() -> LastFMEngine:
     return LastFMEngine(api_key=api_key, username=username)
 
 
-def get_recommendation_engine() -> RecommendationEngine:
-    name = _engine_name()
-    if name == "":
-        raise RuntimeError("RECOMMENDATION_ENGINE is set but empty")
+def _build_one(name: str) -> RecommendationEngine:
     if name == "ytmusic":
         return YTMusicEngine()
     if name == "lastfm":
@@ -32,3 +30,18 @@ def get_recommendation_engine() -> RecommendationEngine:
     raise RuntimeError(
         f"unsupported RECOMMENDATION_ENGINE={name!r}; supported: {sorted(_SUPPORTED)}"
     )
+
+
+def get_recommendation_engine() -> RecommendationEngine:
+    raw = _engine_name()
+    if raw == "":
+        raise RuntimeError("RECOMMENDATION_ENGINE is set but empty")
+
+    names = [n.strip() for n in raw.split(",") if n.strip()]
+    if not names:
+        raise RuntimeError("RECOMMENDATION_ENGINE is set but empty")
+
+    if len(names) == 1:
+        return _build_one(names[0])
+
+    return FallbackEngine([_build_one(n) for n in names])
