@@ -442,3 +442,12 @@ Human-readable label persisted alongside each job so the Android queue UI shows 
 - **Bug fix (alembic)**: `env.py` replaced `+asyncpg` with `+psycopg` for sync Alembic runs in the migrate container.
 - **Bug fix (download.py)**: explicit `await session.commit()` before enqueuing worker — BackgroundTasks execute before the session dependency teardown, so the job row must be committed first.
 - **Bug fix (compose)**: network name corrected from `arr-stack_default` to `arrnetwork`; host port 8000 added to `heerr-backend` so the phone reaches it over Tailscale.
+
+## 2026-06-14 — I1: RecommendationEngine protocol + POST /recommend skeleton
+
+- **`backend/app/services/recommenders/{__init__.py,base.py,factory.py}`** — new module. `base.py` declares `SeedTrack` + `RecommendedTrack` dataclasses and the `RecommendationEngine` Protocol (`recommend(seeds, limit) -> list[RecommendedTrack]`). `factory.py` reads `RECOMMENDATION_ENGINE` env var (default `ytmusic`) and returns a stub engine at I1 — real engines (ytmusicapi, Last.fm, ListenBrainz) land in I2–I5.
+- **`backend/app/schemas/recommend.py`** — pydantic models `RecommendSeed` (forbid extras), `RecommendRequest` (`seeds: list[RecommendSeed]`, `limit: int 1..50, default 20`), `RecommendResultItem`, `RecommendResponse`.
+- **`backend/app/api/v1/recommend.py`** — `POST /api/v1/recommend` scoped `read`. Converts request seeds → `SeedTrack` dataclasses, delegates to the engine, maps results to `RecommendResultItem`.
+- **`backend/app/api/v1/router.py`** — wired the new router below `/queue` and above `/admin`.
+- **`.env.example`** — `RECOMMENDATION_ENGINE=ytmusic` added with documentation of the comma-separated fallback-chain semantics.
+- **Tests:** `backend/tests/test_recommend.py` — 7 cases covering 401 (no auth), 403 (wrong scope), 422 (limit=0, limit=51, extra field), 200 stub empty (and seed conversion verified via the fake engine), 200 with engine results round-trip. Suite: 171 passing. `mypy app/` clean. `ruff check` clean.

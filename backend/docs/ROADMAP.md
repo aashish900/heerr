@@ -182,7 +182,7 @@ selected via `RECOMMENDATION_ENGINE` env var; a comma-separated value enables a 
 Depends on: H1 smoke green. Android N1 (scrobble) should be live before I3/I5 are useful in
 practice — Last.fm and ListenBrainz need listening history to personalise.
 
-### [ ] I1. Protocol + skeleton endpoint
+### [x] I1. Protocol + skeleton endpoint
 **Files:** `backend/app/services/recommenders/__init__.py`, `backend/app/services/recommenders/base.py`, `backend/app/services/recommenders/factory.py`, `backend/app/schemas/recommend.py`, `backend/app/api/v1/recommend.py`; router wired in `backend/app/api/v1/router.py`; `.env.example` gains `RECOMMENDATION_ENGINE=ytmusic`.
 **Deliverable:**
 - `RecommendationEngine` Protocol + `SeedTrack(title, artist, source_url: str | None)` + `RecommendedTrack(title, artist, source_url, score: float | None)` dataclasses in `base.py`.

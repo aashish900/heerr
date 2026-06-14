@@ -1,0 +1,149 @@
+import pytest
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
+
+from app.api.v1.router import api_v1
+from app.db import get_session
+from app.services.recommenders.base import RecommendedTrack
+from app.services.recommenders.factory import get_recommendation_engine
+
+
+class FakeEngine:
+    def __init__(self, results: list[RecommendedTrack] | None = None):
+        self.results = results or []
+        self.last_seeds = None
+        self.last_limit: int | None = None
+
+    async def recommend(self, seeds, limit):
+        self.last_seeds = list(seeds)
+        self.last_limit = limit
+        return list(self.results)
+
+
+@pytest.fixture
+async def fake_engine():
+    return FakeEngine()
+
+
+@pytest.fixture
+async def recommend_app(app_sm, fake_engine):
+    app = FastAPI()
+
+    async def override_get_session():
+        async with app_sm() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    app.dependency_overrides[get_session] = override_get_session
+    app.dependency_overrides[get_recommendation_engine] = lambda: fake_engine
+    app.include_router(api_v1)
+    yield app
+
+
+@pytest.fixture
+async def client(recommend_app):
+    transport = ASGITransport(app=recommend_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
+
+
+_VALID_BODY = {
+    "seeds": [{"title": "Song", "artist": "Artist"}],
+    "limit": 10,
+}
+
+
+async def test_recommend_missing_auth_returns_401(client):
+    resp = await client.post("/api/v1/recommend", json=_VALID_BODY)
+    assert resp.status_code == 401
+
+
+async def test_recommend_wrong_scope_returns_403(client, make_token):
+    raw = await make_token(scopes=("download",))
+    resp = await client.post(
+        "/api/v1/recommend",
+        json=_VALID_BODY,
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert resp.status_code == 403
+
+
+async def test_recommend_invalid_limit_low_returns_422(client, make_token):
+    raw = await make_token(scopes=("read",))
+    resp = await client.post(
+        "/api/v1/recommend",
+        json={"seeds": [], "limit": 0},
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert resp.status_code == 422
+
+
+async def test_recommend_invalid_limit_high_returns_422(client, make_token):
+    raw = await make_token(scopes=("read",))
+    resp = await client.post(
+        "/api/v1/recommend",
+        json={"seeds": [], "limit": 51},
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert resp.status_code == 422
+
+
+async def test_recommend_extra_field_returns_422(client, make_token):
+    raw = await make_token(scopes=("read",))
+    body = {**_VALID_BODY, "extra": "nope"}
+    resp = await client.post(
+        "/api/v1/recommend",
+        json=body,
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert resp.status_code == 422
+
+
+async def test_recommend_stub_returns_empty_results(client, make_token, fake_engine):
+    raw = await make_token(scopes=("read",))
+    resp = await client.post(
+        "/api/v1/recommend",
+        json=_VALID_BODY,
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"results": []}
+    assert fake_engine.last_limit == 10
+    assert fake_engine.last_seeds is not None
+    assert len(fake_engine.last_seeds) == 1
+    assert fake_engine.last_seeds[0].title == "Song"
+    assert fake_engine.last_seeds[0].artist == "Artist"
+    assert fake_engine.last_seeds[0].source_url is None
+
+
+async def test_recommend_returns_engine_results(client, make_token, fake_engine):
+    fake_engine.results = [
+        RecommendedTrack(
+            title="Similar",
+            artist="OtherArtist",
+            source_url="https://music.youtube.com/watch?v=abc",
+            score=0.91,
+        ),
+    ]
+    raw = await make_token(scopes=("read",))
+    resp = await client.post(
+        "/api/v1/recommend",
+        json=_VALID_BODY,
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body == {
+        "results": [
+            {
+                "title": "Similar",
+                "artist": "OtherArtist",
+                "source_url": "https://music.youtube.com/watch?v=abc",
+                "score": 0.91,
+            }
+        ]
+    }
