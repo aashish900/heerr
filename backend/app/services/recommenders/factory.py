@@ -3,9 +3,10 @@ import os
 from app.services.recommenders.base import RecommendationEngine
 from app.services.recommenders.fallback_engine import FallbackEngine
 from app.services.recommenders.lastfm_engine import LastFMEngine
+from app.services.recommenders.listenbrainz_engine import ListenBrainzEngine
 from app.services.recommenders.ytmusic_engine import YTMusicEngine
 
-_SUPPORTED = {"ytmusic", "lastfm"}
+_SUPPORTED = {"ytmusic", "lastfm", "listenbrainz"}
 
 
 def _engine_name() -> str:
@@ -22,11 +23,22 @@ def _build_lastfm() -> LastFMEngine:
     return LastFMEngine(api_key=api_key, username=username)
 
 
+def _build_listenbrainz() -> ListenBrainzEngine:
+    token = os.environ.get("LISTENBRAINZ_USER_TOKEN", "").strip()
+    if not token:
+        raise RuntimeError(
+            "RECOMMENDATION_ENGINE=listenbrainz requires LISTENBRAINZ_USER_TOKEN"
+        )
+    return ListenBrainzEngine(token=token)
+
+
 def _build_one(name: str) -> RecommendationEngine:
     if name == "ytmusic":
         return YTMusicEngine()
     if name == "lastfm":
         return _build_lastfm()
+    if name == "listenbrainz":
+        return _build_listenbrainz()
     raise RuntimeError(
         f"unsupported RECOMMENDATION_ENGINE={name!r}; supported: {sorted(_SUPPORTED)}"
     )

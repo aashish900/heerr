@@ -227,7 +227,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 **Done when:** All branches green.
 **Commit:** `feat(backend): I4 — fallback chain + GET /recommend/health`
 
-### [ ] I5. ListenBrainz engine
+### [x] I5. ListenBrainz engine
 **Files:** `backend/app/services/recommenders/listenbrainz_engine.py`; updated `factory.py`; `.env.example` gains `LISTENBRAINZ_USER_TOKEN`.
 **Deliverable:**
 - `ListenBrainzEngine` implements `RecommendationEngine`.
