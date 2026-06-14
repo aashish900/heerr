@@ -251,22 +251,26 @@ void main() {
       expect(find.text('12 songs'), findsOneWidget);
     });
 
-    testWidgets('Playlists empty → EmptyState "No playlists yet"',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(_defaultsExcept(
-        playlists:
-            _playlistsValue(const AsyncData<List<Playlist>>(<Playlist>[])),
-      )));
-      await tester.pumpAndSettle();
-      await tester.tap(find.descendant(
-        of: find.byType(TabBar),
-        matching: find.text('Playlists'),
-      ));
-      await tester.pumpAndSettle();
-      expect(find.text('No playlists yet'), findsOneWidget);
-      // M2 empty-state copy nudges the user toward the FAB.
-      expect(find.text('Tap + New playlist to create one.'), findsOneWidget);
-    });
+    testWidgets(
+      'Playlists empty → For You entry point still visible (N3)',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(_wrap(_defaultsExcept(
+          playlists:
+              _playlistsValue(const AsyncData<List<Playlist>>(<Playlist>[])),
+        )));
+        await tester.pumpAndSettle();
+        await tester.tap(find.descendant(
+          of: find.byType(TabBar),
+          matching: find.text('Playlists'),
+        ));
+        await tester.pumpAndSettle();
+        // M2 empty state replaced by always-visible For You entry — N3
+        // makes recommendations reachable even before the user has any
+        // playlists.
+        expect(find.byKey(const Key('library-for-you-entry')),
+            findsOneWidget);
+      },
+    );
 
     testWidgets(
       'FAB is rendered on the Playlists sub-tab',

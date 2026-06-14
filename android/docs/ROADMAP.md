@@ -379,7 +379,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** `build_runner` / `analyze` / `test` green.
 **Commit:** `feat(flutter): N2 — seed collection provider (starred + frequent + favourites fallback)`
 
-### [ ] N3. Recommendations provider + screen
+### [x] N3. Recommendations provider + screen
 **Files (new):** `android/app/lib/models/recommended_track.dart` (`freezed`: `title`, `artist`, `sourceUrl`), `android/app/lib/screens/recommendations_screen.dart`.
 **Files (modify):** `android/app/lib/providers/recommendations.dart` (add `recommendationsProvider` `AsyncNotifier` — reads seeds from N2, calls `POST /api/v1/recommend` with seed list + `limit: 20`), `android/app/lib/router.dart` (add `/library/recommendations`), `android/app/lib/screens/library/library_screen.dart` (add "For You →" entry point below playlists section).
 **Deliverable:** Recommendations screen showing title + artist per track, **Download** button (fires existing `downloadDispatcherProvider`), pull-to-refresh, loading/error states.

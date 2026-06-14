@@ -1,8 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../api/client.dart';
+import '../api/endpoints.dart';
 import '../api/subsonic_client.dart';
 import '../api/subsonic_endpoints.dart';
+import '../models/recommended_track.dart';
 import '../models/seed_track.dart';
 import '../models/subsonic/album.dart';
 import '../models/subsonic/playlist.dart';
@@ -11,6 +14,11 @@ import 'library/favourites.dart';
 import 'library/library_playlist.dart';
 
 part 'recommendations.g.dart';
+
+/// Default `limit` sent to the backend's `POST /api/v1/recommend`. Matches
+/// the screen's typical viewport — enough variety, short enough to be
+/// scrollable without pagination.
+const int _kRecommendationsLimit = 20;
 
 /// Hard cap on seeds returned by [seedCollectionProvider]. Tuned to match
 /// the backend's `POST /api/v1/recommend` limit ceiling (50) with headroom:
@@ -151,4 +159,54 @@ Future<List<Song>> _fetchFavouriteSongs(SeedCollectionRef ref) async {
   final Playlist detail =
       await ref.watch(libraryPlaylistProvider(fav.id).future);
   return detail.entry;
+}
+
+/// Recommendation results from the heerr backend (`POST /api/v1/recommend`).
+///
+/// Reads the user's seed collection via [seedCollectionProvider] (N2),
+/// POSTs `{seeds, limit: 20}` to the backend, returns the parsed
+/// [RecommendedTrack] list for the UI.
+///
+/// When the seed collection is empty (no starred / frequent / Favourites
+/// data on the server yet), still calls the backend with `seeds: []` —
+/// the listenbrainz engine drives its own history-based results, so the
+/// empty-seed case is meaningful for users running that engine. ytmusic
+/// and lastfm engines will return `[]` for empty seeds; the screen
+/// renders the empty-state widget.
+///
+/// `inLibrary` cross-reference is not done in v1 — it lands at N4. v1
+/// results all render with `inLibrary: false` and the Download button.
+@riverpod
+class Recommendations extends _$Recommendations {
+  @override
+  Future<List<RecommendedTrack>> build() async {
+    final List<SeedTrack> seeds =
+        await ref.watch(seedCollectionProvider.future);
+    final Dio dio = await ref.watch(dioClientProvider.future);
+
+    final Map<String, dynamic> body = <String, dynamic>{
+      'seeds': seeds.map((SeedTrack s) => s.toJson()).toList(),
+      'limit': _kRecommendationsLimit,
+    };
+
+    return apiCall<List<RecommendedTrack>>(
+      () => dio.post<dynamic>(Endpoints.recommend, data: body),
+      (dynamic data) {
+        final Map<String, dynamic> json = data as Map<String, dynamic>;
+        final dynamic results = json['results'];
+        if (results is! List) return <RecommendedTrack>[];
+        return results
+            .map((dynamic e) =>
+                RecommendedTrack.fromJson(e as Map<String, dynamic>))
+            .toList();
+      },
+    );
+  }
+
+  /// UI helper for pull-to-refresh. Invalidates self so seedCollection
+  /// + recommend are both re-fetched on the next read.
+  Future<void> refresh() async {
+    ref.invalidateSelf();
+    await future;
+  }
 }

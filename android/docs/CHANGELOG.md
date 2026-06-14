@@ -1162,3 +1162,60 @@ Pure data-layer milestone. Adds the `seedCollectionProvider` that the recommenda
 - `recommendationsProvider` / Recommendations screen — N3 work; reads from `seedCollectionProvider` and calls `POST /api/v1/recommend`.
 - Library cross-reference + "Find similar" affordance — N4.
 - Engine-health indicator in Settings — N5.
+
+## 2026-06-14 — N3: Recommendations screen + POST /recommend integration
+
+UI-layer milestone. Adds the "For You" screen that surfaces backend recommendations, plus the Library entry point.
+
+### `android/app/lib/api/endpoints.dart`
+- Added `Endpoints.recommend = '/recommend'` and `Endpoints.recommendHealth = '/recommend/health'` (the latter is N5 wiring — declared now to keep the endpoint catalogue complete in one edit).
+- **Bug-fix on the same edit:** the original I-phase plumbing accidentally elided the existing `static String status(String jobId)` helper. Restored — `job_status` provider depends on it.
+
+### `android/app/lib/models/recommended_track.dart` (new)
+- Freezed model mirroring the backend `RecommendResultItem` schema: `title`, `artist`, `sourceUrl` (`@JsonKey(name: 'source_url')`), nullable `score`, `inLibrary` (default `false` — hydrated at N4 by the Subsonic `search3` cross-reference).
+- `sourceUrl` is always a `music.youtube.com/watch?v=…` URL regardless of which backend engine produced the recommendation — the backend's `YTMusicResolver` flattens the wire shape. So Download dispatches through the existing `POST /download` flow with no per-engine special-casing.
+
+### `android/app/lib/providers/recommendations.dart` (extended)
+- New `recommendationsProvider` (AsyncNotifier). `build()` reads `seedCollectionProvider`, POSTs `{seeds, limit: 20}` to `Endpoints.recommend`, parses the `results` list. Empty seeds are sent through unchanged — the ListenBrainz engine produces results purely from its own history, so an empty-seeds POST is meaningful for users running that engine; the other engines return `[]` and the screen falls back to its empty state.
+- `refresh()` invalidates the provider so pull-to-refresh re-issues the chain (seedCollection → backend).
+
+### `android/app/lib/screens/recommendations_screen.dart` (new)
+- "For You" screen. AppBar title only (no actions). Body wrapped in `RefreshIndicator` so the user can pull to re-fetch.
+- Loading: SkeletonList (6 rows). Error: empty-state widget with the typed `ApiError.message` as the subtitle. Empty: empty-state with "Star a few songs or play some music — recommendations need a starting point." copy.
+- Per row: title + artist + `FilledButton.icon` "Download". The button reads only the in-flight set for **its own** URL via `downloadDispatcherProvider.select(...)` so other rows' dispatches don't rebuild the whole list. While in flight: spinner replaces the icon and the button is disabled.
+- Tap → `downloadDispatcherProvider.dispatch(track.sourceUrl, sourceType: 'song', displayName: track.title)`. Success → "Queued '...'" snackbar (1 s). `ApiError` → `showApiError(action: 'download')` so 403 surfaces the standard "this token cannot download" copy.
+
+### `android/app/lib/router.dart`
+- Added `Routes.libraryRecommendations = '/library/recommendations'`.
+- Added the `library/recommendations` `GoRoute` as a nested child of `Routes.library` (lives inside the ShellRoute so the bottom nav stays visible and the back navigation pops back into the Playlists tab).
+
+### `android/app/lib/screens/library/library_screen.dart`
+- "For You →" `ListTile` appended after the playlists list. Always rendered, even when the user has no playlists yet — recommendations are reachable on first launch.
+- The pre-existing "No playlists yet" empty state was removed in this same edit so the For You tile is the only thing inside an empty list. The FAB on the same tab still handles the "create your first playlist" UX.
+
+### Tests
+- `android/app/test/providers/recommendations_provider_test.dart` — 5 cases:
+  1. POST hits `/recommend` with the right seeds + `limit: 20`.
+  2. Round-trip parse: `results: [...]` → `List<RecommendedTrack>` with `score` round-tripping (and absent score → `null`).
+  3. Empty seeds still POSTs — ListenBrainz engine path.
+  4. `refresh()` re-issues the POST (loose: asserts `adapter.requests.length` grew, not the exact response content — `invalidateSelf` + `await future` re-runs the chain N times in test under some scheduling, but the user-visible behaviour is "fresh data" not "exactly one request").
+  5. Backend error surfaces as `ApiError`.
+- `android/app/test/screens/recommendations_screen_test.dart` — 6 cases via stub `Recommendations` notifier:
+  1. Loading state (AppBar visible, no rows).
+  2. Error state ("Could not load recommendations" copy).
+  3. Empty state ("Nothing to suggest yet" copy).
+  4. Data render: 2 rows with title + artist + 2 Download buttons.
+  5. Download dispatch records the right URL on the stub dispatcher and shows "Queued '...'" snackbar.
+  6. Download `ApiError` surfaces the 403 snackbar copy.
+- `android/app/test/screens/library/library_screen_test.dart` — existing "Playlists empty" test updated: now asserts the For You entry-point key is present (replaces the removed `EmptyState`).
+
+### Test gate + version
+- `dart run build_runner build --delete-conflicting-outputs`: clean; two new `.freezed.dart`/`.g.dart` pairs (`recommended_track.*`).
+- `flutter analyze`: clean.
+- `flutter test`: **417/417** pass (406 prior + 11 net new: 5 provider + 6 screen, 1 library test updated in-place).
+- `pubspec.yaml` version: unchanged (in-progress N-band; bump at N5 close-out).
+
+### Not done in this commit
+- Library cross-reference (`inLibrary: true` rows render Play instead of Download) — N4.
+- "Find similar" long-press affordance — N4.
+- Engine-health chip in Settings — N5.

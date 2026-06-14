@@ -12,6 +12,7 @@ import 'screens/library/library_screen.dart';
 import 'screens/library/playlist_detail_screen.dart';
 import 'screens/player/now_playing_screen.dart';
 import 'screens/queue_screen.dart';
+import 'screens/recommendations_screen.dart';
 import 'screens/servers_screen.dart';
 import 'screens/settings_screen.dart';
 import 'widgets/mini_player.dart';
@@ -31,6 +32,7 @@ class Routes {
   static String libraryArtist(String id) => '/library/artist/$id';
   static String libraryAlbum(String id) => '/library/album/$id';
   static String libraryPlaylist(String id) => '/library/playlist/$id';
+  static const String libraryRecommendations = '/library/recommendations';
 
   // Job-detail lands at D3; route shape defined here to lock the URL.
   static String job(String id) => '/job/$id';
@@ -67,6 +69,11 @@ GoRouter buildHeerrRouter() {
                 builder: (BuildContext context, GoRouterState state) =>
                     PlaylistDetailScreen(
                         playlistId: state.pathParameters['id']!),
+              ),
+              GoRoute(
+                path: 'library/recommendations',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const RecommendationsScreen(),
               ),
             ],
           ),

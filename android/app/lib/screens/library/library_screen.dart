@@ -523,21 +523,25 @@ class _PlaylistsTab extends ConsumerWidget {
           child: Text(e is ApiError ? e.message : 'Error: $e'),
         ),
         data: (List<Playlist> playlists) {
-          if (playlists.isEmpty) {
-            return const EmptyState(
-              icon: Icons.queue_music_outlined,
-              title: 'No playlists yet',
-              subtitle: 'Tap + New playlist to create one.',
-            );
-          }
           final Set<String> markedPlaylists = ref
                   .watch(offlineManifestProvider)
                   .valueOrNull
                   ?.markedPlaylists ??
               const <String>{};
+          // Total = N playlists + 1 trailing "For You →" entry point.
           return ListView.builder(
-            itemCount: playlists.length,
+            itemCount: playlists.length + 1,
             itemBuilder: (BuildContext c, int i) {
+              if (i == playlists.length) {
+                return ListTile(
+                  key: const Key('library-for-you-entry'),
+                  leading: const Icon(Icons.recommend_outlined),
+                  title: const Text('For You'),
+                  subtitle: const Text('Recommendations from your listening'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push(Routes.libraryRecommendations),
+                );
+              }
               final Playlist p = playlists[i];
               return LibraryResultTile(
                 title: p.name,
