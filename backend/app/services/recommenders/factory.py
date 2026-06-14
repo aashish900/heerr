@@ -1,17 +1,9 @@
 import os
 
-from app.services.recommenders.base import (
-    RecommendationEngine,
-    RecommendedTrack,
-    SeedTrack,
-)
+from app.services.recommenders.base import RecommendationEngine
+from app.services.recommenders.ytmusic_engine import YTMusicEngine
 
-
-class _StubEngine:
-    async def recommend(
-        self, seeds: list[SeedTrack], limit: int
-    ) -> list[RecommendedTrack]:
-        return []
+_SUPPORTED = {"ytmusic"}
 
 
 def _engine_name() -> str:
@@ -22,5 +14,8 @@ def get_recommendation_engine() -> RecommendationEngine:
     name = _engine_name()
     if name == "":
         raise RuntimeError("RECOMMENDATION_ENGINE is set but empty")
-    # I1: every selection routes to the stub. Real engines land in I2+.
-    return _StubEngine()
+    if name == "ytmusic":
+        return YTMusicEngine()
+    raise RuntimeError(
+        f"unsupported RECOMMENDATION_ENGINE={name!r}; supported: {sorted(_SUPPORTED)}"
+    )

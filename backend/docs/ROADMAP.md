@@ -192,7 +192,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 **Done when:** All test branches green; `mypy app/` clean on new files.
 **Commit:** `feat(backend): I1 — RecommendationEngine protocol + POST /recommend skeleton`
 
-### [ ] I2. ytmusicapi engine (zero-credential default)
+### [x] I2. ytmusicapi engine (zero-credential default)
 **Files:** `backend/app/services/recommenders/ytmusic_engine.py`; updated `factory.py`.
 **Deliverable:**
 - `YTMusicEngine` implements `RecommendationEngine`.
