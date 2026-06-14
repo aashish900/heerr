@@ -1116,3 +1116,49 @@ First Phase N milestone — wires the Android client to Navidrome's `scrobble.vi
 ### Not done in this commit
 - On-device smoke. Verify play count increments and (if configured) Last.fm scrobble appears after one end-to-end play.
 - `DECISIONLOG.md` entry — N1 implements the architecture already locked in `ROADMAP.md` Phase N intro; N5 will roll an ADR covering the full Phase N feature.
+
+## 2026-06-14 — N2: Seed collection provider (starred + frequent + Favourites fallback)
+
+Pure data-layer milestone. Adds the `seedCollectionProvider` that the recommendations screen (N3) will consume — no UI yet.
+
+### `android/app/lib/api/subsonic_endpoints.dart`
+- Added `SubsonicEndpoints.getStarred2 = '/rest/getStarred2.view'` with a doc comment naming the N2 consumer.
+
+### `android/app/lib/models/seed_track.dart` (new)
+- Freezed model `SeedTrack { title, artist, sourceUrl? }`. Field names + `@JsonKey(name: 'source_url')` mirror the backend's `RecommendSeed` schema so the same model serialises as the `POST /api/v1/recommend` request body without a wire-shape mapper. `sourceUrl` is reserved for future use (when seeds carry a known `music.youtube.com/watch?v=…` URL so the ytmusic backend can skip the search-resolve step) — null in v1.
+
+### `android/app/lib/providers/recommendations.dart` (new)
+- Pure function `buildSeedCollection({starred, frequent, favourites, maxSeeds = 20})` — keeps merge rules testable without a Riverpod container:
+  - Starred songs feed the list first (strongest signal of "user likes this").
+  - Frequent albums feed next — each album contributes one seed shaped as `(album.name, album.artist)`. Treats the album as a quasi-track seed; engines that need a real song title will still get useful results because Last.fm's `track.getSimilar` and ytmusicapi's `search` both tolerate album-name queries well enough at the ranking stage.
+  - Dedup by `(title.lower().trim(), artist.lower().trim())`.
+  - Cap at `maxSeeds` (default 20 — backend ceiling is 50 with comfortable headroom).
+  - Favourites fallback fires **only** when both primary sources produced zero seeds — avoids stacking Favourites on top of the starred/frequent ranking on every fetch.
+  - Entries with missing/whitespace-only title or artist are silently skipped.
+- `seedCollectionProvider` (Riverpod `@riverpod` async function):
+  1. `GET /rest/getStarred2.view` → starred songs.
+  2. `GET /rest/getAlbumList2.view?type=frequent&size=30` → frequent albums.
+  3. If both empty, reads `favouritesPlaylistProvider` + `libraryPlaylistProvider(fav.id)` to pull the Favourites playlist's entries.
+  4. Returns `buildSeedCollection(...)`.
+- Errors propagate as `AsyncError`. Missing Navidrome username (no Favourites playlist resolvable) results in an empty list, not an error.
+
+### Tests
+- `android/app/test/providers/seed_collection_logic_test.dart` — 13 pure-function cases:
+  empty everywhere, starred-only ordering, starred-before-frequent ranking, dedup case-insensitive, dedup whitespace-trim, missing-artist skip, missing-title skip, default-cap (20), explicit cap, Favourites-fallback fires on empty primary, Favourites-fallback skipped with starred non-empty, Favourites-fallback skipped with frequent non-empty, Favourites-fallback also caps + dedupes.
+- `android/app/test/providers/seed_collection_provider_test.dart` — 5 integration cases against a routing dio adapter + settings override:
+  1. Path + query-param assertions for `getStarred2.view` and `getAlbumList2.view?type=frequent&size=30`.
+  2. Round-trip parsing: starred Song + frequent Album → SeedTracks in the right order.
+  3. Favourites fallback path: empty primary + populated Favourites playlist → seeds from the playlist entries, plus assertion that `getPlaylists.view` + `getPlaylist.view` actually fired.
+  4. Negative: primary non-empty → Favourites endpoints **not** hit.
+  5. Empty-Favourites graceful: no Favourites playlist for the user → returns `[]`, no `getPlaylist.view` fire.
+
+### Test gate + version
+- `dart run build_runner build --delete-conflicting-outputs`: clean; two new `.g.dart`/`.freezed.dart` pairs (`seed_track.*`, `recommendations.g.dart`).
+- `flutter analyze`: clean.
+- `flutter test`: **406/406** pass (388 prior + 18 new).
+- `pubspec.yaml` version: unchanged (in-progress N-band; bump at N5 close-out).
+
+### Not done in this commit
+- `recommendationsProvider` / Recommendations screen — N3 work; reads from `seedCollectionProvider` and calls `POST /api/v1/recommend`.
+- Library cross-reference + "Find similar" affordance — N4.
+- Engine-health indicator in Settings — N5.

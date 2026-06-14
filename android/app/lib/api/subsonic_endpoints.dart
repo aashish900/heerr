@@ -64,4 +64,10 @@ class SubsonicEndpoints {
   /// ListenBrainz when those integrations are configured on the server.
   /// See N1 in `android/docs/ROADMAP.md`.
   static const String scrobble = '/rest/scrobble.view';
+
+  /// All starred songs, albums, and artists for the authenticated user.
+  /// Used by the recommendation seed-collection (N2) — starred songs are
+  /// the strongest signal of "music the user likes" available without
+  /// scrobble history.
+  static const String getStarred2 = '/rest/getStarred2.view';
 }

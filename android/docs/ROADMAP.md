@@ -372,7 +372,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** `flutter analyze` clean. `flutter test` green. Manual: play a song end-to-end, confirm Navidrome play count increments and (if Last.fm configured) Last.fm scrobble appears.
 **Commit:** `feat(flutter): N1 — Subsonic scrobble.view integration at 50% playback`
 
-### [ ] N2. Seed collection provider
+### [x] N2. Seed collection provider
 **Files (new):** `android/app/lib/models/seed_track.dart` (`freezed`: `title`, `artist`, `sourceUrl` — nullable), `android/app/lib/providers/recommendations.dart` (`seedCollectionProvider` `AsyncNotifier`).
 **Deliverable:** `seedCollectionProvider` calls `getStarred2.view` + `getAlbumList2.view?type=frequent&size=30`, merges and deduplicates by `title+artist` (max 20, starred ranked first). Falls back to Favourites playlist entries (`libraryPlaylistsProvider`) if both calls return empty.
 **Test gate:** mock Subsonic client returning starred + frequent results; assert merge order; assert dedup; assert Favourites fallback fires when both calls return empty.
