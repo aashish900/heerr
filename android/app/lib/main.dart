@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import 'player/heerr_audio_handler.dart';
 import 'player/player_provider.dart';
+import 'player/scrobble_provider.dart';
 import 'router.dart';
 import 'theme.dart';
 
@@ -30,11 +31,15 @@ Future<void> main() async {
   );
 }
 
-class HeerrApp extends StatelessWidget {
+class HeerrApp extends ConsumerWidget {
   const HeerrApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Boot the scrobble controller. Keep-alive provider; the result is
+    // discarded — we only need the side effect (stream subscription).
+    ref.watch(scrobbleProvider);
+
     final GoRouter router = buildHeerrRouter();
     return MaterialApp.router(
       title: 'heerr',

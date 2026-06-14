@@ -1072,3 +1072,47 @@ Docs-only close-out for the playlist-mutations roadmap (M1 → M5 + the user-dri
 
 ### Not done in this commit
 - The on-device smoke run itself. `smoke_playlists.md` is the user's to fill in PASS lines after they install `v1.2.1` on the Pixel 7 against the live home server.
+
+## 2026-06-14 — N1: Subsonic scrobble.view integration at 50% playback
+
+First Phase N milestone — wires the Android client to Navidrome's `scrobble.view` so play counts increment server-side and Navidrome can forward to Last.fm / ListenBrainz when those server-side integrations are configured.
+
+### `android/app/lib/api/subsonic_endpoints.dart`
+- Added `SubsonicEndpoints.scrobble = '/rest/scrobble.view'` with a doc comment naming the two firing rules (now-playing notification vs ≥ 50% submission) and the cross-link to ROADMAP N1.
+
+### `android/app/lib/player/scrobble_controller.dart` (new)
+- Plain Dart driver. Subscribes to the audio handler's `mediaItem.stream` (track changes) + the underlying just_audio player's `positionStream` (playback progress). Fires `scrobble(id, submission=false)` once per distinct `extras['subsonicId']`, then `scrobble(id, submission=true)` once when position reaches ≥ 50 % of `MediaItem.duration`. The "once per play" guard resets on track change; seeks back-and-forth across the threshold do not re-fire.
+- MediaItems lacking a `subsonicId` extra (offline-only or malformed entries) are silently skipped. Null / zero `MediaItem.duration` suppresses the submission but the now-playing notification still fires. Exceptions from the `ScrobbleCall` are swallowed (best-effort).
+- Exposes `start()` / `dispose()` for explicit lifecycle control.
+
+### `android/app/lib/player/scrobble_provider.dart` (new)
+- `@Riverpod(keepAlive: true) Future<void> scrobble(...)` constructs a `ScrobbleController` wired to `audioHandlerProvider`'s streams + `subsonicDioClientProvider`. The HTTP call is `GET /rest/scrobble.view?id=<sid>&submission=<bool>`; auth params (u/s/t/v/c/f) are injected by the existing `SubsonicAuthInterceptor`. `ref.onDispose` cancels the controller's stream subscriptions.
+
+### `android/app/lib/main.dart`
+- `HeerrApp` switched from `StatelessWidget` to `ConsumerWidget`. `ref.watch(scrobbleProvider)` is read at the root of the widget tree purely for the side effect of booting the controller (the keep-alive provider survives screen rebuilds across the session).
+
+### Tests
+- `android/app/test/player/scrobble_controller_test.dart` — 10 cases covering the full state machine:
+  1. Track start fires `submission=false` with the subsonic id.
+  2. Position ≥ 50 % fires `submission=true` exactly once.
+  3. 49 % does *not* fire submission.
+  4. Track change resets the guard so the new track fires its own submission.
+  5. Re-emission of the same MediaItem does not re-fire the now-playing notification.
+  6. `null` MediaItem clears state — same id refires after a stop.
+  7. MediaItem without `subsonicId` extra fires no scrobbles.
+  8. `null` duration suppresses submission but the now-playing notification still fires.
+  9. Zero duration is guarded (no divide-by-zero, no submission).
+  10. `dispose()` halts further stream processing.
+
+### Test gate + version
+- `dart run build_runner build --delete-conflicting-outputs`: clean; one new `.g.dart` (`scrobble_provider.g.dart`).
+- `flutter analyze`: clean (added `// ignore_for_file: prefer_initializing_formals` in `scrobble_controller.dart` to keep public param names that don't leak the internal underscore prefix).
+- `flutter test`: **388/388** pass (378 prior + 10 new).
+- `pubspec.yaml` version: unchanged (in-progress N-band; bump at N5 close-out).
+
+### Server-side dependency (informational, no code)
+- Navidrome must have Last.fm or ListenBrainz integration configured in `navidrome.toml` / its web UI for the scrobble forwards to land. heerr's app emits the standard Subsonic `scrobble.view` calls regardless — what the server does with them is its own decision.
+
+### Not done in this commit
+- On-device smoke. Verify play count increments and (if configured) Last.fm scrobble appears after one end-to-end play.
+- `DECISIONLOG.md` entry — N1 implements the architecture already locked in `ROADMAP.md` Phase N intro; N5 will roll an ADR covering the full Phase N feature.

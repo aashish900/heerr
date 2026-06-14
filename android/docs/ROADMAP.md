@@ -365,7 +365,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 **Architecture note:** Pluggable `RecommendationEngine` on the backend (see `backend/docs/ROADMAP.md` Phase R). Android sends seeds from Navidrome play history; backend returns `[{title, artist, source_url}]`. Engine is swapped via `RECOMMENDATION_ENGINE` env var — the Android client never knows which engine is active. Dependency order: I1+I2 must land before N3; I4 before N5. N1 should be live for at least a week before I3/I5 are useful (Last.fm / ListenBrainz need scrobble history).
 
-### [ ] N1. Scrobble integration
+### [x] N1. Scrobble integration
 **Files (modify):** playback provider (`audio_service` + `just_audio` integration from K-era) — hook position stream: on track start → `GET /rest/scrobble.view?id=<navidrome-song-id>&submission=false`; at ≥ 50% of track duration (once per play) → `GET /rest/scrobble.view?id=<id>&submission=true`. Both calls via existing `subsonicDioClientProvider`.
 **Deliverable:** `scrobble.view` fires at the right thresholds. Navidrome forwards scrobbles to Last.fm if Last.fm is configured in Navidrome settings (one-time server-side config — set Last.fm API key + user credentials in Navidrome web UI / `navidrome.toml`; no heerr backend change required).
 **Test gate:** 50% threshold fires; 49% does not; double-fire guard (once per play regardless of seeks); `submission=false` on track start; `submission=true` at threshold; correct `id` in both calls.

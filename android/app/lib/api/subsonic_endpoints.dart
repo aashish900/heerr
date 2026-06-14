@@ -56,4 +56,12 @@ class SubsonicEndpoints {
 
   /// Delete a playlist by `id`. Empty envelope on success.
   static const String deletePlaylist = '/rest/deletePlaylist.view';
+
+  /// Register playback with the server. Required `id` (Subsonic song id);
+  /// `submission=false` is the "now playing" notification fired at track
+  /// start; `submission=true` is the "I listened to it" submission fired at
+  /// ≥ 50% of track duration. Navidrome forwards submissions to Last.fm /
+  /// ListenBrainz when those integrations are configured on the server.
+  /// See N1 in `android/docs/ROADMAP.md`.
+  static const String scrobble = '/rest/scrobble.view';
 }
