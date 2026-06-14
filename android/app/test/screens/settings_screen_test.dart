@@ -5,9 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:heerr/models/recommend_health.dart';
 import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/offline/offline_settings.dart';
 import 'package:heerr/offline/offline_size_estimator.dart';
+import 'package:heerr/providers/recommendations.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/providers/settings.dart';
 import 'package:heerr/screens/servers_screen.dart';
@@ -285,4 +287,113 @@ void main() {
       expect(store.snapshot['offline_enabled'], 'true');
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Recommendations section (N5)
+  // -------------------------------------------------------------------------
+
+  group('Recommendations section', () {
+    testWidgets('ok engine renders OK chip, no fallback badge, no help icon',
+        (WidgetTester tester) async {
+      await _useTallSurface(tester);
+      await tester.pumpWidget(_wrap(<Override>[
+        secureStorageProvider.overrideWithValue(_InMemoryStorage()),
+        recommendHealthNotifierProvider.overrideWith(
+            () => _StubHealth(const RecommendHealth(
+                  engine: 'ytmusic',
+                  status: 'ok',
+                  fallbackActive: false,
+                ))),
+      ]));
+      await _pumpForBuild(tester);
+
+      expect(find.text('Engine: ytmusic'), findsOneWidget);
+      expect(find.byKey(const Key('engine-chip-ok')), findsOneWidget);
+      expect(find.byKey(const Key('engine-chip-degraded')), findsNothing);
+      expect(find.byKey(const Key('engine-chip-fallback-active')),
+          findsNothing);
+      expect(find.byKey(const Key('settings-recommend-help')), findsNothing);
+    });
+
+    testWidgets('degraded engine renders Degraded chip + help icon',
+        (WidgetTester tester) async {
+      await _useTallSurface(tester);
+      await tester.pumpWidget(_wrap(<Override>[
+        secureStorageProvider.overrideWithValue(_InMemoryStorage()),
+        recommendHealthNotifierProvider.overrideWith(
+            () => _StubHealth(const RecommendHealth(
+                  engine: 'lastfm',
+                  status: 'degraded',
+                  fallbackActive: false,
+                ))),
+      ]));
+      await _pumpForBuild(tester);
+
+      expect(find.text('Engine: lastfm'), findsOneWidget);
+      expect(find.byKey(const Key('engine-chip-degraded')), findsOneWidget);
+      expect(find.byKey(const Key('engine-chip-fallback-active')),
+          findsNothing);
+      expect(find.byKey(const Key('settings-recommend-help')), findsOneWidget);
+    });
+
+    testWidgets('fallback_active renders the Fallback active badge',
+        (WidgetTester tester) async {
+      await _useTallSurface(tester);
+      await tester.pumpWidget(_wrap(<Override>[
+        secureStorageProvider.overrideWithValue(_InMemoryStorage()),
+        recommendHealthNotifierProvider.overrideWith(
+            () => _StubHealth(const RecommendHealth(
+                  engine: 'lastfm',
+                  status: 'degraded',
+                  fallbackActive: true,
+                ))),
+      ]));
+      await _pumpForBuild(tester);
+
+      expect(find.byKey(const Key('engine-chip-fallback-active')),
+          findsOneWidget);
+      expect(find.byKey(const Key('engine-chip-degraded')), findsOneWidget);
+    });
+
+    testWidgets('tapping help icon reveals inline diagnostic copy',
+        (WidgetTester tester) async {
+      await _useTallSurface(tester);
+      await tester.pumpWidget(_wrap(<Override>[
+        secureStorageProvider.overrideWithValue(_InMemoryStorage()),
+        recommendHealthNotifierProvider.overrideWith(
+            () => _StubHealth(const RecommendHealth(
+                  engine: 'lastfm',
+                  status: 'degraded',
+                  fallbackActive: true,
+                ))),
+      ]));
+      await _pumpForBuild(tester);
+
+      // Help text not yet visible.
+      expect(find.textContaining('Primary engine probe failed'),
+          findsNothing);
+
+      await tester.tap(find.byKey(const Key('settings-recommend-help')));
+      await tester.pump();
+      expect(find.textContaining('Primary engine probe failed'),
+          findsOneWidget);
+    });
+  });
+}
+
+/// Stub notifier for [recommendHealthNotifierProvider]. Wraps a fixed
+/// [RecommendHealth] payload. `refreshIfStale` is a no-op so the
+/// `SettingsScreen`'s post-frame refresh call doesn't trigger a real
+/// HTTP fetch through the unmocked `dioClientProvider`.
+class _StubHealth extends RecommendHealthNotifier {
+  _StubHealth(this._value);
+  final RecommendHealth _value;
+
+  @override
+  Future<RecommendHealth> build() async => _value;
+
+  @override
+  void refreshIfStale({Duration maxAge = const Duration(seconds: 60)}) {
+    // No-op in tests.
+  }
 }

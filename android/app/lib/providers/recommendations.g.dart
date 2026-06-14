@@ -39,7 +39,7 @@ final seedCollectionProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef SeedCollectionRef = AutoDisposeFutureProviderRef<List<SeedTrack>>;
-String _$recommendationsHash() => r'1a8d0fda66af4cdee0c73ddec85185d94accf7a8';
+String _$recommendationsHash() => r'a9cacf58dd8b9aa43cd5eb98c99282d6472f8428';
 
 /// Recommendation results from the heerr backend (`POST /api/v1/recommend`).
 ///
@@ -74,5 +74,35 @@ final recommendationsProvider =
     );
 
 typedef _$Recommendations = AutoDisposeAsyncNotifier<List<RecommendedTrack>>;
+String _$recommendHealthNotifierHash() =>
+    r'44a0fe5eef61faf2068366c686f1a9477ce04e78';
+
+/// Health of the configured recommendation engine. Backed by the backend's
+/// `GET /api/v1/recommend/health` (shipped at I4).
+///
+/// Lifecycle:
+///   - Keep-alive so the cached payload survives Settings tab switches.
+///   - [refreshIfStale] is the hook for "events that should trigger a
+///     re-fetch" — currently called on Settings screen open and on app
+///     resume (router shell). 60 s TTL prevents thrashing when those
+///     events fire in rapid succession.
+///
+/// Failures propagate as `AsyncError`; the Settings widget renders an
+/// "unknown" chip in that case rather than a hard error pane.
+///
+/// Copied from [RecommendHealthNotifier].
+@ProviderFor(RecommendHealthNotifier)
+final recommendHealthNotifierProvider =
+    AsyncNotifierProvider<RecommendHealthNotifier, RecommendHealth>.internal(
+      RecommendHealthNotifier.new,
+      name: r'recommendHealthNotifierProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$recommendHealthNotifierHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$RecommendHealthNotifier = AsyncNotifier<RecommendHealth>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

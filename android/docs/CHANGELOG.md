@@ -1262,3 +1262,56 @@ Closes the "find → download → play in one app" loop for the recommendations 
 ### Not done in this commit
 - Engine-health chip in Settings — N5.
 - The "Find similar →" affordance is wired only through the library-search song rows so far; the album-detail + playlist-detail song rows would need the same wiring on their long-press. Deferred — the search-side surface is the highest-discoverability entry point in v1 and the others can be added without breaking changes.
+
+## 2026-06-14 — N5: Engine health indicator in Settings + Phase N close-out
+
+Closes the recommendations roadmap. Adds a Settings indicator for backend engine health, an app-resume refresh hook, and bumps the release band to v1.3.0.
+
+### `android/app/lib/models/recommend_health.dart` (new)
+- Freezed `RecommendHealth { engine, status, fallbackActive }` mirroring the backend `RecommendHealthResponse` (snake-case wire field for `fallback_active` via `@JsonKey`).
+
+### `android/app/lib/providers/recommendations.dart`
+- New `recommendHealthNotifierProvider` (keep-alive `@Riverpod` class). `build()` hits `GET /api/v1/recommend/health` via the heerr backend dio and stamps `_lastFetchAt`. `refreshIfStale(maxAge: 60s default)` no-ops when the cache is fresh, otherwise calls `ref.invalidateSelf()`. The default 60 s TTL stops resume/screen-open events from thrashing the backend.
+
+### `android/app/lib/screens/settings_screen.dart`
+- `SettingsScreen` switched from `ConsumerWidget` → `ConsumerStatefulWidget` so `initState` can fire a post-frame `refreshIfStale()`. (The provider's keep-alive cache + 60 s TTL keep cold opens cheap.)
+- New `_RecommendationsSection` rendered below `_ServersTile`:
+  - **Loading** state: `Engine health` row with `Checking…` subtitle.
+  - **Error** state: `Could not reach backend — check token in Servers.` in the error colour.
+  - **Data** state: `Engine: <name>` title + status chip (green `OK` / amber `Degraded`) + optional `Fallback active` chip. When degraded, a trailing `help_outline` IconButton toggles an inline diagnostic paragraph (`fallbackActive` → "running on the fallback, check your API key"; `!fallbackActive` → "no engine in the chain is reachable").
+- Visual: chips use `withValues(alpha: …)` (Flutter ≥ 3.27 colour API) so the soft tint + outlined border render correctly under Material 3.
+
+### `android/app/lib/router.dart`
+- `_ShellScaffoldState.unawaitedResume` now also calls `recommendHealthNotifierProvider.refreshIfStale()` on app resume. Cheap — the 60 s TTL guards the call.
+
+### Tests
+- `android/app/test/providers/recommend_health_test.dart` (new) — 4 cases:
+  1. `GETs /recommend/health` with the right path; parses the typed payload (ok / fallback_active=false round-trips).
+  2. Degraded + `fallback_active=true` payload parses correctly.
+  3. `refreshIfStale` is a no-op while the cached payload is < 60 s old (no second HTTP fetch).
+  4. `refreshIfStale(maxAge: Duration.zero)` forces re-fetch on the next read (cache always treated as stale → second HTTP call observed).
+- `android/app/test/screens/settings_screen_test.dart` — 4 new widget cases under a `Recommendations section` group:
+  1. ok engine → green chip + no fallback badge + no help icon.
+  2. Degraded engine → amber chip + help icon visible (no fallback badge when `fallback_active=false`).
+  3. `fallback_active=true` → both the Degraded chip and the Fallback-active chip render.
+  4. Tap the help icon → inline diagnostic copy ("Primary engine probe failed…") appears below the row.
+  All tests inject a `_StubHealth` notifier whose `refreshIfStale` is a no-op so the SettingsScreen's post-frame refresh doesn't try to fire a real HTTP call through the unmocked `dioClientProvider`.
+
+### Test gate + version
+- `dart run build_runner build --delete-conflicting-outputs`: clean; one new pair (`recommend_health.freezed.dart`/`.g.dart`).
+- `flutter analyze`: clean.
+- `flutter test`: **432/432** pass (424 prior + 8 new: 4 provider + 4 widget).
+- `pubspec.yaml`: bumped `1.2.1` → `1.3.0`. Release-band version for the Phase N (recommendations) feature ship.
+
+### Phase N closed (2026-06-14)
+- N1 ✅ Subsonic scrobble integration (track-start + ≥ 50 % submission).
+- N2 ✅ Seed-collection provider (starred + frequent + Favourites fallback).
+- N3 ✅ Recommendations screen + `POST /recommend` integration.
+- N4 ✅ Library cross-reference + Find Similar long-press.
+- N5 ✅ Engine health indicator in Settings.
+- Tag: `v1.3.0` (after the on-device smoke).
+
+### Not done in this commit
+- On-device smoke. Verify recommendations populate, Play branch works for in-library matches, Find Similar long-press seeds the feed, Settings shows the engine chip.
+- `DECISIONLOG.md` ADR for Phase N (will land alongside the smoke run + tag).
+- Album-detail / playlist-detail song-row long-press still routes through the old `AddToPlaylistSheet.show(songIds: …)` shape without `findSimilarSeed`. The library-search song surface is the highest-discoverability entry point in v1; adding the same affordance to the other two surfaces is mechanical.

@@ -6,6 +6,7 @@ import '../api/client.dart';
 import '../api/endpoints.dart';
 import '../api/subsonic_client.dart';
 import '../api/subsonic_endpoints.dart';
+import '../models/recommend_health.dart';
 import '../models/recommended_track.dart';
 import '../models/seed_track.dart';
 import '../models/subsonic/album.dart';
@@ -287,5 +288,47 @@ class Recommendations extends _$Recommendations {
   Future<void> refresh() async {
     ref.invalidateSelf();
     await future;
+  }
+}
+
+/// Default freshness window for [RecommendHealthNotifier]. Calls to
+/// `refreshIfStale` newer than this no-op; older ones invalidate the
+/// provider so the next read re-fetches.
+const Duration _kHealthMaxAge = Duration(seconds: 60);
+
+/// Health of the configured recommendation engine. Backed by the backend's
+/// `GET /api/v1/recommend/health` (shipped at I4).
+///
+/// Lifecycle:
+///   - Keep-alive so the cached payload survives Settings tab switches.
+///   - [refreshIfStale] is the hook for "events that should trigger a
+///     re-fetch" — currently called on Settings screen open and on app
+///     resume (router shell). 60 s TTL prevents thrashing when those
+///     events fire in rapid succession.
+///
+/// Failures propagate as `AsyncError`; the Settings widget renders an
+/// "unknown" chip in that case rather than a hard error pane.
+@Riverpod(keepAlive: true)
+class RecommendHealthNotifier extends _$RecommendHealthNotifier {
+  DateTime? _lastFetchAt;
+
+  @override
+  Future<RecommendHealth> build() async {
+    _lastFetchAt = DateTime.now();
+    final Dio dio = await ref.watch(dioClientProvider.future);
+    return apiCall<RecommendHealth>(
+      () => dio.get<dynamic>(Endpoints.recommendHealth),
+      (dynamic data) =>
+          RecommendHealth.fromJson(data as Map<String, dynamic>),
+    );
+  }
+
+  /// Re-fetch when the cached payload is older than [maxAge]. No-ops
+  /// when the cache is fresh — cheap to call from app-resume / screen-
+  /// open paths without thrashing the backend.
+  void refreshIfStale({Duration maxAge = _kHealthMaxAge}) {
+    final DateTime? last = _lastFetchAt;
+    if (last != null && DateTime.now().difference(last) < maxAge) return;
+    ref.invalidateSelf();
   }
 }

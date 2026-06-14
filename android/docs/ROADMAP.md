@@ -395,7 +395,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** `analyze` / `test` green. Manual: long-press a library song → recommendations screen opens seeded with that song.
 **Commit:** `feat(flutter): N4 — library cross-reference + Find Similar long-press`
 
-### [ ] N5. Engine health indicator in Settings
+### [x] N5. Engine health indicator in Settings
 **Files (modify):** `android/app/lib/screens/settings_screen.dart` (new "Recommendations" section below server profiles — shows engine name chip, `ok`→green / `degraded`→amber, `fallback_active` badge; tappable when degraded for inline help text), `android/app/lib/providers/recommendations.dart` (add `recommendHealthProvider` `AsyncNotifier` with 60s TTL — calls `GET /api/v1/recommend/health` on app resume and Settings screen open).
 **Deliverable:** Settings shows which engine is active and whether it's healthy. Degraded state is actionable (user knows to check their API key or Tailscale).
 **Test gate:** mock health `ok` → green chip renders; mock `degraded` + `fallback_active: true` → amber chip + badge visible.

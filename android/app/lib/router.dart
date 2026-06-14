@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import 'offline/offline_sync.dart';
+import 'providers/recommendations.dart';
 import 'screens/downloads_screen.dart';
 import 'screens/job_detail_screen.dart';
 import 'screens/library/album_detail_screen.dart';
@@ -230,6 +231,10 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
     // Fire-and-forget — resume() ticks immediately, but we don't need to
     // await it; failures land in the manifest's lastError.
     ref.read(offlineSyncProvider.notifier).resume();
+    // N5: also re-check the recommendation engine's health on resume. The
+    // notifier guards on a 60 s TTL so this is cheap to fire on every
+    // foreground transition.
+    ref.read(recommendHealthNotifierProvider.notifier).refreshIfStale();
   }
 
   int _indexFor(String loc) {
