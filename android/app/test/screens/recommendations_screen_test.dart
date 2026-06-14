@@ -146,6 +146,44 @@ void main() {
     expect(find.text('Queued "A1"'), findsOneWidget);
   });
 
+  testWidgets(
+      'inLibrary row renders Play instead of Download (N4 cross-reference)',
+      (WidgetTester tester) async {
+    final tracks = <RecommendedTrack>[
+      const RecommendedTrack(
+        title: 'Library Song',
+        artist: 'Library Artist',
+        sourceUrl: 'https://music.youtube.com/watch?v=lib',
+        inLibrary: true,
+        subsonicSongId: 'subsonic-1',
+      ),
+      const RecommendedTrack(
+        title: 'Remote Song',
+        artist: 'Remote Artist',
+        sourceUrl: 'https://music.youtube.com/watch?v=rem',
+      ),
+    ];
+    await tester.pumpWidget(_wrap(overrides: <Override>[
+      recommendationsProvider
+          .overrideWith(() => _StubRecs(Future<List<RecommendedTrack>>.value(tracks))),
+    ]));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Play'), findsOneWidget);
+    expect(find.text('Download'), findsOneWidget);
+
+    // Each label appears on the right row — quickest check: Play button is
+    // in the same ListTile as the library song's title.
+    final Finder playTile = find.ancestor(
+      of: find.text('Play'),
+      matching: find.byType(ListTile),
+    );
+    expect(
+      find.descendant(of: playTile, matching: find.text('Library Song')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('download ApiError surfaces a snackbar',
       (WidgetTester tester) async {
     final tracks = <RecommendedTrack>[

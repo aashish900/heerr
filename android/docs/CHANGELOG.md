@@ -1219,3 +1219,46 @@ UI-layer milestone. Adds the "For You" screen that surfaces backend recommendati
 - Library cross-reference (`inLibrary: true` rows render Play instead of Download) — N4.
 - "Find similar" long-press affordance — N4.
 - Engine-health chip in Settings — N5.
+
+## 2026-06-14 — N4: Library cross-reference + Find Similar long-press
+
+Closes the "find → download → play in one app" loop for the recommendations flow: results that are already in the user's Navidrome library render **Play** instead of **Download**, and any library song can launch a recommendation feed seeded from itself.
+
+### `android/app/lib/models/recommended_track.dart`
+- Added `subsonicSongId: String?` to the freezed model. Populated by the N4 cross-reference step; required for the Play branch (without it we can't drive Subsonic playback).
+
+### `android/app/lib/providers/recommendations.dart`
+- New `manualSeedProvider` (`StateProvider<SeedTrack?>`). When non-null, `recommendationsProvider.build()` uses it as the **sole** seed and ignores `seedCollectionProvider` for that visit. The screen clears it back to null on `dispose` so the next entry returns to the general "For You" feed.
+- `Recommendations.build()` now hydrates each base result via `_hydrateLibraryMatches(base)`: parallel `search3.view?query=<artist> <title>&songCount=1` calls against the Subsonic dio. On match → `copyWith(inLibrary: true, subsonicSongId: <id>)`; on miss or per-result exception → row falls through unchanged. Subsonic dio not configured at all → cross-reference no-ops gracefully (every row stays remote).
+
+### `android/app/lib/screens/recommendations_screen.dart`
+- Switched `RecommendationsScreen` from `ConsumerWidget` → `ConsumerStatefulWidget` so it can clear `manualSeedProvider` in `dispose`.
+- `_RecommendationTile`: when `track.inLibrary && track.subsonicSongId != null`, renders a **Play** `FilledButton.icon`. Tapping it builds a synthetic `Song(id, title, artist)` (avoids a round-trip through `getSong` for one play) and calls `playSongFromSubsonic(ref, context, song)`. Remote-only rows keep the Download path unchanged.
+
+### `android/app/lib/widgets/add_to_playlist_sheet.dart`
+- `AddToPlaylistSheet` accepts an optional `findSimilarSeed: SeedTrack?`. When non-null, renders a "Find similar →" `ListTile` at the top of the sheet (key `add-to-playlist-find-similar`). Tap sets `manualSeedProvider` to the seed, pops the sheet, and pushes `Routes.libraryRecommendations`. Album-level / multi-song callers leave it null and the affordance disappears.
+- `AddToPlaylistSheet.show()` signature gained the same optional parameter; existing call sites that don't pass it get the original behaviour.
+
+### `android/app/lib/screens/library/library_screen.dart`
+- The library-search "Songs" sub-section long-press now passes `findSimilarSeed: _seedForSong(s)` so users can long-press a found song → "Find similar →" → recommendations seeded from that exact track. The `_seedForSong` helper returns `null` when the Subsonic song has no artist (backend `RecommendSeed` requires both title and artist) so the affordance gracefully hides for orphaned rows.
+
+### Tests
+- `android/app/test/providers/recommendations_provider_test.dart` — 3 new cases (8 total):
+  1. Cross-reference: matching result gets `inLibrary=true` + correct `subsonicSongId`; non-matching result stays `inLibrary=false`. Verifies `search3.view` was called once per result with `songCount: 1`.
+  2. Cross-reference failure tolerance: empty Subsonic envelope → row falls through as `inLibrary=false` (no exception).
+  3. Manual-seed override: when `manualSeedProvider` is set, the POST body's `seeds` array contains exactly that one seed — `seedCollectionProvider` is bypassed.
+- `android/app/test/screens/recommendations_screen_test.dart` — 1 new case (7 total): when one result has `inLibrary=true` + `subsonicSongId`, that row renders the Play button (not Download); a sibling remote-only row still renders Download.
+- `android/app/test/widgets/add_to_playlist_find_similar_test.dart` (new) — 3 cases:
+  1. "Find similar →" tile renders when `findSimilarSeed` is non-null.
+  2. Tile is hidden when `findSimilarSeed` is null.
+  3. Tapping the tile sets `manualSeedProvider` to the passed seed.
+
+### Test gate + version
+- `dart run build_runner build --delete-conflicting-outputs`: clean (no new annotations).
+- `flutter analyze`: clean.
+- `flutter test`: **424/424** pass (417 prior + 7 new: 3 provider + 1 screen + 3 sheet).
+- `pubspec.yaml` version: unchanged (in-progress N-band; bump at N5 close-out).
+
+### Not done in this commit
+- Engine-health chip in Settings — N5.
+- The "Find similar →" affordance is wired only through the library-search song rows so far; the album-detail + playlist-detail song rows would need the same wiring on their long-press. Deferred — the search-side surface is the highest-discoverability entry point in v1 and the others can be added without breaking changes.

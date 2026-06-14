@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../api/client.dart';
@@ -19,6 +20,16 @@ part 'recommendations.g.dart';
 /// the screen's typical viewport — enough variety, short enough to be
 /// scrollable without pagination.
 const int _kRecommendationsLimit = 20;
+
+/// Optional override seed for [recommendationsProvider]. When non-null, the
+/// recommendations notifier uses it as the **sole** seed instead of pulling
+/// from [seedCollectionProvider].
+///
+/// Set by the "Find similar →" long-press affordance (N4) which routes to
+/// `/library/recommendations` with a specific song as the seed. The screen
+/// resets this back to null when popped so the next visit returns to the
+/// general "For You" feed.
+final manualSeedProvider = StateProvider<SeedTrack?>((Ref ref) => null);
 
 /// Hard cap on seeds returned by [seedCollectionProvider]. Tuned to match
 /// the backend's `POST /api/v1/recommend` limit ceiling (50) with headroom:
@@ -180,8 +191,14 @@ Future<List<Song>> _fetchFavouriteSongs(SeedCollectionRef ref) async {
 class Recommendations extends _$Recommendations {
   @override
   Future<List<RecommendedTrack>> build() async {
-    final List<SeedTrack> seeds =
-        await ref.watch(seedCollectionProvider.future);
+    final SeedTrack? manual = ref.watch(manualSeedProvider);
+    final List<SeedTrack> seeds;
+    if (manual != null) {
+      seeds = <SeedTrack>[manual];
+    } else {
+      seeds = await ref.watch(seedCollectionProvider.future);
+    }
+
     final Dio dio = await ref.watch(dioClientProvider.future);
 
     final Map<String, dynamic> body = <String, dynamic>{
@@ -189,7 +206,7 @@ class Recommendations extends _$Recommendations {
       'limit': _kRecommendationsLimit,
     };
 
-    return apiCall<List<RecommendedTrack>>(
+    final List<RecommendedTrack> base = await apiCall<List<RecommendedTrack>>(
       () => dio.post<dynamic>(Endpoints.recommend, data: body),
       (dynamic data) {
         final Map<String, dynamic> json = data as Map<String, dynamic>;
@@ -199,6 +216,68 @@ class Recommendations extends _$Recommendations {
             .map((dynamic e) =>
                 RecommendedTrack.fromJson(e as Map<String, dynamic>))
             .toList();
+      },
+    );
+
+    if (base.isEmpty) return base;
+
+    // Cross-reference each result against the Subsonic library via
+    // `search3.view?query=<artist> <title>&songCount=1`. Library-side
+    // failures are swallowed per result so one bad search3 doesn't kill
+    // the whole list — the result just falls through as inLibrary=false.
+    return _hydrateLibraryMatches(base);
+  }
+
+  Future<List<RecommendedTrack>> _hydrateLibraryMatches(
+    List<RecommendedTrack> base,
+  ) async {
+    final Dio sub;
+    try {
+      sub = await ref.watch(subsonicDioClientProvider.future);
+    } catch (_) {
+      // Navidrome not configured — every row stays remote-only.
+      return base;
+    }
+
+    Future<RecommendedTrack> resolveOne(RecommendedTrack r) async {
+      try {
+        final String? id = await _searchLibraryForMatch(sub, r);
+        if (id == null) return r;
+        return r.copyWith(inLibrary: true, subsonicSongId: id);
+      } catch (_) {
+        return r;
+      }
+    }
+
+    return Future.wait(base.map(resolveOne));
+  }
+
+  Future<String?> _searchLibraryForMatch(
+    Dio sub,
+    RecommendedTrack r,
+  ) async {
+    final String query = '${r.artist} ${r.title}'.trim();
+    if (query.isEmpty) return null;
+    return subsonicCall<String?>(
+      () => sub.get<dynamic>(
+        SubsonicEndpoints.search3,
+        queryParameters: <String, dynamic>{
+          'query': query,
+          'songCount': 1,
+          'artistCount': 0,
+          'albumCount': 0,
+        },
+      ),
+      (Map<String, dynamic> env) {
+        final dynamic block = env['searchResult3'];
+        if (block is! Map<String, dynamic>) return null;
+        final dynamic songs = block['song'];
+        if (songs is! List || songs.isEmpty) return null;
+        final dynamic first = songs.first;
+        if (first is! Map<String, dynamic>) return null;
+        final dynamic id = first['id'];
+        if (id is! String || id.isEmpty) return null;
+        return id;
       },
     );
   }

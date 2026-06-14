@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_error.dart';
 import '../models/recommended_track.dart';
+import '../models/subsonic/song.dart';
+import '../player/playback_actions.dart';
 import '../providers/download.dart';
 import '../providers/recommendations.dart';
 import '../widgets/empty_state.dart';
@@ -19,11 +21,29 @@ import '../widgets/skeleton.dart';
 /// (`POST /download` on the heerr backend). The button shows a small
 /// spinner while the dispatch is in flight (same affordance as the search
 /// result tile).
-class RecommendationsScreen extends ConsumerWidget {
+class RecommendationsScreen extends ConsumerStatefulWidget {
   const RecommendationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RecommendationsScreen> createState() =>
+      _RecommendationsScreenState();
+}
+
+class _RecommendationsScreenState extends ConsumerState<RecommendationsScreen> {
+  @override
+  void dispose() {
+    // Clear the "Find similar" seed when leaving — next visit returns to
+    // the general "For You" feed. Use a post-frame microtask so we don't
+    // mutate provider state mid-build.
+    Future<void>.microtask(() {
+      if (!mounted) return;
+      ref.read(manualSeedProvider.notifier).state = null;
+    });
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final AsyncValue<List<RecommendedTrack>> async =
         ref.watch(recommendationsProvider);
 
@@ -105,9 +125,14 @@ class _ErrorScroll extends StatelessWidget {
   }
 }
 
-/// One row of the recommendations list. The Download button reads only the
-/// in-flight set for *this* row's URL so other rows' dispatches don't
-/// repaint it (avoids whole-list rebuilds on each tap).
+/// One row of the recommendations list.
+///
+/// When `track.inLibrary` is true and a `subsonicSongId` is attached
+/// (set by N4 cross-reference), the trailing slot renders a **Play**
+/// button that drives Subsonic playback via [playSongFromSubsonic]. The
+/// usual case — remote-only candidates — renders the Download button
+/// (reads only the in-flight set for *this* row's URL so other rows'
+/// dispatches don't repaint it).
 class _RecommendationTile extends ConsumerWidget {
   const _RecommendationTile({required this.track});
 
@@ -131,8 +156,30 @@ class _RecommendationTile extends ConsumerWidget {
     }
   }
 
+  Future<void> _onPlay(BuildContext context, WidgetRef ref) async {
+    final String? id = track.subsonicSongId;
+    if (id == null) return;
+    // Build a synthetic Song from what we have — `playSongFromSubsonic`
+    // only reads id/title/artist for the stream URL + queue label, and
+    // we don't want to round-trip through `getSong` for one play.
+    final Song song = Song(id: id, title: track.title, artist: track.artist);
+    await playSongFromSubsonic(ref, context, song);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (track.inLibrary && track.subsonicSongId != null) {
+      return ListTile(
+        title: Text(track.title),
+        subtitle: Text(track.artist),
+        trailing: FilledButton.icon(
+          onPressed: () => unawaited(_onPlay(context, ref)),
+          icon: const Icon(Icons.play_arrow),
+          label: const Text('Play'),
+        ),
+      );
+    }
+
     final bool inFlight = ref.watch(
       downloadDispatcherProvider.select(
         (Set<String> s) => s.contains(track.sourceUrl),

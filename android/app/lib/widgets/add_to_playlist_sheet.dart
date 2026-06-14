@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../api/api_error.dart';
+import '../models/seed_track.dart';
 import '../models/subsonic/playlist.dart';
 import '../providers/library/library_playlists.dart';
 import '../providers/library/playlist_mutations.dart';
+import '../providers/recommendations.dart';
 import '../providers/settings.dart';
+import '../router.dart';
 import 'error_snackbar.dart';
 import 'playlist_dialogs.dart';
 
@@ -32,20 +36,44 @@ import 'playlist_dialogs.dart';
 ///     [showApiError]. Sheet stays so the user can retry without
 ///     re-discovering the entry point.
 class AddToPlaylistSheet extends ConsumerWidget {
-  const AddToPlaylistSheet({required this.songIds, super.key});
+  const AddToPlaylistSheet({
+    required this.songIds,
+    this.findSimilarSeed,
+    super.key,
+  });
 
   final List<String> songIds;
+
+  /// When non-null, renders a "Find similar →" entry at the top of the
+  /// sheet. Tapping it sets [manualSeedProvider] to this seed and
+  /// navigates to `/library/recommendations`. Passed by single-song
+  /// callers (long-press on song rows); album-level / multi-song
+  /// callers leave it null so the affordance doesn't appear.
+  final SeedTrack? findSimilarSeed;
 
   static Future<void> show({
     required BuildContext context,
     required List<String> songIds,
+    SeedTrack? findSimilarSeed,
   }) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => AddToPlaylistSheet(songIds: songIds),
+      builder: (_) => AddToPlaylistSheet(
+        songIds: songIds,
+        findSimilarSeed: findSimilarSeed,
+      ),
     );
+  }
+
+  void _onFindSimilar(BuildContext sheetContext, WidgetRef ref) {
+    final SeedTrack? seed = findSimilarSeed;
+    if (seed == null) return;
+    ref.read(manualSeedProvider.notifier).state = seed;
+    Navigator.of(sheetContext).pop();
+    final GoRouter? router = GoRouter.maybeOf(sheetContext);
+    router?.push(Routes.libraryRecommendations);
   }
 
   String _songCountLabel() => _pluralise(songIds.length);
@@ -137,6 +165,17 @@ class AddToPlaylistSheet extends ConsumerWidget {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
+            if (findSimilarSeed != null) ...<Widget>[
+              ListTile(
+                key: const Key('add-to-playlist-find-similar'),
+                leading: const Icon(Icons.recommend_outlined),
+                title: const Text('Find similar →'),
+                subtitle:
+                    const Text('Recommendations seeded from this song'),
+                onTap: () => _onFindSimilar(context, ref),
+              ),
+              const Divider(height: 1),
+            ],
             ListTile(
               leading: const Icon(Icons.add),
               title: const Text('Create new playlist…'),

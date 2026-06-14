@@ -28,6 +28,12 @@ mixin _$RecommendedTrack {
   double? get score => throw _privateConstructorUsedError;
   bool get inLibrary => throw _privateConstructorUsedError;
 
+  /// Navidrome song id when [inLibrary] is true. Set by the N4
+  /// cross-reference step (parallel `search3.view` calls). Required for
+  /// the "Play" branch — without it we can't drive Subsonic playback.
+  /// Null on remote-only results (the Download path).
+  String? get subsonicSongId => throw _privateConstructorUsedError;
+
   /// Serializes this RecommendedTrack to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -51,6 +57,7 @@ abstract class $RecommendedTrackCopyWith<$Res> {
     @JsonKey(name: 'source_url') String sourceUrl,
     double? score,
     bool inLibrary,
+    String? subsonicSongId,
   });
 }
 
@@ -74,6 +81,7 @@ class _$RecommendedTrackCopyWithImpl<$Res, $Val extends RecommendedTrack>
     Object? sourceUrl = null,
     Object? score = freezed,
     Object? inLibrary = null,
+    Object? subsonicSongId = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -97,6 +105,10 @@ class _$RecommendedTrackCopyWithImpl<$Res, $Val extends RecommendedTrack>
                 ? _value.inLibrary
                 : inLibrary // ignore: cast_nullable_to_non_nullable
                       as bool,
+            subsonicSongId: freezed == subsonicSongId
+                ? _value.subsonicSongId
+                : subsonicSongId // ignore: cast_nullable_to_non_nullable
+                      as String?,
           )
           as $Val,
     );
@@ -118,6 +130,7 @@ abstract class _$$RecommendedTrackImplCopyWith<$Res>
     @JsonKey(name: 'source_url') String sourceUrl,
     double? score,
     bool inLibrary,
+    String? subsonicSongId,
   });
 }
 
@@ -140,6 +153,7 @@ class __$$RecommendedTrackImplCopyWithImpl<$Res>
     Object? sourceUrl = null,
     Object? score = freezed,
     Object? inLibrary = null,
+    Object? subsonicSongId = freezed,
   }) {
     return _then(
       _$RecommendedTrackImpl(
@@ -163,6 +177,10 @@ class __$$RecommendedTrackImplCopyWithImpl<$Res>
             ? _value.inLibrary
             : inLibrary // ignore: cast_nullable_to_non_nullable
                   as bool,
+        subsonicSongId: freezed == subsonicSongId
+            ? _value.subsonicSongId
+            : subsonicSongId // ignore: cast_nullable_to_non_nullable
+                  as String?,
       ),
     );
   }
@@ -177,6 +195,7 @@ class _$RecommendedTrackImpl implements _RecommendedTrack {
     @JsonKey(name: 'source_url') required this.sourceUrl,
     this.score,
     this.inLibrary = false,
+    this.subsonicSongId,
   });
 
   factory _$RecommendedTrackImpl.fromJson(Map<String, dynamic> json) =>
@@ -195,9 +214,16 @@ class _$RecommendedTrackImpl implements _RecommendedTrack {
   @JsonKey()
   final bool inLibrary;
 
+  /// Navidrome song id when [inLibrary] is true. Set by the N4
+  /// cross-reference step (parallel `search3.view` calls). Required for
+  /// the "Play" branch — without it we can't drive Subsonic playback.
+  /// Null on remote-only results (the Download path).
+  @override
+  final String? subsonicSongId;
+
   @override
   String toString() {
-    return 'RecommendedTrack(title: $title, artist: $artist, sourceUrl: $sourceUrl, score: $score, inLibrary: $inLibrary)';
+    return 'RecommendedTrack(title: $title, artist: $artist, sourceUrl: $sourceUrl, score: $score, inLibrary: $inLibrary, subsonicSongId: $subsonicSongId)';
   }
 
   @override
@@ -211,13 +237,22 @@ class _$RecommendedTrackImpl implements _RecommendedTrack {
                 other.sourceUrl == sourceUrl) &&
             (identical(other.score, score) || other.score == score) &&
             (identical(other.inLibrary, inLibrary) ||
-                other.inLibrary == inLibrary));
+                other.inLibrary == inLibrary) &&
+            (identical(other.subsonicSongId, subsonicSongId) ||
+                other.subsonicSongId == subsonicSongId));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, title, artist, sourceUrl, score, inLibrary);
+  int get hashCode => Object.hash(
+    runtimeType,
+    title,
+    artist,
+    sourceUrl,
+    score,
+    inLibrary,
+    subsonicSongId,
+  );
 
   /// Create a copy of RecommendedTrack
   /// with the given fields replaced by the non-null parameter values.
@@ -243,6 +278,7 @@ abstract class _RecommendedTrack implements RecommendedTrack {
     @JsonKey(name: 'source_url') required final String sourceUrl,
     final double? score,
     final bool inLibrary,
+    final String? subsonicSongId,
   }) = _$RecommendedTrackImpl;
 
   factory _RecommendedTrack.fromJson(Map<String, dynamic> json) =
@@ -259,6 +295,13 @@ abstract class _RecommendedTrack implements RecommendedTrack {
   double? get score;
   @override
   bool get inLibrary;
+
+  /// Navidrome song id when [inLibrary] is true. Set by the N4
+  /// cross-reference step (parallel `search3.view` calls). Required for
+  /// the "Play" branch — without it we can't drive Subsonic playback.
+  /// Null on remote-only results (the Download path).
+  @override
+  String? get subsonicSongId;
 
   /// Create a copy of RecommendedTrack
   /// with the given fields replaced by the non-null parameter values.

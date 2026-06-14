@@ -387,7 +387,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** `build_runner` / `analyze` / `test` green. Manual: "For You" entry point visible, recommendations load from the backend.
 **Commit:** `feat(flutter): N3 — recommendations screen + POST /recommend integration`
 
-### [ ] N4. Library cross-reference + "Find similar" affordance
+### [x] N4. Library cross-reference + "Find similar" affordance
 **Files (modify):** `android/app/lib/providers/recommendations.dart` (`recommendationsProvider` cross-references each result via `search3.view?query=<title+artist>&songCount=1`; match → `inLibrary: true`), `android/app/lib/models/recommended_track.dart` (add `inLibrary: bool`), `android/app/lib/screens/recommendations_screen.dart` (`inLibrary: true` rows show **Play** instead of **Download`).
 **Files (new):** `manualSeedProvider` (`StateProvider<SeedTrack?>`).
 **Deliverable:** "Find similar" long-press affordance on any song row in Library screens — sets `manualSeedProvider`, navigates to `/library/recommendations`. `recommendationsProvider` reads manual seed first; falls back to `seedCollectionProvider` if null.

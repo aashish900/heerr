@@ -14,6 +14,7 @@ _$RecommendedTrackImpl _$$RecommendedTrackImplFromJson(
   sourceUrl: json['source_url'] as String,
   score: (json['score'] as num?)?.toDouble(),
   inLibrary: json['in_library'] as bool? ?? false,
+  subsonicSongId: json['subsonic_song_id'] as String?,
 );
 
 Map<String, dynamic> _$$RecommendedTrackImplToJson(
@@ -24,4 +25,5 @@ Map<String, dynamic> _$$RecommendedTrackImplToJson(
   'source_url': instance.sourceUrl,
   if (instance.score case final value?) 'score': value,
   'in_library': instance.inLibrary,
+  if (instance.subsonicSongId case final value?) 'subsonic_song_id': value,
 };

@@ -32,6 +32,12 @@ class RecommendedTrack with _$RecommendedTrack {
     @JsonKey(name: 'source_url') required String sourceUrl,
     double? score,
     @Default(false) bool inLibrary,
+
+    /// Navidrome song id when [inLibrary] is true. Set by the N4
+    /// cross-reference step (parallel `search3.view` calls). Required for
+    /// the "Play" branch — without it we can't drive Subsonic playback.
+    /// Null on remote-only results (the Download path).
+    String? subsonicSongId,
   }) = _RecommendedTrack;
 
   factory RecommendedTrack.fromJson(Map<String, dynamic> json) =>
