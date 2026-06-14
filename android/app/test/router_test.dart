@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:heerr/offline/offline_sync.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/router.dart';
+import 'package:heerr/screens/home/home_screen.dart';
 import 'package:heerr/theme.dart';
 
 // In-memory fake for `flutter_secure_storage`. Needed because the real
@@ -43,16 +44,22 @@ String _activeTitle(WidgetTester tester) {
 }
 
 void main() {
-  testWidgets('boots on the Library route by default', (
+  testWidgets('boots on the Home route by default', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(_bootApp());
     await tester.pumpAndSettle();
 
-    expect(_activeTitle(tester), 'Library');
+    // Home screen renders a time-of-day greeting in the AppBar title.
+    final String title = _activeTitle(tester);
+    expect(
+      <String>['Good morning', 'Good afternoon', 'Good evening'],
+      contains(title),
+      reason: 'expected the Home screen greeting in the AppBar title',
+    );
   });
 
-  testWidgets('bottom nav has Library, Downloads, Queue, Settings tabs', (
+  testWidgets('bottom nav has Home, Library, Downloads, Settings tabs', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(_bootApp());
@@ -63,9 +70,9 @@ void main() {
     );
     expect(nav.destinations, hasLength(4));
     for (final String label in <String>[
+      'Home',
       'Library',
       'Downloads',
-      'Queue',
       'Settings',
     ]) {
       expect(
@@ -85,6 +92,14 @@ void main() {
     await tester.pumpWidget(_bootApp());
     await tester.pumpAndSettle();
 
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Library'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
     // The sub-tab labels live inside the AppBar's TabBar — distinct from
     // the bottom NavigationBar's labels.
     expect(
@@ -101,20 +116,13 @@ void main() {
     );
   });
 
-  testWidgets('tapping the Queue tab navigates to the Queue screen', (
+  testWidgets('tapping the Queue icon in the Home AppBar navigates to Queue', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(_bootApp());
     await tester.pumpAndSettle();
 
-    // Disambiguate from the Library sub-tab named "Queue"-… (none exists,
-    // but Queue is a bottom-nav label so target the NavigationBar subtree).
-    await tester.tap(
-      find.descendant(
-        of: find.byType(NavigationBar),
-        matching: find.text('Queue'),
-      ),
-    );
+    await tester.tap(find.byTooltip('Queue'));
     await tester.pumpAndSettle();
 
     expect(_activeTitle(tester), 'Queue');
@@ -137,7 +145,7 @@ void main() {
     expect(_activeTitle(tester), 'Settings');
   });
 
-  testWidgets('navigation round-trip: Settings → Library returns to Library', (
+  testWidgets('navigation round-trip: Settings → Home returns to Home', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(_bootApp());
@@ -155,11 +163,14 @@ void main() {
     await tester.tap(
       find.descendant(
         of: find.byType(NavigationBar),
-        matching: find.text('Library'),
+        matching: find.text('Home'),
       ),
     );
     await tester.pumpAndSettle();
-    expect(_activeTitle(tester), 'Library');
+    expect(
+      <String>['Good morning', 'Good afternoon', 'Good evening'],
+      contains(_activeTitle(tester)),
+    );
   });
 
   testWidgets('uses Material 3 dark theme', (WidgetTester tester) async {
@@ -175,6 +186,29 @@ void main() {
     expect(Routes.libraryArtist('ar-1'), '/library/artist/ar-1');
     expect(Routes.libraryAlbum('al-2'), '/library/album/al-2');
     expect(Routes.libraryPlaylist('pl-3'), '/library/playlist/pl-3');
+  });
+
+  group('greetingForHour', () {
+    test('5..11 → Good morning', () {
+      for (final int h in <int>[5, 6, 9, 11]) {
+        expect(greetingForHour(h), 'Good morning', reason: 'hour=$h');
+      }
+    });
+    test('12..17 → Good afternoon', () {
+      for (final int h in <int>[12, 13, 15, 17]) {
+        expect(greetingForHour(h), 'Good afternoon', reason: 'hour=$h');
+      }
+    });
+    test('18..23 → Good evening', () {
+      for (final int h in <int>[18, 21, 23]) {
+        expect(greetingForHour(h), 'Good evening', reason: 'hour=$h');
+      }
+    });
+    test('0..4 → Good evening', () {
+      for (final int h in <int>[0, 2, 4]) {
+        expect(greetingForHour(h), 'Good evening', reason: 'hour=$h');
+      }
+    });
   });
 
   group('_ShellScaffold lifecycle wiring', () {

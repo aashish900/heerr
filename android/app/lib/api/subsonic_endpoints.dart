@@ -70,4 +70,11 @@ class SubsonicEndpoints {
   /// the strongest signal of "music the user likes" available without
   /// scrobble history.
   static const String getStarred2 = '/rest/getStarred2.view';
+
+  /// Random song selection. Optional `size` (default 10, max 500). Used by
+  /// the Home screen (O2) as a fallback content source when the library is
+  /// brand-new (no recently-played / most-played history) and as the
+  /// "Discover" fallback for recommendations when the backend returns
+  /// nothing.
+  static const String getRandomSongs = '/rest/getRandomSongs.view';
 }

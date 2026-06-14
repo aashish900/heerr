@@ -1315,3 +1315,58 @@ Closes the recommendations roadmap. Adds a Settings indicator for backend engine
 - On-device smoke. Verify recommendations populate, Play branch works for in-library matches, Find Similar long-press seeds the feed, Settings shows the engine chip.
 - `DECISIONLOG.md` ADR for Phase N (will land alongside the smoke run + tag).
 - Album-detail / playlist-detail song-row long-press still routes through the old `AddToPlaylistSheet.show(songIds: …)` shape without `findSimilarSeed`. The library-search song surface is the highest-discoverability entry point in v1; adding the same affordance to the other two surfaces is mechanical.
+
+
+## 2026-06-14 — Phase O — Home screen (O1–O5)
+
+### O1: Home tab + 4-tab nav restructure
+- `android/app/lib/router.dart` — `Routes.home = '/'`; `Routes.library` becomes `/library` (was `/`). Library nested routes lose their leading `library/` prefix (`'artist/:id'`, `'album/:id'`, `'playlist/:id'`, `'recommendations'`) — the helper getters (`Routes.libraryArtist(id)` etc.) still produce the same `/library/<kind>/<id>` URLs so call sites are unchanged. `initialLocation` flipped to `Routes.home`.
+- `_ShellScaffold._tabs` — now 4 tabs: **Home / Library / Downloads / Settings**. Queue tab dropped from the bottom nav (per user choice); reachable via a top-right `queue_music_outlined` IconButton in the Home AppBar. `_indexFor` keeps Home selected when `/queue` is foregrounded — `/queue` is now a routed-but-unbound destination from the nav point of view.
+- `android/app/lib/screens/home/home_screen.dart` (new) — initial scaffold with greeting (`Good morning` / `Good afternoon` / `Good evening` based on device hour) and the Queue shortcut. Pure-Dart `greetingForHour(int)` helper exported for unit testing.
+- `android/app/test/router_test.dart` — updated assertions for the 4-tab layout, "boots on Home" expectation, Queue-via-AppBar-icon navigation, and 4 unit tests for `greetingForHour` (morning / afternoon / evening / pre-dawn). 14 tests pass.
+
+### O2: Home data providers
+- `android/app/lib/api/subsonic_endpoints.dart` — new constant `getRandomSongs = '/rest/getRandomSongs.view'`.
+- `android/app/lib/providers/home/home_providers.dart` (new) — four providers:
+  - `homeRecentProvider`: `getAlbumList2.view?type=recent&size=8`.
+  - `homeMostPlayedProvider`: `getAlbumList2.view?type=frequent&size=8`.
+  - `homeRandomSongsProvider`: `getRandomSongs.view?size=20`.
+  - `homeRecommendationsProvider`: thin wrapper around `recommendationsProvider`. Falls back to `homeRandomSongsProvider` mapped as `RecommendedTrack(inLibrary=true, subsonicSongId=<id>, sourceUrl='')` when the backend returns empty. Returns a `HomeRecommendations` record `(tracks, isFallback)` so the screen can flip the section header to "Discover" on fallback.
+- `android/app/test/providers/home/home_providers_test.dart` (new) — 7 cases covering correct endpoint + query params, empty envelopes, the random-songs fallback path, and the artist-required filter that drops random songs missing the `artist` field.
+
+### O3: Quick-access grid + horizontal sections
+- `android/app/lib/widgets/home_grid_tile.dart` (new) — compact 2-col tile, 56 px square cover (left) + title (right). Used in the Home quick-access grid; tap → push album route.
+- `android/app/lib/widgets/home_section.dart` (new) — Spotify-style horizontal section: bold header + `ListView.builder(scrollDirection: Axis.horizontal)` of 140 px square cover-art cards with title + optional subtitle below. Generic — used for "Jump back in" and "Most played".
+- `android/app/lib/screens/home/home_screen.dart` — quick-access grid (recently played; falls back to recommendations when recent is empty; full-empty state when both are empty), "Jump back in" section (recent), "Most played" section (frequent). Each section invisible when its source is empty; loading uses `SkeletonBox`; errors silent in v1.
+- `android/app/test/screens/home/home_screen_test.dart` (new) — 6 widget cases: greeting + Queue icon render; recent-albums populate the grid (capped at 6); both sections render when sources are non-empty; empty-recent → recommendation fallback grid OR empty-state; Queue-icon tap routes to /queue.
+
+### O4: Picked for you / Discover recommendations section
+- `android/app/lib/widgets/home_recommendation_card.dart` (new) — 160 px wide vertical card: square colour-swatch placeholder (no per-card cover-art lookup in v1 — would require an extra `getSong.view` round-trip per row), title, artist, action button. **Play** when `track.inLibrary && track.subsonicSongId != null`, **Download** otherwise. Same dispatcher / playback paths as the existing recommendations screen.
+- `android/app/lib/screens/home/home_screen.dart` — `_RecommendationsSection`: horizontal scroll of cards from `homeRecommendationsProvider`. Header reads **"Picked for you"** when `isFallback=false`, **"Discover"** when `isFallback=true`. Hidden when there are no tracks (covered by the full-empty state in `_QuickAccessGrid`).
+- `android/app/test/widgets/home_recommendation_card_test.dart` (new) — 2 cases: in-library renders Play, remote-only renders Download + fires the dispatcher.
+- `android/app/test/screens/home/home_screen_test.dart` — 2 new cases asserting the "Picked for you" ↔ "Discover" header switching.
+
+### O5: Tile-tap routing + pull-to-refresh + v1.4.0
+- `android/app/lib/screens/home/home_screen.dart` — body wrapped in `RefreshIndicator`. Outer ListView pinned to `AlwaysScrollableScrollPhysics` so pull-to-refresh works even on the full-empty state. `_refresh(ref)` invalidates all four Home providers; awaits `homeRecentProvider` so the spinner stays up for at least one round-trip.
+- Tile-tap routing was already wired in O3 (`context.push(Routes.libraryAlbum(a.id))`) — O5 adds the widget test that asserts the actual route shape lands at `/library/album/:id`.
+- `android/app/test/screens/home/home_screen_test.dart` — 2 new cases: album-tile tap routes correctly; calling `RefreshIndicator.onRefresh()` re-fetches `homeRecentProvider`.
+- `android/app/pubspec.yaml`: bumped `1.3.0` → `1.4.0`. Tag `v1.4.0` after on-device smoke.
+
+### Test gate + version
+- `dart run build_runner build --delete-conflicting-outputs`: clean; new pair for `home_providers.g.dart`.
+- `flutter analyze`: clean.
+- `flutter test`: **455/455** pass (432 prior + 23 new: 7 home-provider + 6 + 2 + 2 + 2 home-screen + 2 recommendation-card + 4 greeting + extra router).
+- `pubspec.yaml`: `1.3.0` → `1.4.0`.
+
+### Phase O closed (2026-06-14)
+- O1 ✅ Home tab + 4-tab nav (Home / Library / Downloads / Settings).
+- O2 ✅ Home data providers (recent, frequent, random songs, recommendations w/ fallback).
+- O3 ✅ Quick-access grid + Jump back in + Most played sections.
+- O4 ✅ Picked for you / Discover recommendations section.
+- O5 ✅ Tile-tap routing + pull-to-refresh + v1.4.0 version bump.
+- Tag: `v1.4.0` (after on-device smoke).
+
+### Not done in this commit
+- On-device smoke against the home server. Verify Home boots first; recent / frequent populate from live Navidrome data; recommendations show; pull-to-refresh re-fetches; Queue still reachable via AppBar icon.
+- `DECISIONLOG.md` ADR for Phase O (will land alongside the smoke run + tag).
+- Per-card cover art in `HomeRecommendationCard` — would need an extra `getSong.view` round-trip per row to resolve `coverArt`. Deferred until users notice the placeholder.

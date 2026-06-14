@@ -39,7 +39,7 @@ final seedCollectionProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef SeedCollectionRef = AutoDisposeFutureProviderRef<List<SeedTrack>>;
-String _$recommendationsHash() => r'a9cacf58dd8b9aa43cd5eb98c99282d6472f8428';
+String _$recommendationsHash() => r'94c4d43fb84192f2e7f824dafcd9e1a4fa6154ae';
 
 /// Recommendation results from the heerr backend (`POST /api/v1/recommend`).
 ///

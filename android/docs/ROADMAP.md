@@ -404,6 +404,62 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 ---
 
+## Phase O — Home screen
+
+**Architecture note:** Pure-Android slice. No heerr backend changes — recommendations reuse the existing `POST /api/v1/recommend` endpoint; recently-played / most-played / random-songs come from Navidrome Subsonic (`getAlbumList2`, `getRandomSongs`). Bottom nav becomes `Home · Library · Downloads · Settings` (Queue tab dropped — Queue is now reachable via a `queue_music_outlined` IconButton in the Home AppBar). Default boot tab changes from Library to Home. Design target: Spotify home — time-of-day greeting, 2-column quick-access grid, horizontal-scroll sections, large "Picked for you" cards.
+
+### [x] O1. Nav restructure — add Home tab
+**Files (new):** `android/app/lib/screens/home/home_screen.dart` (scaffold + greeting + Queue shortcut).
+**Files (modify):** `android/app/lib/router.dart` (`Routes.home = '/'`; `Routes.library` now `/library`; library nested routes lose the `library/` prefix but `Routes.libraryArtist(id)` / `libraryAlbum` / `libraryPlaylist` helpers preserve the public URL shape; tabs become **Home / Library / Downloads / Settings** — Queue dropped from the nav and surfaced as an AppBar IconButton on Home).
+**Deliverable:** App boots to Home tab. Bottom nav shows four destinations. Home scaffold renders a time-of-day greeting string (`"Good morning"` / `"Good afternoon"` / `"Good evening"` based on device hour) + a `queue_music_outlined` IconButton in the AppBar that routes to `/queue` — no data yet.
+**Test gate:** router test asserts 4 tabs and default boot to `/home`; unit test for greeting-string helper (morning 5–11, afternoon 12–17, evening 18–4).
+**Done when:** `flutter analyze` clean; `flutter test` green; device shows 4-tab nav booting to Home with greeting.
+**Commit:** `feat(flutter): O1 — home tab + 4-tab nav restructure`
+
+### [x] O2. Home data providers
+**Files (new):** `android/app/lib/providers/home/home_providers.dart`.
+- `homeRecentProvider` (`FutureProvider`): `getAlbumList2.view?type=recent&size=8` via `subsonicDioClientProvider`. Returns `List<Album>`.
+- `homeMostPlayedProvider` (`FutureProvider`): `getAlbumList2.view?type=frequent&size=8`. Returns `List<Album>`.
+- `homeRandomSongsProvider` (`FutureProvider`): `getRandomSongs.view?size=20`. Returns `List<Song>`.
+- `homeRecommendationsProvider` (`FutureProvider`): thin wrapper — reads `recommendationsProvider`; falls back to `homeRandomSongsProvider` when result list is empty (maps random songs to `RecommendedTrack` shape for uniform rendering).
+**Test gate:** mock Subsonic; assert correct endpoint + query params for each provider; assert `homeRandomSongsProvider` is used when `homeRecentProvider` + `homeMostPlayedProvider` both return empty; assert `homeRecommendationsProvider` falls back to random songs when recommendations list is empty.
+**Done when:** `build_runner` / `analyze` / `test` green.
+**Commit:** `feat(flutter): O2 — home data providers (recent, frequent, random, recommendations)`
+
+### [x] O3. Home screen — quick-access grid + horizontal sections
+**Files (new):** `android/app/lib/widgets/home_grid_tile.dart` (compact 2-col tile: 56 px square cover art flush-left + album/playlist name, dark surface, Spotify-style), `android/app/lib/widgets/home_section.dart` (section header text + horizontal `ListView.builder` of square cover-art cards with title below).
+**Files (modify):** `android/app/lib/screens/home/home_screen.dart`:
+- Greeting row at top (time-of-day string).
+- **Quick-access grid:** 2-column `GridView` of up to 6 recently-played albums (`homeRecentProvider`). Fallback: when recent is empty, show top-6 `homeRecommendationsProvider` results in the same grid layout.
+- **"Jump back in" section:** `HomeSection` horizontal scroll of `homeRecentProvider` albums.
+- **"Most played" section:** `HomeSection` horizontal scroll of `homeMostPlayedProvider` albums.
+- All sections use `SkeletonList` while loading and `EmptyState` if both the primary and fallback are empty.
+**Test gate:** widget tests for `HomeGridTile` (cover art renders, title truncates); `HomeSection` (loading / data / empty / error); home screen grid fallback triggers when recent is empty; Most played section renders.
+**Done when:** `analyze` / `test` green; device shows greeting + grid + two horizontal sections with real Navidrome data.
+**Commit:** `feat(flutter): O3 — home quick-access grid + jump back in + most played sections`
+
+### [x] O4. Home screen — "Picked for you" recommendations section
+**Files (new):** `android/app/lib/widgets/home_recommendation_card.dart` (vertical card ~160 px wide: square cover art top, title, artist, Download/Play action button at bottom; cover art resolved via `search3.view?query=<artist> <title>&songCount=1` — reuse N4 cross-reference pattern; fallback to a placeholder if no match).
+**Files (modify):** `android/app/lib/screens/home/home_screen.dart`:
+- **"Picked for you" section:** `HomeSection` horizontal scroll of `HomeRecommendationCard`s from `homeRecommendationsProvider`.
+- Card action: `inLibrary: true` → **Play** (routes to `playSongFromSubsonic`); `inLibrary: false` → **Download** (fires `downloadDispatcherProvider`).
+- Fallback label: when `recommendationsProvider` returned empty and random songs are being shown, section header reads `"Discover"` instead of `"Picked for you"`.
+**Test gate:** widget test for `HomeRecommendationCard` (Play renders when `inLibrary: true`, Download when `false`); Download fires `downloadDispatcherProvider`; section header reads `"Discover"` on fallback path; cover-art miss falls back to placeholder gracefully.
+**Done when:** `build_runner` / `analyze` / `test` green; device shows recommendations cards with correct action buttons.
+**Commit:** `feat(flutter): O4 — picked for you recommendations section + discover fallback`
+
+### [x] O5. Routing + pull-to-refresh + smoke
+**Files (modify):** `android/app/lib/screens/home/home_screen.dart`:
+- Wrap entire screen in `RefreshIndicator` + `CustomScrollView`; on drag invalidates `homeRecentProvider`, `homeMostPlayedProvider`, `homeRandomSongsProvider`, `homeRecommendationsProvider`.
+- Tap on album tile → `/library/album/:id`; tap on artist → `/library/artist/:id`; tap on playlist tile → `/library/playlist/:id`.
+- Full-empty state (all four providers empty): `EmptyState("Nothing here yet — play some music to get started")`.
+**Files (modify):** `android/app/pubspec.yaml` → `1.4.0`.
+**Test gate:** tap-routing widget tests (album/artist/playlist tiles push correct routes); pull-to-refresh triggers all four provider invalidations; full-empty state renders correctly.
+**Done when:** `flutter analyze` clean; `flutter test` green; manual smoke on home server — home screen loads with real Navidrome data, taps route correctly, recommendations load, download dispatches from home card, pull-to-refresh refreshes all sections. Tagged `v1.4.0`.
+**Commit:** `chore(flutter): O5 — home screen routing + pull-to-refresh + v1.4.0 smoke`
+
+---
+
 ## Cross-cutting reminders
 
 - **`flutter analyze` green before declaring any milestone done.**
@@ -439,8 +495,8 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 ## Roadmap complete when
 
-1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5).
+1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5).
 2. Every test gate green at its milestone.
-3. G1, K2, L6, M5 smokes succeeded; N-phase smoke verified after N5.
+3. G1, K2, L6, M5 smokes succeeded; N-phase smoke verified after N5; O5 smoke verified after O5.
 4. CHANGELOG entries exist for each milestone group.
-5. `git log --oneline android/` reads as a clean A→N progression under the `feat(flutter):` / `chore(flutter):` Conventional-Commits cadence.
+5. `git log --oneline android/` reads as a clean A→O progression under the `feat(flutter):` / `chore(flutter):` Conventional-Commits cadence.

@@ -10,6 +10,7 @@ import 'screens/job_detail_screen.dart';
 import 'screens/library/album_detail_screen.dart';
 import 'screens/library/artist_detail_screen.dart';
 import 'screens/library/library_screen.dart';
+import 'screens/home/home_screen.dart';
 import 'screens/library/playlist_detail_screen.dart';
 import 'screens/player/now_playing_screen.dart';
 import 'screens/queue_screen.dart';
@@ -22,7 +23,8 @@ import 'widgets/mini_player.dart';
 // drift apart. Settings is exposed via `/settings`; routing redirects to
 // it when the bearer token is missing (wired at B1/B3 — not here).
 class Routes {
-  static const String library = '/';
+  static const String home = '/';
+  static const String library = '/library';
   static const String downloads = '/downloads';
   static const String queue = '/queue';
   static const String settings = '/settings';
@@ -43,7 +45,7 @@ class Routes {
 /// reuse the exact router config the app boots with.
 GoRouter buildHeerrRouter() {
   return GoRouter(
-    initialLocation: Routes.library,
+    initialLocation: Routes.home,
     routes: <RouteBase>[
       ShellRoute(
         builder: (BuildContext context, GoRouterState state, Widget child) {
@@ -51,42 +53,47 @@ GoRouter buildHeerrRouter() {
         },
         routes: <RouteBase>[
           GoRoute(
+            path: Routes.home,
+            builder: (BuildContext context, GoRouterState state) =>
+                const HomeScreen(),
+          ),
+          GoRoute(
             path: Routes.library,
             builder: (BuildContext context, GoRouterState state) =>
                 const LibraryScreen(),
             routes: <RouteBase>[
               GoRoute(
-                path: 'library/artist/:id',
+                path: 'artist/:id',
                 builder: (BuildContext context, GoRouterState state) =>
                     ArtistDetailScreen(artistId: state.pathParameters['id']!),
               ),
               GoRoute(
-                path: 'library/album/:id',
+                path: 'album/:id',
                 builder: (BuildContext context, GoRouterState state) =>
                     AlbumDetailScreen(albumId: state.pathParameters['id']!),
               ),
               GoRoute(
-                path: 'library/playlist/:id',
+                path: 'playlist/:id',
                 builder: (BuildContext context, GoRouterState state) =>
                     PlaylistDetailScreen(
                         playlistId: state.pathParameters['id']!),
               ),
               GoRoute(
-                path: 'library/recommendations',
+                path: 'recommendations',
                 builder: (BuildContext context, GoRouterState state) =>
                     const RecommendationsScreen(),
               ),
             ],
           ),
           GoRoute(
-            path: Routes.downloads,
-            builder: (BuildContext context, GoRouterState state) =>
-                const DownloadsScreen(),
-          ),
-          GoRoute(
             path: Routes.queue,
             builder: (BuildContext context, GoRouterState state) =>
                 const QueueScreen(),
+          ),
+          GoRoute(
+            path: Routes.downloads,
+            builder: (BuildContext context, GoRouterState state) =>
+                const DownloadsScreen(),
           ),
           GoRoute(
             path: Routes.settings,
@@ -142,6 +149,12 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
     with WidgetsBindingObserver {
   static const List<_NavTab> _tabs = <_NavTab>[
     _NavTab(
+      path: Routes.home,
+      label: 'Home',
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home,
+    ),
+    _NavTab(
       path: Routes.library,
       label: 'Library',
       // Custom 3D-stack icon (`assets/icons/library.svg`, sourced from
@@ -155,12 +168,6 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
       label: 'Downloads',
       icon: Icons.download_for_offline_outlined,
       selectedIcon: Icons.download_for_offline,
-    ),
-    _NavTab(
-      path: Routes.queue,
-      label: 'Queue',
-      icon: Icons.queue_music_outlined,
-      selectedIcon: Icons.queue_music,
     ),
     _NavTab(
       path: Routes.settings,
@@ -238,11 +245,23 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
   }
 
   int _indexFor(String loc) {
-    if (loc.startsWith('/library') || loc == Routes.library) return 0;
-    if (loc.startsWith(Routes.downloads)) return 1;
-    if (loc.startsWith(Routes.queue)) return 2;
+    // Library detail routes live under /library/* — they keep the Library tab
+    // selected. Queue is reachable via the Home AppBar shortcut, so when
+    // /queue is active no tab is "selected"; we still highlight Home as the
+    // most-recently-rooted-in tab to avoid a confusing blank state.
+    if (loc.startsWith(Routes.library)) return 1;
+    if (loc.startsWith(Routes.downloads)) return 2;
     if (loc.startsWith(Routes.settings)) return 3;
     return 0;
+  }
+
+  /// Library uses an SVG asset; every other tab is a Material `IconData`.
+  /// Returns null when the tab has no `IconData` set (i.e. Library).
+  Widget _iconFor(BuildContext context, _NavTab tab, {required bool selected}) {
+    if (tab.icon == null) {
+      return _buildLibraryIcon(context, selected: selected);
+    }
+    return Icon(selected ? tab.selectedIcon : tab.icon);
   }
 
   @override
@@ -260,12 +279,8 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
             destinations: <NavigationDestination>[
               for (final _NavTab t in _tabs)
                 NavigationDestination(
-                  icon: t.icon != null
-                      ? Icon(t.icon)
-                      : _buildLibraryIcon(context, selected: false),
-                  selectedIcon: t.selectedIcon != null
-                      ? Icon(t.selectedIcon)
-                      : _buildLibraryIcon(context, selected: true),
+                  icon: _iconFor(context, t, selected: false),
+                  selectedIcon: _iconFor(context, t, selected: true),
                   label: t.label,
                 ),
             ],

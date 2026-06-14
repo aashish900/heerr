@@ -242,9 +242,13 @@ class Recommendations extends _$Recommendations {
 
     Future<RecommendedTrack> resolveOne(RecommendedTrack r) async {
       try {
-        final String? id = await _searchLibraryForMatch(sub, r);
-        if (id == null) return r;
-        return r.copyWith(inLibrary: true, subsonicSongId: id);
+        final _LibraryMatch? match = await _searchLibraryForMatch(sub, r);
+        if (match == null) return r;
+        return r.copyWith(
+          inLibrary: true,
+          subsonicSongId: match.id,
+          coverArt: match.coverArt,
+        );
       } catch (_) {
         return r;
       }
@@ -253,13 +257,13 @@ class Recommendations extends _$Recommendations {
     return Future.wait(base.map(resolveOne));
   }
 
-  Future<String?> _searchLibraryForMatch(
+  Future<_LibraryMatch?> _searchLibraryForMatch(
     Dio sub,
     RecommendedTrack r,
   ) async {
     final String query = '${r.artist} ${r.title}'.trim();
     if (query.isEmpty) return null;
-    return subsonicCall<String?>(
+    return subsonicCall<_LibraryMatch?>(
       () => sub.get<dynamic>(
         SubsonicEndpoints.search3,
         queryParameters: <String, dynamic>{
@@ -278,7 +282,11 @@ class Recommendations extends _$Recommendations {
         if (first is! Map<String, dynamic>) return null;
         final dynamic id = first['id'];
         if (id is! String || id.isEmpty) return null;
-        return id;
+        final dynamic cover = first['coverArt'];
+        return _LibraryMatch(
+          id: id,
+          coverArt: cover is String && cover.isNotEmpty ? cover : null,
+        );
       },
     );
   }
@@ -289,6 +297,15 @@ class Recommendations extends _$Recommendations {
     ref.invalidateSelf();
     await future;
   }
+}
+
+/// Result of one row's `search3` library probe: the Navidrome song id +
+/// (optionally) the album-cover id to render on the Home recommendation
+/// card without a second `getSong` round-trip.
+class _LibraryMatch {
+  const _LibraryMatch({required this.id, this.coverArt});
+  final String id;
+  final String? coverArt;
 }
 
 /// Default freshness window for [RecommendHealthNotifier]. Calls to

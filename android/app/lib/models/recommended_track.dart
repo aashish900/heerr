@@ -38,6 +38,14 @@ class RecommendedTrack with _$RecommendedTrack {
     /// the "Play" branch — without it we can't drive Subsonic playback.
     /// Null on remote-only results (the Download path).
     String? subsonicSongId,
+
+    /// Navidrome `coverArt` id when the row is library-matched (the N4
+    /// cross-reference returns the full Song, which carries `coverArt`).
+    /// Threaded through to the Home "Picked for you" card so it can render
+    /// the cached library cover instead of a placeholder.
+    /// Null for genuinely-online recommendations — those fall back to the
+    /// YouTube video thumbnail derived from `sourceUrl`.
+    String? coverArt,
   }) = _RecommendedTrack;
 
   factory RecommendedTrack.fromJson(Map<String, dynamic> json) =>

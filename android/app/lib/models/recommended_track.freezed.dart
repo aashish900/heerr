@@ -34,6 +34,14 @@ mixin _$RecommendedTrack {
   /// Null on remote-only results (the Download path).
   String? get subsonicSongId => throw _privateConstructorUsedError;
 
+  /// Navidrome `coverArt` id when the row is library-matched (the N4
+  /// cross-reference returns the full Song, which carries `coverArt`).
+  /// Threaded through to the Home "Picked for you" card so it can render
+  /// the cached library cover instead of a placeholder.
+  /// Null for genuinely-online recommendations — those fall back to the
+  /// YouTube video thumbnail derived from `sourceUrl`.
+  String? get coverArt => throw _privateConstructorUsedError;
+
   /// Serializes this RecommendedTrack to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -58,6 +66,7 @@ abstract class $RecommendedTrackCopyWith<$Res> {
     double? score,
     bool inLibrary,
     String? subsonicSongId,
+    String? coverArt,
   });
 }
 
@@ -82,6 +91,7 @@ class _$RecommendedTrackCopyWithImpl<$Res, $Val extends RecommendedTrack>
     Object? score = freezed,
     Object? inLibrary = null,
     Object? subsonicSongId = freezed,
+    Object? coverArt = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -109,6 +119,10 @@ class _$RecommendedTrackCopyWithImpl<$Res, $Val extends RecommendedTrack>
                 ? _value.subsonicSongId
                 : subsonicSongId // ignore: cast_nullable_to_non_nullable
                       as String?,
+            coverArt: freezed == coverArt
+                ? _value.coverArt
+                : coverArt // ignore: cast_nullable_to_non_nullable
+                      as String?,
           )
           as $Val,
     );
@@ -131,6 +145,7 @@ abstract class _$$RecommendedTrackImplCopyWith<$Res>
     double? score,
     bool inLibrary,
     String? subsonicSongId,
+    String? coverArt,
   });
 }
 
@@ -154,6 +169,7 @@ class __$$RecommendedTrackImplCopyWithImpl<$Res>
     Object? score = freezed,
     Object? inLibrary = null,
     Object? subsonicSongId = freezed,
+    Object? coverArt = freezed,
   }) {
     return _then(
       _$RecommendedTrackImpl(
@@ -181,6 +197,10 @@ class __$$RecommendedTrackImplCopyWithImpl<$Res>
             ? _value.subsonicSongId
             : subsonicSongId // ignore: cast_nullable_to_non_nullable
                   as String?,
+        coverArt: freezed == coverArt
+            ? _value.coverArt
+            : coverArt // ignore: cast_nullable_to_non_nullable
+                  as String?,
       ),
     );
   }
@@ -196,6 +216,7 @@ class _$RecommendedTrackImpl implements _RecommendedTrack {
     this.score,
     this.inLibrary = false,
     this.subsonicSongId,
+    this.coverArt,
   });
 
   factory _$RecommendedTrackImpl.fromJson(Map<String, dynamic> json) =>
@@ -221,9 +242,18 @@ class _$RecommendedTrackImpl implements _RecommendedTrack {
   @override
   final String? subsonicSongId;
 
+  /// Navidrome `coverArt` id when the row is library-matched (the N4
+  /// cross-reference returns the full Song, which carries `coverArt`).
+  /// Threaded through to the Home "Picked for you" card so it can render
+  /// the cached library cover instead of a placeholder.
+  /// Null for genuinely-online recommendations — those fall back to the
+  /// YouTube video thumbnail derived from `sourceUrl`.
+  @override
+  final String? coverArt;
+
   @override
   String toString() {
-    return 'RecommendedTrack(title: $title, artist: $artist, sourceUrl: $sourceUrl, score: $score, inLibrary: $inLibrary, subsonicSongId: $subsonicSongId)';
+    return 'RecommendedTrack(title: $title, artist: $artist, sourceUrl: $sourceUrl, score: $score, inLibrary: $inLibrary, subsonicSongId: $subsonicSongId, coverArt: $coverArt)';
   }
 
   @override
@@ -239,7 +269,9 @@ class _$RecommendedTrackImpl implements _RecommendedTrack {
             (identical(other.inLibrary, inLibrary) ||
                 other.inLibrary == inLibrary) &&
             (identical(other.subsonicSongId, subsonicSongId) ||
-                other.subsonicSongId == subsonicSongId));
+                other.subsonicSongId == subsonicSongId) &&
+            (identical(other.coverArt, coverArt) ||
+                other.coverArt == coverArt));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -252,6 +284,7 @@ class _$RecommendedTrackImpl implements _RecommendedTrack {
     score,
     inLibrary,
     subsonicSongId,
+    coverArt,
   );
 
   /// Create a copy of RecommendedTrack
@@ -279,6 +312,7 @@ abstract class _RecommendedTrack implements RecommendedTrack {
     final double? score,
     final bool inLibrary,
     final String? subsonicSongId,
+    final String? coverArt,
   }) = _$RecommendedTrackImpl;
 
   factory _RecommendedTrack.fromJson(Map<String, dynamic> json) =
@@ -302,6 +336,15 @@ abstract class _RecommendedTrack implements RecommendedTrack {
   /// Null on remote-only results (the Download path).
   @override
   String? get subsonicSongId;
+
+  /// Navidrome `coverArt` id when the row is library-matched (the N4
+  /// cross-reference returns the full Song, which carries `coverArt`).
+  /// Threaded through to the Home "Picked for you" card so it can render
+  /// the cached library cover instead of a placeholder.
+  /// Null for genuinely-online recommendations — those fall back to the
+  /// YouTube video thumbnail derived from `sourceUrl`.
+  @override
+  String? get coverArt;
 
   /// Create a copy of RecommendedTrack
   /// with the given fields replaced by the non-null parameter values.

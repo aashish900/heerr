@@ -110,10 +110,14 @@ class _NullSubsonicAdapter implements HttpClientAdapter {
 /// Routes search3 calls by request query. Returns a song match when the
 /// query contains a configured `(artist title)` pair.
 class _SearchSubsonicAdapter implements HttpClientAdapter {
-  _SearchSubsonicAdapter(this.matches);
+  _SearchSubsonicAdapter(this.matches, {this.covers = const <String, String>{}});
 
   /// Map of query substring → song id to return.
   final Map<String, String> matches;
+
+  /// Map of query substring → coverArt id to attach to the returned song.
+  /// Omit a substring → returned song has no `coverArt` field.
+  final Map<String, String> covers;
   final List<RequestOptions> requests = <RequestOptions>[];
 
   @override
@@ -125,21 +129,27 @@ class _SearchSubsonicAdapter implements HttpClientAdapter {
     requests.add(options);
     final String? query = options.queryParameters['query'] as String?;
     String? id;
+    String? cover;
     if (query != null) {
       for (final MapEntry<String, String> e in matches.entries) {
         if (query.contains(e.key)) {
           id = e.value;
+          cover = covers[e.key];
           break;
         }
       }
     }
     final Map<String, dynamic> result;
     if (id != null) {
+      final Map<String, dynamic> song = <String, dynamic>{
+        'id': id,
+        'title': 'x',
+        'artist': 'y',
+      };
+      if (cover != null) song['coverArt'] = cover;
       result = <String, dynamic>{
         'searchResult3': <String, dynamic>{
-          'song': <Map<String, dynamic>>[
-            <String, dynamic>{'id': id, 'title': 'x', 'artist': 'y'},
-          ],
+          'song': <Map<String, dynamic>>[song],
         },
       };
     } else {
@@ -298,9 +308,14 @@ void main() {
         ],
       }),
     );
-    final _SearchSubsonicAdapter sub = _SearchSubsonicAdapter(<String, String>{
-      'OwnedArtist OwnedSong': 'lib-song-42',
-    });
+    final _SearchSubsonicAdapter sub = _SearchSubsonicAdapter(
+      <String, String>{
+        'OwnedArtist OwnedSong': 'lib-song-42',
+      },
+      covers: <String, String>{
+        'OwnedArtist OwnedSong': 'cover-art-42',
+      },
+    );
     final ProviderContainer c = _container(
       adapter: adapter,
       seeds: <SeedTrack>[const SeedTrack(title: 't', artist: 'a')],
@@ -319,8 +334,12 @@ void main() {
 
     expect(owned.inLibrary, isTrue);
     expect(owned.subsonicSongId, 'lib-song-42');
+    // coverArt from the search3 match flows through to the model so the
+    // Home recommendation card can render the cached album art.
+    expect(owned.coverArt, 'cover-art-42');
     expect(remote.inLibrary, isFalse);
     expect(remote.subsonicSongId, isNull);
+    expect(remote.coverArt, isNull);
 
     // search3 was called once per result.
     expect(sub.requests, hasLength(2));
