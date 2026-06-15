@@ -67,12 +67,17 @@ MediaItem _item({
   String id = 'http://stream/1',
   String title = 'Let It Happen',
   String? artist = 'Tame Impala',
+  String? subsonicId = 'so-1',
 }) {
+  final Map<String, dynamic>? extras = subsonicId == null
+      ? null
+      : <String, dynamic>{'subsonicId': subsonicId};
   return MediaItem(
     id: id,
     title: title,
     artist: artist,
     duration: const Duration(minutes: 3),
+    extras: extras,
   );
 }
 
@@ -135,7 +140,9 @@ void main() {
     final _FakeAdapter adapter = _FakeAdapter(
       (_) => _json('''
 {"subsonic-response":{"status":"ok","version":"1.16.1",
-  "lyrics":{"value":"Lyric line one\\nLyric line two"}}}'''),
+  "lyricsList":{"structuredLyrics":[
+    {"line":[{"value":"Lyric line one"},{"value":"Lyric line two"}]}
+  ]}}}'''),
     );
     await tester.pumpWidget(_wrap(
       snapshot: _snap(item: _item()),
@@ -194,13 +201,15 @@ void main() {
     expect(find.byKey(const Key('now-playing-lyrics-error')), findsOneWidget);
   });
 
-  testWidgets('null artist → empty-state immediately, no HTTP call',
+  testWidgets('null subsonicId + empty artist/title → empty-state, no HTTP call',
       (WidgetTester tester) async {
     final _FakeAdapter adapter = _FakeAdapter(
       (_) => throw StateError('should not be called'),
     );
+    // Provide an item with no subsonicId and no artist/title so both
+    // stages short-circuit without hitting the network.
     await tester.pumpWidget(_wrap(
-      snapshot: _snap(item: _item(artist: null)),
+      snapshot: _snap(item: _item(subsonicId: null, artist: null, title: '')),
       adapter: adapter,
     ));
     await tester.pumpAndSettle();

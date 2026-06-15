@@ -247,7 +247,11 @@ class _Body extends ConsumerWidget {
         const SizedBox(height: 16),
         Center(
           child: showLyrics
-              ? _LyricsPane(title: item.title, artist: item.artist)
+              ? _LyricsPane(
+                  songId: item.extras?['subsonicId'] as String?,
+                  artist: item.artist ?? '',
+                  title: item.title,
+                )
               : _CoverArt(artUri: item.artUri),
         ),
         const SizedBox(height: 24),
@@ -326,21 +330,27 @@ class _CoverArt extends StatelessWidget {
 /// jump when switching views.
 ///
 /// Render rules:
-///  - `artist` or `title` empty → "No lyrics for this track" empty state.
+///  - [songId] null/empty → "No lyrics for this track" empty state (no
+///    network call — happens when a MediaItem has no `subsonicId` extra).
 ///  - Provider loading → spinner.
 ///  - Provider error (any [ApiError]) → readable error line.
 ///  - Provider data null → "No lyrics for this track" empty state.
 ///  - Provider data → scrollable plain text with selectable copy.
 class _LyricsPane extends ConsumerWidget {
-  const _LyricsPane({required this.title, required this.artist});
+  const _LyricsPane({
+    required this.songId,
+    required this.artist,
+    required this.title,
+  });
 
+  final String? songId;
+  final String artist;
   final String title;
-  final String? artist;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final String? a = artist;
-    if (a == null || a.isEmpty || title.isEmpty) {
+    // Skip network entirely when we have nothing to search with.
+    if ((songId == null || songId!.isEmpty) && artist.isEmpty && title.isEmpty) {
       return const _LyricsBox(
         child: Center(
           key: Key('now-playing-lyrics-empty'),
@@ -348,7 +358,8 @@ class _LyricsPane extends ConsumerWidget {
         ),
       );
     }
-    final AsyncValue<Lyrics?> async = ref.watch(lyricsForProvider(a, title));
+    final AsyncValue<Lyrics?> async =
+        ref.watch(lyricsForProvider(songId ?? '', artist, title));
     return _LyricsBox(
       child: async.when(
         loading: () => const Center(

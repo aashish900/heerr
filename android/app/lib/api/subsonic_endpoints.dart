@@ -78,10 +78,12 @@ class SubsonicEndpoints {
   /// nothing.
   static const String getRandomSongs = '/rest/getRandomSongs.view';
 
-  /// Subsonic classic lyrics endpoint. Required `artist` + `title` query
-  /// params; returns the `lyrics` envelope with a `value` string. Navidrome
-  /// surfaces lyrics it has indexed from embedded tags or its own
-  /// integration. Subsonic code 70 (or an empty `value`) signals "no lyrics
-  /// for this track" — surfaced as an empty state, not a hard error. P2.
-  static const String getLyrics = '/rest/getLyrics.view';
+  /// Open Subsonic structured-lyrics endpoint. Required `id` (Navidrome song
+  /// id). Navidrome (≥ 0.52) resolves lyrics via LRCLib (external provider)
+  /// + embedded file tags, so this succeeds for most popular tracks even
+  /// when the audio file has no embedded LYRICS tag. Returns
+  /// `lyricsList.structuredLyrics[].line[].value` which we join with `\n`
+  /// to produce plain text. Code 70 or an empty `structuredLyrics` array →
+  /// empty state, not a hard error. P2.
+  static const String getLyricsBySongId = '/rest/getLyricsBySongId.view';
 }

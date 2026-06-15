@@ -32,28 +32,52 @@ Future<void> main() async {
   );
 }
 
-class HeerrApp extends ConsumerWidget {
+// HeerrApp must be a StatefulWidget so the GoRouter is created once in
+// initState and held as a field. Creating it inside ConsumerWidget.build()
+// was the root cause of the "save settings → navigation reset to Home" bug:
+// when settingsProvider changed (e.g. on first server save), scrobbleProvider
+// rebuilt, which triggered build() again, which created a brand-new GoRouter
+// with initialLocation '/' — resetting the navigation stack.
+class HeerrApp extends ConsumerStatefulWidget {
   const HeerrApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HeerrApp> createState() => _HeerrAppState();
+}
+
+class _HeerrAppState extends ConsumerState<HeerrApp> {
+  late final GoRouter _router;
+
+  @override
+  void initState() {
+    super.initState();
+    _router = buildHeerrRouter();
+  }
+
+  @override
+  void dispose() {
+    _router.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Boot the scrobble controller. Keep-alive provider; the result is
     // discarded — we only need the side effect (stream subscription).
     ref.watch(scrobbleProvider);
 
-    // P1: wire the Now Playing persistence orchestrator (subscribes to
-    // handler streams, debounced 500ms save) and fire the one-shot
-    // cold-start restore. Both are keep-alive — `watch` here is purely
-    // for the side effect.
+    // P1: wire the Now Playing persistence orchestrator + cold-start
+    // restore. Both are keep-alive — `watch` here is purely for the
+    // side effect. Rebuilds of this widget triggered by these providers
+    // are now safe because the router is held in state, not recreated.
     ref.watch(nowPlayingPersistenceProvider);
     ref.watch(nowPlayingRestoreProvider);
 
-    final GoRouter router = buildHeerrRouter();
     return MaterialApp.router(
       title: 'heerr',
       debugShowCheckedModeBanner: false,
       theme: heerrDarkTheme(),
-      routerConfig: router,
+      routerConfig: _router,
     );
   }
 }

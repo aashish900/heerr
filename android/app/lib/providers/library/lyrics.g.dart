@@ -6,7 +6,7 @@ part of 'lyrics.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$lyricsForHash() => r'8a0bde4bb6932d542bdc1b420e851ba3ac51c555';
+String _$lyricsForHash() => r'd5f609a4874de71426371e64ea5d5de0979559bb';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -29,75 +29,79 @@ class _SystemHash {
   }
 }
 
-/// Wraps `GET /rest/getLyrics.view?artist=<artist>&title=<title>`. P2.
+/// Wraps lyrics resolution for the Now Playing screen. P2.
 ///
-/// Returns:
-///  - The parsed [Lyrics] (with `value` non-empty) when Navidrome has
-///    lyrics for the track.
-///  - `null` when there are no lyrics for the track. Two paths arrive
-///    here, both treated as "empty state, not error":
-///      * Subsonic error code 70 (`NotFoundError`).
-///      * `lyrics.value` is missing or empty in the envelope.
+/// Two-stage strategy:
+///   1. `GET /rest/getLyricsBySongId.view?id=<songId>` against Navidrome
+///      (Open Subsonic extension — uses LRCLib + embedded tags if configured).
+///      Skipped when [songId] is empty.
+///   2. If stage 1 returns null (code 70, empty list, or skipped), fall back
+///      to `GET https://lrclib.net/api/get?artist_name=<artist>&track_name=<title>`
+///      directly. Skipped when [artist] or [title] is empty.
 ///
-/// All other [ApiError]s rethrow — the UI surfaces them via the standard
-/// error pane / snackbar.
+/// Returns [Lyrics] with `value` set to plain text when lyrics are found,
+/// or `null` when neither source has them. All other [ApiError]s from
+/// Navidrome rethrow so the UI shows the error pane.
 ///
 /// Copied from [lyricsFor].
 @ProviderFor(lyricsFor)
 const lyricsForProvider = LyricsForFamily();
 
-/// Wraps `GET /rest/getLyrics.view?artist=<artist>&title=<title>`. P2.
+/// Wraps lyrics resolution for the Now Playing screen. P2.
 ///
-/// Returns:
-///  - The parsed [Lyrics] (with `value` non-empty) when Navidrome has
-///    lyrics for the track.
-///  - `null` when there are no lyrics for the track. Two paths arrive
-///    here, both treated as "empty state, not error":
-///      * Subsonic error code 70 (`NotFoundError`).
-///      * `lyrics.value` is missing or empty in the envelope.
+/// Two-stage strategy:
+///   1. `GET /rest/getLyricsBySongId.view?id=<songId>` against Navidrome
+///      (Open Subsonic extension — uses LRCLib + embedded tags if configured).
+///      Skipped when [songId] is empty.
+///   2. If stage 1 returns null (code 70, empty list, or skipped), fall back
+///      to `GET https://lrclib.net/api/get?artist_name=<artist>&track_name=<title>`
+///      directly. Skipped when [artist] or [title] is empty.
 ///
-/// All other [ApiError]s rethrow — the UI surfaces them via the standard
-/// error pane / snackbar.
+/// Returns [Lyrics] with `value` set to plain text when lyrics are found,
+/// or `null` when neither source has them. All other [ApiError]s from
+/// Navidrome rethrow so the UI shows the error pane.
 ///
 /// Copied from [lyricsFor].
 class LyricsForFamily extends Family<AsyncValue<Lyrics?>> {
-  /// Wraps `GET /rest/getLyrics.view?artist=<artist>&title=<title>`. P2.
+  /// Wraps lyrics resolution for the Now Playing screen. P2.
   ///
-  /// Returns:
-  ///  - The parsed [Lyrics] (with `value` non-empty) when Navidrome has
-  ///    lyrics for the track.
-  ///  - `null` when there are no lyrics for the track. Two paths arrive
-  ///    here, both treated as "empty state, not error":
-  ///      * Subsonic error code 70 (`NotFoundError`).
-  ///      * `lyrics.value` is missing or empty in the envelope.
+  /// Two-stage strategy:
+  ///   1. `GET /rest/getLyricsBySongId.view?id=<songId>` against Navidrome
+  ///      (Open Subsonic extension — uses LRCLib + embedded tags if configured).
+  ///      Skipped when [songId] is empty.
+  ///   2. If stage 1 returns null (code 70, empty list, or skipped), fall back
+  ///      to `GET https://lrclib.net/api/get?artist_name=<artist>&track_name=<title>`
+  ///      directly. Skipped when [artist] or [title] is empty.
   ///
-  /// All other [ApiError]s rethrow — the UI surfaces them via the standard
-  /// error pane / snackbar.
+  /// Returns [Lyrics] with `value` set to plain text when lyrics are found,
+  /// or `null` when neither source has them. All other [ApiError]s from
+  /// Navidrome rethrow so the UI shows the error pane.
   ///
   /// Copied from [lyricsFor].
   const LyricsForFamily();
 
-  /// Wraps `GET /rest/getLyrics.view?artist=<artist>&title=<title>`. P2.
+  /// Wraps lyrics resolution for the Now Playing screen. P2.
   ///
-  /// Returns:
-  ///  - The parsed [Lyrics] (with `value` non-empty) when Navidrome has
-  ///    lyrics for the track.
-  ///  - `null` when there are no lyrics for the track. Two paths arrive
-  ///    here, both treated as "empty state, not error":
-  ///      * Subsonic error code 70 (`NotFoundError`).
-  ///      * `lyrics.value` is missing or empty in the envelope.
+  /// Two-stage strategy:
+  ///   1. `GET /rest/getLyricsBySongId.view?id=<songId>` against Navidrome
+  ///      (Open Subsonic extension — uses LRCLib + embedded tags if configured).
+  ///      Skipped when [songId] is empty.
+  ///   2. If stage 1 returns null (code 70, empty list, or skipped), fall back
+  ///      to `GET https://lrclib.net/api/get?artist_name=<artist>&track_name=<title>`
+  ///      directly. Skipped when [artist] or [title] is empty.
   ///
-  /// All other [ApiError]s rethrow — the UI surfaces them via the standard
-  /// error pane / snackbar.
+  /// Returns [Lyrics] with `value` set to plain text when lyrics are found,
+  /// or `null` when neither source has them. All other [ApiError]s from
+  /// Navidrome rethrow so the UI shows the error pane.
   ///
   /// Copied from [lyricsFor].
-  LyricsForProvider call(String artist, String title) {
-    return LyricsForProvider(artist, title);
+  LyricsForProvider call(String songId, String artist, String title) {
+    return LyricsForProvider(songId, artist, title);
   }
 
   @override
   LyricsForProvider getProviderOverride(covariant LyricsForProvider provider) {
-    return call(provider.artist, provider.title);
+    return call(provider.songId, provider.artist, provider.title);
   }
 
   static const Iterable<ProviderOrFamily>? _dependencies = null;
@@ -115,38 +119,40 @@ class LyricsForFamily extends Family<AsyncValue<Lyrics?>> {
   String? get name => r'lyricsForProvider';
 }
 
-/// Wraps `GET /rest/getLyrics.view?artist=<artist>&title=<title>`. P2.
+/// Wraps lyrics resolution for the Now Playing screen. P2.
 ///
-/// Returns:
-///  - The parsed [Lyrics] (with `value` non-empty) when Navidrome has
-///    lyrics for the track.
-///  - `null` when there are no lyrics for the track. Two paths arrive
-///    here, both treated as "empty state, not error":
-///      * Subsonic error code 70 (`NotFoundError`).
-///      * `lyrics.value` is missing or empty in the envelope.
+/// Two-stage strategy:
+///   1. `GET /rest/getLyricsBySongId.view?id=<songId>` against Navidrome
+///      (Open Subsonic extension — uses LRCLib + embedded tags if configured).
+///      Skipped when [songId] is empty.
+///   2. If stage 1 returns null (code 70, empty list, or skipped), fall back
+///      to `GET https://lrclib.net/api/get?artist_name=<artist>&track_name=<title>`
+///      directly. Skipped when [artist] or [title] is empty.
 ///
-/// All other [ApiError]s rethrow — the UI surfaces them via the standard
-/// error pane / snackbar.
+/// Returns [Lyrics] with `value` set to plain text when lyrics are found,
+/// or `null` when neither source has them. All other [ApiError]s from
+/// Navidrome rethrow so the UI shows the error pane.
 ///
 /// Copied from [lyricsFor].
 class LyricsForProvider extends AutoDisposeFutureProvider<Lyrics?> {
-  /// Wraps `GET /rest/getLyrics.view?artist=<artist>&title=<title>`. P2.
+  /// Wraps lyrics resolution for the Now Playing screen. P2.
   ///
-  /// Returns:
-  ///  - The parsed [Lyrics] (with `value` non-empty) when Navidrome has
-  ///    lyrics for the track.
-  ///  - `null` when there are no lyrics for the track. Two paths arrive
-  ///    here, both treated as "empty state, not error":
-  ///      * Subsonic error code 70 (`NotFoundError`).
-  ///      * `lyrics.value` is missing or empty in the envelope.
+  /// Two-stage strategy:
+  ///   1. `GET /rest/getLyricsBySongId.view?id=<songId>` against Navidrome
+  ///      (Open Subsonic extension — uses LRCLib + embedded tags if configured).
+  ///      Skipped when [songId] is empty.
+  ///   2. If stage 1 returns null (code 70, empty list, or skipped), fall back
+  ///      to `GET https://lrclib.net/api/get?artist_name=<artist>&track_name=<title>`
+  ///      directly. Skipped when [artist] or [title] is empty.
   ///
-  /// All other [ApiError]s rethrow — the UI surfaces them via the standard
-  /// error pane / snackbar.
+  /// Returns [Lyrics] with `value` set to plain text when lyrics are found,
+  /// or `null` when neither source has them. All other [ApiError]s from
+  /// Navidrome rethrow so the UI shows the error pane.
   ///
   /// Copied from [lyricsFor].
-  LyricsForProvider(String artist, String title)
+  LyricsForProvider(String songId, String artist, String title)
     : this._internal(
-        (ref) => lyricsFor(ref as LyricsForRef, artist, title),
+        (ref) => lyricsFor(ref as LyricsForRef, songId, artist, title),
         from: lyricsForProvider,
         name: r'lyricsForProvider',
         debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -154,6 +160,7 @@ class LyricsForProvider extends AutoDisposeFutureProvider<Lyrics?> {
             : _$lyricsForHash,
         dependencies: LyricsForFamily._dependencies,
         allTransitiveDependencies: LyricsForFamily._allTransitiveDependencies,
+        songId: songId,
         artist: artist,
         title: title,
       );
@@ -165,10 +172,12 @@ class LyricsForProvider extends AutoDisposeFutureProvider<Lyrics?> {
     required super.allTransitiveDependencies,
     required super.debugGetCreateSourceHash,
     required super.from,
+    required this.songId,
     required this.artist,
     required this.title,
   }) : super.internal();
 
+  final String songId;
   final String artist;
   final String title;
 
@@ -185,6 +194,7 @@ class LyricsForProvider extends AutoDisposeFutureProvider<Lyrics?> {
         dependencies: null,
         allTransitiveDependencies: null,
         debugGetCreateSourceHash: null,
+        songId: songId,
         artist: artist,
         title: title,
       ),
@@ -199,6 +209,7 @@ class LyricsForProvider extends AutoDisposeFutureProvider<Lyrics?> {
   @override
   bool operator ==(Object other) {
     return other is LyricsForProvider &&
+        other.songId == songId &&
         other.artist == artist &&
         other.title == title;
   }
@@ -206,6 +217,7 @@ class LyricsForProvider extends AutoDisposeFutureProvider<Lyrics?> {
   @override
   int get hashCode {
     var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, songId.hashCode);
     hash = _SystemHash.combine(hash, artist.hashCode);
     hash = _SystemHash.combine(hash, title.hashCode);
 
@@ -216,6 +228,9 @@ class LyricsForProvider extends AutoDisposeFutureProvider<Lyrics?> {
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 mixin LyricsForRef on AutoDisposeFutureProviderRef<Lyrics?> {
+  /// The parameter `songId` of this provider.
+  String get songId;
+
   /// The parameter `artist` of this provider.
   String get artist;
 
@@ -228,6 +243,8 @@ class _LyricsForProviderElement
     with LyricsForRef {
   _LyricsForProviderElement(super.provider);
 
+  @override
+  String get songId => (origin as LyricsForProvider).songId;
   @override
   String get artist => (origin as LyricsForProvider).artist;
   @override
