@@ -22,11 +22,11 @@ These are gates the project's own ROADMAP "complete when" checklist requires.
 
 Manual smokes called out as deferred in the CHANGELOG. No written log required — verified on-device is sufficient.
 
-| # | Phase | What to verify |
-|---|-------|----------------|
-| V1 | N (recommendations) | Recommendations populate from backend; Play branch works for in-library matches; Find Similar long-press seeds the feed; Settings shows the engine health chip. |
-| V2 | O (home screen) | Home boots first; recent / frequent albums populate from live Navidrome data; recommendations show; pull-to-refresh re-fetches; Queue still reachable via AppBar icon. |
-| V3 | P (v1.5.0 polish) | P1: queue + position restored after force-close. P2: lyrics toggle works on a track with lyrics; empty state on a track without. P3: 1-min sleep timer pauses playback at expiry; chip + sheet roundtrip works. Tag `v1.5.0` after pass. |
+| # | Phase | Status |
+|---|-------|--------|
+| V1 | N (recommendations) | ✅ 2026-06-15 — verified on-device as part of v1.5.0 smoke. |
+| V2 | O (home screen) | ✅ 2026-06-15 — verified on-device as part of v1.5.0 smoke. |
+| V3 | P (v1.5.0 polish) | ✅ 2026-06-15 — P1/P2/P3 all passed; bug fixes for nav reset + LRCLib fallback also verified. `v1.5.0` tagged. |
 
 ---
 

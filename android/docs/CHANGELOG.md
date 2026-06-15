@@ -1520,3 +1520,27 @@ Closes Phase P. Three player UX improvements bundled as the v1.5.0 polish band: 
   2. **P2 — lyrics.** Play a track Navidrome has lyrics for → AppBar lyrics toggle swaps cover for scrollable text. Play a track *without* lyrics → toggle shows "No lyrics for this track".
   3. **P3 — sleep timer.** Set a 1-minute timer → countdown chip renders in AppBar; wait → playback pauses at expiry; chip disappears. Tap the chip mid-countdown → sheet reopens with "Off" tile.
 - **`v1.5.0` git tag** — created after the smoke passes.
+
+
+## 2026-06-15 — v1.5.0 smoke verified + two bug fixes
+
+### Bug fixes shipped post-tagging
+
+**Fix 1 — Navigation reset on server save** (`android/app/lib/main.dart`):
+`HeerrApp` was a `ConsumerWidget` that called `buildHeerrRouter()` inside `build()`. When `settingsProvider` was invalidated on first server save, `scrobbleProvider` rebuilt → `HeerrApp.build()` ran → new `GoRouter` with `initialLocation: '/'` reset the navigation stack to Home. Fixed by converting to `ConsumerStatefulWidget` with the router held in `initState()`.
+
+**Fix 2 — Lyrics unavailable for popular tracks** (`android/app/lib/providers/library/lyrics.dart`):
+`getLyrics.view` and `getLyricsBySongId.view` both returned nothing because Navidrome's LRCLib integration was not configured in the home-server compose stack. Fixed by adding a direct LRCLib fallback (`https://lrclib.net/api/get?artist_name=…&track_name=…`) that runs when Navidrome returns empty. No auth or server-side config required; covers near all popular tracks.
+
+Both fixes committed as `df90f18` and included in the re-tagged `v1.5.0`.
+
+### On-device smoke — v1.5.0 (2026-06-15)
+
+Verified on Pixel 7, Android 16 (API 36), against live home server over Tailscale.
+
+- **Server setup (bug fix V):** Added server via Settings → Servers. Tapped "Test heerr" → "Connection OK" snackbar appeared; bottom sheet stayed open; no navigation to Home. ✅
+- **P1 — Persist Now Playing:** Played a track for ~30 s, force-closed, relaunched → mini-player showed last-played track at saved position; did not auto-play; tapping resumed from correct position. ✅
+- **P2 — Lyrics:** Opened Now Playing → tapped lyrics toggle → lyrics appeared for tested tracks via LRCLib direct fallback. Empty state shown correctly for tracks without lyrics. ✅
+- **P3 — Sleep timer:** Set 1-minute timer from overflow → countdown chip appeared in AppBar → playback paused at expiry → chip disappeared. Chip-tap mid-countdown reopened sheet with Off tile. ✅
+
+Phase P declared complete. `v1.5.0` tagged and pushed.
