@@ -1583,3 +1583,35 @@ Verified on Pixel 7, Android 16 (API 36).
 - Q3 ✅ `hasPendingSyncTargets`, `onAppForegrounded`/`onAppBackgrounded`, router lifecycle wiring.
 - Q4 ✅ v2.0.0 version bump, docs, on-device smoke.
 - Tag: `v2.0.0`.
+
+---
+
+## 2026-06-16 — Gapless playback (X4b / v2.1.0)
+
+### Change
+- `android/app/lib/player/heerr_audio_handler.dart`: `AudioPlayer` constructor now passes `useLazyPreparation: false`. ExoPlayer prepares the next source in the queue before the current one ends, eliminating the inter-track gap on `setAudioSources`-driven playlists.
+- `android/app/pubspec.yaml` → `2.1.0`.
+
+### Why
+just_audio's `AudioPlayer` defaults `useLazyPreparation: true`. With that default the next `AudioSource` in the playlist is not constructed / handed to ExoPlayer until the current one finishes — which is exactly when the audible gap appears. Flipping to `false` lets ExoPlayer queue the next renderer ahead of time and do its native gapless hand-off.
+
+The change is a single constructor flag flip; no surface area in `setAudioSources` / `playAll` / `restoreQueue` changed. Eager preparation for streaming HTTP sources amounts to opening the URI and buffering the head — cheap on Tailscale-LAN to Navidrome.
+
+### Test gate
+- `flutter analyze`: clean (the pre-existing `isInDebugMode` deprecation warning in `main.dart` is unrelated and outside this change).
+- `flutter test`: **533/533** pass.
+
+### Notes
+- Manual on-device verification deferred to the v2.1.0 smoke checkpoint in DEBT.md.
+- ADR: `DECISIONLOG.md` 2026-06-16 entry ("X4b — gapless playback via `useLazyPreparation: false`").
+
+### On-device smoke — v2.1.0 (2026-06-16)
+Verified on Pixel 7, Android 16 (API 36).
+
+- Play an album with continuous-flow tracks → no audible gap on track transitions. ✅
+- Skip-next / pause / resume / seek still behave correctly. ✅
+- Lock-screen + notification controls update on track change. ✅
+
+### Phase R closed (2026-06-16)
+- R1 ✅ `useLazyPreparation: false` on the `AudioPlayer` constructor.
+- Tag: `v2.1.0`.

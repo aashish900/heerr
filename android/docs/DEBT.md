@@ -64,16 +64,23 @@ ADR: `DECISIONLOG.md` 2026-06-15 ("v1.5.0 player polish band").
 
 ADR: `DECISIONLOG.md` 2026-06-15 ("v2.0.0 background offline sync via WorkManager").
 
+### Scheduled — v2.1.0 (Phase R)
+
+| # | Item | Status |
+|---|------|--------|
+| X4b | Gapless playback (`useLazyPreparation: false` on the `just_audio` `AudioPlayer`). | ✅ R1 shipped 2026-06-16; on-device smoke passed; `v2.1.0` tagged. |
+
+ADR: `DECISIONLOG.md` 2026-06-16 ("X4b: gapless playback via `useLazyPreparation: false`").
+
 ### Unscheduled — v3 backlog
 
 Items still in ROADMAP `## Out of scope`. Do not implement without a new DECISIONLOG entry re-scoping them.
 
 | # | Item | Unlock condition |
 |---|------|-----------------|
-| X4b | Gapless playback (`ConcatenatingAudioSource` switch in `just_audio`). | User reports gap between tracks is noticeable in their listening flow. |
-| X4c | Crossfade (dual-player infra). | Demand + v2 stability proven. |
+| X4c | Crossfade (dual-player infra). | Demand after living with X4b; v3 "seamless player" goal. |
 | X5 | Cast / Sonos / external player hand-off. | Re-scope decision; high-risk transport work. |
-| X6 | Tablet / foldable adaptive layouts. | Re-scope decision; mechanical retrofit across 4 main screens + dialogs. |
+| X7 | Android TV version (leanback UI, D-pad navigation, side-by-side with phone build). | Re-scope decision; needs separate target/flavour + leanback launcher + remote-friendly UI. |
 
 ---
 

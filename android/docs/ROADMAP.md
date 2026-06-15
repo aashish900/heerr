@@ -4,7 +4,7 @@ Track progress through the Android client build. Each milestone = one git commit
 
 See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
-**Status (2026-06-15):** Phases A–O complete (39 milestones). All milestone boxes checked; outstanding doc debt tracked in `docs/DEBT.md`.
+**Status (2026-06-16):** Phases A–R complete. Phase Q shipped at `v2.0.0` (background sync); Phase R shipped at `v2.1.0` (gapless playback). All milestone boxes checked; outstanding doc debt tracked in `docs/DEBT.md`.
 
 **Conventions:**
 - TDD by default (CLAUDE.md §2) — widget tests / unit tests written first, land in the same commit as code.
@@ -499,32 +499,44 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 **Architecture note:** Lifts the L-phase "foreground-only sync window" limitation by adding a `WorkManager`-driven periodic worker that calls into the existing `OfflineSync` notifier code path. Atomic manifest writes from L1 already protect against concurrent foreground / background races — Q1 verifies the invariant under contention. Pure-Android slice; no backend change. See `DECISIONLOG.md` 2026-06-15 ("v2.0.0 — background offline sync") for the full ADR.
 
-### [ ] Q1. WorkManager integration + worker entry point
+### [x] Q1. WorkManager integration + worker entry point
 **Files (new):** `android/app/lib/offline/background_sync.dart` — periodic worker that creates a Riverpod container, calls `offlineSyncProvider.syncNow()`, then disposes.
 **Files (modify):** `android/app/pubspec.yaml` (add `workmanager: ^0.5`), `android/app/android/app/src/main/AndroidManifest.xml` (add `RECEIVE_BOOT_COMPLETED` permission + WorkManager `Initializer`), `android/app/lib/main.dart` (`Workmanager().initialize(...)` before `runApp`).
 **Test gate:** worker entry-point unit test with stub `Dio` + stub manifest — assert the same `OfflineSync.syncNow()` code path runs; assert atomic-write invariant holds when foreground + background both touch the manifest in sequence.
 **Done when:** `build_runner` / `analyze` / `test` green.
 **Commit:** `feat(flutter): Q1 — workmanager integration + background worker`
 
-### [ ] Q2. Constraints + policies
+### [x] Q2. Constraints + policies
 **Files (modify):** `android/app/lib/offline/background_sync.dart` (translate settings → `Constraints`), `android/app/lib/providers/settings.dart` (new `offline_charging_only` key), `android/app/lib/screens/settings_screen.dart` ("Charging only" toggle in Offline section).
 **Behaviour:** `offline_wifi_only` → `Constraints.NetworkType.UNMETERED`. `offline_charging_only` → `Constraints.requiresCharging`. Periodic interval matches existing `offline_poll_interval_min` (default 60 min, min 15 enforced by WorkManager).
 **Test gate:** constraint-derivation unit tests covering each settings permutation.
 **Done when:** `analyze` / `test` green.
 **Commit:** `feat(flutter): Q2 — background sync constraints + charging-only`
 
-### [ ] Q3. Foreground / background interlock
+### [x] Q3. Foreground / background interlock
 **Files (modify):** `android/app/lib/router.dart` (`_ShellScaffoldState.didChangeAppLifecycleState`), `android/app/lib/offline/background_sync.dart` (cancel + reschedule helpers).
 **Behaviour:** On foreground resume, cancel any in-flight background work to avoid double-downloads. On app background, if any markers are pending sync, schedule the worker for the next interval.
 **Test gate:** handoff state-machine tests — verify cancel-on-resume and schedule-on-background fire in the right order; verify the manifest is the single source of truth so a cancelled mid-flight download leaves no orphan state.
 **Done when:** `analyze` / `test` green.
 **Commit:** `feat(flutter): Q3 — foreground/background sync interlock`
 
-### [ ] Q4. v2.0.0 smoke + version bump
+### [x] Q4. v2.0.0 smoke + version bump
 **Files (modify):** `android/app/pubspec.yaml` → `2.0.0`. DECISIONLOG ADR + CHANGELOG entry.
 **Test gate:** manual smoke — mark an album, background the app, leave for one polling interval, observe completed downloads via the Downloads tab on re-open. Toggle WiFi off → worker skips run; toggle on → worker resumes. Charging-only toggle gates correctly on the device's charger state.
 **Done when:** smoke passes. Tagged `v2.0.0`.
 **Commit:** `chore(flutter): v2.0.0 background sync smoke verified`
+
+---
+
+## Phase R — Gapless playback (v2.1.0)
+
+**Architecture note:** Single-flag fix. The codebase already uses `setAudioSources(List<AudioSource>)` (just_audio's modern playlist primitive). The audible inter-track gap was caused by `just_audio`'s `AudioPlayer({useLazyPreparation = true, ...})` default — subsequent sources are not prepared until ExoPlayer needs them. Flipping the constructor flag to `false` lets ExoPlayer pre-prepare the next renderer and perform its native gapless hand-off. See `DECISIONLOG.md` 2026-06-16 ("X4b: gapless playback via `useLazyPreparation: false`") for full rationale.
+
+### [x] R1. Gapless via `useLazyPreparation: false`
+**Files (modify):** `android/app/lib/player/heerr_audio_handler.dart` (`AudioPlayer(useLazyPreparation: false)` in the default-constructor path), `android/app/pubspec.yaml` → `2.1.0`. ADR + CHANGELOG entry.
+**Test gate:** existing handler / persistence / scrobble / sleep-timer suites stay green. No new tests — the flag is a constructor-side toggle that the stub-player tests don't exercise.
+**Done when:** `flutter analyze` clean; `flutter test` green; on-device smoke (`v2.1.0` build → play an album with tracks mixed to flow together → no gap between rows; skip-next / pause / resume still behave; lock-screen + notification still update on track change). Tagged `v2.1.0` after smoke.
+**Commit:** `feat(flutter): R1 — gapless playback via useLazyPreparation: false`
 
 ---
 
@@ -551,10 +563,10 @@ Items scheduled into v1.5.0 (Phase P) or v2.0.0 (Phase Q) are no longer here —
 - Push notifications / FCM.
 - Spotify SDK / OAuth on device.
 - Admin endpoints (CLI-only on backend).
-- Tablet / foldable layouts (v3 backlog).
 - Internationalisation.
 - Offline mutation queue (mutations require online connectivity in v1).
-- Crossfade / gapless playback (v3 backlog).
+- Crossfade — v3 "seamless player" goal (gapless shipped at v2.1.0 / Phase R).
+- Android TV version — v3 goal (leanback UI, D-pad nav, separate flavour).
 - Cast / Sonos / external player hand-off (v3 backlog).
 - Equaliser.
 - Cover-art upload for playlists.

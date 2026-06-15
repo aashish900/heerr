@@ -403,3 +403,27 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Trade-off:** WorkManager has a 15-minute minimum periodic interval. For a user who marks an album and immediately wants it cached, the foreground sync remains the right path — the existing foreground `OfflineSync` tick continues to run when the app is open. Background sync is the "set and forget" path, not the "right now" path.
 
 **Reference:** ROADMAP Phase Q (Q1–Q4). DEBT.md X1 entry updated to mark as scheduled. Backend remains untouched (pure-Android slice).
+
+## 2026-06-16 — X4b: gapless playback via `useLazyPreparation: false` — heerr v2.1.0
+
+**Context:** After v2.0.0 (background sync) shipped, X4b was the lowest-effort outstanding v3-backlog item. The DEBT.md note hinted at a "`ConcatenatingAudioSource` switch in `just_audio`", but the codebase already uses `setAudioSources(List<AudioSource>)` — the modern just_audio API for a playlist. The audible inter-track gap was coming from elsewhere.
+
+**Decision:** Construct `HeerrAudioHandler`'s `AudioPlayer` with `useLazyPreparation: false`. Ship as Phase R / v2.1.0 (single-milestone phase — one constructor flag, no architectural change).
+
+**Why:**
+- `just_audio` 0.10's `AudioPlayer({useLazyPreparation = true, ...})` controls when subsequent items in the playlist are prepared. With the default (`true`), each `AudioSource` is built only when ExoPlayer needs to play it — producing the gap. With `false`, ExoPlayer pre-prepares the next source and performs its native gapless hand-off when the current renderer completes.
+- The flag is per-`AudioPlayer`; no per-source override needed.
+- For HTTP / streaming sources (Subsonic stream URLs, offline `file://` URIs), "eager preparation" amounts to URI parse + initial-buffer fetch — a negligible cost on the Tailscale-LAN connection the app already uses for playback.
+- The handler accepts an `AudioPlayer? player` for tests; the default-constructor path is the only place that needs the flag.
+- No effect on the `localUriForProvider` chokepoint or the scrobble-controller "once per play, resets on track change" guard — both depend on `mediaItem.stream` transitions, which still fire identically whether preparation is lazy or eager.
+
+**Alternatives considered:**
+- **Switch from `setAudioSources` to the deprecated explicit `ConcatenatingAudioSource`.** Same underlying playlist primitive; gives no extra control. Rejected as a backwards step.
+- **Tune `audioLoadConfiguration` (Android `LoadControl`).** Buffer-size / re-buffer thresholds; orthogonal to the gapless transition. Rejected — not the cause of the gap.
+- **Switch to a different audio backend (`media_kit`, `audioplayers`).** Architectural rework against a one-flag fix. Rejected.
+
+**Trade-off:** Eager preparation across the entire queue means slightly more memory pressure for very long queues (`getRandomSongs.view?size=500`-class lists). For the single-user / home-server scope this is invisible; if it ever isn't, a custom `audioLoadConfiguration` can cap the prepared window without flipping `useLazyPreparation` back to `true`.
+
+**Reference:** `android/app/lib/player/heerr_audio_handler.dart` constructor. No test changes — existing tests construct the handler with a stub player and don't exercise the live constructor path.
+
+---

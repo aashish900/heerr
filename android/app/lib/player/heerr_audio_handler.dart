@@ -12,7 +12,7 @@ import 'package:rxdart/rxdart.dart';
 /// `audioHandlerProvider`. The handler outlives screen rebuilds.
 class HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   HeerrAudioHandler({AudioPlayer? player})
-      : _player = player ?? AudioPlayer() {
+      : _player = player ?? AudioPlayer(useLazyPreparation: false) {
     _wirePlayerStreams();
   }
 
