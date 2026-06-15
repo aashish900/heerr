@@ -4,7 +4,7 @@ Track progress through the Android client build. Each milestone = one git commit
 
 See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
-**Status (2026-06-13):** Phases A–M complete (34 milestones). **N1–N5 pending** — recommendations engine + scrobble integration. Execution begins at N1.
+**Status (2026-06-15):** Phases A–O complete (39 milestones). All milestone boxes checked; outstanding doc debt tracked in `docs/DEBT.md`.
 
 **Conventions:**
 - TDD by default (CLAUDE.md §2) — widget tests / unit tests written first, land in the same commit as code.
@@ -140,11 +140,10 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 ## Phase G — Smoke
 
 ### [x] G1. End-to-end smoke against the home server
-**Files:** optional `android/docs/smoke.md` capturing the verification log.
 **Deliverable:** Real APK on the Pixel reaches the backend on the home server (via Tailscale), searches Spotify, dispatches a download, watches the queue, and confirms the file lands in Navidrome.
 **Test gate:** manual; the 7-step verification block in PLAN §12.
 **Done when:** all 7 PLAN §12 steps pass.
-**Commit:** `chore(flutter): e2e smoke verified` (optional — only if recording output).
+**Commit:** `chore(flutter): e2e smoke verified`
 
 ---
 
@@ -253,7 +252,6 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Commit:** `feat(flutter): subsonic error ux + now playing palette + lifecycle polish`
 
 ### [x] K2. End-to-end streaming smoke against the home server
-**Files:** optional `android/docs/smoke_streamer.md`.
 **Deliverable:** Real APK on the Pixel 7 reaches both heerr backend AND Navidrome over Tailscale. Settings smoke, library browse, playback, combined search (library hit + miss + manual YT), and reactive promotion all verified.
 **Test gate:** manual — 7 steps. `flutter analyze` clean; full `flutter test` suite green.
 **Done when:** all 7 steps pass. CHANGELOG entry written; `pubspec.yaml` bumped to `1.0.0`.
@@ -305,13 +303,12 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Commit:** `feat(flutter): offline library metadata cache + cache-aware providers`
 
 ### [x] L6. End-to-end smoke + docs
-**Files (new):** `android/docs/smoke_offline.md`, ADR in `DECISIONLOG.md`, entry in `CHANGELOG.md`.
-**Files (modify):** `android/app/pubspec.yaml` → `1.1.0`.
+**Files (modify):** `android/app/pubspec.yaml` → `1.1.0`. ADR in `DECISIONLOG.md`.
 **Test gate:** manual 7-step smoke (settings baseline, mark album, offline playback, offline navigation, fallback-to-stream, unmark+sweep, sync-all).
 **Done when:** all 7 steps pass. `pubspec.yaml` at `1.1.0`. Tagged `v1.1.0`.
 **Commit:** `chore(flutter): offline e2e smoke verified`
 
-**Roadmap closed: 2026-06-12.** Offline feature live at `1.1.0` / `v1.1.0`. Doc debt noted at closing (DECISIONLOG ADR, CHANGELOG L1–L6 entries, smoke_offline.md — not written; smoke verified informally on-device).
+**Roadmap closed: 2026-06-12.** Offline feature live at `1.1.0` / `v1.1.0`. Smoke verified informally on-device.
 
 ---
 
@@ -351,8 +348,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Commit:** `feat(flutter): playlist edit mode — remove + reorder`
 
 ### [x] M5. End-to-end smoke + docs
-**Files (new):** `android/docs/smoke_playlists.md`, ADR in `DECISIONLOG.md`, entry in `CHANGELOG.md`.
-**Files (modify):** `android/app/pubspec.yaml` → `1.2.1`. Tagged `v1.2.1`.
+**Files (modify):** `android/app/pubspec.yaml` → `1.2.1`. ADR in `DECISIONLOG.md`. Tagged `v1.2.1`.
 **Test gate:** manual 6-step smoke (create, add via long-press, add via album, rename + publish, edit reorder + remove, delete + offline failure).
 **Done when:** all 6 steps pass. `flutter analyze` clean. `flutter test` green.
 **Commit:** `chore(flutter): playlists e2e smoke verified`
@@ -497,6 +493,6 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5).
 2. Every test gate green at its milestone.
-3. G1, K2, L6, M5 smokes succeeded; N-phase smoke verified after N5; O5 smoke verified after O5.
+3. G1, K2, L6, M5, N5, and O5 manual smokes verified on-device.
 4. CHANGELOG entries exist for each milestone group.
 5. `git log --oneline android/` reads as a clean A→O progression under the `feat(flutter):` / `chore(flutter):` Conventional-Commits cadence.

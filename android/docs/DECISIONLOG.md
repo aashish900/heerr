@@ -276,3 +276,78 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Trade-off:** The recommendations feature now spans backend Phase I + Android Phase N, with the wire contract owned by the backend ADR (2026-06-13) and the UX + lifecycle owned by this ADR. Any breaking change to the response shape (e.g. adding `source_engine: String` per result so the UI can chip-tag rows) would need both ADRs revisited and a client/server release coordinated. That's the only fragility we accept — every other engine swap (ytmusic ↔ lastfm ↔ listenbrainz, single vs chain) is server-side only.
 
 **Reference:** Implementation across `android/app/lib/{models/{seed_track,recommended_track,recommend_health}.dart, providers/recommendations.dart, screens/{recommendations_screen,settings_screen,library/library_screen}.dart, player/{scrobble_controller,scrobble_provider}.dart, widgets/add_to_playlist_sheet.dart, router.dart}`. Backend side: `backend/app/services/recommenders/*` + `backend/app/api/v1/recommend.py`. Roadmap milestones N1–N5 in `android/docs/ROADMAP.md` and CHANGELOG entries `2026-06-14 — N1` through `2026-06-14 — N5` enumerate the per-milestone deltas.
+
+---
+
+## 2026-06-12 — Offline downloads: prefer-local/fallback-to-stream, foreground-only sync, per-server manifest — heerr v1.1.0
+
+**Context:** After K2 (streaming MVP), songs could only be played via Navidrome's HTTP stream. The Pixel 7 test device is on Tailscale; if the tailnet is unreachable (travel, VPN off) the library is entirely inaccessible. The ask: cache downloaded songs locally so they play from `file://` when the stream URL isn't reachable. This is a pure-Android slice — no heerr backend or Navidrome change is needed because the download source is the same Subsonic stream URL already used for playback.
+
+**Decision:** Implement offline downloads as a prefer-local/fallback-to-stream layer across L1–L5, shipping as v1.1.0. Five sub-decisions locked for v1:
+
+1. **Prefer-local, fallback-to-stream.** Not a full offline-first mode. `localUriForProvider` is the single chokepoint: if a `ready` manifest entry exists for the song, `song_to_media_item.dart` returns a `file://` URI; otherwise the Subsonic stream URL. All five play surfaces (album, artist, playlist, search, queue) route through the same chokepoint — no per-surface logic.
+
+2. **App-private storage, per-server key.** Files land in `<appDocumentsDir>/offline/<serverKey>/`, where `serverKey = sha256(baseUrl + "|" + username).hex[0..16]`. App-private keeps the files off the shared media store (no `READ_EXTERNAL_STORAGE` permission, no media scanner interference). Per-server keying prevents manifest collisions when the user points at a different Navidrome instance.
+
+3. **Single manifest JSON per server, atomic writes.** Manifest at `<appDocs>/offline/<serverKey>/manifest.json` tracks every song entry (`songId`, `state`, `filePath`, `sizeBytes`, `downloadedAt`). Writes are atomic (write to `.tmp`, then `rename`) so a crash mid-write leaves the prior manifest intact, not a half-written file. No TTL in v1 — the manifest is invalidated only by explicit unmark or "Clear all".
+
+4. **Foreground-only sync, N=3 concurrency, WiFi gate.** `offlineSyncProvider` (`AsyncNotifier`, keep-alive) owns a periodic `Timer` that fires when the app is foregrounded. `WidgetsBindingObserver` in `_ShellScaffoldState` calls `pause()`/`resume()` on lifecycle transitions — no background wakeup, no `WorkManager`. Concurrency is capped at 3 parallel downloads (avoids saturating the home-server NIC). WiFi gate: `connectivity_plus` checks `ConnectivityResult.wifi` before each batch — WiFi-only mode skips downloads on mobile data.
+
+5. **Metadata cache (L5): write-on-success, serve-on-failure, no TTL.** All six library providers (`libraryArtistsProvider`, `libraryArtistProvider`, `libraryAlbumProvider`, `libraryPlaylistsProvider`, `libraryPlaylistProvider`, `librarySearchProvider`) are wrapped in `cacheAware(...)`: success → write to `<serverKey>/cache/<provider-key>.json`; failure → serve prior cache if it exists, rethrow if not. Cover art bytes are persisted to `<serverKey>/covers/<artId>` on first load; `LibraryCoverArt` widget falls back to `Image.file` when offline.
+
+**Why:**
+
+- **Prefer-local/fallback is safer than offline-first.** A full offline-first design would require the app to detect which songs it doesn't have and either block playback or handle a missing-file error mid-stream. Prefer-local is simpler: the playback path is unchanged; local files just intercept it when they exist.
+- **Single chokepoint in `song_to_media_item.dart`.** Centralising the local-vs-stream decision in one function means the five play surfaces need zero offline awareness — they produce `Song` objects the same way they always did.
+- **App-private storage** avoids the `READ_EXTERNAL_STORAGE` permission and media-scanner indexing side effects. The user never needs to interact with these files in a file manager.
+- **Atomic manifest writes.** The manifest is the source of truth for "what's downloaded". A corrupt manifest would break all offline playback — the atomic write + fallback-to-empty-on-corrupt-JSON guards against this.
+- **Foreground-only sync** is the right default for a single-user home-server app. Downloads are fast (LAN speeds over Tailscale), and the user is typically watching the screen when they mark something. `WorkManager` would add significant complexity (wake locks, battery optimisation exemptions, retry policies) for a marginal benefit.
+- **N=3 concurrency** is empirical — 1 is too slow for a 300-song album, unbounded hammers the home server's disk IO. 3 keeps the server comfortable and the UI responsive.
+- **Metadata cache with no TTL.** The library doesn't change while the user is offline; a stale-but-correct cache is the right tradeoff. The next successful online render overwrites, which is the only meaningful "TTL" in this use case.
+
+**Alternatives considered:**
+
+- **Download via heerr backend (`/download` endpoint).** The backend already invokes spotDL and writes files to the Navidrome library. Rejected: spotDL files are already in the library; re-downloading them to the device via the backend would double the network path and require a new backend endpoint. The Subsonic stream URL is the correct source.
+- **`WorkManager` for background sync.** Would allow sync while the screen is off. Rejected for v1: complexity far exceeds the benefit for a single-user, always-home-network app. Deferred to v2 if user reports the foreground window is insufficient.
+- **SQLite instead of JSON manifest.** More robust at scale, richer query surface. Rejected: the manifest is O(library size) but accessed in bulk at sync time, not queried per-song. JSON + full in-memory parse is simpler and fast enough for libraries under ~10K songs.
+- **Per-song sidecar files instead of a central manifest.** Would avoid the manifest-write bottleneck. Rejected: a central manifest is easier to inspect, backup, and clear atomically. The write-bottleneck concern doesn't apply at the sync cadences we're operating at.
+- **MediaStore / shared external storage.** Would make downloaded files visible in other apps' file browsers. Rejected: not a requirement, and avoiding `READ_EXTERNAL_STORAGE` is always preferable.
+
+**Trade-off:** The manifest is a single file shared across all sync operations. If the user syncs a 500-song library, the manifest file could grow to ~200 KB — still in the range where the full parse-on-load is fast (<5 ms). Beyond ~50K songs this would warrant an incremental writer; that's outside single-user home-server scope.
+
+**Reference:** Implementation in `android/app/lib/offline/` (`offline_paths.dart`, `offline_manifest.dart`, `offline_settings.dart`, `offline_marker.dart`, `offline_downloader.dart`, `offline_sync.dart`, `local_uri.dart`, `offline_size_estimator.dart`, `library_cache.dart`). Playback integration in `player/song_to_media_item.dart` and `player/playback_actions.dart`. UI in `widgets/library_result_tile.dart`, `screens/library/{album,playlist}_detail_screen.dart`, `screens/settings_screen.dart`.
+
+---
+
+## 2026-06-14 — Phase O: Home screen as default tab; Queue removed from bottom nav — heerr v1.4.0
+
+**Context:** After Phase N, the bottom nav was `Library · Queue · Settings`. The app's value proposition is find → download → play, but the first screen after launch was always the Library — correct for a "browse your collection" app, but not for one that also recommends what to play next. The Queue tab was the third item in the nav, but most of the time it's empty or only interesting during an active download — a poor use of a persistent tab slot.
+
+**Decision:** Add a Home screen as the new default boot destination and replace the Queue tab with it. Bottom nav becomes `Home · Library · Downloads · Settings`. Queue remains navigable from the Home AppBar (`queue_music_outlined` IconButton → `/queue`). Four sub-decisions locked:
+
+1. **Home is the new `initialLocation` (`/`); Library moves to `/library`.** All library nested routes (`/library/artist/:id`, `/library/album/:id`, `/library/playlist/:id`, `/library/recommendations`) keep the same URL shape; only the base segment changed. `Routes.*` helper getters updated so call sites needed no edits.
+
+2. **Home screen layout: Spotify-style greeting + 2-col quick-access grid + horizontal sections.** Time-of-day greeting (`"Good morning"` / `"Good afternoon"` / `"Good evening"`) from pure-Dart `greetingForHour(int)`. Quick-access grid: 2-column `GridView` of up to 6 recently-played albums from `homeRecentProvider`; falls back to `homeRecommendationsProvider` results when recent is empty. Sections: "Jump back in" (recent albums), "Most played" (frequent albums), "Picked for you" / "Discover" (recommendations). All three data sources (`getAlbumList2.view?type=recent`, `getAlbumList2.view?type=frequent`, recommendations) fire in parallel at screen build; pull-to-refresh invalidates all four providers.
+
+3. **`homeRecommendationsProvider` falls back to random songs (`getRandomSongs.view?size=20`) when the backend returns an empty result list.** Returns a `HomeRecommendations(tracks, isFallback)` record; `isFallback=true` changes the section header from "Picked for you" to "Discover". This ensures the section is never empty (a cold-start app with no scrobble history still shows discovery content), while making clear to the user when they're seeing curated vs random content.
+
+4. **Per-card cover art on `HomeRecommendationCard` is deferred.** The card shows a colour-swatch placeholder in v1. Resolving cover art would require a `getSong.view` call per recommendation row (the recommendation response carries only `title`, `artist`, and `source_url` — no Navidrome `coverArtId`). At 20 cards × 1 request this is 20 extra Subsonic round-trips on every Home load. Deferred until the placeholder is reported as a friction point.
+
+**Why:**
+
+- **Home as default tab.** A tab that shows "what to play next" is a better cold-open than a library browser. Library is where you go with intent; Home is where the app sells itself. This matches Spotify, Apple Music, and YouTube Music's home-tab convention.
+- **Drop Queue from the nav.** Queue is a transient state — only relevant during and immediately after a download. A persistent bottom-nav slot signals that the content is always worth checking, which Queue is not. Moving it to an AppBar icon on Home makes it discoverable without wasting a nav slot.
+- **4 tabs (Home / Library / Downloads / Settings).** Downloads earns its own tab (persistent offline state the user actively manages); Settings is always-available for credential management. 4 tabs is the Material 3 design-system recommended maximum for bottom nav.
+- **Fallback to random songs.** Without it, a new install's Home screen would be mostly empty (no recent albums, no recommendations without scrobble history). Random songs from the library are a better cold-start experience than empty sections and preserve the discovery narrative.
+- **Defer per-card cover art.** The 20 extra `getSong.view` round-trips per Home load matter on a Tailscale connection (each is ~10–50 ms). The placeholder is visually acceptable in v1; the fix is a targeted optimisation that can land without any architectural change when it becomes a priority.
+
+**Alternatives considered:**
+
+- **Keep Queue in the nav, add Home as a 5th tab.** Five tabs exceeds the Material 3 bottom-nav guideline and makes the bar visually crowded on 5" phones. Rejected.
+- **Make Library the default tab but add a Home widget/banner above the library list.** Hybrid approach — keeps Library as the primary surface but inserts discovery content at the top. Rejected: it complicates the Library screen and doesn't give the Home content the visual weight it deserves.
+- **Fire both `getAlbumList2.view?type=recent` and `getAlbumList2.view?type=frequent` in a single aggregated provider.** Would simplify pull-to-refresh. Rejected: the two sections have different fallback behaviours; separating them keeps each provider testable in isolation.
+- **Resolve cover art for recommendation cards at build time (parallel `getSong.view` calls).** Correct but expensive at 20 parallel round-trips per Home load. Deferred as noted above; could be implemented as a lazy-load (cards render with placeholder, then fill in on scroll).
+
+**Trade-off:** Queue is now one extra tap from the Home screen (AppBar icon) instead of one tap from anywhere (bottom nav). Acceptable because Queue is only relevant when the user is actively downloading, and at that moment they're already on the Home screen watching the recommendations or the grid update.
+
+**Reference:** Implementation in `android/app/lib/screens/home/home_screen.dart`, `providers/home/home_providers.dart`, `widgets/{home_grid_tile,home_section,home_recommendation_card}.dart`, `router.dart`. Tests in `test/screens/home/home_screen_test.dart`, `test/providers/home/home_providers_test.dart`, `test/widgets/home_recommendation_card_test.dart`. CHANGELOG entry `2026-06-14 — Phase O`. Roadmap milestones O1–O5.
