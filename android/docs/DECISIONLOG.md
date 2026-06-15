@@ -351,3 +351,55 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Trade-off:** Queue is now one extra tap from the Home screen (AppBar icon) instead of one tap from anywhere (bottom nav). Acceptable because Queue is only relevant when the user is actively downloading, and at that moment they're already on the Home screen watching the recommendations or the grid update.
 
 **Reference:** Implementation in `android/app/lib/screens/home/home_screen.dart`, `providers/home/home_providers.dart`, `widgets/{home_grid_tile,home_section,home_recommendation_card}.dart`, `router.dart`. Tests in `test/screens/home/home_screen_test.dart`, `test/providers/home/home_providers_test.dart`, `test/widgets/home_recommendation_card_test.dart`. CHANGELOG entry `2026-06-14 — Phase O`. Roadmap milestones O1–O5.
+
+---
+
+## 2026-06-15 — v1.5.0 player polish band: re-scope X2 / X3 / X4a in from ROADMAP "out of scope"
+
+**Context:** v1.4.0 (Phase O) closed the main feature roadmap (A–O). Three items in ROADMAP "Out of scope" were called out in `DEBT.md` as user-facing gaps that would meaningfully improve the player surface without architectural risk: persisting Now Playing across cold starts (X2), Subsonic lyrics (X3), and a sleep timer (X4a — the sleep-timer-only subset of the X4 "Sleep timer / Cast / Lyrics / Equaliser" bundle). The user confirmed scope and asked for these to ship as a single polish band before tackling the larger background-sync work.
+
+**Decision:** Re-scope X2, X3, and X4a into the roadmap as Phase P (P1–P4), shipping together as v1.5.0. Update ROADMAP "Out of scope" to remove these items. Each milestone is independently testable; the bundling is a release-shape decision, not a coupling.
+
+**Why:**
+- **X2 (persist Now Playing).** Closes the "cold-start Now Playing drops the queue" surprise that breaks the find-→-download-→-play loop. Cheap (one persistence module + one restore hook); reuses the atomic-write pattern from `offline_manifest.dart` (L1) so the safety story is unchanged.
+- **X3 (lyrics).** Subsonic 1.16 already exposes `getLyrics.view`; Navidrome implements it. Adding a UI toggle in Now Playing is one endpoint, one model, one provider, one screen change. Skipping a third-party Subsonic client to read lyrics is the same UX argument that motivated the original streaming-in-app decision (2026-06-11 ADR).
+- **X4a (sleep timer only).** Sleep timer is a `StateNotifier<Duration?>` + `Timer` — small, contained, well-bounded test surface (`fake_async`). The rest of the X4 bundle (gapless, crossfade) needs deeper `just_audio` integration (`ConcatenatingAudioSource` swap; dual-player infra for crossfade) and is deferred to v3.
+- **Why bundle rather than three minor releases.** Each item is small enough that three back-to-back ships would burn smoke effort and release ceremony without giving the user something materially different per ship. One v1.5.0 ship is the right unit of release for a polish band.
+
+**Alternatives considered:**
+- **Ship each X-item as its own minor (1.5.0 / 1.6.0 / 1.7.0).** Smaller blast radius per release, more granular CHANGELOG. Rejected for the bundle-vs-ceremony reason — they're related enough that one polish-band ship reads more cleanly in the version history.
+- **Roll X4 (full sleep timer + gapless + crossfade) into v1.5.0.** Crossfade requires dual-player infra in `just_audio`; not a v1.5.0-band amount of work.
+- **Hold X3 (lyrics) for v3 alongside Cast.** Both are "music-app-feel" features. Rejected: lyrics ships in half a day; coupling it to a multi-month Cast effort would unnecessarily delay it.
+- **Skip X2 (persist Now Playing) until users complain.** Rejected: it's a regression vs. every other music app the user has used; the absence is a passive friction point that's invisible until you cold-start the app and lose the queue.
+
+**Trade-off:** v1.5.0 doesn't unblock the "leave the app, sync downloads in the background" use case (X1) — that's Phase Q / v2.0.0. Acceptable: X1 is a multi-milestone effort (WorkManager integration, constraint policies, foreground/background interlock) and shouldn't gate the polish ship.
+
+**Reference:** ROADMAP Phase P (P1–P4) for milestone shape. DEBT.md "v2 candidates" updated to mark X2 / X3 / X4a as scheduled.
+
+---
+
+## 2026-06-15 — v2.0.0 background offline sync via WorkManager (X1)
+
+**Context:** v1.1.0 (Phase L) shipped the prefer-local/fallback-to-stream offline-downloads feature with a foreground-only sync window — the ADR (2026-06-12, "Offline downloads") explicitly flagged WorkManager / background sync as deferred to v2 if foreground-only proved insufficient. The deferral has held but the limitation is now visible: marking an album then backgrounding the app leaves the download in a `pending` state until next foreground. For the travel / offline-prep use case (mark before bed, sync overnight, play on a flight) the foreground window is the wrong shape.
+
+**Decision:** Lift the foreground-only constraint with a `WorkManager`-driven periodic background sync. Ship as Phase Q (Q1–Q4) / v2.0.0. Three sub-decisions locked:
+
+1. **WorkManager calls into the existing `OfflineSync` notifier code path.** The background worker creates a Riverpod container, calls `offlineSyncProvider.syncNow()`, then disposes. No parallel sync implementation. This keeps the manifest write path identical in foreground and background — atomic writes from L1 already protect the invariant under contention; Q1 adds a contention test to verify the assumption.
+2. **Constraints derive from existing + one new setting.** `offline_wifi_only` → `Constraints.NetworkType.UNMETERED` (reuses the existing toggle). New `offline_charging_only` → `Constraints.requiresCharging` (opt-in, off by default). Periodic interval is the existing `offline_poll_interval_min` (15 min floor enforced by WorkManager).
+3. **Foreground/background interlock: cancel-on-resume + schedule-on-background.** When the app foregrounds, cancel any in-flight background work to avoid double-downloads. When the app backgrounds with pending markers, schedule the worker for the next interval. The manifest stays the single source of truth — a cancelled mid-flight download leaves no orphan state because the manifest entry is only flipped to `ready` after the file is fully written and verified.
+
+**Why:**
+- **Single code path** for foreground + background sync means one set of tests, one set of bugs, one set of guarantees. The alternative (separate background implementation) doubles the surface for race conditions against the manifest.
+- **Reuse existing settings.** `offline_wifi_only` was designed for the foreground sync but the semantics translate directly to WorkManager constraints. Adding `offline_charging_only` is the only new setting needed.
+- **Interlock prevents double-downloads.** Without it, a user who backgrounds the app mid-sync and immediately re-opens would observe two parallel sync attempts. The cancel-on-resume rule keeps the foreground sync authoritative when the app is visible.
+- **Major version bump.** WorkManager adds a new permission (`RECEIVE_BOOT_COMPLETED`), a new dep, and a new behaviour (sync runs without the app being open). All three are semver-significant enough to justify `2.0.0` over `1.5.0` even though the user-visible UI delta is small.
+
+**Alternatives considered:**
+- **AlarmManager + foreground service** instead of WorkManager. More direct control, no minimum 15-min interval. Rejected: Android's background-execution restrictions on API 26+ make raw `AlarmManager` painful, and the foreground service notification would be intrusive for an app that's already noisy with the audio session.
+- **Foreground service that the user explicitly starts** ("Sync now and keep syncing"). Rejected: the whole point of background sync is that the user doesn't have to interact. A persistent notification + manual start is just a worse foreground mode.
+- **Server-side push to wake the app** (FCM message → sync). Rejected on the same grounds as every other "use FCM" decision in this repo: requires a Firebase project, conflicts with the no-FCM posture (`/CLAUDE.md` §3), and the polling cadence is fine for a feature with no real-time requirement.
+- **Skip background sync entirely; raise the foreground polling interval and assume users will leave the app open longer.** Rejected: the use case (overnight sync of marked albums) cannot be satisfied without the app running in the background. Foreground-only is structurally incompatible with that flow.
+
+**Trade-off:** WorkManager has a 15-minute minimum periodic interval. For a user who marks an album and immediately wants it cached, the foreground sync remains the right path — the existing foreground `OfflineSync` tick continues to run when the app is open. Background sync is the "set and forget" path, not the "right now" path.
+
+**Reference:** ROADMAP Phase Q (Q1–Q4). DEBT.md X1 entry updated to mark as scheduled. Backend remains untouched (pure-Android slice).

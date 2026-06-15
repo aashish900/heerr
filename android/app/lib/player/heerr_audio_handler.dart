@@ -132,6 +132,29 @@ class HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     await play();
   }
 
+  /// P1: restore a persisted queue from disk on cold start. Like [playAll]
+  /// but **does not** call [play] — the user resumes manually via the
+  /// mini-player or Now Playing screen. Seeks to [position] within the
+  /// [currentIndex]-th track.
+  ///
+  /// [items] empty is a no-op (cold start with nothing previously queued).
+  /// [currentIndex] is clamped to `items.length - 1`.
+  Future<void> restoreQueue(
+    List<MediaItem> items, {
+    int currentIndex = 0,
+    Duration position = Duration.zero,
+  }) async {
+    if (items.isEmpty) return;
+    final int idx = currentIndex.clamp(0, items.length - 1);
+    queue.add(items);
+    await _player.setAudioSources(
+      items.map(_toAudioSource).toList(),
+      initialIndex: idx,
+      initialPosition: position,
+    );
+    mediaItem.add(items[idx]);
+  }
+
   // -------------------------------------------------------------------------
   // Transport (delegated to the player)
   // -------------------------------------------------------------------------

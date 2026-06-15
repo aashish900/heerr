@@ -71,7 +71,34 @@ MediaItem songToMediaItem({
     artUri: artUri,
     // Stash the source Song id so callers can map an active MediaItem back
     // to its Subsonic identity (J2 uses this for the now-playing screen +
-    // reactive promotion).
-    extras: <String, dynamic>{'subsonicId': song.id},
+    // reactive promotion). `coverArt` rides along so P1's persistence layer
+    // can round-trip a MediaItem → Song without losing the cover-art id.
+    extras: <String, dynamic>{
+      'subsonicId': song.id,
+      if (song.coverArt != null) 'coverArt': song.coverArt,
+    },
+  );
+}
+
+/// Reverse of [songToMediaItem] — reconstructs a minimal [Song] from a
+/// [MediaItem]. Used by P1's queue persistence to round-trip the active
+/// queue without re-fetching from Subsonic. Returns null when the item
+/// lacks a `subsonicId` extra (malformed / non-Subsonic playback).
+///
+/// Only the fields that survive the [songToMediaItem] mapping are
+/// populated; everything else stays null. That's enough for restore:
+/// [songToMediaItem] only reads `id`, `title`, `artist`, `album`,
+/// `duration`, and `coverArt`.
+Song? songFromMediaItem(MediaItem item) {
+  final dynamic rawId = item.extras?['subsonicId'];
+  if (rawId is! String || rawId.isEmpty) return null;
+  final dynamic rawCover = item.extras?['coverArt'];
+  return Song(
+    id: rawId,
+    title: item.title,
+    artist: item.artist,
+    album: item.album,
+    duration: item.duration?.inSeconds,
+    coverArt: rawCover is String && rawCover.isNotEmpty ? rawCover : null,
   );
 }

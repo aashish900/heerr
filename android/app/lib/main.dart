@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'player/heerr_audio_handler.dart';
+import 'player/now_playing_persistence.dart';
 import 'player/player_provider.dart';
 import 'player/scrobble_provider.dart';
 import 'router.dart';
@@ -39,6 +40,13 @@ class HeerrApp extends ConsumerWidget {
     // Boot the scrobble controller. Keep-alive provider; the result is
     // discarded — we only need the side effect (stream subscription).
     ref.watch(scrobbleProvider);
+
+    // P1: wire the Now Playing persistence orchestrator (subscribes to
+    // handler streams, debounced 500ms save) and fire the one-shot
+    // cold-start restore. Both are keep-alive — `watch` here is purely
+    // for the side effect.
+    ref.watch(nowPlayingPersistenceProvider);
+    ref.watch(nowPlayingRestoreProvider);
 
     final GoRouter router = buildHeerrRouter();
     return MaterialApp.router(

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import 'offline/offline_sync.dart';
+import 'player/now_playing_persistence.dart';
 import 'providers/recommendations.dart';
 import 'screens/downloads_screen.dart';
 import 'screens/job_detail_screen.dart';
@@ -225,12 +228,25 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
       case AppLifecycleState.inactive:
       case AppLifecycleState.hidden:
         ref.read(offlineSyncProvider.notifier).pause();
+        // P1: flush the Now Playing snapshot so position survives an
+        // OS-may-kill-us next. Best-effort — async-fire-and-forget.
+        unawaited(_flushNowPlaying());
       case AppLifecycleState.resumed:
         unawaitedResume();
       case AppLifecycleState.detached:
         // App is fully detaching; the provider's onDispose will cancel the
         // timer when the container tears down.
         break;
+    }
+  }
+
+  Future<void> _flushNowPlaying() async {
+    try {
+      final NowPlayingPersistence p =
+          await ref.read(nowPlayingPersistenceProvider.future);
+      await p.flush();
+    } catch (_) {
+      // Best-effort; swallow.
     }
   }
 

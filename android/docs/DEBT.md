@@ -26,6 +26,7 @@ Manual smokes called out as deferred in the CHANGELOG. No written log required �
 |---|-------|----------------|
 | V1 | N (recommendations) | Recommendations populate from backend; Play branch works for in-library matches; Find Similar long-press seeds the feed; Settings shows the engine health chip. |
 | V2 | O (home screen) | Home boots first; recent / frequent albums populate from live Navidrome data; recommendations show; pull-to-refresh re-fetches; Queue still reachable via AppBar icon. |
+| V3 | P (v1.5.0 polish) | P1: queue + position restored after force-close. P2: lyrics toggle works on a track with lyrics; empty state on a track without. P3: 1-min sleep timer pauses playback at expiry; chip + sheet roundtrip works. Tag `v1.5.0` after pass. |
 
 ---
 
@@ -40,22 +41,44 @@ Real missing features; in-scope (not listed in ROADMAP "out of scope").
 
 ---
 
-## 4. v2 candidates (currently out-of-scope)
+## 4. v2 / v3 candidates
 
-Items listed in ROADMAP `## Out of scope` — do not implement without a DECISIONLOG entry re-scoping them.
+Scheduled items moved to the active ROADMAP. Unscheduled items remain in this section until re-scoped.
+
+### Scheduled — v1.5.0 (Phase P)
+
+| # | Item | Status |
+|---|------|--------|
+| X2 | Persist "Now Playing" queue across cold starts. | ✅ P1 shipped 2026-06-15 |
+| X3 | Lyrics via Subsonic `getLyrics.view`. | ✅ P2 shipped 2026-06-15 |
+| X4a | Sleep timer (just the sleep-timer subset of the original X4 bundle). | ✅ P3 shipped 2026-06-15 |
+
+ADR: `DECISIONLOG.md` 2026-06-15 ("v1.5.0 player polish band").
+
+### Scheduled — v2.0.0 (Phase Q)
+
+| # | Item | Milestone |
+|---|------|-----------|
+| X1 | WorkManager / true background sync. | Q1–Q4 |
+
+ADR: `DECISIONLOG.md` 2026-06-15 ("v2.0.0 background offline sync via WorkManager").
+
+### Unscheduled — v3 backlog
+
+Items still in ROADMAP `## Out of scope`. Do not implement without a new DECISIONLOG entry re-scoping them.
 
 | # | Item | Unlock condition |
 |---|------|-----------------|
-| X1 | WorkManager / true background sync (offline downloads foreground-only in v1). | User reports foreground-only window is insufficient. |
-| X2 | Persist "Now Playing" queue across cold starts. | User reports the cold-start drop is a friction point. |
-| X3 | Lyrics — `getLyrics.view` exists in Subsonic 1.16; cheap to add. | Re-scope decision. |
-| X4 | Sleep timer / gapless playback / crossfade. | Re-scope decision. |
-| X5 | Cast / Sonos / external player hand-off. | Re-scope decision. |
-| X6 | Tablet / foldable adaptive layouts. | Re-scope decision. |
+| X4b | Gapless playback (`ConcatenatingAudioSource` switch in `just_audio`). | User reports gap between tracks is noticeable in their listening flow. |
+| X4c | Crossfade (dual-player infra). | Demand + v2 stability proven. |
+| X5 | Cast / Sonos / external player hand-off. | Re-scope decision; high-risk transport work. |
+| X6 | Tablet / foldable adaptive layouts. | Re-scope decision; mechanical retrofit across 4 main screens + dialogs. |
 
 ---
 
 ## Suggested order of attack
 
 1. **V1 + V2** — verify on-device against the home server before declaring v1.4.0 final.
-2. **X-series** — only after a user-driven re-scoping conversation.
+2. **P1 → P4** — v1.5.0 polish band per ROADMAP Phase P.
+3. **Q1 → Q4** — v2.0.0 background sync per ROADMAP Phase Q.
+4. **X-series remainder** — only after v2.0.0 ships and a re-scoping conversation lands.

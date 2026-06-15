@@ -4,8 +4,12 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../api/api_error.dart';
+import '../../models/subsonic/lyrics.dart';
 import '../../player/heerr_audio_handler.dart';
 import '../../player/player_provider.dart';
+import '../../player/sleep_timer.dart';
+import '../../providers/library/lyrics.dart';
 import '../../providers/queue.dart';
 import '../../utils/palette.dart';
 
@@ -48,6 +52,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   Uri? _tintArtUri;
   Color? _tintColor;
 
+  // P2: lyrics view toggle. Persisted as widget state — survives screen
+  // rebuilds but resets on Now Playing pop / push (intentional; lyrics is
+  // a per-session view choice, not a global preference).
+  bool _showLyrics = false;
+
   // Cached queue notifier so dispose() doesn't have to read it through `ref`
   // (Riverpod invalidates the ref before State.dispose runs — caching here
   // means resume() can fire even during teardown).
@@ -87,6 +96,14 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     super.dispose();
   }
 
+  void _openSleepTimerSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext sheetContext) => const _SleepTimerSheet(),
+    );
+  }
+
   void _maybeRefreshTint(Uri? artUri) {
     if (artUri == _tintArtUri) return;
     _tintArtUri = artUri;
@@ -106,10 +123,40 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     final AsyncValue<PlayerSnapshot> snap =
         ref.watch(playerSnapshotProvider);
 
+    final Duration? sleepRemaining = ref.watch(sleepTimerNotifierProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Now playing'),
         backgroundColor: _tintColor?.withValues(alpha: 0.6),
+        actions: <Widget>[
+          if (sleepRemaining != null)
+            _SleepCountdownChip(remaining: sleepRemaining),
+          IconButton(
+            key: const Key('now-playing-lyrics-toggle'),
+            tooltip: _showLyrics ? 'Show cover art' : 'Show lyrics',
+            icon: Icon(
+              _showLyrics ? Icons.image_outlined : Icons.lyrics_outlined,
+            ),
+            onPressed: () => setState(() => _showLyrics = !_showLyrics),
+          ),
+          PopupMenuButton<String>(
+            key: const Key('now-playing-overflow'),
+            tooltip: 'More',
+            icon: const Icon(Icons.more_vert),
+            onSelected: (String v) {
+              if (v == 'sleep') {
+                _openSleepTimerSheet(context);
+              }
+            },
+            itemBuilder: (BuildContext _) => const <PopupMenuEntry<String>>[
+              PopupMenuItem<String>(
+                value: 'sleep',
+                child: Text('Sleep timer'),
+              ),
+            ],
+          ),
+        ],
       ),
       body: snap.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -125,6 +172,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             color: _tintColor,
             child: _Body(
               snapshot: s,
+              showLyrics: _showLyrics,
               scrubOverride: _scrubOverride,
               onSeekStart: (Duration d) => setState(() => _scrubOverride = d),
               onSeekUpdate: (Duration d) => setState(() => _scrubOverride = d),
@@ -173,6 +221,7 @@ class _TintedBackground extends StatelessWidget {
 class _Body extends ConsumerWidget {
   const _Body({
     required this.snapshot,
+    required this.showLyrics,
     required this.scrubOverride,
     required this.onSeekStart,
     required this.onSeekUpdate,
@@ -180,6 +229,7 @@ class _Body extends ConsumerWidget {
   });
 
   final PlayerSnapshot snapshot;
+  final bool showLyrics;
   final Duration? scrubOverride;
   final ValueChanged<Duration> onSeekStart;
   final ValueChanged<Duration> onSeekUpdate;
@@ -196,7 +246,9 @@ class _Body extends ConsumerWidget {
       children: <Widget>[
         const SizedBox(height: 16),
         Center(
-          child: _CoverArt(artUri: item.artUri),
+          child: showLyrics
+              ? _LyricsPane(title: item.title, artist: item.artist)
+              : _CoverArt(artUri: item.artUri),
         ),
         const SizedBox(height: 24),
         Padding(
@@ -264,6 +316,92 @@ class _CoverArt extends StatelessWidget {
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => placeholder,
       ),
+    );
+  }
+}
+
+/// P2: scrollable lyrics pane shown in place of the cover art when the
+/// user toggles the AppBar lyrics action. Sized to match the cover-art
+/// box (240×240) so the surrounding scrubber + transport + queue don't
+/// jump when switching views.
+///
+/// Render rules:
+///  - `artist` or `title` empty → "No lyrics for this track" empty state.
+///  - Provider loading → spinner.
+///  - Provider error (any [ApiError]) → readable error line.
+///  - Provider data null → "No lyrics for this track" empty state.
+///  - Provider data → scrollable plain text with selectable copy.
+class _LyricsPane extends ConsumerWidget {
+  const _LyricsPane({required this.title, required this.artist});
+
+  final String title;
+  final String? artist;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final String? a = artist;
+    if (a == null || a.isEmpty || title.isEmpty) {
+      return const _LyricsBox(
+        child: Center(
+          key: Key('now-playing-lyrics-empty'),
+          child: Text('No lyrics for this track'),
+        ),
+      );
+    }
+    final AsyncValue<Lyrics?> async = ref.watch(lyricsForProvider(a, title));
+    return _LyricsBox(
+      child: async.when(
+        loading: () => const Center(
+          key: Key('now-playing-lyrics-loading'),
+          child: CircularProgressIndicator(),
+        ),
+        error: (Object e, _) => Center(
+          key: const Key('now-playing-lyrics-error'),
+          child: Text(
+            e is ApiError ? e.message : 'Lyrics error: $e',
+            textAlign: TextAlign.center,
+          ),
+        ),
+        data: (Lyrics? lyrics) {
+          final String? value = lyrics?.value;
+          if (value == null || value.trim().isEmpty) {
+            return const Center(
+              key: Key('now-playing-lyrics-empty'),
+              child: Text('No lyrics for this track'),
+            );
+          }
+          return Scrollbar(
+            child: SingleChildScrollView(
+              key: const Key('now-playing-lyrics-scroll'),
+              padding: const EdgeInsets.all(12),
+              child: SelectableText(
+                value,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _LyricsBox extends StatelessWidget {
+  const _LyricsBox({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return Container(
+      width: 240,
+      height: 240,
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: child,
     );
   }
 }
@@ -428,6 +566,180 @@ class _QueueList extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+}
+
+/// P3: small AppBar chip showing remaining sleep-timer time as `MM:SS`
+/// (or `H:MM:SS` for over an hour). Tapping reopens the bottom sheet so
+/// the user can change or cancel without hunting in the overflow menu.
+class _SleepCountdownChip extends ConsumerWidget {
+  const _SleepCountdownChip({required this.remaining});
+
+  final Duration remaining;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      child: InputChip(
+        key: const Key('now-playing-sleep-chip'),
+        avatar: Icon(Icons.bedtime_outlined, size: 16, color: cs.primary),
+        label: Text(_format(remaining)),
+        onPressed: () => showModalBottomSheet<void>(
+          context: context,
+          showDragHandle: true,
+          builder: (BuildContext _) => const _SleepTimerSheet(),
+        ),
+      ),
+    );
+  }
+
+  static String _format(Duration d) {
+    final int total = d.inSeconds;
+    final int h = total ~/ 3600;
+    final int m = (total % 3600) ~/ 60;
+    final int s = total % 60;
+    final String mm = m.toString().padLeft(2, '0');
+    final String ss = s.toString().padLeft(2, '0');
+    return h > 0 ? '$h:$mm:$ss' : '$mm:$ss';
+  }
+}
+
+/// P3: sleep-timer bottom sheet. Five preset options + "Custom…" + an
+/// "Off" tile when a timer is active.
+class _SleepTimerSheet extends ConsumerWidget {
+  const _SleepTimerSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final Duration? active = ref.watch(sleepTimerNotifierProvider);
+
+    void apply(Duration d) {
+      ref.read(sleepTimerNotifierProvider.notifier).setDuration(d);
+      Navigator.of(context).pop();
+    }
+
+    return SafeArea(
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                'Sleep timer',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            ListTile(
+              key: const Key('sleep-timer-15'),
+              leading: const Icon(Icons.bedtime_outlined),
+              title: const Text('15 minutes'),
+              onTap: () => apply(const Duration(minutes: 15)),
+            ),
+            ListTile(
+              key: const Key('sleep-timer-30'),
+              leading: const Icon(Icons.bedtime_outlined),
+              title: const Text('30 minutes'),
+              onTap: () => apply(const Duration(minutes: 30)),
+            ),
+            ListTile(
+              key: const Key('sleep-timer-45'),
+              leading: const Icon(Icons.bedtime_outlined),
+              title: const Text('45 minutes'),
+              onTap: () => apply(const Duration(minutes: 45)),
+            ),
+            ListTile(
+              key: const Key('sleep-timer-60'),
+              leading: const Icon(Icons.bedtime_outlined),
+              title: const Text('1 hour'),
+              onTap: () => apply(const Duration(hours: 1)),
+            ),
+            ListTile(
+              key: const Key('sleep-timer-custom'),
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Custom…'),
+              onTap: () async {
+                final int? minutes =
+                    await _CustomMinutesDialog.show(context);
+                if (minutes == null || minutes <= 0) return;
+                if (!context.mounted) return;
+                apply(Duration(minutes: minutes));
+              },
+            ),
+            if (active != null)
+              ListTile(
+                key: const Key('sleep-timer-off'),
+                leading: const Icon(Icons.cancel_outlined),
+                title: const Text('Off (cancel)'),
+                onTap: () {
+                  ref.read(sleepTimerNotifierProvider.notifier).cancel();
+                  Navigator.of(context).pop();
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "Enter minutes" dialog for the custom sleep-timer option. Returns the
+/// integer minute count, or null on cancel / invalid input.
+class _CustomMinutesDialog extends StatefulWidget {
+  const _CustomMinutesDialog();
+
+  static Future<int?> show(BuildContext context) {
+    return showDialog<int>(
+      context: context,
+      builder: (_) => const _CustomMinutesDialog(),
+    );
+  }
+
+  @override
+  State<_CustomMinutesDialog> createState() => _CustomMinutesDialogState();
+}
+
+class _CustomMinutesDialogState extends State<_CustomMinutesDialog> {
+  final TextEditingController _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Custom sleep timer'),
+      content: TextField(
+        key: const Key('sleep-timer-custom-field'),
+        controller: _ctrl,
+        autofocus: true,
+        keyboardType: TextInputType.number,
+        decoration: const InputDecoration(
+          labelText: 'Minutes',
+          hintText: 'e.g. 25',
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const Key('sleep-timer-custom-confirm'),
+          onPressed: () {
+            final int? parsed = int.tryParse(_ctrl.text.trim());
+            Navigator.of(context).pop(parsed);
+          },
+          child: const Text('Set'),
+        ),
+      ],
     );
   }
 }

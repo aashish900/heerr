@@ -1370,3 +1370,153 @@ Closes the recommendations roadmap. Adds a Settings indicator for backend engine
 - On-device smoke against the home server. Verify Home boots first; recent / frequent populate from live Navidrome data; recommendations show; pull-to-refresh re-fetches; Queue still reachable via AppBar icon.
 - `DECISIONLOG.md` ADR for Phase O (will land alongside the smoke run + tag).
 - Per-card cover art in `HomeRecommendationCard` — would need an extra `getSong.view` round-trip per row to resolve `coverArt`. Deferred until users notice the placeholder.
+
+
+## 2026-06-15 — P1: persist Now Playing across cold starts
+
+Lifts the cold-start "lost queue" surprise: the active queue, current track, and playback position are written to `<appDocs>/now_playing.json` and restored on the next launch — restored state is queued but not auto-played; the user taps to resume.
+
+### Files (new)
+- `android/app/lib/player/now_playing_snapshot.dart` — freezed `NowPlayingSnapshot(songs, currentIndex, positionMs, updatedAt)`. `Song` reuses the existing `models/subsonic/song.dart` JSON shape.
+- `android/app/lib/player/now_playing_store.dart` — atomic load/save (`.tmp` + rename, same safety pattern as `OfflineManifestStore` from L1). Missing / empty / corrupt JSON → `load()` returns `null`. Keep-alive provider `nowPlayingStoreProvider` resolves the file at `<appDocs>/now_playing.json` via the existing `applicationDocumentsDirectoryProvider`.
+- `android/app/lib/player/now_playing_persistence.dart` — `NowPlayingPersistence` orchestrator (debounced 500 ms save on any handler-stream event + immediate `flush()`); `buildSnapshotFromHandler` production helper; `nowPlayingPersistenceProvider` (keep-alive) fuses the handler's `queue` / `mediaItem` / `playbackState` streams into a single trigger; `nowPlayingRestoreProvider` runs the cold-start restore once.
+
+### Files (modify)
+- `android/app/lib/player/song_to_media_item.dart` — `coverArt` now rides in `MediaItem.extras` alongside `subsonicId` so `songFromMediaItem` (new) can round-trip without losing the cover-art id.
+- `android/app/lib/player/heerr_audio_handler.dart` — new `restoreQueue(items, currentIndex, position)` method that sets up the queue + initial seek **without** calling `play()`.
+- `android/app/lib/main.dart` — `HeerrApp` watches `nowPlayingPersistenceProvider` + `nowPlayingRestoreProvider` for side effects (same pattern as `scrobbleProvider`).
+- `android/app/lib/router.dart` — `_ShellScaffoldState.didChangeAppLifecycleState` now calls `nowPlayingPersistence.flush()` on `paused` / `inactive` / `hidden` so a position written within the last 500 ms is captured before the OS may kill us.
+
+### Tests (new, 21 total)
+- `test/player/now_playing_snapshot_test.dart` — JSON round-trip including the empty-defaults case.
+- `test/player/now_playing_store_test.dart` — 6 cases: missing-file / empty-file / corrupt-JSON → `null`; save+load round-trip; atomic-write (no stray `.tmp`); parent-dir auto-create; `clear()` idempotent.
+- `test/player/now_playing_persistence_test.dart` — 7 cases: debounce collapses bursts to one save; `flush` bypasses debounce; `flush` cancels a pending debounce timer; `dispose` cancels pending work and stops listening; builder throwing is swallowed; save failure (unwriteable path) swallowed; second `start` call replaces the previous subscription + builder.
+- `test/player/song_from_media_item_test.dart` — 5 cases: full-fields extraction; missing/empty `subsonicId` → null; absent `coverArt`; round-trip via `songToMediaItem` preserves Song fields.
+
+### Test gate
+- `dart run build_runner build --delete-conflicting-outputs`: clean.
+- `flutter analyze`: clean.
+- `flutter test`: **483/483** pass (462 prior + 21 new).
+
+### Restore semantics — explicit non-goals for v1
+- Restored queue does **not** auto-play. The mini-player appears with the last-played track at the saved position; the user taps to resume. This is a friction-vs-surprise tradeoff: auto-play would surprise users who closed the app to silence it.
+- The persisted snapshot is **not** scoped per Navidrome server. Switching servers mid-session leaves the snapshot pointed at song ids that may not exist on the new server; restore still attempts the queue, and `just_audio` errors on play if the ids don't resolve. Acceptable because settings switches are rare; can be revisited if it bites.
+- Scrobble may fire `submission=false` on restore for the restored current track because the existing `mediaItem.add` path triggers `ScrobbleController._onMediaItem`. This is no worse than today's `playSong` → `play()` ordering (which scrobbles before audio actually starts) and Last.fm / ListenBrainz dedupe now-playing notifications.
+
+### Not done in this commit
+- On-device smoke (deferred to P4 per ROADMAP).
+- `DECISIONLOG.md` ADR — the v1.5.0 polish-band ADR landed at the scope/plan step (2026-06-15 entry covers P1–P3 together).
+
+
+## 2026-06-15 — P2: Subsonic lyrics in Now Playing
+
+Adds an AppBar lyrics toggle on the Now Playing screen — taps swap the 240×240 cover-art panel for a 240×240 scrollable plain-text lyrics box. Empty state is the same dimensions so the surrounding scrubber / transport / queue don't jump. Hits Subsonic's classic `GET /rest/getLyrics.view?artist=…&title=…`.
+
+### Files (new)
+- `android/app/lib/models/subsonic/lyrics.dart` — freezed `Lyrics(artist, title, value)`; all fields nullable to match Navidrome's "empty `lyrics` element when nothing known" behaviour.
+- `android/app/lib/providers/library/lyrics.dart` — `lyricsForProvider(artist, title)` family. Returns `Lyrics?` — null is the "no lyrics for this track" empty state. Two paths arrive there: Subsonic code 70 (`NotFoundError` caught + swallowed) and an empty / whitespace-only `value` in the envelope. Other `ApiError`s rethrow.
+
+### Files (modify)
+- `android/app/lib/api/subsonic_endpoints.dart` — new `getLyrics` constant + docstring.
+- `android/app/lib/screens/player/now_playing_screen.dart`:
+  - `_NowPlayingScreenState._showLyrics: bool` — per-session view toggle, resets when the screen is popped.
+  - AppBar action — `key: 'now-playing-lyrics-toggle'`, icon swaps between `lyrics_outlined` and `image_outlined`.
+  - `_Body` now takes `showLyrics`; renders `_LyricsPane` instead of `_CoverArt` when true.
+  - `_LyricsPane` reads `lyricsForProvider(artist, title)` and renders four states (loading / error / null-or-empty / data). Data state uses `SelectableText` inside a `Scrollbar` + `SingleChildScrollView` for long lyrics.
+  - `_LyricsBox` keeps the box 240×240 so the layout never reflows on toggle.
+
+### Tests (new, 15 total)
+- `test/models/subsonic/lyrics_test.dart` — 3 cases: full-envelope round-trip; missing fields; empty envelope.
+- `test/providers/library/lyrics_test.dart` — 7 cases: happy path hits correct path + params; code 70 → null; empty value → null; whitespace-only value → null; missing `lyrics` block → null; empty artist/title short-circuit (no HTTP call); other Subsonic errors rethrow as typed `ApiError`.
+- `test/screens/player/now_playing_lyrics_toggle_test.dart` — 5 widget cases: toggle button visible; tap toggles cover ↔ lyrics and back; code-70 envelope renders the empty-state; non-70 error renders the error pane; null artist short-circuits the empty state without firing any HTTP call.
+
+### Test gate
+- `dart run build_runner build --delete-conflicting-outputs`: clean.
+- `flutter analyze`: clean.
+- `flutter test`: **498/498** pass (483 prior + 15 new).
+
+### Design notes
+- **Lyrics is a per-session view choice**, not a stored preference. Backgrounding then re-foregrounding Now Playing keeps the toggle; popping the screen resets it. This matches how Spotify / Apple Music treat the lyrics overlay and avoids a "why is lyrics on for tracks that have none?" first-impression.
+- **No `getLyricsBySongId.view` / synced lyrics in v1.** Open-Subsonic's structured timed-lyrics extension is the future direction but Navidrome's stable release still exposes the classic plain-text endpoint. Upgrading later is a model + provider change; the screen wiring stays.
+- **Selectable text** in the data view because users do copy lyrics to share — defaulting to selectable avoids the "this app stole my long-press" friction.
+
+### Not done in this commit
+- On-device smoke (deferred to P4).
+- `DECISIONLOG.md` ADR — covered by the 2026-06-15 "v1.5.0 player polish band" entry.
+
+
+## 2026-06-15 — P3: sleep timer
+
+Adds a session-scoped sleep timer to Now Playing. Overflow menu → Sleep timer → bottom sheet with 15 / 30 / 45 / 60-minute presets + Custom… + Off (when active). When active, a countdown chip renders in the AppBar (taps reopens the sheet). On expiry, fires `audioHandlerProvider.pause()`. Survives app background; deliberately does not survive cold start.
+
+### Files (new)
+- `android/app/lib/player/sleep_timer.dart`:
+  - `SleepTimerController` — pure-Dart `Timer.periodic` driver, takes an `onExpire` callback. Public stream + getter for `remaining`. Same plain-Dart pattern as `scrobble_controller.dart` so unit tests run under `fake_async` without standing up `audio_service` / `just_audio` platform channels.
+  - `SleepTimerNotifier` (`@Riverpod(keepAlive: true)`) — wraps the controller, wires `onExpire` to `ref.read(audioHandlerProvider).pause()`, exposes `setDuration(Duration?)` + `cancel()`. `state` mirrors the controller's `remaining`.
+
+### Files (modify)
+- `android/app/lib/screens/player/now_playing_screen.dart`:
+  - AppBar actions extended: when `sleepTimerNotifierProvider` state is non-null, a `_SleepCountdownChip` renders ahead of the existing lyrics toggle. New overflow `PopupMenuButton` with a single "Sleep timer" entry that opens `_SleepTimerSheet`.
+  - `_SleepCountdownChip` — `InputChip` with bedtime glyph and `MM:SS` / `H:MM:SS` formatted countdown. Tapping reopens the sheet so the user can change / cancel without hunting the overflow.
+  - `_SleepTimerSheet` — modal bottom sheet wrapped in `SingleChildScrollView` so the 6 tiles (5 presets + Custom… + conditional Off) survive small viewports without RenderFlex overflow.
+  - `_CustomMinutesDialog` — `AlertDialog` with a numeric TextField; returns the parsed minutes (or null).
+
+### Tests (new, 15 total)
+- `test/player/sleep_timer_test.dart` — 10 controller cases under `fake_async`:
+  1. Starts idle (`remaining == null`).
+  2. `setDuration(5s)` ticks down to 1s.
+  3. Expiry fires `onExpire` exactly once, clears `remaining`, no further ticks.
+  4. `setDuration(null)` cancels mid-countdown without firing `onExpire`.
+  5. `cancel()` is sugar for `setDuration(null)`.
+  6. `setDuration` mid-countdown replaces the active timer (countdown resets).
+  7. `Duration.zero` and negative durations are treated as cancel.
+  8. Broadcast `stream` emits each state change exactly once, including expiry → null.
+  9. Exception from `onExpire` is swallowed via `.catchError` (does not escape the timer callback into the FakeAsync zone).
+  10. `dispose()` stops ticking and ignores further `setDuration` calls.
+- `test/screens/player/now_playing_sleep_timer_test.dart` — 5 widget cases:
+  1. Countdown chip is absent when timer is idle.
+  2. Countdown chip is visible with formatted `15:00` text when active.
+  3. Overflow → Sleep timer opens the sheet with all 5 preset keys present and Off hidden.
+  4. Tapping "15 minutes" sets the timer + closes the sheet + reveals the chip.
+  5. Off tile appears when active; tapping it cancels and hides the chip. (Tile may be below the fold in the small test viewport — test uses `tester.ensureVisible` before tapping.)
+
+### Test gate
+- `dart run build_runner build --delete-conflicting-outputs`: clean.
+- `flutter analyze`: clean.
+- `flutter test`: **513/513** pass (498 prior + 15 new).
+
+### Design notes
+- **Plain-Dart controller, thin Riverpod adapter.** Same shape as `scrobble_controller.dart` + `scrobble_provider.dart` (N1). Unit tests don't depend on `HeerrAudioHandler` (which pulls in `just_audio`'s platform channels and can't be instantiated in `flutter test`). The Riverpod notifier handles the integration; tests of the integration would belong in an on-device smoke (P4).
+- **Session-scoped, not persisted.** A persisted sleep timer would need a "wall-clock end time" stored to disk and a restore path that compares now vs that end-time on cold start. Out of scope for v1; deferring matches user intent ("sleep timer is the gesture you make when going to sleep, not a preference").
+- **Chip-tap reopens the sheet** rather than opening a separate "edit" affordance — matches Spotify's pattern and avoids a second control surface.
+- **Custom minutes via TextField + parse.** A more polished v2 could replace with a numeric stepper / wheel picker; the TextField is the simplest input that works (numeric keyboard, integer parse, invalid entries silently dropped).
+
+### Not done in this commit
+- On-device smoke (deferred to P4).
+- `DECISIONLOG.md` ADR — covered by the 2026-06-15 "v1.5.0 player polish band" entry.
+
+
+## 2026-06-15 — P4: v1.5.0 — player polish band ships
+
+Closes Phase P. Three player UX improvements bundled as the v1.5.0 polish band: persisted Now Playing across cold starts (P1 / X2), Subsonic lyrics in Now Playing (P2 / X3), session-scoped sleep timer (P3 / X4a). Pure-Android slice; no backend change. ADR locked at `DECISIONLOG.md` 2026-06-15 ("v1.5.0 player polish band").
+
+### Files (modify)
+- `android/app/pubspec.yaml`: bumped `1.4.0` → `1.5.0`. Release-band version for the player-polish ship.
+
+### Test gate
+- `flutter analyze`: clean.
+- `flutter test`: **513/513** pass across the prior baseline + 51 P-phase tests (21 P1 + 15 P2 + 15 P3).
+
+### Phase P closed (2026-06-15)
+- P1 ✅ Persist Now Playing across cold starts.
+- P2 ✅ Subsonic lyrics in Now Playing.
+- P3 ✅ Sleep timer.
+- P4 ✅ Version bump.
+- Tag: `v1.5.0` (after the on-device smoke).
+
+### Not done in this commit
+- **On-device smoke.** Three steps to verify on the live Pixel against the home server before tagging:
+  1. **P1 — persist NP.** Start a queue, play for ~30 s, force-close the app, relaunch → mini-player shows the last-played track at the saved position; tapping resumes from that position.
+  2. **P2 — lyrics.** Play a track Navidrome has lyrics for → AppBar lyrics toggle swaps cover for scrollable text. Play a track *without* lyrics → toggle shows "No lyrics for this track".
+  3. **P3 — sleep timer.** Set a 1-minute timer → countdown chip renders in AppBar; wait → playback pauses at expiry; chip disappears. Tap the chip mid-countdown → sheet reopens with "Off" tile.
+- **`v1.5.0` git tag** — created after the smoke passes.

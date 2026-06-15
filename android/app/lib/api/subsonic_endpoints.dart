@@ -77,4 +77,11 @@ class SubsonicEndpoints {
   /// "Discover" fallback for recommendations when the backend returns
   /// nothing.
   static const String getRandomSongs = '/rest/getRandomSongs.view';
+
+  /// Subsonic classic lyrics endpoint. Required `artist` + `title` query
+  /// params; returns the `lyrics` envelope with a `value` string. Navidrome
+  /// surfaces lyrics it has indexed from embedded tags or its own
+  /// integration. Subsonic code 70 (or an empty `value`) signals "no lyrics
+  /// for this track" — surfaced as an empty state, not a hard error. P2.
+  static const String getLyrics = '/rest/getLyrics.view';
 }

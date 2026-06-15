@@ -456,6 +456,78 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 ---
 
+## Phase P — Player polish (v1.5.0)
+
+**Architecture note:** Three independent player UX improvements, bundled as the v1.5.0 polish ship: persisted Now Playing across cold starts (X2), Subsonic lyrics (X3), sleep timer (X4a). Pure-Android slice; no backend change. Each milestone is independent — they ship together only because the bundle is the version's marketing story. See `DECISIONLOG.md` 2026-06-15 ("v1.5.0 player polish band") for the re-scoping rationale.
+
+### [x] P1. Persist Now Playing across cold starts
+**Files (new):** `android/app/lib/player/queue_persistence.dart`.
+**Files (modify):** `android/app/lib/player/heerr_audio_handler.dart` (restore-on-init), `android/app/lib/main.dart` (await restore before `runApp`).
+**Storage:** `<appDocs>/now_playing.json`, atomic write (tmp + rename, same pattern as `offline_manifest.dart` from L1).
+**Schema:** `{songs: [Song], currentIndex: int, positionMs: int, updatedAt: int}`.
+**Save triggers:** debounced 500 ms on play/pause/skip/seek; flush on `AppLifecycleState.paused`.
+**Restore behaviour:** cold start parses file → mini-player appears with last-played track at saved position; **does not auto-play** (tap-to-resume keeps user in control).
+**Test gate:** unit tests for persistence round-trip + corrupt-file fallback (empty queue, not crash); handler integration test with stub `AudioPlayer` asserts restore reaches `MediaItem` queue without firing `play()`.
+**Done when:** `analyze` / `test` green; on-device verification deferred to P4 smoke.
+**Commit:** `feat(flutter): P1 — persist Now Playing across cold starts`
+
+### [x] P2. Lyrics
+**Files (new):** `android/app/lib/models/subsonic/lyrics.dart`, `android/app/lib/providers/library/lyrics.dart`.
+**Files (modify):** `android/app/lib/api/subsonic_endpoints.dart` (new `getLyrics` constant `/rest/getLyrics.view`), `android/app/lib/screens/player/now_playing_screen.dart` (AppBar toggle + lyrics sheet).
+**Behaviour:** AppBar toggle flips Now Playing between cover-art view and a scrollable plain-text lyrics view. Empty state ("No lyrics for this track") when Navidrome returns code 70.
+**Test gate:** provider tests cover envelope-parse success, missing-lyrics (code 70 → empty state, no error), other Subsonic errors map to `ApiError`. Widget test asserts toggle swaps panes and lyrics scroll.
+**Done when:** `build_runner` / `analyze` / `test` green.
+**Commit:** `feat(flutter): P2 — Subsonic lyrics in Now Playing`
+
+### [x] P3. Sleep timer
+**Files (new):** `android/app/lib/player/sleep_timer.dart` — keep-alive notifier holding `Duration?` remaining + an internal `Timer`, ticking 1 s.
+**Files (modify):** `android/app/lib/screens/player/now_playing_screen.dart` (overflow menu → "Sleep timer" → bottom sheet with 15 / 30 / 45 / 60 / Off / Custom options).
+**Behaviour:** Setting a duration starts the timer; ticks render in the AppBar as a small countdown chip. On expiry → `playerProvider.notifier.pause()`. Survives app background; does not survive cold start (intentional — sleep timers are session-scoped).
+**Test gate:** `fake_async` tests for countdown / cancel / expiry-fires-pause / custom-duration; widget test asserts chip appears when timer active.
+**Done when:** `analyze` / `test` green.
+**Commit:** `feat(flutter): P3 — sleep timer`
+
+### [x] P4. v1.5.0 smoke + version bump
+**Files (modify):** `android/app/pubspec.yaml` → `1.5.0`. DECISIONLOG ADR + CHANGELOG entry.
+**Test gate:** manual on-device smoke — P1 (queue restored after cold start, tap-to-resume from saved position); P2 (lyrics toggle works on tracks with + without lyrics in Navidrome); P3 (15-min timer pauses playback at expiry).
+**Done when:** all three smokes pass. Tagged `v1.5.0`.
+**Commit:** `chore(flutter): v1.5.0 player polish smoke verified`
+
+---
+
+## Phase Q — Background offline sync (v2.0.0)
+
+**Architecture note:** Lifts the L-phase "foreground-only sync window" limitation by adding a `WorkManager`-driven periodic worker that calls into the existing `OfflineSync` notifier code path. Atomic manifest writes from L1 already protect against concurrent foreground / background races — Q1 verifies the invariant under contention. Pure-Android slice; no backend change. See `DECISIONLOG.md` 2026-06-15 ("v2.0.0 — background offline sync") for the full ADR.
+
+### [ ] Q1. WorkManager integration + worker entry point
+**Files (new):** `android/app/lib/offline/background_sync.dart` — periodic worker that creates a Riverpod container, calls `offlineSyncProvider.syncNow()`, then disposes.
+**Files (modify):** `android/app/pubspec.yaml` (add `workmanager: ^0.5`), `android/app/android/app/src/main/AndroidManifest.xml` (add `RECEIVE_BOOT_COMPLETED` permission + WorkManager `Initializer`), `android/app/lib/main.dart` (`Workmanager().initialize(...)` before `runApp`).
+**Test gate:** worker entry-point unit test with stub `Dio` + stub manifest — assert the same `OfflineSync.syncNow()` code path runs; assert atomic-write invariant holds when foreground + background both touch the manifest in sequence.
+**Done when:** `build_runner` / `analyze` / `test` green.
+**Commit:** `feat(flutter): Q1 — workmanager integration + background worker`
+
+### [ ] Q2. Constraints + policies
+**Files (modify):** `android/app/lib/offline/background_sync.dart` (translate settings → `Constraints`), `android/app/lib/providers/settings.dart` (new `offline_charging_only` key), `android/app/lib/screens/settings_screen.dart` ("Charging only" toggle in Offline section).
+**Behaviour:** `offline_wifi_only` → `Constraints.NetworkType.UNMETERED`. `offline_charging_only` → `Constraints.requiresCharging`. Periodic interval matches existing `offline_poll_interval_min` (default 60 min, min 15 enforced by WorkManager).
+**Test gate:** constraint-derivation unit tests covering each settings permutation.
+**Done when:** `analyze` / `test` green.
+**Commit:** `feat(flutter): Q2 — background sync constraints + charging-only`
+
+### [ ] Q3. Foreground / background interlock
+**Files (modify):** `android/app/lib/router.dart` (`_ShellScaffoldState.didChangeAppLifecycleState`), `android/app/lib/offline/background_sync.dart` (cancel + reschedule helpers).
+**Behaviour:** On foreground resume, cancel any in-flight background work to avoid double-downloads. On app background, if any markers are pending sync, schedule the worker for the next interval.
+**Test gate:** handoff state-machine tests — verify cancel-on-resume and schedule-on-background fire in the right order; verify the manifest is the single source of truth so a cancelled mid-flight download leaves no orphan state.
+**Done when:** `analyze` / `test` green.
+**Commit:** `feat(flutter): Q3 — foreground/background sync interlock`
+
+### [ ] Q4. v2.0.0 smoke + version bump
+**Files (modify):** `android/app/pubspec.yaml` → `2.0.0`. DECISIONLOG ADR + CHANGELOG entry.
+**Test gate:** manual smoke — mark an album, background the app, leave for one polling interval, observe completed downloads via the Downloads tab on re-open. Toggle WiFi off → worker skips run; toggle on → worker resumes. Charging-only toggle gates correctly on the device's charger state.
+**Done when:** smoke passes. Tagged `v2.0.0`.
+**Commit:** `chore(flutter): v2.0.0 background sync smoke verified`
+
+---
+
 ## Cross-cutting reminders
 
 - **`flutter analyze` green before declaring any milestone done.**
@@ -472,18 +544,19 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 ## Out of scope
 
+Items scheduled into v1.5.0 (Phase P) or v2.0.0 (Phase Q) are no longer here — see those phase sections above.
+
 - iOS port.
 - Light theme.
 - Push notifications / FCM.
 - Spotify SDK / OAuth on device.
 - Admin endpoints (CLI-only on backend).
-- Tablet / foldable layouts.
+- Tablet / foldable layouts (v3 backlog).
 - Internationalisation.
 - Offline mutation queue (mutations require online connectivity in v1).
-- WorkManager / true background sync (foreground-only sync window in v1).
-- Crossfade / gapless playback.
-- Sleep timer, Cast, Lyrics, Equaliser.
-- Persistence of "Now Playing" across app cold starts.
+- Crossfade / gapless playback (v3 backlog).
+- Cast / Sonos / external player hand-off (v3 backlog).
+- Equaliser.
 - Cover-art upload for playlists.
 - Concurrent sync across multiple servers.
 
@@ -491,8 +564,8 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 ## Roadmap complete when
 
-1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5).
+1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5, P1–P4, Q1–Q4).
 2. Every test gate green at its milestone.
-3. G1, K2, L6, M5, N5, and O5 manual smokes verified on-device.
+3. G1, K2, L6, M5, N5, O5, P4, and Q4 manual smokes verified on-device.
 4. CHANGELOG entries exist for each milestone group.
-5. `git log --oneline android/` reads as a clean A→O progression under the `feat(flutter):` / `chore(flutter):` Conventional-Commits cadence.
+5. `git log --oneline android/` reads as a clean A→Q progression under the `feat(flutter):` / `chore(flutter):` Conventional-Commits cadence.
