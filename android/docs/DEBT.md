@@ -78,7 +78,6 @@ Items still in ROADMAP `## Out of scope`. Do not implement without a new DECISIO
 
 | # | Item | Unlock condition |
 |---|------|-----------------|
-| X4c | Crossfade (dual-player infra). | Demand after living with X4b; v3 "seamless player" goal. |
 | X5 | Cast / Sonos / external player hand-off. | Re-scope decision; high-risk transport work. |
 | X7 | Android TV version (leanback UI, D-pad navigation, side-by-side with phone build). | Re-scope decision; needs separate target/flavour + leanback launcher + remote-friendly UI. |
 

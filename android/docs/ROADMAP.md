@@ -565,7 +565,7 @@ Items scheduled into v1.5.0 (Phase P) or v2.0.0 (Phase Q) are no longer here —
 - Admin endpoints (CLI-only on backend).
 - Internationalisation.
 - Offline mutation queue (mutations require online connectivity in v1).
-- Crossfade — v3 "seamless player" goal (gapless shipped at v2.1.0 / Phase R).
+- Crossfade (gapless is the v2.1.0 / Phase R substitute — crossfade overrides the album's intended transitions, which is the opposite of what gapless preserves).
 - Android TV version — v3 goal (leanback UI, D-pad nav, separate flavour).
 - Cast / Sonos / external player hand-off (v3 backlog).
 - Equaliser.
