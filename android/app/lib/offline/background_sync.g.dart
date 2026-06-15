@@ -1,26 +1,29 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'offline_settings.dart';
+part of 'background_sync.dart';
 
 // **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 
-String _$offlineSettingsHash() => r'b16380b57dbb1f53067f4017f744ccd7afbfdc3e';
+String _$backgroundSyncSchedulerHash() =>
+    r'fca5d1657ad9bd18615543452094acdcb363ad02';
 
-/// See also [OfflineSettings].
-@ProviderFor(OfflineSettings)
-final offlineSettingsProvider =
-    AsyncNotifierProvider<OfflineSettings, OfflineSettingsValue>.internal(
-      OfflineSettings.new,
-      name: r'offlineSettingsProvider',
+/// See also [backgroundSyncScheduler].
+@ProviderFor(backgroundSyncScheduler)
+final backgroundSyncSchedulerProvider =
+    Provider<BackgroundSyncScheduler>.internal(
+      backgroundSyncScheduler,
+      name: r'backgroundSyncSchedulerProvider',
       debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
           ? null
-          : _$offlineSettingsHash,
+          : _$backgroundSyncSchedulerHash,
       dependencies: null,
       allTransitiveDependencies: null,
     );
 
-typedef _$OfflineSettings = AsyncNotifier<OfflineSettingsValue>;
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef BackgroundSyncSchedulerRef = ProviderRef<BackgroundSyncScheduler>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

@@ -20,7 +20,7 @@ SettingsValue _settings({
     offlineEnabled: false,
     offlineSyncAll: false,
     offlineWifiOnly: true,
-    offlinePollIntervalMin: 15,
+    offlinePollIntervalMin: 15, offlineChargingOnly: false,
   );
 }
 

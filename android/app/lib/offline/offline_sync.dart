@@ -197,6 +197,7 @@ class OfflineSync extends _$OfflineSync {
                 syncAll: false,
                 wifiOnly: true,
                 pollIntervalMinutes: 15,
+                chargingOnly: false,
               );
 
       // Resolve target song set. Markers + (optionally) sync-all enumeration.

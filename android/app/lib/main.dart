@@ -1,8 +1,11 @@
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:workmanager/workmanager.dart';
 
+import 'offline/background_sync.dart';
 import 'player/heerr_audio_handler.dart';
 import 'player/now_playing_persistence.dart';
 import 'player/player_provider.dart';
@@ -12,6 +15,13 @@ import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Q1: initialize WorkManager so the Q2 scheduler has a callback to dispatch
+  // periodic offline-sync ticks to. Registration of the actual periodic task
+  // lands at Q2 — this call only wires the dispatcher.
+  await Workmanager().initialize(
+    backgroundSyncCallbackDispatcher,
+    isInDebugMode: kDebugMode,
+  );
   final HeerrAudioHandler handler = await AudioService.init(
     builder: HeerrAudioHandler.new,
     config: const AudioServiceConfig(

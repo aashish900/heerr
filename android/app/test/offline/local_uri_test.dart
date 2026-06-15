@@ -10,12 +10,14 @@ OfflineSettingsValue _offlineSettings({
   bool syncAll = false,
   bool wifiOnly = true,
   int pollIntervalMinutes = 15,
+  bool chargingOnly = false,
 }) =>
     (
       enabled: enabled,
       syncAll: syncAll,
       wifiOnly: wifiOnly,
       pollIntervalMinutes: pollIntervalMinutes,
+      chargingOnly: chargingOnly,
     );
 
 ProviderContainer _container({

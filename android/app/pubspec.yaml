@@ -2,7 +2,7 @@ name: heerr
 description: heerr Android client — thin REST client for the heerr FastAPI backend.
 publish_to: 'none'
 
-version: 1.5.0
+version: 2.0.0
 
 environment:
   sdk: ^3.12.0
@@ -59,6 +59,12 @@ dependencies:
   # so deps churn is one commit). Permission ACCESS_NETWORK_STATE is
   # implicit on Android — no AndroidManifest edit needed.
   connectivity_plus: ^6.0.0
+
+  # Q1: WorkManager-driven background offline sync. Calls into the existing
+  # `OfflineSync` notifier code path from a separate background isolate via
+  # `Workmanager().executeTask(...)`. See DECISIONLOG.md 2026-06-15
+  # ("v2.0.0 — background offline sync") for the architectural rationale.
+  workmanager: ^0.9.0
 
   # Material Icons font is enabled in the `flutter:` section below; no extra
   # font deps needed for the dark M3 theme.

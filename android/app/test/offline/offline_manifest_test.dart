@@ -36,7 +36,7 @@ SettingsValue _navidromeOnly() => (
       offlineEnabled: false,
       offlineSyncAll: false,
       offlineWifiOnly: true,
-      offlinePollIntervalMin: 15,
+      offlinePollIntervalMin: 15, offlineChargingOnly: false,
     );
 
 void main() {
@@ -172,7 +172,7 @@ void main() {
         offlineEnabled: false,
         offlineSyncAll: false,
         offlineWifiOnly: true,
-        offlinePollIntervalMin: 15,
+        offlinePollIntervalMin: 15, offlineChargingOnly: false,
       );
 
       expect(

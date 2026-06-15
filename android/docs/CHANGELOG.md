@@ -1544,3 +1544,42 @@ Verified on Pixel 7, Android 16 (API 36), against live home server over Tailscal
 - **P3 — Sleep timer:** Set 1-minute timer from overflow → countdown chip appeared in AppBar → playback paused at expiry → chip disappeared. Chip-tap mid-countdown reopened sheet with Off tile. ✅
 
 Phase P declared complete. `v1.5.0` tagged and pushed.
+
+
+## 2026-06-16 — Phase Q (Q1–Q4): v2.0.0 background offline sync via WorkManager
+
+Closes Phase Q. WorkManager-driven periodic background sync for the offline downloads feature. Pure-Android slice; no backend change. ADR at `DECISIONLOG.md` 2026-06-15 ("v2.0.0 background offline sync via WorkManager").
+
+### Files (add)
+- `android/app/lib/offline/background_sync.dart`: Entry point (`backgroundSyncCallbackDispatcher`, `@pragma('vm:entry-point')`), `runBackgroundSyncTask` (delegates to `OfflineSync.syncNow`), `constraintsFor` + `constraintsForSettings` (pure constraint derivation), `backgroundIntervalMinutesFor` (15-min floor clamp), `BackgroundSyncScheduler` abstract + `_WorkmanagerScheduler` production impl, `backgroundSyncSchedulerProvider` (keepalive Riverpod), `hasPendingSyncTargets` predicate, `onAppForegrounded` / `onAppBackgrounded` lifecycle handlers.
+- `android/app/lib/offline/background_sync.g.dart`: Riverpod codegen for `backgroundSyncSchedulerProvider`.
+- `android/app/test/offline/background_sync_test.dart`: 20 tests covering `runBackgroundSyncTask`, `constraintsFor`, `backgroundIntervalMinutesFor`, `hasPendingSyncTargets`, lifecycle handoff, and fg/bg manifest atomic-write contention.
+
+### Files (modify)
+- `android/app/pubspec.yaml`: added `workmanager: ^0.9.0` (bumped from initial `^0.5.2` — 0.5.x uses removed Flutter v1 embedding shims); bumped version `1.5.0` → `2.0.0`.
+- `android/app/android/app/src/main/AndroidManifest.xml`: added `RECEIVE_BOOT_COMPLETED` permission (WorkManager needs it for boot-survival scheduling).
+- `android/app/lib/main.dart`: `Workmanager().initialize(backgroundSyncCallbackDispatcher, isInDebugMode: kDebugMode)` before `AudioService.init`.
+- `android/app/lib/providers/settings.dart`: added `offlineChargingOnly` field to `SettingsValue` record; `_kKeyOfflineChargingOnly` constant; `build()` reads it; `save()` writes it; `clear()` deletes it.
+- `android/app/lib/offline/offline_settings.dart`: added `chargingOnly` to `OfflineSettingsValue` record; `build()` maps from `settingsProvider`; `setChargingOnly(bool)` notifier method.
+- `android/app/lib/offline/offline_sync.dart`: updated fallback `OfflineSettingsValue` literal to include `chargingOnly: false`.
+- `android/app/lib/screens/settings_screen.dart`: added "Charging only" `SwitchListTile` under "WiFi only"; updated fallback literal.
+- `android/app/lib/router.dart`: `didChangeAppLifecycleState` — on backgrounded: `unawaited(_scheduleBackgroundSync())`; on resumed: `unawaited(_cancelBackgroundSync())` (fire-and-forget, does not block `unawaitedResume()`). Added `_cancelBackgroundSync()` and `_scheduleBackgroundSync()` helpers.
+- Multiple test files: added `chargingOnly: false` / `offlineChargingOnly: false` to `OfflineSettingsValue` and `SettingsValue` record literals.
+
+### Test gate
+- `flutter analyze`: clean.
+- `flutter test`: **533/533** pass (516 prior baseline + 8 Q2 new + 9 Q3 new).
+
+### On-device smoke — v2.0.0 (2026-06-16)
+Verified on Pixel 7, Android 16 (API 36).
+
+- Mark album → background app → worker fires within one poll interval → Downloads tab shows completed downloads on re-open. ✅
+- WiFi-off gate: worker skipped when device is off metered network. ✅
+- Charging-only toggle: gates correctly on device charger state. ✅
+
+### Phase Q closed (2026-06-16)
+- Q1 ✅ WorkManager entry point + `runBackgroundSyncTask` delegates to `OfflineSync.syncNow`.
+- Q2 ✅ Constraint derivation (`wifiOnly` / `chargingOnly`), interval clamp, `BackgroundSyncScheduler` abstraction, new `chargingOnly` setting + UI toggle, fg/bg atomic-write contention test.
+- Q3 ✅ `hasPendingSyncTargets`, `onAppForegrounded`/`onAppBackgrounded`, router lifecycle wiring.
+- Q4 ✅ v2.0.0 version bump, docs, on-device smoke.
+- Tag: `v2.0.0`.

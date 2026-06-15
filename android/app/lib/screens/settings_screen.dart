@@ -236,6 +236,7 @@ class _OfflineSection extends ConsumerWidget {
           syncAll: false,
           wifiOnly: true,
           pollIntervalMinutes: 15,
+          chargingOnly: false,
         );
 
     return Column(
@@ -275,6 +276,19 @@ class _OfflineSection extends ConsumerWidget {
                   onChanged: (bool v) => ref
                       .read(offlineSettingsProvider.notifier)
                       .setWifiOnly(v),
+                ),
+                // Q2: gates the WorkManager periodic worker on charger state.
+                // Foreground sync ignores this — running while the user has
+                // the app open should never be blocked.
+                SwitchListTile(
+                  title: const Text('Charging only'),
+                  subtitle: const Text(
+                    'Only run background sync while plugged in.',
+                  ),
+                  value: s.chargingOnly,
+                  onChanged: (bool v) => ref
+                      .read(offlineSettingsProvider.notifier)
+                      .setChargingOnly(v),
                 ),
                 _SyncAllTile(syncAll: s.syncAll),
                 ListTile(

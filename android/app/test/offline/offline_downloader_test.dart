@@ -60,7 +60,7 @@ SettingsValue _settings({String url = 'http://navi:4533', String? user = 'me', S
     offlineEnabled: true,
     offlineSyncAll: false,
     offlineWifiOnly: true,
-    offlinePollIntervalMin: 15,
+    offlinePollIntervalMin: 15, offlineChargingOnly: false,
   );
 }
 

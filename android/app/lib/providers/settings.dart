@@ -24,6 +24,11 @@ typedef SettingsValue = ({
   bool offlineSyncAll,
   bool offlineWifiOnly,
   int offlinePollIntervalMin,
+  // Q2: background-sync constraint. When true, the WorkManager constraint
+  // requires the device to be charging before the periodic worker runs.
+  // Default false — most users want overnight sync regardless of charger
+  // state, and WiFi-only already protects against cellular spend.
+  bool offlineChargingOnly,
 });
 
 const String _kKeyUrl = 'backend_base_url';
@@ -37,6 +42,7 @@ const String _kKeyOfflineEnabled = 'offline_enabled';
 const String _kKeyOfflineSyncAll = 'offline_sync_all';
 const String _kKeyOfflineWifiOnly = 'offline_wifi_only';
 const String _kKeyOfflinePollIntervalMin = 'offline_poll_interval_min';
+const String _kKeyOfflineChargingOnly = 'offline_charging_only';
 
 // Defaults applied at build-time when the corresponding secure-storage key
 // is missing. Master switch ships OFF so existing installs keep streaming;
@@ -45,6 +51,7 @@ const bool _kDefaultOfflineEnabled = false;
 const bool _kDefaultOfflineSyncAll = false;
 const bool _kDefaultOfflineWifiOnly = true;
 const int _kDefaultOfflinePollIntervalMin = 15;
+const bool _kDefaultOfflineChargingOnly = false;
 
 class ServerProfile {
   const ServerProfile({
@@ -99,6 +106,7 @@ class Settings extends _$Settings {
     final String? offSyncAll = await store.read(_kKeyOfflineSyncAll);
     final String? offWifiOnly = await store.read(_kKeyOfflineWifiOnly);
     final String? offPoll = await store.read(_kKeyOfflinePollIntervalMin);
+    final String? offCharging = await store.read(_kKeyOfflineChargingOnly);
     return (
       backendBaseUrl: url,
       bearerToken: token,
@@ -110,6 +118,8 @@ class Settings extends _$Settings {
       offlineWifiOnly: _parseBool(offWifiOnly, _kDefaultOfflineWifiOnly),
       offlinePollIntervalMin:
           _parseInt(offPoll, _kDefaultOfflinePollIntervalMin),
+      offlineChargingOnly:
+          _parseBool(offCharging, _kDefaultOfflineChargingOnly),
     );
   }
 
@@ -123,6 +133,7 @@ class Settings extends _$Settings {
     bool? offlineSyncAll,
     bool? offlineWifiOnly,
     int? offlinePollIntervalMin,
+    bool? offlineChargingOnly,
   }) async {
     final SecureStorage store = ref.read(secureStorageProvider);
     if (backendBaseUrl != null) await store.write(_kKeyUrl, backendBaseUrl);
@@ -151,6 +162,12 @@ class Settings extends _$Settings {
         offlinePollIntervalMin.toString(),
       );
     }
+    if (offlineChargingOnly != null) {
+      await store.write(
+        _kKeyOfflineChargingOnly,
+        offlineChargingOnly.toString(),
+      );
+    }
     ref.invalidateSelf();
   }
 
@@ -165,6 +182,7 @@ class Settings extends _$Settings {
     await store.delete(_kKeyOfflineSyncAll);
     await store.delete(_kKeyOfflineWifiOnly);
     await store.delete(_kKeyOfflinePollIntervalMin);
+    await store.delete(_kKeyOfflineChargingOnly);
     ref.invalidateSelf();
   }
 }

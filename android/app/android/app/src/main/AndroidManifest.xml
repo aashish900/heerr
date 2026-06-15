@@ -9,6 +9,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
+    <!-- Q1: WorkManager-driven background offline sync. RECEIVE_BOOT_COMPLETED
+         is what makes scheduled periodic work survive a device reboot — the
+         workmanager plugin itself supplies the WorkManager Initializer
+         content-provider via manifest merge, so no <provider> entry is needed
+         here. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+
     <application
         android:label="heerr"
         android:name="${applicationName}"

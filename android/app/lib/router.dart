@@ -5,6 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import 'offline/background_sync.dart';
+import 'offline/offline_manifest.dart';
+import 'offline/offline_settings.dart';
 import 'offline/offline_sync.dart';
 import 'player/now_playing_persistence.dart';
 import 'providers/recommendations.dart';
@@ -231,7 +234,16 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
         // P1: flush the Now Playing snapshot so position survives an
         // OS-may-kill-us next. Best-effort — async-fire-and-forget.
         unawaited(_flushNowPlaying());
+        // Q3: hand off to the background worker. Skips when offline is off
+        // or the manifest has no markers — the predicate lives inside
+        // `onAppBackgrounded` so the lifecycle hook stays declarative.
+        unawaited(_scheduleBackgroundSync());
       case AppLifecycleState.resumed:
+        // Q3: cancel any in-flight background work so the foreground
+        // notifier is the sole manifest writer while the app is visible —
+        // no double-downloads. Fire-and-forget; resume() runs synchronously
+        // below regardless of how the cancel completes.
+        unawaited(_cancelBackgroundSync());
         unawaitedResume();
       case AppLifecycleState.detached:
         // App is fully detaching; the provider's onDispose will cancel the
@@ -258,6 +270,31 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
     // notifier guards on a 60 s TTL so this is cheap to fire on every
     // foreground transition.
     ref.read(recommendHealthNotifierProvider.notifier).refreshIfStale();
+  }
+
+  Future<void> _cancelBackgroundSync() async {
+    try {
+      await onAppForegrounded(ref.read(backgroundSyncSchedulerProvider));
+    } catch (_) {
+      // Best-effort — the manifest is the source of truth either way.
+    }
+  }
+
+  Future<void> _scheduleBackgroundSync() async {
+    try {
+      final OfflineSettingsValue? offline =
+          ref.read(offlineSettingsProvider).valueOrNull;
+      final OfflineManifest? manifest =
+          ref.read(offlineManifestProvider).valueOrNull;
+      if (offline == null || manifest == null) return;
+      await onAppBackgrounded(
+        scheduler: ref.read(backgroundSyncSchedulerProvider),
+        offline: offline,
+        manifest: manifest,
+      );
+    } catch (_) {
+      // Best-effort — the next backgrounding gets another shot.
+    }
   }
 
   int _indexFor(String loc) {

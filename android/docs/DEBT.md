@@ -27,6 +27,7 @@ Manual smokes called out as deferred in the CHANGELOG. No written log required �
 | V1 | N (recommendations) | ✅ 2026-06-15 — verified on-device as part of v1.5.0 smoke. |
 | V2 | O (home screen) | ✅ 2026-06-15 — verified on-device as part of v1.5.0 smoke. |
 | V3 | P (v1.5.0 polish) | ✅ 2026-06-15 — P1/P2/P3 all passed; bug fixes for nav reset + LRCLib fallback also verified. `v1.5.0` tagged. |
+| V4 | Q (v2.0.0 background sync) | ✅ 2026-06-16 — mark album → background → worker fires → downloads complete; WiFi-off gate skips worker; charging-only toggle gates correctly. `v2.0.0` tagged. |
 
 ---
 
@@ -57,9 +58,9 @@ ADR: `DECISIONLOG.md` 2026-06-15 ("v1.5.0 player polish band").
 
 ### Scheduled — v2.0.0 (Phase Q)
 
-| # | Item | Milestone |
-|---|------|-----------|
-| X1 | WorkManager / true background sync. | Q1–Q4 |
+| # | Item | Status |
+|---|------|--------|
+| X1 | WorkManager / true background sync. | ✅ Q1–Q4 shipped 2026-06-16 |
 
 ADR: `DECISIONLOG.md` 2026-06-15 ("v2.0.0 background offline sync via WorkManager").
 
@@ -78,7 +79,7 @@ Items still in ROADMAP `## Out of scope`. Do not implement without a new DECISIO
 
 ## Suggested order of attack
 
-1. **V1 + V2** — verify on-device against the home server before declaring v1.4.0 final.
-2. **P1 → P4** — v1.5.0 polish band per ROADMAP Phase P.
-3. **Q1 → Q4** — v2.0.0 background sync per ROADMAP Phase Q.
-4. **X-series remainder** — only after v2.0.0 ships and a re-scoping conversation lands.
+1. ✅ **V1 + V2** — verified on-device 2026-06-15.
+2. ✅ **P1 → P4** — v1.5.0 shipped 2026-06-15.
+3. ✅ **Q1 → Q4** — v2.0.0 shipped 2026-06-16.
+4. **X-series remainder** — only after a re-scoping conversation lands.

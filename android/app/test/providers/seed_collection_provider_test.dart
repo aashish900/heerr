@@ -116,7 +116,7 @@ const SettingsValue _kSettingsWithUsername = (
   offlineEnabled: false,
   offlineSyncAll: false,
   offlineWifiOnly: true,
-  offlinePollIntervalMin: 15,
+  offlinePollIntervalMin: 15, offlineChargingOnly: false,
 );
 
 ProviderContainer _container(

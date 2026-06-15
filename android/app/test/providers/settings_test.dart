@@ -263,12 +263,34 @@ void main() {
       expect(v.offlineSyncAll, isFalse);
     });
 
+    test('save(offlineChargingOnly) round-trips through storage', () async {
+      // Q2: background-sync charging-only constraint.
+      final _FakeSecureStorage fake = _FakeSecureStorage();
+      final ProviderContainer c = _makeContainer(fake);
+      addTearDown(c.dispose);
+
+      await c.read(settingsProvider.future);
+      final SettingsValue defaults = await c.read(settingsProvider.future);
+      expect(defaults.offlineChargingOnly, isFalse);
+
+      await c
+          .read(settingsProvider.notifier)
+          .save(offlineChargingOnly: true);
+
+      final SettingsValue v = await c.read(settingsProvider.future);
+      expect(v.offlineChargingOnly, isTrue);
+      expect(fake.snapshot, <String, String>{
+        'offline_charging_only': 'true',
+      });
+    });
+
     test('clear() wipes offline keys too and re-emits defaults', () async {
       final _FakeSecureStorage fake = _FakeSecureStorage(<String, String>{
         'offline_enabled': 'true',
         'offline_sync_all': 'true',
         'offline_wifi_only': 'false',
         'offline_poll_interval_min': '60',
+        'offline_charging_only': 'true',
       });
       final ProviderContainer c = _makeContainer(fake);
       addTearDown(c.dispose);
@@ -281,6 +303,7 @@ void main() {
       expect(v.offlineSyncAll, isFalse);
       expect(v.offlineWifiOnly, isTrue);
       expect(v.offlinePollIntervalMin, 15);
+      expect(v.offlineChargingOnly, isFalse);
       expect(fake.snapshot, isEmpty);
     });
 

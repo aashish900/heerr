@@ -15,6 +15,9 @@ typedef OfflineSettingsValue = ({
   bool syncAll,
   bool wifiOnly,
   int pollIntervalMinutes,
+  // Q2: background-sync constraint. Gates the periodic worker on the device
+  // being plugged in. Has no effect on the foreground sync timer.
+  bool chargingOnly,
 });
 
 @Riverpod(keepAlive: true)
@@ -27,6 +30,7 @@ class OfflineSettings extends _$OfflineSettings {
       syncAll: s.offlineSyncAll,
       wifiOnly: s.offlineWifiOnly,
       pollIntervalMinutes: s.offlinePollIntervalMin,
+      chargingOnly: s.offlineChargingOnly,
     );
   }
 
@@ -59,6 +63,12 @@ class OfflineSettings extends _$OfflineSettings {
     await ref
         .read(settingsProvider.notifier)
         .save(offlinePollIntervalMin: minutes);
+  }
+
+  Future<void> setChargingOnly(bool value) async {
+    await ref
+        .read(settingsProvider.notifier)
+        .save(offlineChargingOnly: value);
   }
 
   Future<void> _clearEstimateCacheFor(
