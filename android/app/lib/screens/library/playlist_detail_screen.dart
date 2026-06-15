@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
+import '../../models/seed_track.dart';
 import '../../models/subsonic/playlist.dart';
 import '../../models/subsonic/song.dart';
 import '../../offline/offline_manifest.dart';
@@ -423,6 +424,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
           onLongPress: () => AddToPlaylistSheet.show(
             context: context,
             songIds: <String>[s.id],
+            findSimilarSeed: seedForSong(s),
           ),
         );
       },

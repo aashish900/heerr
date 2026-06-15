@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_error.dart';
+import '../../models/seed_track.dart';
 import '../../models/subsonic/album.dart';
 import '../../models/subsonic/song.dart';
 import '../../offline/offline_manifest.dart';
@@ -189,6 +190,7 @@ class _Body extends ConsumerWidget {
           onLongPress: () => AddToPlaylistSheet.show(
             context: context,
             songIds: <String>[s.id],
+            findSimilarSeed: seedForSong(s),
           ),
         );
       },

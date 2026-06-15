@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'subsonic/song.dart';
+
 part 'seed_track.freezed.dart';
 part 'seed_track.g.dart';
 
@@ -23,4 +25,13 @@ class SeedTrack with _$SeedTrack {
 
   factory SeedTrack.fromJson(Map<String, dynamic> json) =>
       _$SeedTrackFromJson(json);
+}
+
+/// Build a [SeedTrack] for the "Find similar →" long-press affordance on
+/// a song row. Returns null if the [Song] lacks an artist — the backend's
+/// `RecommendSeed` requires both title and artist.
+SeedTrack? seedForSong(Song song) {
+  final String? artist = song.artist;
+  if (artist == null || artist.isEmpty) return null;
+  return SeedTrack(title: song.title, artist: artist);
 }

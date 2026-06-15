@@ -33,10 +33,10 @@ Manual smokes called out as deferred in the CHANGELOG. No written log required �
 
 Real missing features; in-scope (not listed in ROADMAP "out of scope").
 
-| # | Item | Effort | Notes |
+| # | Item | Status | Notes |
 |---|------|--------|-------|
-| F1 | Cover art on `HomeRecommendationCard` — placeholder swatch in v1. | Low | One `getSong.view` per row at render; throttle to avoid N parallel requests. Named as deferred in `CHANGELOG.md` O4 "not done". |
-| F2 | Find Similar long-press on **album-detail** and **playlist-detail** song rows. | Low | Only library-search surface currently routes through `AddToPlaylistSheet` with `findSimilarSeed`. Mechanical to add; `CHANGELOG.md` N5 "not done" flags it explicitly. |
+| F1 | Cover art on `HomeRecommendationCard`. | ✅ already done | `_CoverArt` in `widgets/home_recommendation_card.dart` already does library cover → YouTube thumbnail → placeholder; `coverArt` field is hydrated on `RecommendedTrack` by the N4 cross-reference step. DEBT entry was stale. |
+| F2 | Find Similar long-press on **album-detail** and **playlist-detail** song rows. | ✅ 2026-06-15 | `seedForSong(Song)` extracted to `models/seed_track.dart`; both detail screens now pass `findSimilarSeed: seedForSong(s)` on `onLongPress`. `flutter analyze` clean; 462/462 tests pass. |
 
 ---
 
@@ -58,5 +58,4 @@ Items listed in ROADMAP `## Out of scope` — do not implement without a DECISIO
 ## Suggested order of attack
 
 1. **V1 + V2** — verify on-device against the home server before declaring v1.4.0 final.
-2. **F1, F2** — polish passes, each under half a day.
-3. **X-series** — only after a user-driven re-scoping conversation.
+2. **X-series** — only after a user-driven re-scoping conversation.

@@ -33,15 +33,6 @@ import '../../widgets/playlist_dialogs.dart';
 import '../../widgets/result_tile.dart';
 import '../../widgets/skeleton.dart';
 
-/// Build a `SeedTrack` for the "Find similar →" long-press affordance
-/// (N4). Returns null if the Song lacks an artist — the backend's
-/// `RecommendSeed` requires both title and artist.
-SeedTrack? _seedForSong(Song song) {
-  final String? artist = song.artist;
-  if (artist == null || artist.isEmpty) return null;
-  return SeedTrack(title: song.title, artist: artist);
-}
-
 /// Library tab — when idle, shows a `TabBar` of Artists / Albums / Playlists
 /// driven by Subsonic. When the user enters search mode (search icon in the
 /// AppBar), the tab UI is hidden and the combined-search results render:
@@ -254,7 +245,7 @@ class _CombinedResultsBody extends ConsumerWidget {
                     onLongPress: () => AddToPlaylistSheet.show(
                       context: context,
                       songIds: <String>[s.id],
-                      findSimilarSeed: _seedForSong(s),
+                      findSimilarSeed: seedForSong(s),
                     ),
                   ),
               ],
