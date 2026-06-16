@@ -294,7 +294,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 **Done when:** every endpoint that depends on `bearer_token()` can `Depends(current_user)`.
 **Commit:** `feat(auth): J7 — bearer token resolves to User`
 
-### [ ] J8. Per-user scoping — `/queue`, `/status/{id}`
+### [x] J8. Per-user scoping — `/queue`, `/status/{id}`
 **Files modified:** `backend/app/api/v1/{queue,status}.py`, `backend/app/services/jobs.py` (add `user_id` filter helpers), `backend/tests/test_{queue,status}.py`.
 **Deliverable:** `/queue` returns only jobs where `jobs.user_id = current_user.id`. `/status/{id}` 404s if the job belongs to a different user (no leaking that the id exists). Admin tokens (`is_admin=true`) bypass the filter.
 **Test gate:** two-user seed; user-A's queue does not contain user-B's jobs; user-A `/status/{job_of_B}` → 404; admin sees both.

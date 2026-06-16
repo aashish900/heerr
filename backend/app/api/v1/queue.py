@@ -16,35 +16,27 @@ _RECENT_LIMIT = 20
 @router.get("/queue", response_model=QueueResponse)
 async def get_queue(
     session: AsyncSession = Depends(get_session),
-    _tok: Token = Depends(require_scope("read")),
+    tok: Token = Depends(require_scope("read")),
 ) -> QueueResponse:
-    active_rows = (
-        (
-            await session.execute(
-                select(Job)
-                .where(Job.state.in_(["queued", "running"]))
-                .order_by(Job.created_at.asc())
-            )
+    active_stmt = select(Job).where(Job.state.in_(["queued", "running"]))
+    recent_stmt = (
+        select(Job)
+        .where(Job.state.in_(["done", "failed"]))
+        .order_by(
+            Job.finished_at.desc().nulls_last(),
+            Job.created_at.desc(),
         )
-        .scalars()
-        .all()
+        .limit(_RECENT_LIMIT)
     )
+    # Per-user isolation. Admin tokens see every user's jobs.
+    if not tok.is_admin:
+        active_stmt = active_stmt.where(Job.user_id == tok.user_id)
+        recent_stmt = recent_stmt.where(Job.user_id == tok.user_id)
 
-    recent_rows = (
-        (
-            await session.execute(
-                select(Job)
-                .where(Job.state.in_(["done", "failed"]))
-                .order_by(
-                    Job.finished_at.desc().nulls_last(),
-                    Job.created_at.desc(),
-                )
-                .limit(_RECENT_LIMIT)
-            )
-        )
-        .scalars()
-        .all()
+    active_rows = (
+        (await session.execute(active_stmt.order_by(Job.created_at.asc()))).scalars().all()
     )
+    recent_rows = (await session.execute(recent_stmt)).scalars().all()
 
     # Batch-load song output paths in a single query.
     song_urls = [j.source_url for j in (*active_rows, *recent_rows) if j.source_type == "song"]

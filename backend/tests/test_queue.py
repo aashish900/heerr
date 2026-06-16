@@ -297,3 +297,114 @@ async def test_recent_track_has_output_path(client, make_token, app_sm, cleanup)
     ).json()
     item = next(it for it in body["recent"] if it["job_id"] == str(job.id))
     assert item["output_path"] == "/data/media/music/withdl.mp3"
+
+
+# ---- J8: per-user isolation -----------------------------------------------
+
+
+async def test_queue_only_shows_current_users_jobs(client, app_sm, cleanup):
+    """user-A sees only their own jobs; user-B's jobs are invisible."""
+    import hashlib
+    import secrets
+    import uuid
+
+    from app.models import Token, User
+
+    async with app_sm() as s:
+        ua = User(navidrome_username=f"alice-{uuid.uuid4().hex[:8]}")
+        ub = User(navidrome_username=f"bob-{uuid.uuid4().hex[:8]}")
+        s.add_all([ua, ub])
+        await s.flush()
+
+        raw_a = f"raw-{secrets.token_urlsafe(16)}"
+        raw_b = f"raw-{secrets.token_urlsafe(16)}"
+        tok_a = Token(
+            token_hash=hashlib.sha256(raw_a.encode()).hexdigest(),
+            owner_label=ua.navidrome_username,
+            scopes=["read", "download"],
+            user_id=ua.id,
+        )
+        tok_b = Token(
+            token_hash=hashlib.sha256(raw_b.encode()).hexdigest(),
+            owner_label=ub.navidrome_username,
+            scopes=["read", "download"],
+            user_id=ub.id,
+        )
+        s.add_all([tok_a, tok_b])
+        await s.flush()
+
+        ja = Job(
+            source_url="https://www.youtube.com/watch?v=alice1",
+            source_type="song",
+            state="queued",
+            created_by_token_id=tok_a.id,
+            user_id=ua.id,
+        )
+        jb = Job(
+            source_url="https://www.youtube.com/watch?v=bob1",
+            source_type="song",
+            state="queued",
+            created_by_token_id=tok_b.id,
+            user_id=ub.id,
+        )
+        s.add_all([ja, jb])
+        await s.commit()
+        ja_id, jb_id = str(ja.id), str(jb.id)
+
+    body_a = (
+        await client.get("/api/v1/queue", headers={"Authorization": f"Bearer {raw_a}"})
+    ).json()
+    body_b = (
+        await client.get("/api/v1/queue", headers={"Authorization": f"Bearer {raw_b}"})
+    ).json()
+
+    active_a_ids = {it["job_id"] for it in body_a["active"]}
+    active_b_ids = {it["job_id"] for it in body_b["active"]}
+    assert ja_id in active_a_ids and jb_id not in active_a_ids
+    assert jb_id in active_b_ids and ja_id not in active_b_ids
+
+
+async def test_admin_token_sees_all_users_jobs(client, app_sm, make_token, cleanup):
+    """is_admin=True bypasses user filter."""
+    import hashlib
+    import secrets
+    import uuid
+
+    from app.models import Token, User
+
+    async with app_sm() as s:
+        u = User(navidrome_username=f"charlie-{uuid.uuid4().hex[:8]}")
+        s.add(u)
+        await s.flush()
+        raw_u = f"raw-{secrets.token_urlsafe(16)}"
+        s.add(
+            Token(
+                token_hash=hashlib.sha256(raw_u.encode()).hexdigest(),
+                owner_label=u.navidrome_username,
+                scopes=["read", "download"],
+                user_id=u.id,
+            )
+        )
+        await s.flush()
+        s.add(
+            Job(
+                source_url="https://www.youtube.com/watch?v=charlie",
+                source_type="song",
+                state="queued",
+                created_by_token_id=(
+                    await s.execute(
+                        text("SELECT id FROM tokens WHERE token_hash = :h"),
+                        {"h": hashlib.sha256(raw_u.encode()).hexdigest()},
+                    )
+                ).scalar_one(),
+                user_id=u.id,
+            )
+        )
+        await s.commit()
+
+    raw_admin = await make_token(is_admin=True)
+    body = (
+        await client.get("/api/v1/queue", headers={"Authorization": f"Bearer {raw_admin}"})
+    ).json()
+    urls = {it["source_url"] for it in body["active"]}
+    assert "https://www.youtube.com/watch?v=charlie" in urls

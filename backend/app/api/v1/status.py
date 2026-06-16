@@ -32,10 +32,11 @@ def to_view(job: Job, output_path: str | None) -> JobView:
 async def get_status(
     job_id: UUID,
     session: AsyncSession = Depends(get_session),
-    _tok: Token = Depends(require_scope("read")),
+    tok: Token = Depends(require_scope("read")),
 ) -> JobView:
     job = await session.get(Job, job_id)
-    if job is None:
+    # Hide cross-user job existence behind a 404 — don't leak that the id is real.
+    if job is None or (not tok.is_admin and job.user_id != tok.user_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"job {job_id} not found",

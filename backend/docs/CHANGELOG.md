@@ -534,3 +534,9 @@ Human-readable label persisted alongside each job so the Android queue UI shows 
 
 - **`backend/app/api/deps.py`** — `bearer_token` now `selectinload`s the `Token.user` relationship so downstream deps can read `tok.user` without lazy-loading. New invariant: `tok.user is None` raises 500 (post-J2 every token must have a `user_id`; None means data corruption, not an anonymous request). New `current_user(tok=Depends(bearer_token)) -> User` extractor for route signatures that want the user directly.
 - **Tests:** `backend/tests/test_auth.py` adds two cases — CLI-minted token (no explicit `user_id`) resolves to `system-admin` via the J2 server-default, and a login-minted token (explicit `user_id`) resolves to the logged-in user. Pre-existing 401/403/admin tests stay green. Suite: 275 passing. `mypy app/` clean. `ruff` clean.
+
+## 2026-06-16 — J8: per-user /queue + /status; admin bypass
+
+- **`backend/app/api/v1/queue.py`** — `/queue` filters both `active` and `recent` Job queries by `tok.user_id` unless the token is `is_admin`.
+- **`backend/app/api/v1/status.py`** — `/status/{job_id}` returns 404 (not 403) when the job belongs to another user; admin tokens bypass. Hides cross-user job-id existence from probes.
+- **Tests:** new cases in `test_queue.py` (two-user isolation + admin sees both) and `test_status.py` (cross-user → 404 + admin sees any). All pre-existing 20 cases stay green (default `system_admin_user_id()` keeps single-user tests aligned). Suite: 279 passing. `mypy app/` clean. `ruff` clean.

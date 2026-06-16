@@ -280,3 +280,107 @@ async def test_failed_job_has_error(client, make_token, app_sm, cleanup):
     assert body["state"] == "failed"
     assert body["error"] == "spotdl crashed"
     assert body["output_path"] is None
+
+
+# ---- J8: per-user isolation -----------------------------------------------
+
+
+async def test_status_404_for_other_users_job(client, app_sm, cleanup):
+    """user-A requesting user-B's job id gets 404 (no leak)."""
+    import hashlib
+    import secrets
+    import uuid
+
+    from sqlalchemy import text
+
+    from app.models import Job, Token, User
+
+    async with app_sm() as s:
+        ua = User(navidrome_username=f"alice-{uuid.uuid4().hex[:8]}")
+        ub = User(navidrome_username=f"bob-{uuid.uuid4().hex[:8]}")
+        s.add_all([ua, ub])
+        await s.flush()
+
+        raw_a = f"raw-{secrets.token_urlsafe(16)}"
+        s.add(
+            Token(
+                token_hash=hashlib.sha256(raw_a.encode()).hexdigest(),
+                owner_label=ua.navidrome_username,
+                scopes=["read", "download"],
+                user_id=ua.id,
+            )
+        )
+        await s.flush()
+
+        # Job belongs to bob; alice tries to read it.
+        tok_b_id = (
+            await s.execute(
+                text(
+                    "INSERT INTO tokens (token_hash, owner_label, scopes, user_id)"
+                    " VALUES (:h, :o, ARRAY['read','download']::text[], :u) RETURNING id"
+                ),
+                {
+                    "h": hashlib.sha256(secrets.token_urlsafe(16).encode()).hexdigest(),
+                    "o": ub.navidrome_username,
+                    "u": str(ub.id),
+                },
+            )
+        ).scalar_one()
+        bob_job = Job(
+            source_url="https://www.youtube.com/watch?v=bobs",
+            source_type="song",
+            state="queued",
+            created_by_token_id=tok_b_id,
+            user_id=ub.id,
+        )
+        s.add(bob_job)
+        await s.commit()
+        bob_job_id = str(bob_job.id)
+
+    r = await client.get(
+        f"/api/v1/status/{bob_job_id}", headers={"Authorization": f"Bearer {raw_a}"}
+    )
+    assert r.status_code == 404
+
+
+async def test_status_admin_can_read_any_users_job(client, app_sm, make_token, cleanup):
+    import hashlib
+    import secrets
+    import uuid
+
+    from sqlalchemy import text
+
+    from app.models import Job, User
+
+    async with app_sm() as s:
+        u = User(navidrome_username=f"dana-{uuid.uuid4().hex[:8]}")
+        s.add(u)
+        await s.flush()
+        tok_id = (
+            await s.execute(
+                text(
+                    "INSERT INTO tokens (token_hash, owner_label, scopes, user_id)"
+                    " VALUES (:h, :o, ARRAY['read','download']::text[], :u) RETURNING id"
+                ),
+                {
+                    "h": hashlib.sha256(secrets.token_urlsafe(16).encode()).hexdigest(),
+                    "o": u.navidrome_username,
+                    "u": str(u.id),
+                },
+            )
+        ).scalar_one()
+        job = Job(
+            source_url="https://www.youtube.com/watch?v=danas",
+            source_type="song",
+            state="queued",
+            created_by_token_id=tok_id,
+            user_id=u.id,
+        )
+        s.add(job)
+        await s.commit()
+        jid = str(job.id)
+
+    raw_admin = await make_token(is_admin=True)
+    r = await client.get(f"/api/v1/status/{jid}", headers={"Authorization": f"Bearer {raw_admin}"})
+    assert r.status_code == 200
+    assert r.json()["job_id"] == jid
