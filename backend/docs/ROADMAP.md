@@ -315,12 +315,12 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 **Done when:** ops can mint a token for a specific user from the CLI.
 **Commit:** `feat(cli+admin): J10 — token ↔ user wiring`
 
-### [ ] J11. DECISIONLOG ADR + CONTEXT.md + CHANGELOG + version bump
-**Files modified:** `backend/docs/DECISIONLOG.md` (new ADR "Multi-user via Navidrome IdP — heerr backend v0.2.0"), `backend/docs/CONTEXT.md` (replace "single-user" line with multi-user / per-tailnet shape), `backend/docs/CHANGELOG.md` (J1–J10 entries), `backend/pyproject.toml` → `0.2.0`.
+### [x] J11. DECISIONLOG ADR + CONTEXT.md + CHANGELOG + version bump
+**Files modified:** `backend/docs/DECISIONLOG.md` (new ADR "Multi-user via Navidrome IdP — heerr backend v2.0.0-rc1"), `backend/docs/CONTEXT.md` (replace "single-user" line with multi-user / per-tailnet shape), `backend/docs/CHANGELOG.md` (J1–J10 entries), `backend/pyproject.toml` → `2.0.0-rc1`.
 **Deliverable:** ADR explains why Navidrome-as-IdP, why no password column, why Tailscale-only is preserved. CONTEXT.md staleness rule satisfied. CHANGELOG bullets per milestone.
 **Test gate:** none (documentation).
 **Done when:** docs reflect implementation; version bumped.
-**Commit:** `chore(backend): J11 — multi-user ADR + CONTEXT/CHANGELOG + v0.2.0`
+**Commit:** `chore(backend): J11 — multi-user ADR + CONTEXT/CHANGELOG + v2.0.0-rc1`
 
 ### [ ] J12. End-to-end multi-user smoke on the home server
 **Deliverable:** Two real Navidrome accounts on the home Navidrome (`alice`, `bob`). From the backend container or a sibling, log in as each via `/auth/login`; download a different track each; assert `/queue` for alice's token excludes bob's job and vice-versa. Admin token (CLI-minted) sees both.

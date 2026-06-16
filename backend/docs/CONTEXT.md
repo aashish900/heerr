@@ -27,7 +27,7 @@ A native mobile app where I search for songs (via YouTube Music) and, if found, 
 ## Hard constraints / learnings (don't re-litigate)
 - spotDL **cannot run on the phone**: fails on iOS entirely; on Android via Termux it dies on a `libpthread.so.0` / tls-client dependency. Backend-only.
 - Spotify search was replaced by YouTube Music (2026-06-10): spotDL's Spotify→YouTube matching produced wrong songs for regional/non-English tracks. Passing `music.youtube.com/watch?v=` URLs directly to spotDL bypasses all matching.
-- Single-user: **no Redis/Celery needed to start.** FastAPI BackgroundTasks + Postgres job table. Add a real queue only if outgrown.
+- Small multi-user, single-tailnet (Phase J, v2.0.0-rc1): one heerr instance per family. Authentication is delegated to Navidrome via `POST /auth/login` (Subsonic ping handshake) — heerr stores **no passwords**. Per-user isolation on `/queue`, `/status`, `/search` dedup hints, and `/download` idempotency. Files in `MUSIC_OUTPUT_DIR` are shared (one Navidrome library). **No Redis/Celery needed** — FastAPI BackgroundTasks + Postgres job table remain the queue substrate. Add a real queue only if outgrown.
 - spotDL invoked via subprocess (not library import) — isolation + cancellability + no version-coupling. Installed in `/opt/spotdl-venv` in the Docker image.
 
 ## Server environment (already running)
@@ -38,7 +38,7 @@ A native mobile app where I search for songs (via YouTube Music) and, if found, 
 - Shared filesystem root at `/data`.
 
 ## heerr deployment shape
-- `/.env.example` — env template; populate as `.env` next to the arr-stack compose file (Postgres creds, `DATABASE_URL`, `MUSIC_OUTPUT_DIR`). No Spotify credentials needed.
+- `/.env.example` — env template; populate as `.env` next to the arr-stack compose file (Postgres creds, `DATABASE_URL`, `MUSIC_OUTPUT_DIR`, `NAVIDROME_URL` — required for the Phase J multi-user login flow). No Spotify credentials needed.
 - `/docker-compose.snippet.yml` — four services merged into arr-stack:
   - `heerr-postgres-init` (one-shot: chowns `/data/postgres` to UID 999).
   - `heerr-postgres` (`pgvector/pgvector:pg17`, bind-mounted `/data/postgres`, fixed IP `172.39.0.50`).

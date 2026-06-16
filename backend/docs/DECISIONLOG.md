@@ -278,3 +278,42 @@ b) **Skip Trivy scanning of `/opt/spotdl-venv`** by adding `skip-dirs: /opt/spot
 **Trade-off:** The `FallbackEngine` collapses the chain to a single result set — the user can't see which engine produced which recommendation. If quality comparison becomes interesting, the response shape could be extended with a per-result `source_engine` field; that's a non-breaking addition. The Android client (N5) currently treats the chain as one logical engine, which is the right v1 default.
 
 **Reference:** Implementation lives across `backend/app/services/recommenders/{base.py, factory.py, ytmusic_engine.py, lastfm_engine.py, listenbrainz_engine.py, fallback_engine.py, yt_resolver.py}` and `backend/app/api/v1/recommend.py`. Roadmap milestones I1–I5 (in `backend/docs/ROADMAP.md`) and CHANGELOG entries 2026-06-14 enumerate the per-milestone deltas.
+
+## 2026-06-16 — Phase J: multi-user via Navidrome IdP — heerr backend v2.0.0-rc1
+
+**Context:** Pre-J the heerr backend was a single-user request app: one operator, one bearer token paste, one Navidrome account, one queue/history. Adding multi-user surfaced two questions: where do credentials live, and what is "isolation"? Storing passwords on the backend means inventing reset/recovery flows, bcrypt/argon2 hashing, and an admin user-mgmt surface — all out of proportion for a single-tailnet family app. Sharing one Navidrome instance per heerr instance is already the deployment shape (the operator runs Navidrome too), and Navidrome already authenticates users via Subsonic auth.
+
+**Decision:** Adopt the **Jellyseerr-style "trust the upstream" pattern**: heerr stores no passwords. Authentication is delegated to Navidrome via Subsonic `ping.view`; success upserts a `users` row keyed by `navidrome_username` and mints a heerr opaque token tied to that user. Per-user isolation is applied at every read/write surface (`/queue`, `/status`, `/search`, `/download`). The backend ships as `v2.0.0-rc1` since the auth flow, the schema, and the deployment env vars all changed in semver-major-incompatible ways.
+
+Sub-decisions locked across J1–J10:
+
+1. **Schema (`users` table; FK on `tokens` and `jobs`).** `users.id UUID PK`, `users.navidrome_username TEXT UNIQUE NOT NULL`, plus `created_at` / `last_login_at`. `tokens.user_id` and `jobs.user_id` are `NOT NULL` post-J2 with `ON DELETE RESTRICT`. (Migrations 0004 + 0005.)
+2. **Transitional server default.** Migration 0005 creates a `system_admin_user_id() RETURNS uuid STABLE` function and applies it as `DEFAULT` on both `user_id` columns. Existing INSERT sites that don't yet pass `user_id` (test fixtures, CLI before J10, legacy callers) keep working — the default routes them to the synthetic `system-admin` user. Explicit `NULL` still fails (`NOT NULL` is enforced). Tracked for removal as a J9 follow-up: once every INSERT site sets `user_id` explicitly the DEFAULT can be dropped. The bridge is the "green before, green after" pattern in plain SQL form.
+3. **Per-user partial unique index** (migration 0006). Replaces the global `jobs_active_source_url_idx (source_url) WHERE active` with `jobs_active_user_source_url_idx (user_id, source_url) WHERE active`. Concurrent active jobs for the same URL by *different* users are allowed; same user still can't queue twice.
+4. **Identity flow: `POST /api/v1/auth/login`.** `{username, password}` → Subsonic `ping.view` handshake (`u`, `t = md5(password+salt)`, `s = salt`, `v=1.16.1`, `c=heerr`, `f=json`). On success: upsert user, bump `last_login_at`, mint opaque token, return `{token, scopes, navidrome_url, navidrome_username}`. 401 on bad creds, 503 when Navidrome is unreachable.
+5. **`bearer_token` resolves to a User.** `selectinload(Token.user)` is eager. `tok.user is None` raises 500 — post-J2 every token must have a `user_id`; None means data corruption, not an anonymous request.
+6. **Read filtering.** `/queue` and `/status/{id}` scope to `tok.user_id` unless `tok.is_admin`. `/status` returns 404 (not 403) for cross-user job ids — does not leak that the id exists.
+7. **Write idempotency.** `/search` dedup hints (`already_downloaded`, `active_job_id`) reflect *this user's* history only. `/download` is idempotent per-user; re-POSTing the same URL by the same user returns `deduped=true`; a different user POSTing the same URL gets a fresh job.
+8. **File sharing.** Files written by the worker land in the single shared `MUSIC_OUTPUT_DIR` (one Navidrome library). The `downloads` table is global (one row per `source_url`); the worker uses `INSERT … ON CONFLICT (source_url) DO NOTHING` so a second user's worker doesn't fail when the file already exists on disk.
+9. **Operator surface.** `python -m app.cli create-token --user=<navidrome_username>` FK-links a token to any existing user (defaults to `system-admin`). `list-tokens` shows the `user=` column. `POST /api/v1/admin/users` (admin-only, idempotent) lets the operator pre-create a heerr `users` row before that user logs in for the first time.
+
+**Why this is small not large:**
+- No password column. No password hashing, no reset flow, no email integration, no recovery — all of that lives in Navidrome already.
+- Tailscale-only posture is preserved. No public ingress, no TLS, no rate limiting, no abuse handling were added — the threat model is unchanged (`/CLAUDE.md` §3).
+- One new env var (`NAVIDROME_URL`). One new endpoint (`POST /auth/login`). One new admin endpoint (`POST /admin/users`). Two new migrations (0004 + 0005) plus one structural index swap (0006). The bulk of the work is per-user filtering on existing endpoints.
+
+**Why v2.0.0-rc1 and not v0.2.0:**
+- Required new env var: `NAVIDROME_URL` (boot fails fast without it) — backwards-incompatible at deploy time.
+- Token wire-format unchanged but issuance flow new: paste-from-CLI → POST /auth/login on the Android client (Phase S). Existing tokens keep working through the `system-admin` backfill, but new tokens are minted differently.
+- `jobs.user_id` is now part of dedup semantics; existing scripts that POST `/download` will see deduped semantics shift from "global URI" to "per-user URI". That's user-observable behavior changing.
+- The single-user → multi-user posture is a load-bearing architectural decision overturn; semver-major is the honest signal. `rc1` because Phase S (Android) and J12 (home-server smoke) are pending — the multi-user story isn't fully proven end-to-end yet.
+
+**Alternatives considered:**
+- **Store passwords on heerr (bcrypt + reset flow + email).** Rejected — far out of proportion for a single-tailnet family app; duplicates capabilities Navidrome already provides.
+- **OAuth/OIDC against an external IdP** (Google / GitHub / Authentik). Rejected — adds a public-internet dependency that contradicts the Tailscale-only posture. Also leaks user identity to a third party for an app that is otherwise zero-third-party.
+- **Continue with one-bearer-token-per-operator; defer multi-user to v3.** Rejected after explicit user ask. The cost of the schema migration is small enough that delaying it would only mean a larger migration later.
+- **Public-internet exposure with self-serve signup.** Rejected — would have required TLS, rate limiting, abuse handling, terms-of-service. None of that is in scope, and the user's intent (per the planning round) is family multi-user inside one tailnet, not SaaS.
+
+**Trade-off:** The `system_admin_user_id()` server default is a transitional bridge. While it exists, an app bug that forgets to pass `user_id` on a `tokens` / `jobs` INSERT will silently route to `system-admin` instead of erroring. Mitigated by per-user-isolation tests (J8 + J9) that would catch any cross-user leakage produced by such a bug. Dropping the default is a J9 follow-up tracked in DEBT after Phase S smoke proves the app side wires `user_id` on every code path.
+
+**Reference:** Implementation across `backend/alembic/versions/{0004_users.py,0005_backfill_users.py,0006_per_user_jobs_index.py}`, `backend/app/{models/user.py,services/navidrome_auth.py,api/v1/auth.py,schemas/{auth,user}.py}`, plus the per-user filter additions in `backend/app/{api/v1/{queue,status,search,download,admin}.py,services/jobs.py,services/workers.py,api/deps.py,cli.py}`. CHANGELOG entries `2026-06-16 — J1` through `J10` enumerate the per-milestone deltas. Phase J on the Android side ("Phase S") is the next slice (`android/docs/ROADMAP.md`).
