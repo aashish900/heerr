@@ -67,4 +67,8 @@ class Job(Base):
     )
     started_at: Mapped[datetime | None] = mapped_column(sa.TIMESTAMP(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(sa.TIMESTAMP(timezone=True), nullable=True)
-    user_id: Mapped[UUID | None] = mapped_column(postgresql.UUID(as_uuid=True), nullable=True)
+    user_id: Mapped[UUID] = mapped_column(
+        postgresql.UUID(as_uuid=True),
+        nullable=False,
+        server_default=sa.text("system_admin_user_id()"),
+    )

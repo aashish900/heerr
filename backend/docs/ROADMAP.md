@@ -252,7 +252,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 **Done when:** `alembic upgrade head` clean on a fresh DB and on a DB with v0.1.x rows; `alembic downgrade -1` clean.
 **Commit:** `feat(db): J1 — users table + nullable user_id FKs on tokens and jobs`
 
-### [ ] J2. Backfill migration — synthetic `legacy-admin` + `system-admin` users; `NOT NULL` FKs
+### [x] J2. Backfill migration — synthetic `legacy-admin` + `system-admin` users; `NOT NULL` FKs
 **Files:** `backend/alembic/versions/0003_backfill_users.py`, `backend/tests/test_migration_0003.py`.
 **Deliverable:** Inserts two seed users (`legacy-admin`, `system-admin`). Backfills `tokens.user_id` → `system-admin` (CLI-minted assumption) and `jobs.user_id` → `legacy-admin` for every pre-J1 row. After backfill, `ALTER COLUMN user_id SET NOT NULL` on both tables.
 **Test gate:** seeds a v0.1.x DB with rows, runs migration, asserts every pre-existing row has the right user_id; new `NOT NULL` constraint enforced.
