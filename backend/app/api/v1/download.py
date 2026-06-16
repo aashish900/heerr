@@ -24,7 +24,7 @@ async def download(
     tok: Token = Depends(require_scope("download")),
 ) -> DownloadResponse:
     if req.source_type == "song":
-        existing_dl = await find_download_for_song(session, req.source_url)
+        existing_dl = await find_download_for_song(session, req.source_url, user_id=tok.user_id)
         if existing_dl is not None:
             return DownloadResponse(
                 job_id=existing_dl.job_id,
@@ -37,6 +37,7 @@ async def download(
         source_url=req.source_url,
         source_type=req.source_type,
         token_id=tok.id,
+        user_id=tok.user_id,
         display_name=req.display_name,
     )
     # Commit before enqueuing: BackgroundTasks run before the get_session

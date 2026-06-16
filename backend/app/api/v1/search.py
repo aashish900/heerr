@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,8 +25,14 @@ router = APIRouter(tags=["search"])
 async def _hydrate_hints(
     session: AsyncSession,
     items: list[YTMusicResult],
+    user_id: UUID,
 ) -> tuple[set[str], dict[str, str]]:
-    """Return (downloaded_urls, active_job_id_by_url)."""
+    """Return (downloaded_urls, active_job_id_by_url) — both scoped to `user_id`.
+
+    Dedupe hints reflect *this user's* request history. The file on disk may
+    exist for another user — the Subsonic library surfaces it independently;
+    the heerr hint here is "did you request this through heerr."
+    """
     urls = [it.source_url for it in items]
     if not urls:
         return set(), {}
@@ -33,7 +41,12 @@ async def _hydrate_hints(
     song_urls = [it.source_url for it in items if it.source_type == "song"]
     if song_urls:
         r = await session.execute(
-            select(Download.source_url).where(Download.source_url.in_(song_urls))
+            select(Download.source_url)
+            .join(Job, Job.id == Download.job_id)
+            .where(
+                Download.source_url.in_(song_urls),
+                Job.user_id == user_id,
+            )
         )
         downloaded = set(r.scalars().all())
 
@@ -41,6 +54,7 @@ async def _hydrate_hints(
         select(Job.source_url, Job.id).where(
             Job.source_url.in_(urls),
             Job.state.in_(["queued", "running"]),
+            Job.user_id == user_id,
         )
     )
     active = {row[0]: row[1] for row in r.all()}
@@ -52,7 +66,7 @@ async def search(
     req: SearchRequest,
     session: AsyncSession = Depends(get_session),
     ytmusic: YTMusicClient = Depends(get_ytmusic_client),
-    _token: Token = Depends(require_scope("read")),
+    tok: Token = Depends(require_scope("read")),
 ) -> SearchResponse:
     try:
         yt_results = await ytmusic.search(req.query, req.type, req.limit)
@@ -62,7 +76,7 @@ async def search(
             detail=f"YouTube Music error: {e}",
         ) from e
 
-    downloaded, active = await _hydrate_hints(session, yt_results)
+    downloaded, active = await _hydrate_hints(session, yt_results, tok.user_id)
 
     items = [
         SearchResultItem(

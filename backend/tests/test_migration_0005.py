@@ -104,7 +104,7 @@ def test_backfill_assigns_seed_users_to_preexisting_rows(db_conn):
         db_conn.commit()
 
     # Re-run the J2 upgrade.
-    command.upgrade(_alembic_cfg(), "0005")
+    command.upgrade(_alembic_cfg(), "head")
 
     with db_conn.cursor() as cur:
         cur.execute(
@@ -130,7 +130,7 @@ def test_backfill_assigns_seed_users_to_preexisting_rows(db_conn):
 def test_seed_users_insert_is_idempotent(db_conn):
     """Downgrade and re-upgrade — seed users must not duplicate (unique violation would fail)."""
     command.downgrade(_alembic_cfg(), "0004")
-    command.upgrade(_alembic_cfg(), "0005")
+    command.upgrade(_alembic_cfg(), "head")
     with db_conn.cursor() as cur:
         cur.execute(
             "SELECT count(*) FROM users"

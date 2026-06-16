@@ -540,3 +540,16 @@ Human-readable label persisted alongside each job so the Android queue UI shows 
 - **`backend/app/api/v1/queue.py`** — `/queue` filters both `active` and `recent` Job queries by `tok.user_id` unless the token is `is_admin`.
 - **`backend/app/api/v1/status.py`** — `/status/{job_id}` returns 404 (not 403) when the job belongs to another user; admin tokens bypass. Hides cross-user job-id existence from probes.
 - **Tests:** new cases in `test_queue.py` (two-user isolation + admin sees both) and `test_status.py` (cross-user → 404 + admin sees any). All pre-existing 20 cases stay green (default `system_admin_user_id()` keeps single-user tests aligned). Suite: 279 passing. `mypy app/` clean. `ruff` clean.
+
+## 2026-06-16 — J9: per-user /search dedup + /download idempotency
+
+- **`backend/alembic/versions/0006_per_user_jobs_index.py`** — drops the global `jobs_active_source_url_idx` partial unique index `(source_url)` and replaces it with `jobs_active_user_source_url_idx` on `(user_id, source_url) WHERE state IN ('queued','running')`. Different users can hold concurrent active jobs for the same URL; the same user still can't.
+- **`backend/app/models/job.py`** — `__table_args__` updated to the new composite index.
+- **`backend/app/services/jobs.py`** —
+  - `find_active_for_url(session, source_url, user_id=None)`: optional `user_id` filter. Admin sanity checks omit it for global view.
+  - `find_download_for_song(session, source_url, user_id=None)`: when `user_id` is set, joins through `jobs` so the Download row is only returned if its owning Job belongs to that user.
+  - `create_job_idempotent(..., user_id=None, ...)`: scopes dedupe to the per-user partial unique index; on race the IntegrityError-then-refetch path matches the same user. None falls back to the `system_admin_user_id()` server default (J2 bridge).
+- **`backend/app/api/v1/search.py`** — `_hydrate_hints` now receives the current user's id; both the downloads-set and active-job-id queries filter by `user_id`. Dedupe hints reflect *this user's* request history; the Subsonic library separately surfaces files on disk regardless of who requested them.
+- **`backend/app/api/v1/download.py`** — `/download` passes `tok.user_id` to both `find_download_for_song` and `create_job_idempotent`. Re-POSTing the same URL by the same user still dedupes; a different user gets a fresh job.
+- **`backend/app/services/workers.py`** — switched the `Download` insert to PostgreSQL `INSERT ... ON CONFLICT (source_url) DO NOTHING`. Files on disk are shared via the Navidrome library; a second user's worker downloads to the same path and the existing Download row stays canonical without raising IntegrityError.
+- **Tests:** new `test_migration_0006.py` (old index dropped, new composite index present, two users can have concurrent active jobs for same URL, same user still blocked). `test_search.py` adds two-user dedup-hint isolation. `test_download.py` adds two-user idempotency (user-B's POST creates a fresh job; user-A still dedupes for themselves). `test_migration_0005.py` upgrade target switched to `"head"` so downgrade+upgrade leaves the DB at the correct revision for downstream tests. Suite: 285 passing. `mypy app/` clean. `ruff` clean.

@@ -32,7 +32,8 @@ class Job(Base):
             name="jobs_source_type_valid",
         ),
         sa.Index(
-            "jobs_active_source_url_idx",
+            "jobs_active_user_source_url_idx",
+            "user_id",
             "source_url",
             unique=True,
             postgresql_where=sa.text("state IN ('queued','running')"),

@@ -370,3 +370,92 @@ async def test_query_and_limit_passed_to_ytmusic(client, make_token, fake_ytmusi
     )
     assert fake_ytmusic.last_query == "blinding lights"
     assert fake_ytmusic.last_limit == 5
+
+
+# ---- J9: per-user dedup hints --------------------------------------------
+
+
+async def test_search_hints_scoped_to_current_user(client, app_sm, fake_ytmusic):
+    """user-A's downloaded song is invisible to user-B's search hints."""
+    import hashlib
+    import secrets
+
+    from app.models import Token, User
+
+    async with app_sm() as s:
+        ua = User(navidrome_username=f"alice-{uuid.uuid4().hex[:8]}")
+        ub = User(navidrome_username=f"bob-{uuid.uuid4().hex[:8]}")
+        s.add_all([ua, ub])
+        await s.flush()
+        raw_a = f"raw-{secrets.token_urlsafe(16)}"
+        raw_b = f"raw-{secrets.token_urlsafe(16)}"
+        tok_a = Token(
+            token_hash=hashlib.sha256(raw_a.encode()).hexdigest(),
+            owner_label=ua.navidrome_username,
+            scopes=["read", "download"],
+            user_id=ua.id,
+        )
+        tok_b = Token(
+            token_hash=hashlib.sha256(raw_b.encode()).hexdigest(),
+            owner_label=ub.navidrome_username,
+            scopes=["read", "download"],
+            user_id=ub.id,
+        )
+        s.add_all([tok_a, tok_b])
+        await s.flush()
+
+        # user-A has downloaded the song.
+        job_a = Job(
+            source_url="https://www.youtube.com/watch?v=shared",
+            source_type="song",
+            state="done",
+            created_by_token_id=tok_a.id,
+            user_id=ua.id,
+        )
+        s.add(job_a)
+        await s.flush()
+        s.add(
+            Download(
+                source_url="https://www.youtube.com/watch?v=shared",
+                job_id=job_a.id,
+                output_path="/data/media/music/shared.mp3",
+            )
+        )
+
+        # user-A also has an active job for a different song.
+        active_a = Job(
+            source_url="https://www.youtube.com/watch?v=active",
+            source_type="song",
+            state="queued",
+            created_by_token_id=tok_a.id,
+            user_id=ua.id,
+        )
+        s.add(active_a)
+        await s.commit()
+
+    fake_ytmusic.songs = [
+        _song("https://www.youtube.com/watch?v=shared"),
+        _song("https://www.youtube.com/watch?v=active"),
+    ]
+
+    # user-B's view: neither hint should fire.
+    rb = await client.post(
+        "/api/v1/search",
+        json={"query": "x", "type": "song"},
+        headers={"Authorization": f"Bearer {raw_b}"},
+    )
+    assert rb.status_code == 200
+    items_b = {it["source_url"]: it for it in rb.json()["results"]}
+    assert items_b["https://www.youtube.com/watch?v=shared"]["already_downloaded"] is False
+    assert items_b["https://www.youtube.com/watch?v=shared"]["active_job_id"] is None
+    assert items_b["https://www.youtube.com/watch?v=active"]["active_job_id"] is None
+
+    # user-A's view: both hints fire.
+    ra = await client.post(
+        "/api/v1/search",
+        json={"query": "x", "type": "song"},
+        headers={"Authorization": f"Bearer {raw_a}"},
+    )
+    items_a = {it["source_url"]: it for it in ra.json()["results"]}
+    assert items_a["https://www.youtube.com/watch?v=shared"]["already_downloaded"] is True
+    assert items_a["https://www.youtube.com/watch?v=active"]["active_job_id"] is not None

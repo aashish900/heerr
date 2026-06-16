@@ -301,7 +301,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 **Done when:** cross-user isolation verified end-to-end.
 **Commit:** `feat(api): J8 — per-user filtering on /queue and /status`
 
-### [ ] J9. Per-user scoping — `/search` dedupe + `/download` idempotency
+### [x] J9. Per-user scoping — `/search` dedupe + `/download` idempotency
 **Files modified:** `backend/app/api/v1/{search,download}.py`, `backend/app/services/jobs.py` (`create_job_idempotent` + `find_active_for_uri` take a `user_id`), `backend/tests/test_{search,download}.py`.
 **Deliverable:** `/search` dedupe hints (`already_downloaded`, `active_job_id`) are computed against the requesting user's jobs only — not globally. `/download` idempotency: re-POSTing the same URI for the same user returns the existing job (`deduped: true`); a different user POSTing the same URI gets their own new job. The partial-unique-index from A2 stays as a defence in depth but is no longer the primary dedupe path.
 **Test gate:** user-A downloads X → user-B `/search` for X sees `already_downloaded=false`; user-B `/download` X creates a fresh job; user-A re-downloading X gets `deduped=true`.

@@ -310,3 +310,76 @@ async def test_on_disk_song_returns_synthetic_done(
     assert body["deduped"] is True
     assert body["job_id"] == str(job_id)
     assert fake_enqueuer.calls == []
+
+
+# ---- J9: per-user idempotency --------------------------------------------
+
+
+async def test_download_same_url_different_users_creates_separate_jobs(
+    client, app_sm, fake_enqueuer, cleanup
+):
+    """user-A's active job for X does not block user-B's /download X."""
+    import hashlib
+    import secrets
+    import uuid as _uuid
+
+    from app.models import Token, User
+
+    async with app_sm() as s:
+        ua = User(navidrome_username=f"alice-{_uuid.uuid4().hex[:8]}")
+        ub = User(navidrome_username=f"bob-{_uuid.uuid4().hex[:8]}")
+        s.add_all([ua, ub])
+        await s.flush()
+        raw_a = f"raw-{secrets.token_urlsafe(16)}"
+        raw_b = f"raw-{secrets.token_urlsafe(16)}"
+        s.add(
+            Token(
+                token_hash=hashlib.sha256(raw_a.encode()).hexdigest(),
+                owner_label=ua.navidrome_username,
+                scopes=["read", "download"],
+                user_id=ua.id,
+            )
+        )
+        s.add(
+            Token(
+                token_hash=hashlib.sha256(raw_b.encode()).hexdigest(),
+                owner_label=ub.navidrome_username,
+                scopes=["read", "download"],
+                user_id=ub.id,
+            )
+        )
+        await s.commit()
+
+    url = "https://www.youtube.com/watch?v=shared-dl"
+
+    # user-A queues the URL.
+    ra = await client.post(
+        "/api/v1/download",
+        json={"source_url": url, "source_type": "song"},
+        headers={"Authorization": f"Bearer {raw_a}"},
+    )
+    assert ra.status_code == 202
+    a_body = ra.json()
+    assert a_body["deduped"] is False
+    a_job_id = a_body["job_id"]
+
+    # user-B queues the SAME URL — must get a fresh job, not user-A's.
+    rb = await client.post(
+        "/api/v1/download",
+        json={"source_url": url, "source_type": "song"},
+        headers={"Authorization": f"Bearer {raw_b}"},
+    )
+    assert rb.status_code == 202
+    b_body = rb.json()
+    assert b_body["deduped"] is False
+    assert b_body["job_id"] != a_job_id
+
+    # user-A re-POSTing the same URL still dedupes for themselves.
+    ra2 = await client.post(
+        "/api/v1/download",
+        json={"source_url": url, "source_type": "song"},
+        headers={"Authorization": f"Bearer {raw_a}"},
+    )
+    assert ra2.status_code == 202
+    assert ra2.json()["deduped"] is True
+    assert ra2.json()["job_id"] == a_job_id

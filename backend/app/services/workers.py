@@ -64,15 +64,22 @@ async def run_job(
         async with sm() as s:
             if source_type == "song" and files:
                 first = files[0]
-                s.add(
-                    Download(
+                # ON CONFLICT DO NOTHING: another user may have already downloaded
+                # the same source_url (per-user job dedupe means we don't catch
+                # that case at /download time). The file on disk is shared via
+                # Navidrome's library, so the existing Download row is canonical.
+                from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+                await s.execute(
+                    pg_insert(Download)
+                    .values(
                         source_url=source_url,
                         job_id=job_id,
                         output_path=first.path,
                         file_size_bytes=first.size_bytes,
                     )
+                    .on_conflict_do_nothing(index_elements=[Download.source_url])
                 )
-                await s.flush()
             await mark_done(s, job_id)
             await s.commit()
     except Exception as e:
