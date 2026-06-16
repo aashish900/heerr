@@ -4,7 +4,7 @@ Track progress through the backend build. Each milestone = one git commit with a
 
 See `PLAN.md` and `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file is the *how* / *when*.
 
-**Status (2026-06-09):** Phases A–G complete (16/17 milestones, A1 through G2). **H1 pending** — requires running the deployed stack on the home server; deferred until next on-site session.
+**Status (2026-06-16):** Phases A–G complete (16/17 milestones, A1 through G2). **H1 pending** — requires running the deployed stack on the home server; deferred until next on-site session. Phase I (recommendations engine, I1–I5) shipped. **Phase J (multi-user via Navidrome IdP, J1–J10) planned — not started.**
 
 **Conventions:**
 - TDD per CLAUDE.md §2 — tests written first, land in same commit as code.
@@ -241,6 +241,95 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 
 ---
 
+## Phase J — Multi-user via Navidrome IdP
+
+**Architecture note:** Heerr delegates identity to Navidrome (Jellyseerr pattern). No password column on the backend — Subsonic `ping.view` is the credential check. New `users` table; existing `tokens` and `jobs` gain `user_id` FKs; per-user filtering on `/queue`, `/status`, `/search`, `/download`. CLI-minted tokens attach to a fixed `system-admin` user. **Tailscale-only posture is preserved** — no public ingress, no TLS, no rate limiting added. Overturns the "Single-user" framing in `backend/docs/CONTEXT.md` line 30 via the J11 ADR. Depends on H1 only in the sense that the home-server smoke for Phase J (J12, manual) requires a real Navidrome to point at; Phase J code itself does not require H1 to land.
+
+### [ ] J1. Schema migration — `users` table + FK columns (nullable)
+**Files:** `backend/alembic/versions/0002_users.py`, `backend/tests/test_migration_0002.py`.
+**Deliverable:** New `users` table (`id uuid pk default gen_random_uuid()`, `navidrome_username text unique not null`, `created_at timestamptz default now()`, `last_login_at timestamptz null`). New nullable `user_id uuid references users(id) on delete restrict` columns on `tokens` and `jobs`. No backfill yet (J2 owns that). Migration is idempotent up/down.
+**Test gate:** migration up + down round-trips clean; unique-constraint on `navidrome_username` enforced; FK reject on bogus `user_id`.
+**Done when:** `alembic upgrade head` clean on a fresh DB and on a DB with v0.1.x rows; `alembic downgrade -1` clean.
+**Commit:** `feat(db): J1 — users table + nullable user_id FKs on tokens and jobs`
+
+### [ ] J2. Backfill migration — synthetic `legacy-admin` + `system-admin` users; `NOT NULL` FKs
+**Files:** `backend/alembic/versions/0003_backfill_users.py`, `backend/tests/test_migration_0003.py`.
+**Deliverable:** Inserts two seed users (`legacy-admin`, `system-admin`). Backfills `tokens.user_id` → `system-admin` (CLI-minted assumption) and `jobs.user_id` → `legacy-admin` for every pre-J1 row. After backfill, `ALTER COLUMN user_id SET NOT NULL` on both tables.
+**Test gate:** seeds a v0.1.x DB with rows, runs migration, asserts every pre-existing row has the right user_id; new `NOT NULL` constraint enforced.
+**Done when:** every pre-existing token / job row carries a user_id; `INSERT` without `user_id` fails.
+**Commit:** `feat(db): J2 — backfill users + lock user_id NOT NULL`
+
+### [ ] J3. ORM models — `User` + relationship wiring
+**Files:** `backend/app/models/user.py`, `backend/app/models/{token,job}.py` (add relationship), `backend/app/models/__init__.py`, `backend/tests/test_models_match_schema.py` (update).
+**Deliverable:** `User` SQLAlchemy model mirroring J1 schema; `Token.user`, `Job.user` back-refs. `compare_metadata` clean against the J2-migrated container.
+**Test gate:** model/schema diff returns no differences; relationship navigation in a sample query.
+**Done when:** `compare_metadata` clean.
+**Commit:** `feat(models): J3 — User ORM + token/job relationships`
+
+### [ ] J4. `NAVIDROME_URL` config + `.env.example`
+**Files:** `backend/app/config.py`, `backend/.env.example`, `backend/tests/test_config.py`.
+**Deliverable:** New required `NAVIDROME_URL` field on `Settings` (string, no default in prod; test fixtures supply a stub). `.env.example` gains `NAVIDROME_URL=http://navidrome.example.tailnet:4533`. Missing-value error message names the variable.
+**Test gate:** missing env var → clear startup error; valid URL parses.
+**Done when:** boot fails fast with a named error when `NAVIDROME_URL` is unset; sets correctly when present.
+**Commit:** `feat(config): J4 — NAVIDROME_URL required setting`
+
+### [ ] J5. Navidrome auth service — Subsonic ping verify
+**Files:** `backend/app/services/navidrome_auth.py`, `backend/tests/test_navidrome_auth.py`.
+**Deliverable:** Pure async `verify_credentials(username, password) -> bool` that calls `GET <NAVIDROME_URL>/rest/ping.view?u=<u>&t=<md5(p+salt)>&s=<salt>&v=1.16.1&c=heerr&f=json`. Parses `subsonic-response.status`; returns True on `"ok"`, False on `"failed"`. Network errors raise `NavidromeUnreachable` (typed). HTTP via `httpx.AsyncClient`; no `dio`-style retry.
+**Test gate:** stubbed httpx for ok / wrong-password / unreachable paths; salt is deterministic in tests (injected).
+**Done when:** all three branches green; no real network traffic in tests.
+**Commit:** `feat(auth): J5 — Navidrome Subsonic credential verify`
+
+### [ ] J6. `POST /api/v1/auth/login`
+**Files:** `backend/app/schemas/auth.py`, `backend/app/api/v1/auth.py`, `backend/app/api/v1/router.py`, `backend/tests/test_auth_login.py`.
+**Deliverable:** `LoginRequest(username, password)` → `LoginResponse(token, scopes, navidrome_url, navidrome_username)`. Calls J5 to verify; on success upserts a `users` row (insert-if-missing keyed on `navidrome_username`), mints a heerr opaque token via existing token-mint path with scopes `[read, download]`, returns the raw token once. Updates `last_login_at`. 401 on bad creds; 503 on `NavidromeUnreachable`.
+**Test gate:** new-user happy path (inserts row + mints token); existing-user happy path (no row insert, new token row, last_login bumped); bad creds → 401; Navidrome unreachable → 503.
+**Done when:** all four branches green; token rows correctly FK to the user.
+**Commit:** `feat(api): J6 — POST /auth/login via Navidrome IdP`
+
+### [ ] J7. `bearer_token()` dep resolves `token → user`
+**Files modified:** `backend/app/api/deps.py`, `backend/tests/test_auth.py`. New helper `current_user()`.
+**Deliverable:** `bearer_token()` now eager-loads the joined `User` and exposes both. `current_user()` is a thin extractor. CLI-minted tokens always resolve to `system-admin`.
+**Test gate:** existing auth tests stay green; new tests assert token → user resolution; missing-FK row (shouldn't exist post-J2) raises an internal error not a silent None.
+**Done when:** every endpoint that depends on `bearer_token()` can `Depends(current_user)`.
+**Commit:** `feat(auth): J7 — bearer token resolves to User`
+
+### [ ] J8. Per-user scoping — `/queue`, `/status/{id}`
+**Files modified:** `backend/app/api/v1/{queue,status}.py`, `backend/app/services/jobs.py` (add `user_id` filter helpers), `backend/tests/test_{queue,status}.py`.
+**Deliverable:** `/queue` returns only jobs where `jobs.user_id = current_user.id`. `/status/{id}` 404s if the job belongs to a different user (no leaking that the id exists). Admin tokens (`is_admin=true`) bypass the filter.
+**Test gate:** two-user seed; user-A's queue does not contain user-B's jobs; user-A `/status/{job_of_B}` → 404; admin sees both.
+**Done when:** cross-user isolation verified end-to-end.
+**Commit:** `feat(api): J8 — per-user filtering on /queue and /status`
+
+### [ ] J9. Per-user scoping — `/search` dedupe + `/download` idempotency
+**Files modified:** `backend/app/api/v1/{search,download}.py`, `backend/app/services/jobs.py` (`create_job_idempotent` + `find_active_for_uri` take a `user_id`), `backend/tests/test_{search,download}.py`.
+**Deliverable:** `/search` dedupe hints (`already_downloaded`, `active_job_id`) are computed against the requesting user's jobs only — not globally. `/download` idempotency: re-POSTing the same URI for the same user returns the existing job (`deduped: true`); a different user POSTing the same URI gets their own new job. The partial-unique-index from A2 stays as a defence in depth but is no longer the primary dedupe path.
+**Test gate:** user-A downloads X → user-B `/search` for X sees `already_downloaded=false`; user-B `/download` X creates a fresh job; user-A re-downloading X gets `deduped=true`.
+**Done when:** dedupe is user-scoped at the service layer.
+**Commit:** `feat(api): J9 — per-user search dedupe + download idempotency`
+
+### [ ] J10. CLI updates + Admin endpoints — token ↔ user wiring
+**Files modified:** `backend/app/cli.py`, `backend/app/api/v1/admin.py`, `backend/tests/test_{cli,admin}.py`.
+**Deliverable:** `create-token` gains required `--user=<navidrome_username>` flag (defaults to `system-admin`); errors clearly if the user does not exist. `list-tokens` shows `user.navidrome_username` per row. New `POST /admin/users` (admin-only) lets the operator pre-create a heerr `users` row without first logging in (rarely needed; documented for ops).
+**Test gate:** CLI happy + bad-user paths; admin user-create idempotent; non-admin → 403.
+**Done when:** ops can mint a token for a specific user from the CLI.
+**Commit:** `feat(cli+admin): J10 — token ↔ user wiring`
+
+### [ ] J11. DECISIONLOG ADR + CONTEXT.md + CHANGELOG + version bump
+**Files modified:** `backend/docs/DECISIONLOG.md` (new ADR "Multi-user via Navidrome IdP — heerr backend v0.2.0"), `backend/docs/CONTEXT.md` (replace "single-user" line with multi-user / per-tailnet shape), `backend/docs/CHANGELOG.md` (J1–J10 entries), `backend/pyproject.toml` → `0.2.0`.
+**Deliverable:** ADR explains why Navidrome-as-IdP, why no password column, why Tailscale-only is preserved. CONTEXT.md staleness rule satisfied. CHANGELOG bullets per milestone.
+**Test gate:** none (documentation).
+**Done when:** docs reflect implementation; version bumped.
+**Commit:** `chore(backend): J11 — multi-user ADR + CONTEXT/CHANGELOG + v0.2.0`
+
+### [ ] J12. End-to-end multi-user smoke on the home server
+**Deliverable:** Two real Navidrome accounts on the home Navidrome (`alice`, `bob`). From the backend container or a sibling, log in as each via `/auth/login`; download a different track each; assert `/queue` for alice's token excludes bob's job and vice-versa. Admin token (CLI-minted) sees both.
+**Test gate:** manual; 6-step verification block recorded in `backend/docs/CHANGELOG.md`.
+**Done when:** all six steps pass.
+**Commit:** `chore(backend): J12 — multi-user e2e smoke verified`
+
+---
+
 ## Cross-cutting reminders
 
 - **`.env` never committed.** Only `.env.example`.
@@ -261,8 +350,9 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 
 ## Roadmap complete when
 
-1. All milestone boxes checked (A1–H1, I1–I5).
+1. All milestone boxes checked (A1–H1, I1–I5, J1–J12).
 2. Every test gate green at its milestone.
 3. H1 smoke succeeds against the real home stack.
-4. CHANGELOG entries exist for each milestone group.
-5. `git log --oneline backend/` reads as a clean A→H→I progression.
+4. J12 multi-user smoke succeeds against the real home stack.
+5. CHANGELOG entries exist for each milestone group.
+6. `git log --oneline backend/` reads as a clean A→H→I→J progression.
