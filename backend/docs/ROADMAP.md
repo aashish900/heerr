@@ -280,7 +280,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 **Done when:** all three branches green; no real network traffic in tests.
 **Commit:** `feat(auth): J5 — Navidrome Subsonic credential verify`
 
-### [ ] J6. `POST /api/v1/auth/login`
+### [x] J6. `POST /api/v1/auth/login`
 **Files:** `backend/app/schemas/auth.py`, `backend/app/api/v1/auth.py`, `backend/app/api/v1/router.py`, `backend/tests/test_auth_login.py`.
 **Deliverable:** `LoginRequest(username, password)` → `LoginResponse(token, scopes, navidrome_url, navidrome_username)`. Calls J5 to verify; on success upserts a `users` row (insert-if-missing keyed on `navidrome_username`), mints a heerr opaque token via existing token-mint path with scopes `[read, download]`, returns the raw token once. Updates `last_login_at`. 401 on bad creds; 503 on `NavidromeUnreachable`.
 **Test gate:** new-user happy path (inserts row + mints token); existing-user happy path (no row insert, new token row, last_login bumped); bad creds → 401; Navidrome unreachable → 503.
