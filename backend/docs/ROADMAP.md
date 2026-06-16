@@ -273,7 +273,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 **Done when:** boot fails fast with a named error when `NAVIDROME_URL` is unset; sets correctly when present.
 **Commit:** `feat(config): J4 — NAVIDROME_URL required setting`
 
-### [ ] J5. Navidrome auth service — Subsonic ping verify
+### [x] J5. Navidrome auth service — Subsonic ping verify
 **Files:** `backend/app/services/navidrome_auth.py`, `backend/tests/test_navidrome_auth.py`.
 **Deliverable:** Pure async `verify_credentials(username, password) -> bool` that calls `GET <NAVIDROME_URL>/rest/ping.view?u=<u>&t=<md5(p+salt)>&s=<salt>&v=1.16.1&c=heerr&f=json`. Parses `subsonic-response.status`; returns True on `"ok"`, False on `"failed"`. Network errors raise `NavidromeUnreachable` (typed). HTTP via `httpx.AsyncClient`; no `dio`-style retry.
 **Test gate:** stubbed httpx for ok / wrong-password / unreachable paths; salt is deterministic in tests (injected).

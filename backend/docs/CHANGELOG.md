@@ -517,3 +517,8 @@ Human-readable label persisted alongside each job so the Android queue UI shows 
 - **`backend/app/config.py`** — `Settings.navidrome_url: str` (required, no default). Boot fails fast with a clear pydantic error if unset.
 - **`.env.example`** (repo root) — new `NAVIDROME_URL=http://navidrome.example.tailnet:4533` block with tailnet-only guidance.
 - **Tests:** `test_config.py` REQUIRED_ENV gains `NAVIDROME_URL`; parametrised "missing required raises" covers the new field automatically. `test_cli.py` + `test_db_session.py` fixtures supply the stub. Suite: 261 passing. `mypy app/` clean. `ruff` clean.
+
+## 2026-06-16 — J5: Navidrome auth service — Subsonic ping verify
+
+- **`backend/app/services/navidrome_auth.py`** — new `verify_credentials(*, base_url, username, password, http=None, salt_source=...)` coroutine. Issues `GET <base>/rest/ping.view` with the Subsonic auth handshake: `u`, `t = md5(password + salt)`, `s = salt`, `v = "1.16.1"`, `c = "heerr"`, `f = "json"`. Returns `True` iff response is `200` AND `subsonic-response.status == "ok"`. Non-200 / non-JSON / `failed` status all return `False`. `httpx.ConnectError`, `ConnectTimeout`, `ReadTimeout`, and other `HTTPError`s raise `NavidromeUnreachable` so J6 can map them to `503` (vs `401` for bad credentials). Salt + http client are injectable for tests.
+- **Tests:** `backend/tests/test_navidrome_auth.py` — 7 cases: ok happy path (asserts exact query-string shape), `failed` status → False, non-200 → False, non-JSON body → False, `ConnectError` → `NavidromeUnreachable`, `ReadTimeout` → `NavidromeUnreachable`, trailing-slash on `base_url` does not double the path. Suite: 268 passing. `mypy app/` clean. `ruff` clean.
