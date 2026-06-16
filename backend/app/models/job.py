@@ -1,11 +1,17 @@
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 class Job(Base):
@@ -72,3 +78,5 @@ class Job(Base):
         nullable=False,
         server_default=sa.text("system_admin_user_id()"),
     )
+
+    user: Mapped[User] = relationship(back_populates="jobs")

@@ -259,7 +259,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 **Done when:** every pre-existing token / job row carries a user_id; `INSERT` without `user_id` fails.
 **Commit:** `feat(db): J2 — backfill users + lock user_id NOT NULL`
 
-### [ ] J3. ORM models — `User` + relationship wiring
+### [x] J3. ORM models — `User` + relationship wiring
 **Files:** `backend/app/models/user.py`, `backend/app/models/{token,job}.py` (add relationship), `backend/app/models/__init__.py`, `backend/tests/test_models_match_schema.py` (update).
 **Deliverable:** `User` SQLAlchemy model mirroring J1 schema; `Token.user`, `Job.user` back-refs. `compare_metadata` clean against the J2-migrated container.
 **Test gate:** model/schema diff returns no differences; relationship navigation in a sample query.
