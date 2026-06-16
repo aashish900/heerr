@@ -175,3 +175,82 @@ def test_revoke_token_already_revoked_fails(cli_env, cli_app):
 def test_revoke_token_invalid_uuid_fails(cli_env, cli_app):
     result = runner.invoke(cli_app, ["revoke-token", "not-a-uuid"])
     assert result.exit_code != 0
+
+
+# ---- J10: --user flag wiring ---------------------------------------------
+
+
+def _user_id_for(libpq_url: str, navidrome_username: str):
+    with psycopg.connect(libpq_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id FROM users WHERE navidrome_username = %s",
+                (navidrome_username,),
+            )
+            row = cur.fetchone()
+            return row[0] if row else None
+
+
+def test_create_token_defaults_user_to_system_admin(cli_env, cli_app):
+    r = runner.invoke(cli_app, ["create-token", "--owner", "ops"])
+    assert r.exit_code == 0, r.stdout
+    raw = r.stdout.strip()
+    h = _hash(raw)
+    with psycopg.connect(cli_env) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT u.navidrome_username FROM tokens t"
+                " JOIN users u ON u.id = t.user_id"
+                " WHERE t.token_hash = %s",
+                (h,),
+            )
+            assert cur.fetchone()[0] == "system-admin"
+
+
+def test_create_token_with_explicit_user(cli_env, cli_app):
+    # Seed a user via raw SQL — the CLI doesn't create users itself.
+    with psycopg.connect(cli_env) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO users (navidrome_username) VALUES (%s) ON CONFLICT DO NOTHING",
+                ("alice-cli",),
+            )
+        conn.commit()
+
+    r = runner.invoke(
+        cli_app,
+        ["create-token", "--owner", "alice-cli", "--user", "alice-cli"],
+    )
+    assert r.exit_code == 0, r.stdout
+    raw = r.stdout.strip()
+    h = _hash(raw)
+    with psycopg.connect(cli_env) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT u.navidrome_username FROM tokens t"
+                " JOIN users u ON u.id = t.user_id"
+                " WHERE t.token_hash = %s",
+                (h,),
+            )
+            assert cur.fetchone()[0] == "alice-cli"
+        # The user row is kept between tests — the INSERT in the seed step is
+        # idempotent (ON CONFLICT DO NOTHING). Deleting it here would race the
+        # fixture-level `DELETE FROM tokens` ordering against the FK.
+
+
+def test_create_token_unknown_user_fails(cli_env, cli_app):
+    r = runner.invoke(
+        cli_app,
+        ["create-token", "--owner", "x", "--user", "nobody-here"],
+    )
+    assert r.exit_code != 0
+    # CliRunner merges stderr into stdout by default — that's what we asserted.
+    assert "unknown user" in r.stdout.lower()
+
+
+def test_list_tokens_includes_user_column(cli_env, cli_app):
+    r = runner.invoke(cli_app, ["create-token", "--owner", "ops"])
+    assert r.exit_code == 0
+    lst = runner.invoke(cli_app, ["list-tokens"])
+    assert lst.exit_code == 0
+    assert "user=system-admin" in lst.stdout

@@ -82,6 +82,7 @@ async def test_admin_endpoints_require_auth(client):
         ("GET", "/api/v1/admin/tokens"),
         ("POST", f"/api/v1/admin/tokens/{uuid.uuid4()}/revoke"),
         ("POST", f"/api/v1/admin/jobs/{uuid.uuid4()}/retry"),
+        ("POST", "/api/v1/admin/users"),
     ]:
         r = await client.request(method, path, json={})
         assert r.status_code == 401, f"{method} {path}"
@@ -339,3 +340,80 @@ async def test_retry_blocked_when_another_active_job_for_same_uri(
     h = {"Authorization": f"Bearer {raw_admin}"}
     r = await client.post(f"/api/v1/admin/jobs/{failed.id}/retry", headers=h)
     assert r.status_code == 409
+
+
+# ---- J10: POST /admin/users ----------------------------------------------
+
+
+async def test_create_user_admin_only(client, make_token, cleanup):
+    raw_user = await make_token(is_admin=False)
+    h = {"Authorization": f"Bearer {raw_user}"}
+    r = await client.post(
+        "/api/v1/admin/users",
+        json={"navidrome_username": "alice"},
+        headers=h,
+    )
+    assert r.status_code == 403
+
+
+async def test_create_user_persists_and_is_idempotent(client, make_token, app_sm, cleanup):
+    import uuid as _uuid
+
+    from sqlalchemy import text as _text
+
+    raw_admin = await make_token(is_admin=True)
+    h = {"Authorization": f"Bearer {raw_admin}"}
+    name = f"alice-{_uuid.uuid4().hex[:8]}"
+
+    r1 = await client.post(
+        "/api/v1/admin/users",
+        json={"navidrome_username": name},
+        headers=h,
+    )
+    assert r1.status_code == 200
+    body1 = r1.json()
+    assert body1["navidrome_username"] == name
+    assert body1["last_login_at"] is None
+
+    # Repeat call returns the same row (idempotent), not a 409.
+    r2 = await client.post(
+        "/api/v1/admin/users",
+        json={"navidrome_username": name},
+        headers=h,
+    )
+    assert r2.status_code == 200
+    body2 = r2.json()
+    assert body2["id"] == body1["id"]
+
+    # Only one users row exists.
+    async with app_sm() as s:
+        c = await s.execute(
+            _text("SELECT count(*) FROM users WHERE navidrome_username = :u"),
+            {"u": name},
+        )
+        assert c.scalar_one() == 1
+        await s.execute(
+            _text("DELETE FROM users WHERE navidrome_username = :u"),
+            {"u": name},
+        )
+        await s.commit()
+
+
+async def test_create_user_validates_input(client, make_token, cleanup):
+    raw_admin = await make_token(is_admin=True)
+    h = {"Authorization": f"Bearer {raw_admin}"}
+    assert (await client.post("/api/v1/admin/users", json={}, headers=h)).status_code == 422
+    assert (
+        await client.post(
+            "/api/v1/admin/users",
+            json={"navidrome_username": ""},
+            headers=h,
+        )
+    ).status_code == 422
+    assert (
+        await client.post(
+            "/api/v1/admin/users",
+            json={"navidrome_username": "x", "extra": 1},
+            headers=h,
+        )
+    ).status_code == 422

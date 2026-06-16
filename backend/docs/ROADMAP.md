@@ -308,7 +308,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 **Done when:** dedupe is user-scoped at the service layer.
 **Commit:** `feat(api): J9 — per-user search dedupe + download idempotency`
 
-### [ ] J10. CLI updates + Admin endpoints — token ↔ user wiring
+### [x] J10. CLI updates + Admin endpoints — token ↔ user wiring
 **Files modified:** `backend/app/cli.py`, `backend/app/api/v1/admin.py`, `backend/tests/test_{cli,admin}.py`.
 **Deliverable:** `create-token` gains required `--user=<navidrome_username>` flag (defaults to `system-admin`); errors clearly if the user does not exist. `list-tokens` shows `user.navidrome_username` per row. New `POST /admin/users` (admin-only) lets the operator pre-create a heerr `users` row without first logging in (rarely needed; documented for ops).
 **Test gate:** CLI happy + bad-user paths; admin user-create idempotent; non-admin → 403.

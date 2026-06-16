@@ -10,17 +10,57 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_admin
 from app.api.v1.status import to_view
 from app.db import get_session
-from app.models import Job, Token
+from app.models import Job, Token, User
 from app.schemas.job import JobView
 from app.schemas.token import (
     CreateTokenRequest,
     CreateTokenResponse,
     TokenView,
 )
+from app.schemas.user import CreateUserRequest, UserView
 from app.services.jobs import find_active_for_url
 from app.services.workers import JobEnqueuer, get_enqueuer
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+# ---- users ----------------------------------------------------------------
+
+
+@router.post(
+    "/users",
+    response_model=UserView,
+)
+async def create_or_get_user(
+    req: CreateUserRequest,
+    session: AsyncSession = Depends(get_session),
+    _admin: Token = Depends(require_admin),
+) -> UserView:
+    """Idempotent pre-create of a heerr `users` row.
+
+    Lets the operator mint a token for a user before that user logs in for
+    the first time. Re-issuing the same `navidrome_username` returns the
+    existing row (200 OK, not 409) so scripts can be re-run safely.
+    """
+    existing = (
+        await session.execute(select(User).where(User.navidrome_username == req.navidrome_username))
+    ).scalar_one_or_none()
+    if existing is not None:
+        return UserView(
+            id=existing.id,
+            navidrome_username=existing.navidrome_username,
+            created_at=existing.created_at,
+            last_login_at=existing.last_login_at,
+        )
+    user = User(navidrome_username=req.navidrome_username)
+    session.add(user)
+    await session.flush()
+    return UserView(
+        id=user.id,
+        navidrome_username=user.navidrome_username,
+        created_at=user.created_at,
+        last_login_at=user.last_login_at,
+    )
 
 
 # ---- tokens ---------------------------------------------------------------
