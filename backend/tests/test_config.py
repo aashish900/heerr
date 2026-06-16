@@ -6,6 +6,7 @@ from app.config import Settings
 REQUIRED_ENV = {
     "DATABASE_URL": "postgresql+asyncpg://u:p@h/d",
     "MUSIC_OUTPUT_DIR": "/data/media/music",
+    "NAVIDROME_URL": "http://navidrome.example:4533",
 }
 
 
@@ -22,6 +23,7 @@ def test_loads_from_env(monkeypatch):
     s = Settings()
     assert s.database_url == REQUIRED_ENV["DATABASE_URL"]
     assert s.music_output_dir == REQUIRED_ENV["MUSIC_OUTPUT_DIR"]
+    assert s.navidrome_url == REQUIRED_ENV["NAVIDROME_URL"]
 
 
 @pytest.mark.parametrize("missing", list(REQUIRED_ENV))

@@ -8,6 +8,7 @@ class Settings(BaseSettings):
 
     database_url: str
     music_output_dir: str
+    navidrome_url: str
 
 
 @lru_cache

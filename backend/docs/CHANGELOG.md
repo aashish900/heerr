@@ -511,3 +511,9 @@ Human-readable label persisted alongside each job so the Android queue UI shows 
 - **`backend/app/models/user.py`** — added `tokens: Mapped[list[Token]]` and `jobs: Mapped[list[Job]]` collections, both `back_populates`-linked to their owning side. Switched to `from __future__ import annotations` + `TYPE_CHECKING` imports to avoid circular import at module load.
 - **`backend/app/models/{token,job}.py`** — added `user: Mapped[User]` forward refs with matching `back_populates`. Same circular-import treatment.
 - **Tests:** `backend/tests/test_user_relationships.py` — exercises every direction (`User.tokens`, `User.jobs`, `Token.user`, `Job.user`) via `selectinload` to verify the relationships are wired and navigable in an async session. `test_models_match_schema.py` stays green (relationships don't change the schema). Suite: 260 passing. `mypy app/` clean. `ruff` clean.
+
+## 2026-06-16 — J4: NAVIDROME_URL required setting
+
+- **`backend/app/config.py`** — `Settings.navidrome_url: str` (required, no default). Boot fails fast with a clear pydantic error if unset.
+- **`.env.example`** (repo root) — new `NAVIDROME_URL=http://navidrome.example.tailnet:4533` block with tailnet-only guidance.
+- **Tests:** `test_config.py` REQUIRED_ENV gains `NAVIDROME_URL`; parametrised "missing required raises" covers the new field automatically. `test_cli.py` + `test_db_session.py` fixtures supply the stub. Suite: 261 passing. `mypy app/` clean. `ruff` clean.

@@ -14,6 +14,7 @@ def cli_env(monkeypatch, pg_libpq_url, pg_async_url):
     monkeypatch.setenv("SPOTIFY_CLIENT_ID", "x")
     monkeypatch.setenv("SPOTIFY_CLIENT_SECRET", "y")
     monkeypatch.setenv("MUSIC_OUTPUT_DIR", "/data")
+    monkeypatch.setenv("NAVIDROME_URL", "http://navidrome.example:4533")
     from app import config
 
     config.get_settings.cache_clear()

@@ -266,7 +266,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 **Done when:** `compare_metadata` clean.
 **Commit:** `feat(models): J3 — User ORM + token/job relationships`
 
-### [ ] J4. `NAVIDROME_URL` config + `.env.example`
+### [x] J4. `NAVIDROME_URL` config + `.env.example`
 **Files:** `backend/app/config.py`, `backend/.env.example`, `backend/tests/test_config.py`.
 **Deliverable:** New required `NAVIDROME_URL` field on `Settings` (string, no default in prod; test fixtures supply a stub). `.env.example` gains `NAVIDROME_URL=http://navidrome.example.tailnet:4533`. Missing-value error message names the variable.
 **Test gate:** missing env var → clear startup error; valid URL parses.
