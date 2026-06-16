@@ -491,3 +491,11 @@ Human-readable label persisted alongside each job so the Android queue UI shows 
 - **Tests:** `backend/tests/test_listenbrainz_engine.py` — 20 cases: happy path (score-ordered, resolved URLs), client seeds ignored, username cache (validate called once across two recommend() calls), validate failure / invalid token returns empty, recommendations API failure isolated, metadata API failure isolated, empty recommendations short-circuit, unresolvable result skipped, limit cap, metadata partial-coverage tolerated, recommendation item missing mbid skipped, probe ok/false-on-exception/false-on-invalid-token, single-element health_chain, engine missing-token raises, factory branches (missing token raises, present token returns engine, listenbrainz inside fallback chain). Suite: 243 passing. `mypy app/` clean. `ruff check` clean.
 
 **Backend Phase I complete (I1–I5).**
+
+## 2026-06-16 — J1: users table + nullable user_id FKs on tokens and jobs
+
+- **`backend/alembic/versions/0004_users.py`** — new migration. Creates `users` (`id uuid pk`, `navidrome_username text unique not null`, `created_at`, `last_login_at`). Adds nullable `user_id uuid` columns on `tokens` and `jobs` with `ON DELETE RESTRICT` FKs to `users.id`. Indexes `tokens_user_idx`, `jobs_user_idx`. J2 will backfill and flip to `NOT NULL`.
+- **`backend/app/models/user.py`** — new `User` ORM mirroring the migrated schema.
+- **`backend/app/models/{token,job}.py`** — added nullable `user_id` column + FK constraint + per-user index so `compare_metadata` stays clean.
+- **`backend/app/models/__init__.py`** — exports `User`.
+- **Tests:** `backend/tests/test_migration_0004.py` — 8 cases: users table exists, `navidrome_username` uniqueness, nullable `user_id` on tokens and jobs, FK rejects bogus uuid (both tables), FK accepts a real user row, `ON DELETE RESTRICT` blocks deletion when tokens reference the user. Suite: 251 passing (167 → 251 includes the new file). `mypy app/` clean. `ruff check` + `ruff format` clean.

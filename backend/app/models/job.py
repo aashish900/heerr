@@ -37,6 +37,13 @@ class Job(Base):
             sa.text("created_at DESC"),
         ),
         sa.Index("jobs_token_idx", "created_by_token_id"),
+        sa.ForeignKeyConstraint(
+            ["user_id"],
+            ["users.id"],
+            ondelete="RESTRICT",
+            name="jobs_user_id_fkey",
+        ),
+        sa.Index("jobs_user_idx", "user_id"),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -60,3 +67,4 @@ class Job(Base):
     )
     started_at: Mapped[datetime | None] = mapped_column(sa.TIMESTAMP(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(sa.TIMESTAMP(timezone=True), nullable=True)
+    user_id: Mapped[UUID | None] = mapped_column(postgresql.UUID(as_uuid=True), nullable=True)

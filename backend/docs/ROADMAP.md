@@ -245,7 +245,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 
 **Architecture note:** Heerr delegates identity to Navidrome (Jellyseerr pattern). No password column on the backend — Subsonic `ping.view` is the credential check. New `users` table; existing `tokens` and `jobs` gain `user_id` FKs; per-user filtering on `/queue`, `/status`, `/search`, `/download`. CLI-minted tokens attach to a fixed `system-admin` user. **Tailscale-only posture is preserved** — no public ingress, no TLS, no rate limiting added. Overturns the "Single-user" framing in `backend/docs/CONTEXT.md` line 30 via the J11 ADR. Depends on H1 only in the sense that the home-server smoke for Phase J (J12, manual) requires a real Navidrome to point at; Phase J code itself does not require H1 to land.
 
-### [ ] J1. Schema migration — `users` table + FK columns (nullable)
+### [x] J1. Schema migration — `users` table + FK columns (nullable)
 **Files:** `backend/alembic/versions/0002_users.py`, `backend/tests/test_migration_0002.py`.
 **Deliverable:** New `users` table (`id uuid pk default gen_random_uuid()`, `navidrome_username text unique not null`, `created_at timestamptz default now()`, `last_login_at timestamptz null`). New nullable `user_id uuid references users(id) on delete restrict` columns on `tokens` and `jobs`. No backfill yet (J2 owns that). Migration is idempotent up/down.
 **Test gate:** migration up + down round-trips clean; unique-constraint on `navidrome_username` enforced; FK reject on bogus `user_id`.
