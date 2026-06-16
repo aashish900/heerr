@@ -287,7 +287,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 **Done when:** all four branches green; token rows correctly FK to the user.
 **Commit:** `feat(api): J6 — POST /auth/login via Navidrome IdP`
 
-### [ ] J7. `bearer_token()` dep resolves `token → user`
+### [x] J7. `bearer_token()` dep resolves `token → user`
 **Files modified:** `backend/app/api/deps.py`, `backend/tests/test_auth.py`. New helper `current_user()`.
 **Deliverable:** `bearer_token()` now eager-loads the joined `User` and exposes both. `current_user()` is a thin extractor. CLI-minted tokens always resolve to `system-admin`.
 **Test gate:** existing auth tests stay green; new tests assert token → user resolution; missing-FK row (shouldn't exist post-J2) raises an internal error not a silent None.

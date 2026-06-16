@@ -2,7 +2,7 @@ import pytest
 from fastapi import Depends, FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from app.api.deps import bearer_token, require_admin, require_scope
+from app.api.deps import bearer_token, current_user, require_admin, require_scope
 from app.db import get_session
 
 
@@ -36,6 +36,10 @@ async def auth_app(app_sm):
     @app.get("/admin-only")
     async def admin_only(tok=Depends(require_admin)):
         return {"ok": True}
+
+    @app.get("/whoami-user")
+    async def whoami_user(user=Depends(current_user)):
+        return {"navidrome_username": user.navidrome_username}
 
     yield app
 
@@ -134,3 +138,45 @@ async def test_admin_allowed_on_admin_route(client, make_token):
 async def test_admin_route_still_requires_auth(client):
     r = await client.get("/admin-only")
     assert r.status_code == 401
+
+
+# ---- J7: token resolves to user ------------------------------------------
+
+
+async def test_cli_minted_token_resolves_to_system_admin(client, make_token):
+    """Tokens minted without explicit user_id (CLI / pre-J6) use the system_admin
+    server-default and must therefore resolve to the system-admin user."""
+    raw = await make_token(owner="cli-user")
+    r = await client.get("/whoami-user", headers={"Authorization": f"Bearer {raw}"})
+    assert r.status_code == 200
+    assert r.json()["navidrome_username"] == "system-admin"
+
+
+async def test_login_minted_token_resolves_to_logged_in_user(app_sm, client):
+    """A token minted by POST /auth/login is FK-linked to that user and
+    current_user must reflect it."""
+    import hashlib
+    import secrets
+    import uuid
+
+    from app.models import Token, User
+
+    username = f"alice-{uuid.uuid4().hex[:8]}"
+    raw = f"raw-{secrets.token_urlsafe(16)}"
+    async with app_sm() as s:
+        user = User(navidrome_username=username)
+        s.add(user)
+        await s.flush()
+        s.add(
+            Token(
+                token_hash=hashlib.sha256(raw.encode()).hexdigest(),
+                owner_label=username,
+                scopes=["read", "download"],
+                user_id=user.id,
+            )
+        )
+        await s.commit()
+
+    r = await client.get("/whoami-user", headers={"Authorization": f"Bearer {raw}"})
+    assert r.status_code == 200
+    assert r.json()["navidrome_username"] == username

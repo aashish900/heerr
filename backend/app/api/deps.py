@@ -5,10 +5,11 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.context import owner_label_var
 from app.db import get_session
-from app.models import Token
+from app.models import Token, User
 
 _security = HTTPBearer(auto_error=False)
 
@@ -26,7 +27,9 @@ async def bearer_token(
             headers=_UNAUTH_HEADERS,
         )
     token_hash = hashlib.sha256(creds.credentials.encode()).hexdigest()
-    result = await session.execute(select(Token).where(Token.token_hash == token_hash))
+    result = await session.execute(
+        select(Token).options(selectinload(Token.user)).where(Token.token_hash == token_hash)
+    )
     tok = result.scalar_one_or_none()
     if tok is None or tok.revoked_at is not None:
         raise HTTPException(
@@ -34,8 +37,21 @@ async def bearer_token(
             detail="unknown or revoked token",
             headers=_UNAUTH_HEADERS,
         )
+    if tok.user is None:
+        # Post-J2 every token row must have a user_id FK. None here means
+        # data corruption (FK dropped or referencing a deleted user) — fail
+        # loudly rather than silently routing as an anonymous request.
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="token has no associated user",
+        )
     owner_label_var.set(tok.owner_label)
     return tok
+
+
+async def current_user(tok: Token = Depends(bearer_token)) -> User:
+    """Extracts the bearer token's User. Eager-loaded by `bearer_token`."""
+    return tok.user
 
 
 def require_scope(*required: str) -> Callable[[Token], Awaitable[Token]]:
