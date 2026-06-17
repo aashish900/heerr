@@ -22,7 +22,7 @@ These will mislead a future Claude session reading the bootstrap docs.
 | # | Item | Triggered by | Effort |
 |---|------|--------------|--------|
 | C1 | **No real job queue.** `FastAPI BackgroundTasks` does not survive container restart, has no concurrency cap, no retry policy, no scheduled work. Two `/download` calls = two concurrent spotDL subprocesses. **First thing to fail under real multi-user load.** | Migration to arq / Celery / RQ. Worker needs DB session, settings, spotDL runner, `request_id` propagation. | L |
-| C2 | **No boot-recovery for orphaned `running` jobs.** Container restart mid-download leaves rows in `running` forever until admin manually retries each. | Add a startup hook that marks rows with `state='running' AND started_at < now() - interval 'X minutes'` as `failed` (or re-enqueue once C1 lands). | S |
+| ~~C2~~ | ~~No boot-recovery for orphaned `running` jobs.~~ Resolved 2026-06-17: `recover_orphaned_jobs()` runs in the FastAPI lifespan; every `state='running'` row at boot is marked `failed` with `error_msg='orphaned at boot'`. No grace window — if the worker process is gone, the row is by definition orphaned. | — |
 | C3 | **Job cancellation is impossible.** No `cancel-job` endpoint; no PID/Task tracking; only way to stop a spotDL subprocess is killing the container. | Track `asyncio.Task` per `job_id` (or process handle once C1 lands). Add `POST /jobs/{id}/cancel`. | M |
 | C4 | **No token expiry.** Tokens are revocable-only. Once minted they live forever. Multi-user makes a stolen-token incident permanent. Adding `expires_at` now is a 2-column migration; after Phase S Android ships it's a coordinated client/server release. | `tokens.expires_at` + check in `bearer_token`. Optional refresh-token flow. | S |
 | ~~C5~~ | ~~**No `/auth/logout`.**~~ Resolved 2026-06-16: `POST /api/v1/auth/logout` sets `revoked_at = now()` on the current token; returns 204. Subsequent calls with the same token return 401 (already revoked) via the existing `bearer_token` check. | — | — |
@@ -72,7 +72,7 @@ These will mislead a future Claude session reading the bootstrap docs.
 |---|------|-------|
 | T1 | **Order-sensitive failure modes.** `test_migration_0005` downgrade/upgrade can leave the DB at the wrong revision for downstream tests (caught + fixed once already). `test_models_match_schema` only runs at session start — a test that downgrades and forgets to upgrade silently passes the schema-match. | Session-scoped autouse fixture that asserts DB is at `head` after every test that runs `command.downgrade`. |
 | T2 | No integration test for concurrent worker invocations. Worker concurrency is exercised by a single faked runner; real-world race on the same output template / Download row insert is untested. | |
-| T3 | No test for stale-job recovery (because no code for it — see C2). | |
+| ~~T3~~ | ~~No test for stale-job recovery.~~ Resolved 2026-06-17 alongside C2: `tests/test_jobs_service.py` covers the three transitions (running→failed, untouched queued/done, dedup-slot freed after recovery) plus a lifespan-integration test. | — |
 | T4 | No regression test that "an INSERT into jobs without user_id silently picks up system-admin" — pairs with M1. | |
 
 ---

@@ -416,3 +416,134 @@ async def test_find_download_for_song_returns_none(app_sm, cleanup_jobs):
     async with app_sm() as s:
         dl = await find_download_for_song(s, "https://www.youtube.com/watch?v=missing")
     assert dl is None
+
+
+# ---- C2 / T3: recover_orphaned_jobs ---------------------------------------
+
+
+async def test_recover_orphaned_marks_running_as_failed(app_sm, token_id, cleanup_jobs):
+    from app.services.jobs import recover_orphaned_jobs
+
+    async with app_sm() as s:
+        running = Job(
+            source_url="https://music.youtube.com/watch?v=orphan-1",
+            source_type="song",
+            state="running",
+            created_by_token_id=token_id,
+        )
+        queued = Job(
+            source_url="https://music.youtube.com/watch?v=untouched-q",
+            source_type="song",
+            state="queued",
+            created_by_token_id=token_id,
+        )
+        done = Job(
+            source_url="https://music.youtube.com/watch?v=untouched-d",
+            source_type="song",
+            state="done",
+            created_by_token_id=token_id,
+        )
+        s.add_all([running, queued, done])
+        await s.commit()
+        running_id, queued_id, done_id = running.id, queued.id, done.id
+
+    async with app_sm() as s:
+        n = await recover_orphaned_jobs(s)
+        await s.commit()
+    assert n == 1
+
+    async with app_sm() as s:
+        r = (await s.execute(select(Job).where(Job.id == running_id))).scalar_one()
+        q = (await s.execute(select(Job).where(Job.id == queued_id))).scalar_one()
+        d = (await s.execute(select(Job).where(Job.id == done_id))).scalar_one()
+    assert r.state == "failed"
+    assert r.error_msg == "orphaned at boot"
+    assert r.finished_at is not None
+    assert q.state == "queued"
+    assert d.state == "done"
+
+
+async def test_recover_orphaned_idempotent(app_sm, token_id, cleanup_jobs):
+    """Second call with nothing in 'running' is a no-op (returns 0)."""
+    from app.services.jobs import recover_orphaned_jobs
+
+    async with app_sm() as s:
+        s.add(
+            Job(
+                source_url="https://music.youtube.com/watch?v=clean",
+                source_type="song",
+                state="done",
+                created_by_token_id=token_id,
+            )
+        )
+        await s.commit()
+
+    async with app_sm() as s:
+        n = await recover_orphaned_jobs(s)
+        await s.commit()
+    assert n == 0
+
+
+async def test_recover_orphaned_clears_active_dedup(app_sm, token_id, cleanup_jobs):
+    """After recovery, a new job for the same URL+user can be enqueued.
+
+    Pre-recovery the partial unique index `jobs_active_user_source_url_idx`
+    blocks re-insertion because the stale `running` row counts as active.
+    After recovery (`failed` state) the index slot frees up.
+    """
+    from app.services.jobs import recover_orphaned_jobs
+
+    url = "https://music.youtube.com/watch?v=requeue-after-recover"
+    async with app_sm() as s:
+        s.add(
+            Job(
+                source_url=url,
+                source_type="song",
+                state="running",
+                created_by_token_id=token_id,
+            )
+        )
+        await s.commit()
+
+    async with app_sm() as s:
+        await recover_orphaned_jobs(s)
+        await s.commit()
+
+    async with app_sm() as s:
+        job, deduped = await create_job_idempotent(
+            s,
+            source_url=url,
+            source_type="song",
+            token_id=token_id,
+        )
+        await s.commit()
+    assert deduped is False
+    assert job.state == "queued"
+
+
+async def test_lifespan_runs_recovery(app_sm, token_id, cleanup_jobs):
+    """Driving the FastAPI lifespan fires recover_orphaned_jobs."""
+    from app.main import lifespan
+
+    async with app_sm() as s:
+        s.add(
+            Job(
+                source_url="https://music.youtube.com/watch?v=lifespan-orphan",
+                source_type="song",
+                state="running",
+                created_by_token_id=token_id,
+            )
+        )
+        await s.commit()
+
+    fake_app = type("FakeApp", (), {})()
+    async with lifespan(fake_app):
+        pass
+
+    async with app_sm() as s:
+        stmt = select(Job).where(
+            Job.source_url == "https://music.youtube.com/watch?v=lifespan-orphan"
+        )
+        job = (await s.execute(stmt)).scalar_one()
+    assert job.state == "failed"
+    assert job.error_msg == "orphaned at boot"

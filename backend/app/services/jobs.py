@@ -145,3 +145,31 @@ async def bump_attempt(session: AsyncSession, job_id: UUID) -> None:
     await session.execute(
         update(Job).where(Job.id == job_id).values(attempt_count=Job.attempt_count + 1)
     )
+
+
+async def recover_orphaned_jobs(session: AsyncSession) -> int:
+    """Mark every `running` job as `failed` — called once at process boot.
+
+    `FastAPI BackgroundTasks` does not survive a container restart. Any job
+    still in `running` after a restart is by definition orphaned: its worker
+    process is gone and will never transition it to `done` or `failed`. Left
+    untouched, the row sits forever, blocks future per-user dedup on the same
+    URL (the partial unique index treats `running` as active), and confuses
+    `/queue` callers.
+
+    Returns the number of rows updated. Idempotent — a second call on a fresh
+    DB updates zero rows.
+    """
+    result = cast(
+        CursorResult,
+        await session.execute(
+            update(Job)
+            .where(Job.state == "running")
+            .values(
+                state="failed",
+                finished_at=func.now(),
+                error_msg="orphaned at boot",
+            )
+        ),
+    )
+    return result.rowcount or 0

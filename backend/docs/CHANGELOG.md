@@ -677,3 +677,17 @@ Knocked out the three lowest-effort items from DEBT.md.
   - Tests: `tests/test_max_body_size.py` (under-cap passes, over-cap 413, non-HTTP scope passes through).
 
 - Full suite green (314/314, +14 new). `ruff check`, `ruff format --check`, `mypy app/` all clean.
+
+## 2026-06-17 — DEBT C2 + T3: boot recovery for orphaned `running` jobs
+
+- **`backend/app/services/jobs.py`** — new `recover_orphaned_jobs(session)`:
+  `UPDATE jobs SET state='failed', finished_at=now(), error_msg='orphaned at boot' WHERE state='running'`. Returns rowcount. Idempotent.
+- **`backend/app/main.py`** — FastAPI `lifespan` async context manager runs the recovery once at process boot. Logs WARNING with `count` when rows were recovered, INFO otherwise. `create_app()` wires `lifespan=lifespan` onto the FastAPI constructor.
+- **`backend/tests/conftest.py`** — pg fixture now also sets `MUSIC_OUTPUT_DIR` and `NAVIDROME_URL` env defaults so any code path that touches `Settings()` during tests can construct (previously only `DATABASE_URL` was set).
+- **`backend/tests/test_jobs_service.py`** — four new tests:
+  - `test_recover_orphaned_marks_running_as_failed`: only `running` rows transition; `queued` and `done` untouched.
+  - `test_recover_orphaned_idempotent`: second call returns 0.
+  - `test_recover_orphaned_clears_active_dedup`: after recovery the partial unique index slot is free, so a re-POSTed `/download` for the same URL+user creates a fresh job (deduped=False).
+  - `test_lifespan_runs_recovery`: drives the FastAPI lifespan via the `lifespan(fake_app)` context manager and asserts the orphan was failed.
+- Why no grace window: at boot the worker process is by definition gone. Any row still in `running` will never advance. A `started_at < now() - interval 'X'` filter would only delay the same cleanup. Once a real queue lands (C1) this can move to a per-worker leases model.
+- 318/318 tests green (+4 new). ruff + mypy clean.

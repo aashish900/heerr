@@ -31,6 +31,8 @@ def pg_libpq_url():
         libpq = f"postgresql://{pg.username}:{pg.password}" f"@{host}:{port}/{pg.dbname}"
         sa_url = f"postgresql+psycopg://{pg.username}:{pg.password}" f"@{host}:{port}/{pg.dbname}"
         os.environ["DATABASE_URL"] = sa_url
+        os.environ.setdefault("MUSIC_OUTPUT_DIR", "/tmp/heerr-test-music")
+        os.environ.setdefault("NAVIDROME_URL", "http://navidrome.test:4533")
         cfg = Config(str(ALEMBIC_INI))
         command.upgrade(cfg, "head")
         yield libpq
