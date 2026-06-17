@@ -15,5 +15,11 @@ class Endpoints {
   static const String recommend = '/recommend';
   static const String recommendHealth = '/recommend/health';
 
+  /// Phase S (multi-user): backend J6 — `POST /auth/login`. Accepts
+  /// `{username, password}`, validates them against Navidrome via the
+  /// backend's IdP shim, and returns `{token, scopes, navidromeUrl,
+  /// navidromeUsername}` on success.
+  static const String authLogin = '/auth/login';
+
   static String status(String jobId) => '/status/$jobId';
 }
