@@ -1743,8 +1743,19 @@ navidromePassword)` onto `settingsProvider`.
   ListenBrainz + biometric unlock + soft profile switch into the
   v3.1.0 backlog.
 
-### S11 — v3.0.0-rc1 version bump (smoke pending)
-- Modified: `android/app/pubspec.yaml` → `3.0.0-rc1`. RC1 ships
-  pre-smoke because backend J6 (`POST /auth/login`) is not yet
-  deployed on the home server. The first on-device smoke against the
-  live IdP shim will promote the build to `v3.0.0`.
+### S11 — v3.0.0 on-device smoke verified
+- Modified: `android/app/pubspec.yaml` → `3.0.0`. RC1 was promoted to
+  the clean `v3.0.0` tag after the 7-step on-device smoke against the
+  live home-server stack (heerr backend at `3.0.0-rc1`, J6
+  `/auth/login` live, two real Navidrome users) passed.
+- Fixes folded into the smoke window:
+  - `main.dart` no longer reads `ProviderScope.containerOf` in
+    `initState` — the root `ProviderContainer` is now injected into
+    `HeerrApp` to avoid an inherited-widget lifecycle crash at boot.
+  - Settings screen hides the legacy "Servers" tile when an active
+    Profile exists (single source of truth = Profile registry).
+  - `/login` redirect no longer rewrites to `/` when an active profile
+    exists — required so the "Add profile" button can push `/login`.
+  - Home tab gained a tappable search bar that drops into the Library
+    tab's combined-search mode via a new `librarySearchAutoFocus`
+    one-shot flag.

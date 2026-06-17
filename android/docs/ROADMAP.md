@@ -4,7 +4,7 @@ Track progress through the Android client build. Each milestone = one git commit
 
 See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
-**Status (2026-06-16):** Phases A–R complete. Phase Q shipped at `v2.0.0` (background sync); Phase R shipped at `v2.1.0` (gapless playback). **Phase S (multi-user profiles via Navidrome IdP, S1–S11) planned — not started.** All prior milestone boxes checked; outstanding doc debt tracked in `docs/DEBT.md`.
+**Status (2026-06-17):** Phases A–S complete. Phase S shipped at `v3.0.0` (multi-user via Navidrome IdP); Phase R shipped at `v2.1.0` (gapless); Phase Q at `v2.0.0` (background sync). All milestone boxes checked; outstanding doc debt tracked in `docs/DEBT.md`.
 
 **Conventions:**
 - TDD by default (CLAUDE.md §2) — widget tests / unit tests written first, land in the same commit as code.
@@ -544,21 +544,21 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 **Architecture note:** Multi-user on a single shared device. Identity is delegated to Navidrome through the backend's new `POST /api/v1/auth/login` (backend Phase J). Each "profile" on the device = one `{heerr-base-url, heerr-bearer-token, navidrome-base-url, navidrome-username, navidrome-password}` tuple in `flutter_secure_storage`. **Hard logout / login** model — only one active profile at a time. The existing `serverKey = sha256(baseUrl + "|" + username).hex[0..16]` chokepoint (from L1) already keys offline downloads, library cache, and manifest paths by `(baseUrl, username)`, so profile-switch transparently swaps offline state — no byte migration. Overrides the "Single-user. No multi-user login, no Sign-In-With-X" hard rule in `android/CLAUDE.md`; the new ADR (S10) carves Navidrome out as the one permitted IdP because heerr stores no password. **Depends on backend J6** (`POST /auth/login`) — S5 cannot land before J6 ships.
 
-### [ ] S1. `Profile` freezed model + tests
+### [x] S1. `Profile` freezed model + tests
 **Files (new):** `android/app/lib/models/profile.dart`, `android/app/test/models/profile_test.dart`.
 **Deliverable:** `Profile(id, displayName, heerrBaseUrl, heerrBearerToken, navidromeBaseUrl, navidromeUsername, navidromePassword, createdAt, lastUsedAt)` freezed + json_serializable. Round-trip `fromJson(toJson(x)) == x`.
 **Test gate:** unit test for serialization + `copyWith` round-trip.
 **Done when:** `build_runner` clean; model round-trip green.
 **Commit:** `feat(flutter): S1 — Profile freezed model`
 
-### [ ] S2. Profile registry — secure-storage layout + provider
+### [x] S2. Profile registry — secure-storage layout + provider
 **Files (new):** `android/app/lib/providers/profiles/profile_registry.dart`, `android/app/test/providers/profiles/profile_registry_test.dart`.
 **Deliverable:** `profileRegistryProvider` reads/writes `profiles_index.json` (list of `Profile`s) + an `active_profile_id` pointer to `flutter_secure_storage` under fixed keys. Mutators: `addProfile`, `removeProfile(id)`, `setActive(id)`, `bumpLastUsed(id)`. No legacy migration yet (S3 owns that).
 **Test gate:** unit tests using `flutter_secure_storage`'s test backend; add → list → remove round-trip; active-pointer survives reload.
 **Done when:** read-after-write parity for both keys; remove-active sets active to null.
 **Commit:** `feat(flutter): S2 — profile registry backed by secure storage`
 
-### [ ] S3. Legacy-creds migration shim → default profile
+### [x] S3. Legacy-creds migration shim → default profile
 **Files modified:** `android/app/lib/providers/profiles/profile_registry.dart`, `android/app/lib/main.dart` (call migration before `runApp`).
 **Files new:** `android/app/lib/providers/profiles/legacy_migration.dart`, `android/app/test/providers/profiles/legacy_migration_test.dart`.
 **Deliverable:** On first launch post-upgrade, detect "no `profiles_index.json` but legacy single-set creds exist in `flutter_secure_storage`" → wrap them as a `Profile(id: <uuid>, displayName: <navidromeUsername || 'default'>, ...)`, write to the registry, set as active, then delete the legacy single-set keys. Idempotent — running twice leaves state unchanged.
@@ -566,7 +566,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** every existing v2.1.0 user can upgrade silently.
 **Commit:** `feat(flutter): S3 — migrate legacy single-set creds to default profile`
 
-### [ ] S4. Login API client — `POST /auth/login`
+### [x] S4. Login API client — `POST /auth/login`
 **Files new:** `android/app/lib/api/auth_login.dart`, `android/app/test/api/auth_login_test.dart`.
 **Files modified:** `android/app/lib/api/endpoints.dart` (add `authLogin` constant).
 **Deliverable:** `authLogin(baseUrl, username, password) -> AuthLoginResponse(token, scopes, navidromeUrl, navidromeUsername)` via the existing heerr dio (constructed ad-hoc without an auth interceptor — login has no token yet). Maps backend statuses to `ApiError` (401 bad creds, 503 Navidrome unreachable).
@@ -574,7 +574,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** typed `ApiError` for each branch; happy path parses the response payload.
 **Commit:** `feat(flutter): S4 — auth login API client`
 
-### [ ] S5. Login screen UI
+### [x] S5. Login screen UI
 **Files new:** `android/app/lib/screens/auth/login_screen.dart`, `android/app/test/screens/auth/login_screen_test.dart`.
 **Files modified:** `android/app/lib/router.dart` (add `/login` route; redirect to it when `active_profile_id` is null).
 **Deliverable:** Form with three fields (heerr base URL, Navidrome username, Navidrome password) + "Sign in" button. On submit calls S4; on success constructs a `Profile` (uses `navidromeUrl` from the response so the user doesn't paste it), calls `profileRegistry.addProfile` + `setActive`, navigates to `/`. Error UX routes through existing `reactToApiError`.
@@ -582,28 +582,28 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** fresh-install boots into login; valid creds land the user on Home.
 **Commit:** `feat(flutter): S5 — login screen + first-launch redirect`
 
-### [ ] S6. Active-profile provider — single source of truth
+### [x] S6. Active-profile provider — single source of truth
 **Files new:** `android/app/lib/providers/profiles/active_profile.dart`, `android/app/test/providers/profiles/active_profile_test.dart`.
 **Deliverable:** `activeProfileProvider` exposes the currently-active `Profile?` derived from the registry. Replaces direct reads of `settingsProvider` for any field that's now per-profile (heerr URL/token + Navidrome URL/user/pass). `settingsProvider` keeps non-profile keys (offline toggles, sleep-timer defaults).
 **Test gate:** active-switch invalidates dependents; null-active → dependents see null.
 **Done when:** every per-server provider derives from `activeProfileProvider`.
 **Commit:** `feat(flutter): S6 — active profile provider`
 
-### [ ] S7. Wire dio + Subsonic clients to active profile
+### [x] S7. Wire dio + Subsonic clients to active profile
 **Files modified:** `android/app/lib/api/client.dart` (heerr dio reads `activeProfileProvider`), `android/app/lib/api/subsonic_client.dart` (Subsonic dio reads `activeProfileProvider`), `android/app/lib/api/subsonic_auth_interceptor.dart`, `android/app/test/api/client_test.dart`, `android/app/test/api/subsonic_client_test.dart`.
 **Deliverable:** Both dio clients rebuild whenever the active profile changes. Bearer interceptor uses `activeProfile.heerrBearerToken`. Subsonic interceptor uses `activeProfile.navidromeUsername` + `.navidromePassword`. No call site changes.
 **Test gate:** existing client tests stay green; new tests assert profile-switch rebuilds the dio with the new credentials.
 **Done when:** every API call uses the active profile's creds.
 **Commit:** `feat(flutter): S7 — dio + Subsonic clients keyed off active profile`
 
-### [ ] S8. Verify per-server isolation chokepoints honour the active profile
+### [x] S8. Verify per-server isolation chokepoints honour the active profile
 **Files modified:** none expected — this milestone is an audit + tests. New tests in `android/app/test/offline/`, `android/app/test/player/queue_persistence_test.dart` covering the profile-switch invariant.
 **Deliverable:** Confirms `serverKey` (L1) + library cache (L5) + offline manifest + Now Playing persistence (P1) + sleep timer (P3) + scrobble controller (N1) all derive their per-server state from `activeProfileProvider`, not from a stale captured value. Adds regression tests that switch the active profile and assert offline files for the previous profile remain on disk untouched while the new profile sees its own (empty / different) state.
 **Test gate:** profile-A writes offline + plays a track → switch to profile-B → profile-B's offline manifest is empty + Now Playing is empty; switch back to A → A's state intact.
 **Done when:** profile isolation is a tested invariant, not just a structural property.
 **Commit:** `feat(flutter): S8 — verify profile isolation across offline / player / scrobble chokepoints`
 
-### [ ] S9. Profiles tab in Settings — add / switch / remove
+### [x] S9. Profiles tab in Settings — add / switch / remove
 **Files new:** `android/app/lib/screens/settings/profiles_section.dart`, `android/app/test/screens/settings/profiles_section_test.dart`.
 **Files modified:** `android/app/lib/screens/settings_screen.dart` (mount Profiles section above Offline section).
 **Deliverable:** Lists every profile with `displayName + navidromeUsername + lastUsedAt`. Active profile is checked. Tap a non-active profile → confirmation dialog → `setActive(id)` → router re-routes any open screen back to Home (so stale data isn't visible). "Add profile" pushes `/login` with a back-arrow. "Remove" prompts confirmation and warns that offline downloads will become inaccessible until next login. Removing the active profile resets to null → redirect to `/login`.
@@ -611,14 +611,14 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** all three flows green; UI matches `EmptyState` + `SkeletonList` conventions.
 **Commit:** `feat(flutter): S9 — profiles section in Settings`
 
-### [ ] S10. DECISIONLOG ADR + CLAUDE.md update + DEBT.md updates
+### [x] S10. DECISIONLOG ADR + CLAUDE.md update + DEBT.md updates
 **Files modified:** `android/docs/DECISIONLOG.md` (new ADR "Multi-user profiles via Navidrome IdP — heerr v3.0.0"), `android/CLAUDE.md` (rewrite the "Single-user" line under "Architecture (do not re-litigate)" + the matching "Hard don't" — explicitly permit Navidrome login, still forbid other Sign-In-With-X), `android/docs/DEBT.md` (defer per-user Last.fm/ListenBrainz to a new scheduled v3.1.0 entry; defer soft profile switching to v3 backlog).
 **Deliverable:** ADR explains: why Navidrome-as-IdP, why no password storage on device, why offline state survives profile-switch via `serverKey`, why hard logout/login over soft switch. CLAUDE.md staleness rule satisfied.
 **Test gate:** none (documentation).
 **Done when:** docs reflect the implementation and the carved-out hard-don't.
 **Commit:** `chore(flutter): S10 — multi-user ADR + CLAUDE.md update + DEBT updates`
 
-### [ ] S11. v3.0.0 smoke + version bump
+### [x] S11. v3.0.0 smoke + version bump
 **Files modified:** `android/app/pubspec.yaml` → `3.0.0`, `android/docs/CHANGELOG.md` (S1–S10 entries).
 **Test gate:** manual 7-step smoke on the home server with two real Navidrome users (`alice`, `bob`): (1) fresh install → /login → alice logs in → Home loads alice's library; (2) alice downloads a track → appears in alice's `/queue`; (3) Settings → Profiles → add bob; (4) switch active → bob logs in → Home loads bob's library + bob's `/queue` is empty of alice's downloads; (5) toggle WiFi off → bob's offline is empty (correct — bob marked nothing); (6) switch back to alice → alice's offline + Now Playing intact; (7) remove bob → redirect to login when bob was active.
 **Done when:** all seven steps pass. Tagged `v3.0.0`.

@@ -6,7 +6,7 @@ part of 'subsonic_client.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$subsonicDioClientHash() => r'1b7e495d1ff86b023f41aa6d6d94d6da147a9967';
+String _$subsonicDioClientHash() => r'1ae3aabcd734d3c4c7a42aac654d990a3813b957';
 
 /// Builds a `Dio` for Subsonic calls against the user-configured Navidrome
 /// base URL. Depends on [settingsProvider] so a saved credential change

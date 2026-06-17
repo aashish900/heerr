@@ -6,7 +6,7 @@ part of 'client.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$dioClientHash() => r'e46a1576b07017c50d091c733a35254b128c41a9';
+String _$dioClientHash() => r'd5d4692efef4198177e5597b23a6dfec6277326e';
 
 /// Builds the app's `Dio` instance from the currently-loaded settings.
 /// Depends on `settingsProvider` so the dio rebuilds whenever the user
