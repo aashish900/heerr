@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../models/profile.dart';
+import '../providers/profiles/active_profile.dart';
 import '../providers/settings.dart';
 import 'api_error.dart';
 
@@ -30,11 +32,19 @@ class BearerAuthInterceptor extends Interceptor {
 /// are loaded asynchronously from secure storage.
 @riverpod
 Future<Dio> dioClient(DioClientRef ref) async {
+  // S7: the active [Profile] is the source of truth when present. Falls
+  // back to the legacy `settingsProvider` single-set keys so any pre-S
+  // install whose migration didn't fire (partial creds, see S3) still
+  // works against the existing API until the user logs in.
+  final Profile? active = ref.watch(activeProfileProvider);
   final SettingsValue settings = await ref.watch(settingsProvider.future);
+
+  final String baseUrl = active?.heerrBaseUrl ?? settings.backendBaseUrl ?? '';
+  final String? token = active?.heerrBearerToken ?? settings.bearerToken;
 
   final Dio dio = Dio(
     BaseOptions(
-      baseUrl: settings.backendBaseUrl ?? '',
+      baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 10),
       sendTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
@@ -43,7 +53,7 @@ Future<Dio> dioClient(DioClientRef ref) async {
       // `validateStatus` (2xx only) is the right behaviour.
     ),
   );
-  dio.interceptors.add(BearerAuthInterceptor(settings.bearerToken));
+  dio.interceptors.add(BearerAuthInterceptor(token));
   return dio;
 }
 
