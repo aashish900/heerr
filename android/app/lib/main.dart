@@ -47,7 +47,7 @@ Future<void> main() async {
   runApp(
     UncontrolledProviderScope(
       container: rootContainer,
-      child: const HeerrApp(),
+      child: HeerrApp(rootContainer: rootContainer),
     ),
   );
 }
@@ -59,7 +59,14 @@ Future<void> main() async {
 // rebuilt, which triggered build() again, which created a brand-new GoRouter
 // with initialLocation '/' — resetting the navigation stack.
 class HeerrApp extends ConsumerStatefulWidget {
-  const HeerrApp({super.key});
+  const HeerrApp({super.key, required this.rootContainer});
+
+  /// The same [ProviderContainer] passed to [UncontrolledProviderScope].
+  /// Injected explicitly because reading the inherited widget during
+  /// `initState` via `ProviderScope.containerOf(context)` violates
+  /// Flutter's `dependOnInheritedWidgetOfExactType-before-initState`
+  /// rule and crashes the first launch.
+  final ProviderContainer rootContainer;
 
   @override
   ConsumerState<HeerrApp> createState() => _HeerrAppState();
@@ -71,7 +78,7 @@ class _HeerrAppState extends ConsumerState<HeerrApp> {
   @override
   void initState() {
     super.initState();
-    _router = buildHeerrRouter(container: ProviderScope.containerOf(context));
+    _router = buildHeerrRouter(container: widget.rootContainer);
   }
 
   @override
