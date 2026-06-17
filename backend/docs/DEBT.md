@@ -1,6 +1,6 @@
 # DEBT.md — heerr backend
 
-Outstanding work as of 2026-06-16 (post `v2.0.0-rc1`). Append new items; strike-through + date when resolved.
+Outstanding work as of 2026-06-16 (post `v3.0.0-rc1`). Append new items; strike-through + date when resolved.
 
 Sourced from the 2026-06-16 architecture audit after Phase J shipped. Items here are the canonical home for everything the J11 ADR labelled "tracked in DEBT", plus the wider audit findings.
 
@@ -12,7 +12,7 @@ These will mislead a future Claude session reading the bootstrap docs.
 
 | # | Item | Where | Notes |
 |---|------|-------|-------|
-| ~~D1~~ | ~~`app.title`/`version` hardcoded `"0.1.0"` in `app/main.py:12`; `pyproject.toml` is `2.0.0-rc1`. Misleads OpenAPI clients and Android Phase S.~~ | `app/main.py:12` | Read from `pyproject` or package version (e.g. `importlib.metadata.version("heerr-backend")`). |
+| ~~D1~~ | ~~`app.title`/`version` hardcoded `"0.1.0"` in `app/main.py:12`; `pyproject.toml` is `3.0.0-rc1`. Misleads OpenAPI clients and Android Phase S.~~ | `app/main.py:12` | Read from `pyproject` or package version (e.g. `importlib.metadata.version("heerr-backend")`). |
 | ~~D2~~ | ~~`backend/docs/PLAN.md` referenced from `CLAUDE.md` as the "frozen v1 contract" predates Phase J.~~ Resolved 2026-06-16: PLAN.md was deleted in 47d6575; stale references scrubbed from `/CLAUDE.md`, `backend/CLAUDE.md`, `backend/README.md`, `backend/docs/ROADMAP.md`. DECISIONLOG / CHANGELOG references left intact as frozen-in-time records. | — | — |
 
 ---

@@ -9,7 +9,7 @@ def create_app() -> FastAPI:
     setup_logging()
     app = FastAPI(
         title="heerr backend",
-        version="2.0.0-rc1",
+        version="3.0.0-rc1",
         openapi_url="/api/v1/openapi.json",
         docs_url="/api/v1/docs",
         redoc_url=None,

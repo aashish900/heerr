@@ -316,7 +316,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 **Commit:** `feat(cli+admin): J10 — token ↔ user wiring`
 
 ### [x] J11. DECISIONLOG ADR + CONTEXT.md + CHANGELOG + version bump
-**Files modified:** `backend/docs/DECISIONLOG.md` (new ADR "Multi-user via Navidrome IdP — heerr backend v2.0.0-rc1"), `backend/docs/CONTEXT.md` (replace "single-user" line with multi-user / per-tailnet shape), `backend/docs/CHANGELOG.md` (J1–J10 entries), `backend/pyproject.toml` → `2.0.0-rc1`.
+**Files modified:** `backend/docs/DECISIONLOG.md` (new ADR "Multi-user via Navidrome IdP — heerr backend v2.0.0-rc1"), `backend/docs/CONTEXT.md` (replace "single-user" line with multi-user / per-tailnet shape), `backend/docs/CHANGELOG.md` (J1–J10 entries), `backend/pyproject.toml` → `3.0.0-rc1`.
 **Deliverable:** ADR explains why Navidrome-as-IdP, why no password column, why Tailscale-only is preserved. CONTEXT.md staleness rule satisfied. CHANGELOG bullets per milestone.
 **Test gate:** none (documentation).
 **Done when:** docs reflect implementation; version bumped.

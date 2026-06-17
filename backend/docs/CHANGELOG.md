@@ -561,11 +561,11 @@ Human-readable label persisted alongside each job so the Android queue UI shows 
 - **`backend/app/api/v1/admin.py`** — new `POST /api/v1/admin/users` (admin-only, idempotent). Operator can pre-create a heerr `users` row before that user logs in for the first time. Re-issuing the same `navidrome_username` returns the existing row (200, not 409) so the call is safe to script. Auth-gate test extended to cover the new route.
 - **Tests:** `test_cli.py` — `--user` defaults to `system-admin`; explicit `--user alice-cli` links the token correctly; unknown user → exit 1 with "unknown user" message; `list-tokens` output includes `user=system-admin`. `test_admin.py` — non-admin → 403; happy + idempotent paths; 422 on empty / missing / extra fields. Suite: 292 passing. `mypy app/` clean. `ruff` clean.
 
-## 2026-06-16 — J11: Phase J close — ADR + CONTEXT + version 2.0.0-rc1
+## 2026-06-16 — J11: Phase J close — ADR + CONTEXT + version 3.0.0-rc1
 
 - **`backend/docs/DECISIONLOG.md`** — new ADR "Phase J: multi-user via Navidrome IdP — heerr backend v2.0.0-rc1". Captures the Jellyseerr-style "trust upstream" decision, the eight sub-decisions locked across J1–J10 (schema, transitional default, per-user index, login flow, bearer-token resolution, read filtering, write idempotency, file sharing, operator surface), the rationale for skipping straight to v2 semver, and the alternatives considered.
 - **`backend/docs/CONTEXT.md`** — replaces "Single-user" line with "Small multi-user, single-tailnet" — explicitly notes no-password-storage, Navidrome-IdP, file-sharing semantics, and `NAVIDROME_URL` as a required env var. CLAUDE.md staleness rule satisfied.
-- **`backend/pyproject.toml`** — `0.1.0` → `2.0.0-rc1`. Major-version jump because the new required env var, the new auth flow, and the per-user dedup shift in `/download` are all backwards-incompatible at deploy time. `-rc1` because Android Phase S and the J12 home-server smoke are still pending.
+- **`backend/pyproject.toml`** — `0.1.0` → `3.0.0-rc1`. Major-version jump because the new required env var, the new auth flow, and the per-user dedup shift in `/download` are all backwards-incompatible at deploy time. `-rc1` because Android Phase S and the J12 home-server smoke are still pending.
 - **Phase J: J1–J11 shipped.** Suite at J11: 292 passing. `mypy app/` clean. `ruff` clean.
 
 ## 2026-06-16 — sec: bump starlette ≥ 1.3.1 (CVE-2026-54283)
