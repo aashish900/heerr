@@ -72,6 +72,23 @@ ADR: `DECISIONLOG.md` 2026-06-15 ("v2.0.0 background offline sync via WorkManage
 
 ADR: `DECISIONLOG.md` 2026-06-16 ("X4b: gapless playback via `useLazyPreparation: false`").
 
+### Scheduled — v3.0.0 (Phase S)
+
+| # | Item | Status |
+|---|------|--------|
+| S1–S10 | Multi-user profiles via Navidrome IdP (registry, migration, login, active-profile provider, dio wiring, isolation audit, Settings UI, docs). | ✅ shipped 2026-06-17 |
+| S11 | v3.0.0 smoke + bump (deferred to on-device verification once backend J6 is live). | ⏳ pending backend J6 + on-device smoke |
+
+ADR: `DECISIONLOG.md` 2026-06-17 ("Multi-user profiles via Navidrome IdP — heerr v3.0.0").
+
+### Deferred — v3.1.0 backlog
+
+| # | Item | Unlock condition |
+|---|------|-----------------|
+| S-future | Per-user Last.fm / ListenBrainz forwarding configured *on the device* instead of via `navidrome.toml`. | Reports of mis-attributed scrobbles in a multi-user household where Navidrome's per-user forwarding isn't enough. |
+| S-future | Biometric unlock for the per-profile Navidrome password. | User asks for re-auth on app resume; pulls in `local_auth` dep. |
+| S-future | Soft profile switching (in-memory swap, no app teardown). | Profile-switch latency becomes a friction point in practice. |
+
 ### Unscheduled — v3 backlog
 
 Items still in ROADMAP `## Out of scope`. Do not implement without a new DECISIONLOG entry re-scoping them.

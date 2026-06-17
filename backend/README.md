@@ -405,7 +405,7 @@ backend/
     ├── CONTEXT.md             standing facts (env, constraints, server, deps)
     ├── DECISIONLOG.md         ADRs (newest at bottom)
     ├── CHANGELOG.md           per-task append-only log
-    ├── DEBT.md                outstanding tech debt (post v2.0.0-rc1)
+    ├── DEBT.md                outstanding tech debt (post v3.0.0-rc1)
     └── ROADMAP.md             milestone build sequence (A1 → J12)
 ```
 
@@ -462,4 +462,4 @@ PRs targeting `main` that touch `backend/**` or the workflow file build the imag
 | `docs/DECISIONLOG.md` | ADRs — every "we chose X over Y because Z" decision with alternatives considered. |
 | `docs/ROADMAP.md` | Milestone build sequence with per-milestone commit messages. |
 | `docs/CHANGELOG.md` | Append-only log of every task's changes. |
-| `docs/DEBT.md` | Outstanding tech debt tracked post v2.0.0-rc1. |
+| `docs/DEBT.md` | Outstanding tech debt tracked post v3.0.0-rc1. |
