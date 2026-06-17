@@ -1,5 +1,6 @@
 import hashlib
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -46,6 +47,7 @@ async def bearer_token(
             detail="token has no associated user",
         )
     owner_label_var.set(tok.owner_label)
+    tok.last_used_at = datetime.now(UTC)
     return tok
 
 

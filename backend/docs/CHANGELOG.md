@@ -631,3 +631,26 @@ Human-readable label persisted alongside each job so the Android queue UI shows 
   - **N14:** Backend does not canonicalize YouTube Music URLs before handing to spotDL. URLs with `&list=...` / `&index=...` drive spotDL into a broken `KeyError: 'videoDetails'` path; bare `watch?v=<id>` works.
 - Both surfaced during the J12 smoke and are listed in the J12 CHANGELOG entry above; promoted to formal DEBT items here.
 - No code changes.
+
+## 2026-06-17 — DEBT trivials: N3 + N7 + N11
+
+Knocked out the three lowest-effort items from DEBT.md.
+
+- **N3 — `tokens.last_used_at`.**
+  - New migration `backend/alembic/versions/0007_tokens_last_used_at.py` adds a nullable `TIMESTAMP WITH TIME ZONE` column on `tokens`.
+  - `backend/app/models/token.py`: corresponding `last_used_at: Mapped[datetime | None]`.
+  - `backend/app/api/deps.py`: `bearer_token` stamps `tok.last_used_at = datetime.now(UTC)` after auth succeeds. The existing `get_session` commit pattern persists it.
+  - Tests: `tests/test_migration_0007.py` (column shape); new case `test_bearer_token_bumps_last_used_at` in `tests/test_auth.py`.
+  - Operator value: makes `last-used` a sortable column for the future `--user` filter on `list-tokens` (N4) and for revoking stale tokens.
+
+- **N7 — `/health` vs `/ready` split.**
+  - `backend/app/api/v1/health.py`: `/health` stays unconditional 200; new `/ready` runs `SELECT 1` via `get_session` and returns 503 on failure.
+  - Tests: `test_ready_returns_200_when_db_reachable` and `test_ready_returns_503_when_db_unreachable` in `tests/test_health.py` (the latter overrides `get_session` with a stub whose `execute()` raises).
+  - Docker / k8s readiness probes can move to `/ready`; `/health` remains a cheap liveness ping.
+
+- **N11 — spotDL version logged at process startup.**
+  - `backend/app/services/spotdl_runner.py`: new `log_spotdl_version()` runs `spotdl --version` via `subprocess.run` (10s timeout, capture_output) and logs an INFO line with `spotdl_executable` + `spotdl_version`. Failures (FileNotFound / Timeout / OSError) log a WARNING but never crash the app.
+  - `backend/app/main.py`: invoked once inside `create_app()` after `setup_logging()`.
+  - No per-job overhead; container version pin is in the structured boot log.
+
+- Full suite green (300/300). `ruff check`, `ruff format --check`, `mypy app/` all clean.

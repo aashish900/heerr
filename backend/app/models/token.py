@@ -47,6 +47,9 @@ class Token(Base):
         server_default=sa.text("now()"),
     )
     revoked_at: Mapped[datetime | None] = mapped_column(sa.TIMESTAMP(timezone=True), nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        sa.TIMESTAMP(timezone=True), nullable=True
+    )
     user_id: Mapped[UUID] = mapped_column(
         postgresql.UUID(as_uuid=True),
         nullable=False,

@@ -51,15 +51,15 @@ These will mislead a future Claude session reading the bootstrap docs.
 |---|------|-------|
 | N1 | No `GET /admin/users` list / `DELETE /admin/users/{id}`. J10 added create-or-get but no list/remove. Operator inspects via raw SQL. | |
 | N2 | No `GET /admin/jobs` with filtering. Same. | |
-| N3 | No `tokens.last_used_at`. Can't tell which tokens are stale and safe to revoke. | Bump in `bearer_token` (cheap; once per request). |
+| ~~N3~~ | ~~No `tokens.last_used_at`.~~ Resolved 2026-06-17: migration 0007 added the column; `bearer_token` stamps `now()` on every authenticated request. | — |
 | N4 | CLI `list-tokens` has no `--user` filter. Hard to clean up after one user. | |
 | N5 | No CORS configuration. Future admin web UI from a tailnet browser will be blocked. | |
 | N6 | No request body size limits. FastAPI default is unlimited. `POST /search` with a 10 MB query lands intact in worker memory. | |
-| N7 | `/health` returns `200 {"status":"ok"}` unconditionally — doesn't verify DB. Container healthcheck calls this. | Add `/ready` that pings DB; keep `/health` cheap. |
+| ~~N7~~ | ~~`/health` returns `200 {"status":"ok"}` unconditionally — doesn't verify DB.~~ Resolved 2026-06-17: split into `/health` (unconditional 200) + `/ready` (runs `SELECT 1`, returns 503 on failure). | — |
 | N8 | OpenAPI docs at `/api/v1/docs` are unauthenticated and expose admin endpoint shapes. | Tailscale-only mitigates; still sloppy. |
 | N9 | `bearer_token` raises 500 on `tok.user is None`. Correct semantically (data corruption) but a delete-user-mid-request race surfaces a 500 with no actionable error. | Either return 401 with a "session invalidated" detail or guard the delete-user path. |
 | N10 | `spotdl_runner` swallows fine-grained errors — captures 4 KB stdout+stderr tail with no structured categorization (network / region-lock / age-gate / transcode failure). | Classify common spotDL exit patterns; surface as typed `SpotdlError` subclasses. |
-| N11 | No spotDL version fingerprint logged at job start. Two containers on different spotDL versions produce different outputs; nothing in the job row records which version ran. | One-line log at job start. |
+| ~~N11~~ | ~~No spotDL version fingerprint logged at job start.~~ Resolved 2026-06-17: `log_spotdl_version()` probes `spotdl --version` once during `create_app()`; result lands in the structured boot log. | — |
 | N12 | No structured progress on jobs. Documented decision; multi-user UX makes the gap more visible. | Coupled with C3 — needs cancellable workers anyway. |
 | N13 | **`POST /auth/login` returns 500 instead of 503 when `NAVIDROME_URL` is missing or malformed.** Surfaced during J12 smoke: with the env var unset, `verify_credentials` lets an httpx URL-parse exception bubble unhandled. Operator misconfig should look like "Navidrome unreachable", not "backend crashed". | Defensive validation in `app/config.py` (fail fast at boot if `NAVIDROME_URL` is not a parseable `http(s)` URL) and/or a broader `except` in `verify_credentials` that wraps non-`NavidromeUnreachable` errors. |
 | N14 | **Backend does not canonicalize YouTube Music URLs before handing to spotDL.** Surfaced during J12 smoke: URLs with `&list=...` / `&index=...` query params drive spotDL into a broken `KeyError: 'videoDetails'` code path; stripping to bare `watch?v=<id>` works. Two real user paste-ins failed before this was diagnosed. | Strip non-essential query params (`list`, `index`, `pp`, `feature`, ...) in the `/download` handler or in `spotdl_runner` before subprocess invoke. Independently, the pinned spotDL is upstream-broken on the full URL form — consider bumping. |

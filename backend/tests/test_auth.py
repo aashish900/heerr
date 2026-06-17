@@ -180,3 +180,33 @@ async def test_login_minted_token_resolves_to_logged_in_user(app_sm, client):
     r = await client.get("/whoami-user", headers={"Authorization": f"Bearer {raw}"})
     assert r.status_code == 200
     assert r.json()["navidrome_username"] == username
+
+
+# ---- N3: last_used_at bumped on every authenticated request ---------------
+
+
+async def test_bearer_token_bumps_last_used_at(client, make_token, app_sm):
+    """Every authenticated request stamps tokens.last_used_at = now()."""
+    import hashlib
+    from datetime import UTC, datetime
+
+    from sqlalchemy import select
+
+    from app.models import Token
+
+    raw = await make_token(owner="last-used-probe")
+    token_hash = hashlib.sha256(raw.encode()).hexdigest()
+
+    # Pre-condition: brand-new token has NULL last_used_at.
+    async with app_sm() as s:
+        tok = (await s.execute(select(Token).where(Token.token_hash == token_hash))).scalar_one()
+        assert tok.last_used_at is None
+
+    before = datetime.now(UTC)
+    r = await client.get("/whoami", headers={"Authorization": f"Bearer {raw}"})
+    assert r.status_code == 200
+
+    async with app_sm() as s:
+        tok = (await s.execute(select(Token).where(Token.token_hash == token_hash))).scalar_one()
+        assert tok.last_used_at is not None
+        assert tok.last_used_at >= before

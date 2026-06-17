@@ -1,10 +1,42 @@
 import asyncio
+import logging
 import os
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 _AUDIO_SUFFIXES = {".mp3", ".m4a", ".opus", ".flac", ".ogg", ".wav"}
 _OUTPUT_TAIL_BYTES = 4000
+
+_log = logging.getLogger(__name__)
+
+
+def log_spotdl_version() -> None:
+    """Probe `spotdl --version` once at app boot and log the result.
+
+    Two containers on different spotDL versions produce different outputs;
+    pinning the version in the boot log makes it possible to correlate a
+    bad job back to a specific spotdl build.
+    """
+    exe = _spotdl_executable()
+    try:
+        result = subprocess.run(
+            [exe, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        version = (result.stdout or result.stderr or "").strip() or "unknown"
+        _log.info(
+            "spotdl version probed",
+            extra={"spotdl_executable": exe, "spotdl_version": version},
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
+        _log.warning(
+            "spotdl version probe failed",
+            extra={"spotdl_executable": exe, "error": str(exc)},
+        )
 
 
 def _spotdl_executable() -> str:

@@ -41,3 +41,39 @@ async def test_module_level_app_exists():
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         r = await c.get("/api/v1/health")
     assert r.status_code == 200
+
+
+async def test_ready_returns_200_when_db_reachable(app_sm):
+    from app.db import get_session
+
+    app = create_app()
+
+    async def override_get_session():
+        async with app_sm() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        r = await c.get("/api/v1/ready")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok"}
+
+
+async def test_ready_returns_503_when_db_unreachable():
+    from app.db import get_session
+
+    app = create_app()
+
+    async def broken_session():
+        class _Bad:
+            async def execute(self, *a, **k):
+                raise RuntimeError("connection refused")
+
+        yield _Bad()
+
+    app.dependency_overrides[get_session] = broken_session
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        r = await c.get("/api/v1/ready")
+    assert r.status_code == 503
