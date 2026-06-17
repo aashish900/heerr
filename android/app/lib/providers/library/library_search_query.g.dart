@@ -31,5 +31,28 @@ final librarySearchQueryProvider =
     );
 
 typedef _$LibrarySearchQuery = Notifier<String>;
+String _$librarySearchAutoFocusHash() =>
+    r'c55b892985420976e3ad57c16227eaf7e110342a';
+
+/// One-shot flag flipped by surfaces outside the Library tab (Home's
+/// search shortcut) to request that Library auto-enter search mode on
+/// next mount. The LibraryScreen reads it in `initState`, applies it,
+/// then resets it so a later plain tap on the Library tab doesn't
+/// reopen search.
+///
+/// Copied from [LibrarySearchAutoFocus].
+@ProviderFor(LibrarySearchAutoFocus)
+final librarySearchAutoFocusProvider =
+    NotifierProvider<LibrarySearchAutoFocus, bool>.internal(
+      LibrarySearchAutoFocus.new,
+      name: r'librarySearchAutoFocusProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$librarySearchAutoFocusHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$LibrarySearchAutoFocus = Notifier<bool>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

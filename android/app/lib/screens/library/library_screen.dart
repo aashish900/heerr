@@ -54,7 +54,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     super.initState();
     final String initial = ref.read(librarySearchQueryProvider);
     _searchController = TextEditingController(text: initial);
-    _searching = initial.isNotEmpty;
+    final bool autoFocusRequested =
+        ref.read(librarySearchAutoFocusProvider);
+    _searching = initial.isNotEmpty || autoFocusRequested;
+    if (autoFocusRequested) {
+      // Consume after the first build so subsequent navigations into the
+      // Library tab don't accidentally re-enter search mode.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(librarySearchAutoFocusProvider.notifier).consume();
+      });
+    }
   }
 
   @override

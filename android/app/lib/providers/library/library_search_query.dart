@@ -22,3 +22,22 @@ class LibrarySearchQuery extends _$LibrarySearchQuery {
     state = '';
   }
 }
+
+/// One-shot flag flipped by surfaces outside the Library tab (Home's
+/// search shortcut) to request that Library auto-enter search mode on
+/// next mount. The LibraryScreen reads it in `initState`, applies it,
+/// then resets it so a later plain tap on the Library tab doesn't
+/// reopen search.
+@Riverpod(keepAlive: true)
+class LibrarySearchAutoFocus extends _$LibrarySearchAutoFocus {
+  @override
+  bool build() => false;
+
+  void request() {
+    state = true;
+  }
+
+  void consume() {
+    state = false;
+  }
+}

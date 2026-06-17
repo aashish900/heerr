@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../models/recommended_track.dart';
 import '../../models/subsonic/album.dart';
 import '../../providers/home/home_providers.dart';
+import '../../providers/library/library_search_query.dart';
 import '../../router.dart' show Routes;
 import '../../widgets/empty_state.dart';
 import '../../widgets/home_grid_tile.dart';
@@ -80,6 +81,7 @@ class _HomeBody extends ConsumerWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 24),
       children: const <Widget>[
+        _HomeSearchBar(),
         _QuickAccessGrid(),
         _JumpBackInSection(),
         _MostPlayedSection(),
@@ -305,6 +307,53 @@ class _MostPlayedSection extends ConsumerWidget {
               .toList(),
         );
       },
+    );
+  }
+}
+
+/// Tappable search affordance at the top of Home. Tapping it requests
+/// the Library tab to auto-enter search mode on next mount, then
+/// navigates to /library — search lives on a single chokepoint
+/// (Library's combined-search field), so this surface is presentation
+/// only and not a duplicate input.
+class _HomeSearchBar extends ConsumerWidget {
+  const _HomeSearchBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ColorScheme colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Material(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(28),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {
+            ref.read(librarySearchAutoFocusProvider.notifier).request();
+            ref.read(librarySearchQueryProvider.notifier).clear();
+            context.go(Routes.library);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: <Widget>[
+                Icon(Icons.search, color: colors.onSurfaceVariant),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Search your library + YouTube Music',
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
