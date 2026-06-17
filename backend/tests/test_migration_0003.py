@@ -23,8 +23,8 @@ def test_downloads_has_source_url_column(db_conn):
 def test_source_type_check_accepts_song(db_conn, seed_token):
     cur = db_conn.cursor()
     cur.execute(
-        "INSERT INTO jobs (source_url, source_type, state, created_by_token_id)"
-        " VALUES (%s, %s, %s, %s) RETURNING id",
+        "INSERT INTO jobs (source_url, source_type, state, created_by_token_id, user_id)"
+        " VALUES (%s, %s, %s, %s, system_admin_user_id()) RETURNING id",
         ("https://www.youtube.com/watch?v=yt0003", "song", "queued", seed_token),
     )
     job_id = cur.fetchone()[0]
@@ -35,7 +35,7 @@ def test_source_type_check_rejects_track(db_conn, seed_token):
     cur = db_conn.cursor()
     with pytest.raises(pg_errors.CheckViolation):
         cur.execute(
-            "INSERT INTO jobs (source_url, source_type, state, created_by_token_id)"
-            " VALUES (%s, %s, %s, %s)",
+            "INSERT INTO jobs (source_url, source_type, state, created_by_token_id, user_id)"
+            " VALUES (%s, %s, %s, %s, system_admin_user_id())",
             ("https://www.youtube.com/watch?v=yt0003b", "track", "queued", seed_token),
         )

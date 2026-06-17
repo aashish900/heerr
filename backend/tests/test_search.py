@@ -1,6 +1,7 @@
 import uuid
 
 import pytest
+import sqlalchemy as sa
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
@@ -127,6 +128,7 @@ async def _seed_download(app_sm, token_id, source_url: str):
                 source_type="song",
                 state="done",
                 created_by_token_id=token_id,
+                user_id=sa.func.system_admin_user_id(),
             )
         )
         await s.flush()
@@ -150,6 +152,7 @@ async def _seed_active_job(app_sm, token_id, source_url: str, type_: str, state:
                 source_type=type_,
                 state=state,
                 created_by_token_id=token_id,
+                user_id=sa.func.system_admin_user_id(),
             )
         )
         await s.commit()

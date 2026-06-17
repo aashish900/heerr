@@ -20,8 +20,8 @@ def test_jobs_display_name_column_exists(db_conn):
 def test_jobs_display_name_accepts_text(db_conn, seed_token):
     cur = db_conn.cursor()
     cur.execute(
-        "INSERT INTO jobs (source_url, source_type, state, display_name, created_by_token_id) "
-        "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+        "INSERT INTO jobs (source_url, source_type, state, display_name, created_by_token_id, user_id)"
+        "VALUES (%s, %s, %s, %s, %s, system_admin_user_id()) RETURNING id",
         (
             f"https://www.youtube.com/watch?v=disp-{uuid.uuid4()}",
             "song",
@@ -38,8 +38,8 @@ def test_jobs_display_name_accepts_text(db_conn, seed_token):
 def test_jobs_display_name_nullable(db_conn, seed_token):
     cur = db_conn.cursor()
     cur.execute(
-        "INSERT INTO jobs (source_url, source_type, state, created_by_token_id) "
-        "VALUES (%s, %s, %s, %s) RETURNING id",
+        "INSERT INTO jobs (source_url, source_type, state, created_by_token_id, user_id)"
+        "VALUES (%s, %s, %s, %s, system_admin_user_id()) RETURNING id",
         (
             f"https://www.youtube.com/watch?v=nodisp-{uuid.uuid4()}",
             "song",

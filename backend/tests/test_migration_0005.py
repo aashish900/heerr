@@ -58,28 +58,10 @@ def test_jobs_user_id_not_null_enforced(db_conn, seed_token):
         )
 
 
-def test_tokens_default_user_id_is_system_admin(db_conn):
-    cur = db_conn.cursor()
-    cur.execute(
-        "INSERT INTO tokens (token_hash, owner_label, scopes)"
-        " VALUES (%s, %s, %s) RETURNING user_id",
-        (f"hash-{uuid.uuid4()}", "default", ["read"]),
-    )
-    user_id = cur.fetchone()[0]
-    cur.execute("SELECT navidrome_username FROM users WHERE id = %s", (user_id,))
-    assert cur.fetchone()[0] == "system-admin"
-
-
-def test_jobs_default_user_id_is_system_admin(db_conn, seed_token):
-    cur = db_conn.cursor()
-    cur.execute(
-        "INSERT INTO jobs (source_url, source_type, state, created_by_token_id)"
-        " VALUES (%s, %s, %s, %s) RETURNING user_id",
-        ("https://www.youtube.com/watch?v=ytJ2def", "song", "queued", seed_token),
-    )
-    user_id = cur.fetchone()[0]
-    cur.execute("SELECT navidrome_username FROM users WHERE id = %s", (user_id,))
-    assert cur.fetchone()[0] == "system-admin"
+# NOTE: the J2 system_admin_user_id() server default tested here historically
+# was dropped by migration 0008. The "INSERT without user_id silently picks up
+# system-admin" tests now live in test_migration_0008.py (asserting the
+# opposite — NotNullViolation, not silent route).
 
 
 def test_backfill_assigns_seed_users_to_preexisting_rows(db_conn):

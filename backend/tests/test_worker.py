@@ -2,6 +2,7 @@ import hashlib
 import uuid
 
 import pytest
+import sqlalchemy as sa
 from sqlalchemy import func, select, text
 
 from app.models import Download, Job, Token
@@ -17,6 +18,7 @@ async def token_id(app_sm):
     async with app_sm() as s:
         tok = Token(
             token_hash=h,
+            user_id=sa.func.system_admin_user_id(),
             owner_label="worker-test",
             scopes=["read", "download"],
         )
@@ -45,6 +47,7 @@ async def _seed_queued_job(app_sm, token_id, source_url, source_type="song"):
         source_type=source_type,
         state="queued",
         created_by_token_id=token_id,
+        user_id=sa.func.system_admin_user_id(),
     )
     async with app_sm() as s:
         s.add(job)
@@ -245,6 +248,7 @@ async def test_run_job_non_queued_job_is_noop(app_sm, token_id, tmp_path, cleanu
         source_type="song",
         state="running",  # not queued
         created_by_token_id=token_id,
+        user_id=sa.func.system_admin_user_id(),
     )
     async with app_sm() as s:
         s.add(job)

@@ -4,6 +4,7 @@ from datetime import UTC
 from uuid import UUID
 
 import pytest
+import sqlalchemy as sa
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
@@ -108,6 +109,7 @@ async def test_create_token_returns_raw_once_and_persists_hash(client, make_toke
             "owner_label": "admin-test-aashish",
             "scopes": ["read", "download"],
             "is_admin": False,
+            "navidrome_username": "system-admin",
         },
     )
     assert r.status_code == 201, r.text
@@ -146,7 +148,7 @@ async def test_create_token_invalid_scope_returns_422(client, make_token, cleanu
     r = await client.post(
         "/api/v1/admin/tokens",
         headers=h,
-        json={"owner_label": "x", "scopes": ["bogus"]},
+        json={"owner_label": "x", "scopes": ["bogus"], "navidrome_username": "system-admin"},
     )
     assert r.status_code == 422
 
@@ -157,7 +159,7 @@ async def test_create_token_empty_scopes_returns_422(client, make_token, cleanup
     r = await client.post(
         "/api/v1/admin/tokens",
         headers=h,
-        json={"owner_label": "x", "scopes": []},
+        json={"owner_label": "x", "scopes": [], "navidrome_username": "system-admin"},
     )
     assert r.status_code == 422
 
@@ -174,6 +176,7 @@ async def test_list_tokens_does_not_leak_hash_or_raw(client, make_token, cleanup
         json={
             "owner_label": "admin-test-listed",
             "scopes": ["read"],
+            "navidrome_username": "system-admin",
         },
     )
     raw_new = r1.json()["raw_token"]
@@ -198,7 +201,11 @@ async def test_revoke_token_sets_revoked_at(client, make_token, cleanup):
     create_r = await client.post(
         "/api/v1/admin/tokens",
         headers=h,
-        json={"owner_label": "admin-test-revoke", "scopes": ["read"]},
+        json={
+            "owner_label": "admin-test-revoke",
+            "scopes": ["read"],
+            "navidrome_username": "system-admin",
+        },
     )
     token_id = create_r.json()["id"]
 
@@ -223,7 +230,11 @@ async def test_revoke_already_revoked_returns_409(client, make_token, cleanup):
     create_r = await client.post(
         "/api/v1/admin/tokens",
         headers=h,
-        json={"owner_label": "admin-test-dblrev", "scopes": ["read"]},
+        json={
+            "owner_label": "admin-test-dblrev",
+            "scopes": ["read"],
+            "navidrome_username": "system-admin",
+        },
     )
     token_id = create_r.json()["id"]
     await client.post(f"/api/v1/admin/tokens/{token_id}/revoke", headers=h)
@@ -252,6 +263,7 @@ async def _seed_job(
         error_msg=error_msg,
         attempt_count=attempt_count,
         created_by_token_id=token_id,
+        user_id=sa.func.system_admin_user_id(),
         finished_at=datetime.now(UTC) if state in ("done", "failed") else None,
     )
     async with app_sm() as s:

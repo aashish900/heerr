@@ -11,6 +11,7 @@ class CreateTokenRequest(BaseModel):
     owner_label: str = Field(..., min_length=1)
     scopes: list[Literal["read", "download"]] = Field(..., min_length=1)
     is_admin: bool = False
+    navidrome_username: str = Field(..., min_length=1)
 
     @field_validator("scopes")
     @classmethod

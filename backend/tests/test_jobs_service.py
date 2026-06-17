@@ -19,10 +19,15 @@ from app.services.jobs import (
 
 
 @pytest.fixture
-async def token_id(app_sm):
+async def token_id(app_sm, system_admin_user_id):
     h = hashlib.sha256(f"raw-{uuid.uuid4()}".encode()).hexdigest()
     async with app_sm() as s:
-        tok = Token(token_hash=h, owner_label="test", scopes=["read", "download"])
+        tok = Token(
+            token_hash=h,
+            owner_label="test",
+            scopes=["read", "download"],
+            user_id=system_admin_user_id,
+        )
         s.add(tok)
         await s.commit()
         await s.refresh(tok)
@@ -45,13 +50,14 @@ async def cleanup_jobs(app_sm):
 # ---- create_job_idempotent ------------------------------------------------
 
 
-async def test_create_inserts_new_job(app_sm, token_id, cleanup_jobs):
+async def test_create_inserts_new_job(app_sm, token_id, system_admin_user_id, cleanup_jobs):
     async with app_sm() as s:
         job, deduped = await create_job_idempotent(
             s,
             source_url="https://www.youtube.com/watch?v=a",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
         )
         await s.commit()
     assert deduped is False
@@ -63,13 +69,14 @@ async def test_create_inserts_new_job(app_sm, token_id, cleanup_jobs):
     assert job.display_name is None
 
 
-async def test_create_stores_display_name(app_sm, token_id, cleanup_jobs):
+async def test_create_stores_display_name(app_sm, token_id, system_admin_user_id, cleanup_jobs):
     async with app_sm() as s:
         job, deduped = await create_job_idempotent(
             s,
             source_url="https://www.youtube.com/watch?v=disp-new",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
             display_name="Bohemian Rhapsody — Queen",
         )
         await s.commit()
@@ -80,7 +87,9 @@ async def test_create_stores_display_name(app_sm, token_id, cleanup_jobs):
         assert row.display_name == "Bohemian Rhapsody — Queen"
 
 
-async def test_create_dedupe_keeps_existing_display_name(app_sm, token_id, cleanup_jobs):
+async def test_create_dedupe_keeps_existing_display_name(
+    app_sm, token_id, system_admin_user_id, cleanup_jobs
+):
     """Re-dispatching an active URI does not overwrite the original label."""
     async with app_sm() as s:
         first, _ = await create_job_idempotent(
@@ -88,6 +97,7 @@ async def test_create_dedupe_keeps_existing_display_name(app_sm, token_id, clean
             source_url="https://www.youtube.com/watch?v=disp-dup",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
             display_name="Original Name",
         )
         await s.commit()
@@ -99,6 +109,7 @@ async def test_create_dedupe_keeps_existing_display_name(app_sm, token_id, clean
             source_url="https://www.youtube.com/watch?v=disp-dup",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
             display_name="Other Name",
         )
     assert deduped is True
@@ -106,13 +117,16 @@ async def test_create_dedupe_keeps_existing_display_name(app_sm, token_id, clean
     assert second.display_name == "Original Name"
 
 
-async def test_create_dedupes_when_active_exists(app_sm, token_id, cleanup_jobs):
+async def test_create_dedupes_when_active_exists(
+    app_sm, token_id, system_admin_user_id, cleanup_jobs
+):
     async with app_sm() as s:
         first, _ = await create_job_idempotent(
             s,
             source_url="https://www.youtube.com/watch?v=b",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
         )
         await s.commit()
         first_id = first.id
@@ -123,18 +137,22 @@ async def test_create_dedupes_when_active_exists(app_sm, token_id, cleanup_jobs)
             source_url="https://www.youtube.com/watch?v=b",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
         )
     assert deduped is True
     assert second.id == first_id
 
 
-async def test_create_allows_requeue_after_done(app_sm, token_id, cleanup_jobs):
+async def test_create_allows_requeue_after_done(
+    app_sm, token_id, system_admin_user_id, cleanup_jobs
+):
     async with app_sm() as s:
         first, _ = await create_job_idempotent(
             s,
             source_url="https://www.youtube.com/watch?v=c",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
         )
         await s.commit()
         first_id = first.id
@@ -150,6 +168,7 @@ async def test_create_allows_requeue_after_done(app_sm, token_id, cleanup_jobs):
             source_url="https://www.youtube.com/watch?v=c",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
         )
         await s.commit()
     assert deduped is False
@@ -158,7 +177,7 @@ async def test_create_allows_requeue_after_done(app_sm, token_id, cleanup_jobs):
 
 
 async def test_create_concurrent_inserts_dedupe_via_partial_unique_index(
-    app_sm, token_id, cleanup_jobs
+    app_sm, token_id, system_admin_user_id, cleanup_jobs
 ):
     """The partial-unique-index ensures only one of two parallel creates wins."""
     uri = "https://www.youtube.com/watch?v=race"
@@ -170,6 +189,7 @@ async def test_create_concurrent_inserts_dedupe_via_partial_unique_index(
                 source_url=uri,
                 source_type="song",
                 token_id=token_id,
+                user_id=system_admin_user_id,
             )
             await s.commit()
             return job.id, deduped
@@ -184,13 +204,16 @@ async def test_create_concurrent_inserts_dedupe_via_partial_unique_index(
 # ---- mark_running ---------------------------------------------------------
 
 
-async def test_mark_running_sets_state_and_started_at(app_sm, token_id, cleanup_jobs):
+async def test_mark_running_sets_state_and_started_at(
+    app_sm, token_id, system_admin_user_id, cleanup_jobs
+):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
             source_url="https://www.youtube.com/watch?v=r1",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
         )
         await s.commit()
         job_id = job.id
@@ -205,13 +228,16 @@ async def test_mark_running_sets_state_and_started_at(app_sm, token_id, cleanup_
         assert row.started_at is not None
 
 
-async def test_mark_running_rejects_non_queued(app_sm, token_id, cleanup_jobs):
+async def test_mark_running_rejects_non_queued(
+    app_sm, token_id, system_admin_user_id, cleanup_jobs
+):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
             source_url="https://www.youtube.com/watch?v=r2",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
         )
         await s.commit()
         await mark_running(s, job.id)
@@ -225,13 +251,16 @@ async def test_mark_running_rejects_non_queued(app_sm, token_id, cleanup_jobs):
 # ---- mark_done ------------------------------------------------------------
 
 
-async def test_mark_done_sets_state_and_finished_at(app_sm, token_id, cleanup_jobs):
+async def test_mark_done_sets_state_and_finished_at(
+    app_sm, token_id, system_admin_user_id, cleanup_jobs
+):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
             source_url="https://www.youtube.com/watch?v=d1",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
         )
         await s.commit()
         job_id = job.id
@@ -247,13 +276,14 @@ async def test_mark_done_sets_state_and_finished_at(app_sm, token_id, cleanup_jo
         assert row.finished_at is not None
 
 
-async def test_mark_done_rejects_queued(app_sm, token_id, cleanup_jobs):
+async def test_mark_done_rejects_queued(app_sm, token_id, system_admin_user_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
             source_url="https://www.youtube.com/watch?v=d2",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
         )
         await s.commit()
 
@@ -265,13 +295,14 @@ async def test_mark_done_rejects_queued(app_sm, token_id, cleanup_jobs):
 # ---- mark_failed ----------------------------------------------------------
 
 
-async def test_mark_failed_from_queued(app_sm, token_id, cleanup_jobs):
+async def test_mark_failed_from_queued(app_sm, token_id, system_admin_user_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
             source_url="https://www.youtube.com/watch?v=f1",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
         )
         await s.commit()
         job_id = job.id
@@ -287,13 +318,14 @@ async def test_mark_failed_from_queued(app_sm, token_id, cleanup_jobs):
         assert row.error_msg == "validation died"
 
 
-async def test_mark_failed_from_running(app_sm, token_id, cleanup_jobs):
+async def test_mark_failed_from_running(app_sm, token_id, system_admin_user_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
             source_url="https://www.youtube.com/watch?v=f2",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
         )
         await s.commit()
         await mark_running(s, job.id)
@@ -309,13 +341,14 @@ async def test_mark_failed_from_running(app_sm, token_id, cleanup_jobs):
         assert row.error_msg == "spotdl crashed"
 
 
-async def test_mark_failed_rejects_done(app_sm, token_id, cleanup_jobs):
+async def test_mark_failed_rejects_done(app_sm, token_id, system_admin_user_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
             source_url="https://www.youtube.com/watch?v=f3",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
         )
         await s.commit()
         await mark_running(s, job.id)
@@ -330,13 +363,14 @@ async def test_mark_failed_rejects_done(app_sm, token_id, cleanup_jobs):
 # ---- bump_attempt ---------------------------------------------------------
 
 
-async def test_bump_attempt_increments(app_sm, token_id, cleanup_jobs):
+async def test_bump_attempt_increments(app_sm, token_id, system_admin_user_id, cleanup_jobs):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
             source_url="https://www.youtube.com/watch?v=b1",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
         )
         await s.commit()
         job_id = job.id
@@ -354,13 +388,16 @@ async def test_bump_attempt_increments(app_sm, token_id, cleanup_jobs):
 # ---- finders --------------------------------------------------------------
 
 
-async def test_find_active_for_url_returns_active(app_sm, token_id, cleanup_jobs):
+async def test_find_active_for_url_returns_active(
+    app_sm, token_id, system_admin_user_id, cleanup_jobs
+):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
             source_url="https://www.youtube.com/watch?v=find-a",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
         )
         await s.commit()
 
@@ -370,13 +407,16 @@ async def test_find_active_for_url_returns_active(app_sm, token_id, cleanup_jobs
     assert found.id == job.id
 
 
-async def test_find_active_for_url_returns_none_after_done(app_sm, token_id, cleanup_jobs):
+async def test_find_active_for_url_returns_none_after_done(
+    app_sm, token_id, system_admin_user_id, cleanup_jobs
+):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
             source_url="https://www.youtube.com/watch?v=find-b",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
         )
         await s.commit()
         await mark_running(s, job.id)
@@ -388,13 +428,16 @@ async def test_find_active_for_url_returns_none_after_done(app_sm, token_id, cle
     assert found is None
 
 
-async def test_find_download_for_song_returns_download(app_sm, token_id, cleanup_jobs):
+async def test_find_download_for_song_returns_download(
+    app_sm, token_id, system_admin_user_id, cleanup_jobs
+):
     async with app_sm() as s:
         job, _ = await create_job_idempotent(
             s,
             source_url="https://www.youtube.com/watch?v=find-dl",
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
         )
         await s.commit()
         s.add(
@@ -421,7 +464,9 @@ async def test_find_download_for_song_returns_none(app_sm, cleanup_jobs):
 # ---- C2 / T3: recover_orphaned_jobs ---------------------------------------
 
 
-async def test_recover_orphaned_marks_running_as_failed(app_sm, token_id, cleanup_jobs):
+async def test_recover_orphaned_marks_running_as_failed(
+    app_sm, token_id, system_admin_user_id, cleanup_jobs
+):
     from app.services.jobs import recover_orphaned_jobs
 
     async with app_sm() as s:
@@ -430,18 +475,21 @@ async def test_recover_orphaned_marks_running_as_failed(app_sm, token_id, cleanu
             source_type="song",
             state="running",
             created_by_token_id=token_id,
+            user_id=system_admin_user_id,
         )
         queued = Job(
             source_url="https://music.youtube.com/watch?v=untouched-q",
             source_type="song",
             state="queued",
             created_by_token_id=token_id,
+            user_id=system_admin_user_id,
         )
         done = Job(
             source_url="https://music.youtube.com/watch?v=untouched-d",
             source_type="song",
             state="done",
             created_by_token_id=token_id,
+            user_id=system_admin_user_id,
         )
         s.add_all([running, queued, done])
         await s.commit()
@@ -463,7 +511,7 @@ async def test_recover_orphaned_marks_running_as_failed(app_sm, token_id, cleanu
     assert d.state == "done"
 
 
-async def test_recover_orphaned_idempotent(app_sm, token_id, cleanup_jobs):
+async def test_recover_orphaned_idempotent(app_sm, token_id, system_admin_user_id, cleanup_jobs):
     """Second call with nothing in 'running' is a no-op (returns 0)."""
     from app.services.jobs import recover_orphaned_jobs
 
@@ -474,6 +522,7 @@ async def test_recover_orphaned_idempotent(app_sm, token_id, cleanup_jobs):
                 source_type="song",
                 state="done",
                 created_by_token_id=token_id,
+                user_id=system_admin_user_id,
             )
         )
         await s.commit()
@@ -484,7 +533,9 @@ async def test_recover_orphaned_idempotent(app_sm, token_id, cleanup_jobs):
     assert n == 0
 
 
-async def test_recover_orphaned_clears_active_dedup(app_sm, token_id, cleanup_jobs):
+async def test_recover_orphaned_clears_active_dedup(
+    app_sm, token_id, system_admin_user_id, cleanup_jobs
+):
     """After recovery, a new job for the same URL+user can be enqueued.
 
     Pre-recovery the partial unique index `jobs_active_user_source_url_idx`
@@ -501,6 +552,7 @@ async def test_recover_orphaned_clears_active_dedup(app_sm, token_id, cleanup_jo
                 source_type="song",
                 state="running",
                 created_by_token_id=token_id,
+                user_id=system_admin_user_id,
             )
         )
         await s.commit()
@@ -515,13 +567,14 @@ async def test_recover_orphaned_clears_active_dedup(app_sm, token_id, cleanup_jo
             source_url=url,
             source_type="song",
             token_id=token_id,
+            user_id=system_admin_user_id,
         )
         await s.commit()
     assert deduped is False
     assert job.state == "queued"
 
 
-async def test_lifespan_runs_recovery(app_sm, token_id, cleanup_jobs):
+async def test_lifespan_runs_recovery(app_sm, token_id, system_admin_user_id, cleanup_jobs):
     """Driving the FastAPI lifespan fires recover_orphaned_jobs."""
     from app.main import lifespan
 
@@ -532,6 +585,7 @@ async def test_lifespan_runs_recovery(app_sm, token_id, cleanup_jobs):
                 source_type="song",
                 state="running",
                 created_by_token_id=token_id,
+                user_id=system_admin_user_id,
             )
         )
         await s.commit()

@@ -1,4 +1,5 @@
 import pytest
+import sqlalchemy as sa
 from fastapi import Depends, FastAPI
 from httpx import ASGITransport, AsyncClient
 
@@ -232,6 +233,7 @@ async def test_dangling_user_returns_401(client, app_sm):
         s.add(
             Token(
                 token_hash=token_hash,
+                user_id=sa.func.system_admin_user_id(),
                 owner_label="dangling-probe",
                 scopes=["read", "download"],
             )

@@ -3,6 +3,7 @@ import uuid
 from datetime import UTC
 
 import pytest
+import sqlalchemy as sa
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
@@ -74,6 +75,7 @@ async def _seed_job(
         display_name=display_name,
         error_msg=error_msg,
         created_by_token_id=token_id,
+        user_id=sa.func.system_admin_user_id(),
         started_at=datetime.now(UTC) if set_started else None,
         finished_at=datetime.now(UTC) if set_finished else None,
     )

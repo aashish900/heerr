@@ -691,3 +691,25 @@ Knocked out the three lowest-effort items from DEBT.md.
   - `test_lifespan_runs_recovery`: drives the FastAPI lifespan via the `lifespan(fake_app)` context manager and asserts the orphan was failed.
 - Why no grace window: at boot the worker process is by definition gone. Any row still in `running` will never advance. A `started_at < now() - interval 'X'` filter would only delay the same cleanup. Once a real queue lands (C1) this can move to a per-worker leases model.
 - 318/318 tests green (+4 new). ruff + mypy clean.
+
+## 2026-06-17 — DEBT M1 + T4: drop system_admin_user_id() server default
+
+- **`backend/alembic/versions/0008_drop_system_admin_default.py`** — new migration `ALTER COLUMN ... DROP DEFAULT` on `tokens.user_id` and `jobs.user_id`. The PG function `system_admin_user_id()` itself is preserved for operator one-off lookups. Downgrade re-applies the defaults.
+- **`backend/app/models/{token,job}.py`** — `server_default=sa.text("system_admin_user_id()")` removed from both `user_id` mapped columns; the column is `NOT NULL` with no default.
+- **`backend/app/schemas/token.py`** — `CreateTokenRequest.navidrome_username` is now required (`min_length=1`).
+- **`backend/app/api/v1/admin.py`** — `POST /admin/tokens` looks up the user by `navidrome_username`, returns **404** if unknown, otherwise FK-links the new token to that user. Breaking API change for any script that called this endpoint without naming a user — the operator should pre-create the user via `POST /admin/users` first (idempotent) or pass `"system-admin"` for the legacy synthetic account.
+- **`backend/app/services/jobs.py`** — `create_job_idempotent(user_id=...)` is now required (positional/kwarg), not `UUID | None`. The "transitional path" branch was deleted.
+- **Test fixture updates:**
+  - `tests/conftest.py` — new session-scoped `system_admin_user_id` fixture (resolves the synthetic user's UUID at first call); `make_token` and `seed_token` fixtures now pass `user_id` explicitly.
+  - `tests/test_jobs_service.py` — `token_id` fixture seeds the synthetic user; every `create_job_idempotent(...)` call site now passes `user_id=system_admin_user_id`; C2 `Job(...)` blocks add `user_id` too.
+  - Test files that build `Job(...)` / `Token(...)` directly (test_queue, test_search, test_status, test_admin, test_worker, test_download, test_auth) now pass `user_id=sa.func.system_admin_user_id()` so they explicitly route to the synthetic user (no silent default).
+  - Migration tests 0001–0004 patched to pass `user_id` on raw psycopg INSERTs (column list + `system_admin_user_id()` in the VALUES tuple).
+  - `tests/test_migration_0005.py` — the two obsolete `*_default_user_id_is_system_admin` tests removed (they asserted behavior 0008 reverses); replaced by the M1/T4 tests below.
+  - `tests/test_admin.py`, `tests/test_logging.py` — admin POST `/admin/tokens` JSON bodies now include `"navidrome_username": "system-admin"`.
+- **`backend/tests/test_migration_0008.py`** (new) — T4 regression tests:
+  - `test_tokens_user_id_default_dropped`, `test_jobs_user_id_default_dropped` — assert `information_schema.columns.column_default` is NULL.
+  - `test_system_admin_user_id_function_still_exists` — the PG helper function is preserved.
+  - `test_insert_token_without_user_id_raises_not_null`, `test_insert_job_without_user_id_raises_not_null` — any future code path that omits `user_id` fails loudly with `NotNullViolation`.
+- Full suite green (321/321). ruff + mypy clean.
+
+**Operator note:** if you previously called `POST /admin/tokens` from a script with `{"owner_label", "scopes", "is_admin"}`, you must now also pass `"navidrome_username"`. The CLI subcommand `python -m app.cli create-token --user=<username>` was already FK-aware (J10) — no change there.

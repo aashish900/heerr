@@ -27,7 +27,7 @@ def test_tokens_has_nullable_user_id(db_conn):
     cur.execute("SELECT user_id FROM tokens LIMIT 0")
     # Insert without user_id must still work (nullable in 0004; J2 will flip to NOT NULL)
     cur.execute(
-        "INSERT INTO tokens (token_hash, owner_label, scopes) VALUES (%s, %s, %s) RETURNING id",
+        "INSERT INTO tokens (token_hash, owner_label, scopes, user_id) VALUES (%s, %s, %s, system_admin_user_id()) RETURNING id",
         (f"hash-{uuid.uuid4()}", "no-user", ["read"]),
     )
     cur.fetchone()
@@ -51,8 +51,8 @@ def test_tokens_user_id_fk_rejects_bogus(db_conn, seed_token):
 def test_jobs_user_id_fk_rejects_bogus(db_conn, seed_token):
     cur = db_conn.cursor()
     cur.execute(
-        "INSERT INTO jobs (source_url, source_type, state, created_by_token_id)"
-        " VALUES (%s, %s, %s, %s) RETURNING id",
+        "INSERT INTO jobs (source_url, source_type, state, created_by_token_id, user_id)"
+        " VALUES (%s, %s, %s, %s, system_admin_user_id()) RETURNING id",
         ("https://www.youtube.com/watch?v=yt0004", "song", "queued", seed_token),
     )
     job_id = cur.fetchone()[0]

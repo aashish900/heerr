@@ -77,7 +77,6 @@ class Job(Base):
     user_id: Mapped[UUID] = mapped_column(
         postgresql.UUID(as_uuid=True),
         nullable=False,
-        server_default=sa.text("system_admin_user_id()"),
     )
 
     user: Mapped[User] = relationship(back_populates="jobs")

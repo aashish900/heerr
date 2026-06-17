@@ -76,6 +76,14 @@ async def create_token(
     session: AsyncSession = Depends(get_session),
     _admin: Token = Depends(require_admin),
 ) -> CreateTokenResponse:
+    target = (
+        await session.execute(select(User).where(User.navidrome_username == req.navidrome_username))
+    ).scalar_one_or_none()
+    if target is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"unknown navidrome_username: {req.navidrome_username}",
+        )
     raw = secrets.token_urlsafe(32)
     h = hashlib.sha256(raw.encode()).hexdigest()
     tok = Token(
@@ -83,6 +91,7 @@ async def create_token(
         owner_label=req.owner_label,
         scopes=req.scopes,
         is_admin=req.is_admin,
+        user_id=target.id,
     )
     session.add(tok)
     await session.flush()

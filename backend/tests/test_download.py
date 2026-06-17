@@ -3,6 +3,7 @@ import uuid
 from uuid import UUID
 
 import pytest
+import sqlalchemy as sa
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
@@ -287,6 +288,7 @@ async def test_on_disk_song_returns_synthetic_done(
                 source_type="song",
                 state="done",
                 created_by_token_id=token_id,
+                user_id=sa.func.system_admin_user_id(),
             )
         )
         await s.flush()

@@ -51,9 +51,12 @@ def db_conn(pg_libpq_url):
 @pytest.fixture
 def seed_token(db_conn):
     cur = db_conn.cursor()
+    cur.execute("SELECT system_admin_user_id()")
+    sys_admin = cur.fetchone()[0]
     cur.execute(
-        "INSERT INTO tokens (token_hash, owner_label, scopes) " "VALUES (%s, %s, %s) RETURNING id",
-        (f"hash-{uuid.uuid4()}", "test", ["read", "download"]),
+        "INSERT INTO tokens (token_hash, owner_label, scopes, user_id) "
+        "VALUES (%s, %s, %s, %s) RETURNING id",
+        (f"hash-{uuid.uuid4()}", "test", ["read", "download"], sys_admin),
     )
     return cur.fetchone()[0]
 
@@ -74,7 +77,20 @@ async def app_sm(app_engine):
 
 
 @pytest.fixture
-async def make_token(app_sm):
+async def system_admin_user_id(app_sm):
+    """UUID of the system-admin user seeded by migration 0005.
+
+    Used by fixtures that need a valid `user_id` FK target without seeding a
+    fresh user per test. Post-0008 the server default is gone, so callers
+    must pass `user_id` explicitly.
+    """
+    async with app_sm() as s:
+        r = await s.execute(text("SELECT system_admin_user_id()"))
+        return r.scalar_one()
+
+
+@pytest.fixture
+async def make_token(app_sm, system_admin_user_id):
     """Async factory: returns the raw token string, cleans rows on teardown."""
     inserted_hashes: list[str] = []
 
@@ -83,6 +99,7 @@ async def make_token(app_sm):
         scopes: tuple[str, ...] = ("read", "download"),
         is_admin: bool = False,
         revoked: bool = False,
+        user_id: uuid.UUID | None = None,
     ) -> str:
         raw = f"raw-{uuid.uuid4().hex}"
         h = hashlib.sha256(raw.encode()).hexdigest()
@@ -94,6 +111,7 @@ async def make_token(app_sm):
                     scopes=list(scopes),
                     is_admin=is_admin,
                     revoked_at=datetime.now(UTC) if revoked else None,
+                    user_id=user_id or system_admin_user_id,
                 )
             )
             await s.commit()

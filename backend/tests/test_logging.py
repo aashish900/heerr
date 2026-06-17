@@ -210,7 +210,7 @@ async def test_admin_create_token_does_not_leak_raw_token_in_logs(client, access
     r = await client.post(
         "/api/v1/admin/tokens",
         headers={"Authorization": f"Bearer {admin_raw}"},
-        json={"owner_label": "newuser", "scopes": ["read"]},
+        json={"owner_label": "newuser", "scopes": ["read"], "navidrome_username": "system-admin"},
     )
     assert r.status_code in (200, 201)
     raw_returned = r.json()["raw_token"]

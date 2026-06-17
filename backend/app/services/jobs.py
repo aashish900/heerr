@@ -57,7 +57,7 @@ async def create_job_idempotent(
     source_url: str,
     source_type: str,
     token_id: UUID,
-    user_id: UUID | None = None,
+    user_id: UUID,
     display_name: str | None = None,
 ) -> tuple[Job, bool]:
     """Return (job, deduped).
@@ -71,25 +71,19 @@ async def create_job_idempotent(
     state IN ('queued','running')` makes concurrent duplicate inserts by the
     same user impossible at the DB level. The IntegrityError-then-refetch
     path converts the loser of a race into a clean `deduped=True` result.
-
-    When `user_id` is None the row uses the `system_admin_user_id()` server
-    default and dedupe is scoped against that synthetic user — the J2
-    transitional path retained for callers that don't yet pass a user.
     """
     existing = await find_active_for_url(session, source_url, user_id=user_id)
     if existing is not None:
         return existing, True
 
-    kwargs: dict[str, object] = {
-        "source_url": source_url,
-        "source_type": source_type,
-        "state": "queued",
-        "display_name": display_name,
-        "created_by_token_id": token_id,
-    }
-    if user_id is not None:
-        kwargs["user_id"] = user_id
-    job = Job(**kwargs)
+    job = Job(
+        source_url=source_url,
+        source_type=source_type,
+        state="queued",
+        display_name=display_name,
+        created_by_token_id=token_id,
+        user_id=user_id,
+    )
     session.add(job)
     try:
         async with session.begin_nested():
