@@ -1615,3 +1615,136 @@ Verified on Pixel 7, Android 16 (API 36).
 ### Phase R closed (2026-06-16)
 - R1 ✅ `useLazyPreparation: false` on the `AudioPlayer` constructor.
 - Tag: `v2.1.0`.
+
+---
+
+## 2026-06-17 — Phase S: multi-user profiles via Navidrome IdP (v3.0.0-rc1)
+
+Re-scoped from "single-user, no multi-user login" (`/CLAUDE.md` §3) to multi-user
+via the backend's new `POST /api/v1/auth/login` IdP shim (backend J6). Identity
+is delegated to Navidrome; no other Sign-In-With-X provider is permitted. Hard
+logout/login model — one active profile at a time. Per-server isolation is free
+via the existing L1 `serverKey` because S8 overlays the active profile's
+`(heerrBaseUrl, heerrBearerToken, navidromeBaseUrl, navidromeUsername,
+navidromePassword)` onto `settingsProvider`.
+
+### S1 — Profile freezed model
+- New: `models/profile.dart` — freezed + json_serializable record with
+  `{id, displayName, heerrBaseUrl, heerrBearerToken, navidromeBaseUrl,
+  navidromeUsername, navidromePassword, createdAt, lastUsedAt}`.
+- Tests: round-trip `fromJson(toJson()) == self`, `copyWith` semantics,
+  value-equality.
+
+### S2 — Profile registry provider
+- New: `providers/profiles/profile_registry.dart` —
+  `@Riverpod(keepAlive: true) class ProfileRegistry` exposing
+  `addProfile / removeProfile / setActive / bumpLastUsed`. Backed by
+  `flutter_secure_storage` under fixed keys `profiles_index` and
+  `active_profile_id` (distinct from the legacy `server_profiles` /
+  `active_server_name`).
+- Tests: add / setActive / remove flows, persistence round-trip across
+  two `ProviderContainer`s, corrupt-index fallback, dangling-active drop.
+
+### S3 — Legacy creds migration shim
+- New: `providers/profiles/legacy_migration.dart` —
+  `migrateLegacyCreds(ProviderContainer)`. Detects pre-S full single-set
+  creds, wraps them in a [Profile], persists via the registry, sets
+  active, sweeps legacy keys. Idempotent on three axes (fresh-install,
+  already-migrated, partial-creds all no-op).
+- Modified: `main.dart` — runs migration before `runApp` against a root
+  `ProviderContainer` that `UncontrolledProviderScope` adopts.
+- Tests: full-creds path, fresh-install no-op, already-migrated no-op,
+  partial-creds no-op, idempotency, empty-username treated as missing.
+
+### S4 — Login API client
+- New: `api/auth_login.dart` — `authLogin(baseUrl, username, password) ->
+  AuthLoginResponse(token, scopes, navidromeUrl, navidromeUsername)`.
+  Builds its own ad-hoc `Dio` (no bearer interceptor — login has no
+  token yet). Maps `DioException` through the existing
+  `mapDioErrorToApiError` chokepoint.
+- Modified: `api/endpoints.dart` — new `Endpoints.authLogin = '/auth/login'`.
+- Tests: happy path (token + scopes + Navidrome echo), 401 →
+  `UnauthorizedError`, 503 → `RateLimitedError`, network failure →
+  `NetworkError`, 500 → `HttpStatusError`.
+
+### S5 — Login screen UI
+- New: `screens/auth/login_screen.dart` — 3-field form (heerr base URL,
+  Navidrome username, Navidrome password) + Sign-in button + password
+  visibility toggle. On submit calls S4; on success constructs a
+  [Profile] via the response's `navidromeUrl` + `navidromeUsername`,
+  persists via `profileRegistry`, sets active, navigates to `/`. Errors
+  route through `showApiError`.
+- Modified: `router.dart` — adds `Routes.login` + a redirect closure
+  that, when an `ProviderContainer` is supplied, rewrites all
+  off-/login navigation to `/login` when no profile is active, and
+  conversely redirects `/login` to `/` once active. Container plumbed
+  via `buildHeerrRouter(container: ProviderScope.containerOf(context))`.
+- Tests: renders three fields, empty-submit validation, non-http URL
+  rejection, password-visibility toggle.
+
+### S6 — Active profile provider
+- New: `providers/profiles/active_profile.dart` —
+  `activeProfileProvider` derives the currently-active [Profile] from
+  the registry. Null when no profile is active or the active id points
+  at a removed profile.
+- Tests: null when none active, returns active after `setActive`,
+  switching updates the provider, removed-active goes null.
+
+### S7 — dio + Subsonic clients keyed off active profile
+- Modified: `api/client.dart` — `dioClientProvider` watches
+  `activeProfileProvider`; uses its `heerrBaseUrl` + `heerrBearerToken`
+  when present. Falls back to legacy `settingsProvider` keys for the
+  brief pre-hydration window and unmigrated installs.
+- Modified: `api/subsonic_client.dart` — `subsonicDioClientProvider`
+  applies the same pattern with `navidromeBaseUrl` +
+  `navidromeUsername` + `navidromePassword`.
+- Tests: switching active profile rebuilds heerr dio with new base URL;
+  same for Subsonic dio.
+
+### S8 — Per-server isolation invariant
+- Modified: `providers/settings.dart` — `Settings.build()` watches
+  `activeProfileProvider`; when present, overlays its per-server
+  credentials onto the returned `SettingsValue`. Legacy keys remain the
+  fallback. The overlay propagates the active profile's
+  `(navidromeBaseUrl, navidromeUsername)` through every existing
+  callsite that hashes those into a `serverKey` (L1 offline paths, L5
+  library cache, P1 NowPlaying persistence, scrobble controller) —
+  isolation is implicit and tested.
+- Tests: distinct serverKey per profile, `settingsProvider` echoes
+  active profile creds, `OfflinePaths.serverRoot` returns disjoint dirs
+  per profile + alice's files survive a bob → alice round-trip.
+
+### S9 — Profiles section in Settings
+- New: `screens/settings/profiles_section.dart` — lists every profile
+  with display name + Navidrome username + relative `lastUsedAt`,
+  marks active, exposes Switch / Remove via per-row overflow menu,
+  Add profile entry pushes `/login`. Switch / Remove dialogs use
+  `FilledButton` confirmations; removing the active profile clears the
+  pointer and pushes `/login`.
+- Modified: `screens/settings_screen.dart` — mounts `ProfilesSection`
+  above the existing offline / servers / recommendations sections.
+- Tests: empty registry → empty-state + Add row; renders one row per
+  profile + marks active via `ListTile.selected`; switch flow confirms
+  via dialog and writes via `setActive`; remove-active leaves the
+  registry without an active pointer.
+
+### S10 — DECISIONLOG ADR + CLAUDE.md carve-out + DEBT updates
+- New ADR (`DECISIONLOG.md` 2026-06-17 "Multi-user profiles via
+  Navidrome IdP — heerr v3.0.0") — captures the seven sub-decisions
+  above plus the trade-off on the settings overlay.
+- Modified `android/CLAUDE.md`: rewrites the "Single-user." hard rule
+  to permit the Navidrome IdP path specifically; updates the "Hard
+  don'ts" to forbid every *other* Sign-In-With-X provider and to
+  forbid reading per-server creds from `settingsProvider` and
+  `activeProfileProvider` in the same callsite (the overlay makes one
+  redundant).
+- Modified `DEBT.md`: marks S1–S10 shipped, adds S11 as pending
+  backend J6 + on-device smoke, slots per-user Last.fm /
+  ListenBrainz + biometric unlock + soft profile switch into the
+  v3.1.0 backlog.
+
+### S11 — v3.0.0-rc1 version bump (smoke pending)
+- Modified: `android/app/pubspec.yaml` → `3.0.0-rc1`. RC1 ships
+  pre-smoke because backend J6 (`POST /auth/login`) is not yet
+  deployed on the home server. The first on-device smoke against the
+  live IdP shim will promote the build to `v3.0.0`.
