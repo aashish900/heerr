@@ -322,7 +322,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 **Done when:** docs reflect implementation; version bumped.
 **Commit:** `chore(backend): J11 — multi-user ADR + CONTEXT/CHANGELOG + v2.0.0-rc1`
 
-### [ ] J12. End-to-end multi-user smoke on the home server
+### [x] J12. End-to-end multi-user smoke on the home server
 **Deliverable:** Two real Navidrome accounts on the home Navidrome (`alice`, `bob`). From the backend container or a sibling, log in as each via `/auth/login`; download a different track each; assert `/queue` for alice's token excludes bob's job and vice-versa. Admin token (CLI-minted) sees both.
 **Test gate:** manual; 6-step verification block recorded in `backend/docs/CHANGELOG.md`.
 **Done when:** all six steps pass.

@@ -596,3 +596,20 @@ Human-readable label persisted alongside each job so the Android queue UI shows 
 - **Tests:** `backend/tests/test_auth_logout.py` — 4 cases: happy path (204 + `revoked_at` set in DB), second call returns 401, missing auth returns 401, alice's logout does not touch bob's token.
 - **`backend/docs/DEBT.md`** — C5 marked resolved.
 - Suite: 296 passing (was 292; +4 new). `ruff` + `ruff format --check` + `mypy app/` all clean.
+
+## 2026-06-17 — J12: multi-user e2e smoke verified on home server
+
+- **Setup:** Two real Navidrome accounts (`varsha`, `simran`) used as test users; admin token minted via `python -m app.cli create-token --admin`.
+- **Verified:**
+  1. `/auth/login` succeeds for both users with distinct tokens.
+  2. `/queue` is per-user isolated — each user's response excludes the other's jobs; admin token sees both.
+  3. Cross-user `/status/{id}` returns 404 in both directions.
+  4. Per-user dedupe behaves as designed (same URL re-POSTed by the same user → `deduped:true`; same URL POSTed by a different user → new job row).
+  5. Downloaded files land under `/data/media/music/` and Navidrome indexes them.
+- **Findings (not blockers, recorded for follow-up):**
+  - `NAVIDROME_URL` env var must be set as a full URL with scheme + port (`http://<host>:4533`). With it unset/malformed the verifier raises an unhandled exception → 500 instead of 503. Worth a defensive check in `verify_credentials` so misconfig surfaces as a clear error.
+  - YouTube Music URLs containing `&list=...` / `&index=...` query params drive spotDL into a broken `KeyError: 'videoDetails'` code path. Stripping to the bare `watch?v=<id>` form works. Either the backend should canonicalize the URL before handing to spotDL, or the pinned spotDL needs a bump — tracked separately.
+  - `/queue` returns `{"active":[...], "recent":[...]}`, not a flat array. The temporary smoke runbook had jq that assumed a flat array; corrected at use time, no code impact.
+- **`backend/docs/ROADMAP.md`** — J12 checkbox flipped to `[x]`.
+- **`backend/docs/smoke-test.md`** — temporary runbook deleted (was marked for deletion on success per its own header).
+- No code or test changes; this is the manual verification gate for Phase J.
