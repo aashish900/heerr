@@ -80,6 +80,11 @@ async def verify_credentials(
         except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout) as exc:
             logger.warning("navidrome unreachable: %s", exc)
             raise NavidromeUnreachable(str(exc)) from exc
+        except httpx.InvalidURL as exc:
+            # Malformed base_url that slipped past config validation — treat as
+            # unreachable so caller returns 503, not 500.
+            logger.warning("navidrome invalid url: %s", exc)
+            raise NavidromeUnreachable(f"invalid navidrome url: {exc}") from exc
         except httpx.HTTPError as exc:
             # Treat any other transport error as unreachable — caller maps to 503.
             logger.warning("navidrome http error: %s", exc)

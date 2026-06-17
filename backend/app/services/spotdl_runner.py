@@ -4,9 +4,22 @@ import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 _AUDIO_SUFFIXES = {".mp3", ".m4a", ".opus", ".flac", ".ogg", ".wav"}
 _OUTPUT_TAIL_BYTES = 4000
+
+# YouTube/YT Music query params that spotdl chokes on. Concrete failure mode:
+# URLs with `&list=...` or `&index=...` drive spotdl into a KeyError:
+# 'videoDetails' code path. Strip everything except the video id (`v`).
+_YT_KEEP_PARAMS = {"v"}
+_YT_HOSTS = {
+    "www.youtube.com",
+    "youtube.com",
+    "m.youtube.com",
+    "music.youtube.com",
+    "youtu.be",
+}
 
 _log = logging.getLogger(__name__)
 
@@ -37,6 +50,18 @@ def log_spotdl_version() -> None:
             "spotdl version probe failed",
             extra={"spotdl_executable": exe, "error": str(exc)},
         )
+
+
+def canonicalize_yt_url(url: str) -> str:
+    """Strip non-essential query params from YT / YT-Music URLs.
+
+    Keeps only `v=<id>`. Non-YT hosts pass through unchanged.
+    """
+    parsed = urlparse(url)
+    if parsed.hostname not in _YT_HOSTS:
+        return url
+    params = [(k, v) for k, v in parse_qsl(parsed.query) if k in _YT_KEEP_PARAMS]
+    return urlunparse(parsed._replace(query=urlencode(params), fragment=""))
 
 
 def _spotdl_executable() -> str:
@@ -96,7 +121,7 @@ async def run_spotdl(source_url: str, output_dir: str | Path) -> list[Downloaded
     cmd = [
         _spotdl_executable(),
         "download",
-        source_url,
+        canonicalize_yt_url(source_url),
         "--output",
         str(out_path / "{title}-{artist}.{output-ext}"),
     ]

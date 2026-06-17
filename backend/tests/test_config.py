@@ -43,3 +43,25 @@ def test_extra_env_vars_ignored(monkeypatch):
     monkeypatch.setenv("SPOTIFY_CLIENT_SECRET", "leftover")
     s = Settings()
     assert s.database_url == REQUIRED_ENV["DATABASE_URL"]
+
+
+# ---- N13: NAVIDROME_URL must be a parseable http(s) URL --------------------
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "",
+        "not-a-url",
+        "ftp://navidrome.example",
+        "navidrome.example:4533",
+        "http://",
+    ],
+)
+def test_invalid_navidrome_url_raises(monkeypatch, bad):
+    for k, v in REQUIRED_ENV.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.setenv("NAVIDROME_URL", bad)
+    with pytest.raises(ValidationError) as exc:
+        Settings()
+    assert "navidrome_url" in str(exc.value).lower()

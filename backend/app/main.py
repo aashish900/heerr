@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api.middleware import RequestLoggingMiddleware
+from app.api.middleware import MaxBodySizeMiddleware, RequestLoggingMiddleware
 from app.api.v1.router import api_v1
 from app.logging_config import setup_logging
 from app.services.spotdl_runner import log_spotdl_version
@@ -17,6 +17,7 @@ def create_app() -> FastAPI:
         redoc_url=None,
     )
     app.add_middleware(RequestLoggingMiddleware)
+    app.add_middleware(MaxBodySizeMiddleware)
     app.include_router(api_v1)
     return app
 

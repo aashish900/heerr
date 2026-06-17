@@ -210,3 +210,47 @@ async def test_bearer_token_bumps_last_used_at(client, make_token, app_sm):
         tok = (await s.execute(select(Token).where(Token.token_hash == token_hash))).scalar_one()
         assert tok.last_used_at is not None
         assert tok.last_used_at >= before
+
+
+# ---- N9: dangling user → 401 (not 500) -----------------------------------
+
+
+async def test_dangling_user_returns_401(client, app_sm):
+    """Token row whose user_id FK points at a deleted user (race) → 401."""
+    import hashlib
+    import secrets
+
+    from sqlalchemy import text
+
+    from app.models import Token
+
+    # Mint a token wired to system-admin first, then null out user_id to
+    # simulate the corruption the N9 guard is for.
+    raw = f"raw-{secrets.token_urlsafe(16)}"
+    token_hash = hashlib.sha256(raw.encode()).hexdigest()
+    async with app_sm() as s:
+        s.add(
+            Token(
+                token_hash=token_hash,
+                owner_label="dangling-probe",
+                scopes=["read", "download"],
+            )
+        )
+        await s.commit()
+        # Forcibly null the FK to reproduce data-corruption / mid-request race.
+        await s.execute(text("ALTER TABLE tokens ALTER COLUMN user_id DROP NOT NULL"))
+        await s.execute(
+            text("UPDATE tokens SET user_id = NULL WHERE token_hash = :h"),
+            {"h": token_hash},
+        )
+        await s.commit()
+
+    try:
+        r = await client.get("/whoami", headers={"Authorization": f"Bearer {raw}"})
+        assert r.status_code == 401
+        assert r.json()["detail"] == "session invalidated"
+    finally:
+        async with app_sm() as s:
+            await s.execute(text("DELETE FROM tokens WHERE token_hash = :h"), {"h": token_hash})
+            await s.execute(text("ALTER TABLE tokens ALTER COLUMN user_id SET NOT NULL"))
+            await s.commit()

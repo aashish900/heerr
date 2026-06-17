@@ -39,12 +39,13 @@ async def bearer_token(
             headers=_UNAUTH_HEADERS,
         )
     if tok.user is None:
-        # Post-J2 every token row must have a user_id FK. None here means
-        # data corruption (FK dropped or referencing a deleted user) — fail
-        # loudly rather than silently routing as an anonymous request.
+        # Post-J2 every token row should have a user_id FK. None here is the
+        # delete-user-mid-request race (or FK corruption): treat as an
+        # invalidated session — 401, not 500.
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="token has no associated user",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="session invalidated",
+            headers=_UNAUTH_HEADERS,
         )
     owner_label_var.set(tok.owner_label)
     tok.last_used_at = datetime.now(UTC)

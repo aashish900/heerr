@@ -654,3 +654,26 @@ Knocked out the three lowest-effort items from DEBT.md.
   - No per-job overhead; container version pin is in the structured boot log.
 
 - Full suite green (300/300). `ruff check`, `ruff format --check`, `mypy app/` all clean.
+
+## 2026-06-17 — DEBT cleanup pass 2: N13 + N14 + N9 + N6
+
+- **N13 — `/auth/login` 500→503 on bad `NAVIDROME_URL`.**
+  - `backend/app/config.py`: `field_validator` on `Settings.navidrome_url` rejects anything that isn't a parseable `http(s)` URL with a netloc. Empty string, `ftp://`, schemeless host, etc. now fail at boot with a clear `ValidationError`.
+  - `backend/app/services/navidrome_auth.py`: `verify_credentials` catches `httpx.InvalidURL` and re-raises as `NavidromeUnreachable` so any URL that slips past config validation still surfaces as 503 (not bubbling as 500).
+  - Tests: `test_invalid_navidrome_url_raises` parametrized over five bad values in `tests/test_config.py`.
+
+- **N14 — canonicalize YouTube / YT-Music URLs before spotdl.**
+  - `backend/app/services/spotdl_runner.py`: new `canonicalize_yt_url(url)` keeps only `?v=<id>` for YT / YT-Music hosts, drops `list`, `index`, `pp`, `feature`, fragments, etc. Non-YT hosts pass through unchanged. `run_spotdl` calls it before subprocess invoke.
+  - Eliminates the `KeyError: 'videoDetails'` failure mode J12 surfaced when users paste URLs with `&list=...` / `&index=...`.
+  - Tests: `tests/test_yt_canonicalize.py` (4 parametrized cases + non-YT passthrough).
+
+- **N9 — `bearer_token` 500→401 on dangling user.**
+  - `backend/app/api/deps.py`: when `tok.user is None` (delete-user-mid-request race or FK corruption) returns `401 {"detail": "session invalidated"}` with `WWW-Authenticate: Bearer`, instead of `500`.
+  - Tests: `test_dangling_user_returns_401` in `tests/test_auth.py` — temporarily drops the `tokens.user_id` `NOT NULL` constraint, nulls the FK on a real token row, hits an authed endpoint, restores the constraint in `finally`.
+
+- **N6 — request body size limit.**
+  - `backend/app/api/middleware.py`: new `MaxBodySizeMiddleware` (pure ASGI). Reads `Content-Length`, returns `413 {"detail": "request body exceeds N bytes"}` if over cap. Cap default 1 MiB — well above any legitimate `/search` or `/download` JSON body. Sits in front of FastAPI body parsing so oversized payloads never land in worker memory.
+  - `backend/app/main.py`: wired into `create_app()` alongside the existing logging middleware.
+  - Tests: `tests/test_max_body_size.py` (under-cap passes, over-cap 413, non-HTTP scope passes through).
+
+- Full suite green (314/314, +14 new). `ruff check`, `ruff format --check`, `mypy app/` all clean.
