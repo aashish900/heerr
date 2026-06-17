@@ -68,9 +68,14 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
             // While the registry is still loading, don't redirect — let
             // the destination screen render a loading state.
             if (value == null) return null;
+            // First-launch / signed-out: rewrite everything except
+            // /login to /login. The reverse (active-profile + at-/login
+            // → Home) is intentionally NOT applied so the "Add profile"
+            // button can push /login while a profile is already active.
+            // The LoginScreen navigates to / itself on successful
+            // submit; there's no loop risk.
             final bool atLogin = state.matchedLocation == Routes.login;
             if (value.activeId == null && !atLogin) return Routes.login;
-            if (value.activeId != null && atLogin) return Routes.home;
             return null;
           },
     routes: <RouteBase>[
