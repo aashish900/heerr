@@ -1618,7 +1618,7 @@ Verified on Pixel 7, Android 16 (API 36).
 
 ---
 
-## 2026-06-17 — Phase S: multi-user profiles via Navidrome IdP (v3.0.0-rc1)
+## 2026-06-17 — Phase S: multi-user profiles via Navidrome IdP (v3.0.0)
 
 Re-scoped from "single-user, no multi-user login" (`/CLAUDE.md` §3) to multi-user
 via the backend's new `POST /api/v1/auth/login` IdP shim (backend J6). Identity
@@ -1746,7 +1746,7 @@ navidromePassword)` onto `settingsProvider`.
 ### S11 — v3.0.0 on-device smoke verified
 - Modified: `android/app/pubspec.yaml` → `3.0.0`. RC1 was promoted to
   the clean `v3.0.0` tag after the 7-step on-device smoke against the
-  live home-server stack (heerr backend at `3.0.0-rc1`, J6
+  live home-server stack (heerr backend at `3.0.0`, J6
   `/auth/login` live, two real Navidrome users) passed.
 - Fixes folded into the smoke window:
   - `main.dart` no longer reads `ProviderScope.containerOf` in

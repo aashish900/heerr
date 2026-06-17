@@ -279,11 +279,11 @@ b) **Skip Trivy scanning of `/opt/spotdl-venv`** by adding `skip-dirs: /opt/spot
 
 **Reference:** Implementation lives across `backend/app/services/recommenders/{base.py, factory.py, ytmusic_engine.py, lastfm_engine.py, listenbrainz_engine.py, fallback_engine.py, yt_resolver.py}` and `backend/app/api/v1/recommend.py`. Roadmap milestones I1–I5 (in `backend/docs/ROADMAP.md`) and CHANGELOG entries 2026-06-14 enumerate the per-milestone deltas.
 
-## 2026-06-16 — Phase J: multi-user via Navidrome IdP — heerr backend v3.0.0-rc1
+## 2026-06-16 — Phase J: multi-user via Navidrome IdP — heerr backend v3.0.0
 
 **Context:** Pre-J the heerr backend was a single-user request app: one operator, one bearer token paste, one Navidrome account, one queue/history. Adding multi-user surfaced two questions: where do credentials live, and what is "isolation"? Storing passwords on the backend means inventing reset/recovery flows, bcrypt/argon2 hashing, and an admin user-mgmt surface — all out of proportion for a single-tailnet family app. Sharing one Navidrome instance per heerr instance is already the deployment shape (the operator runs Navidrome too), and Navidrome already authenticates users via Subsonic auth.
 
-**Decision:** Adopt the **Jellyseerr-style "trust the upstream" pattern**: heerr stores no passwords. Authentication is delegated to Navidrome via Subsonic `ping.view`; success upserts a `users` row keyed by `navidrome_username` and mints a heerr opaque token tied to that user. Per-user isolation is applied at every read/write surface (`/queue`, `/status`, `/search`, `/download`). The backend ships as `v3.0.0-rc1` since the auth flow, the schema, and the deployment env vars all changed in semver-major-incompatible ways.
+**Decision:** Adopt the **Jellyseerr-style "trust the upstream" pattern**: heerr stores no passwords. Authentication is delegated to Navidrome via Subsonic `ping.view`; success upserts a `users` row keyed by `navidrome_username` and mints a heerr opaque token tied to that user. Per-user isolation is applied at every read/write surface (`/queue`, `/status`, `/search`, `/download`). The backend ships as `v3.0.0` since the auth flow, the schema, and the deployment env vars all changed in semver-major-incompatible ways.
 
 Sub-decisions locked across J1–J10:
 
@@ -302,7 +302,7 @@ Sub-decisions locked across J1–J10:
 - Tailscale-only posture is preserved. No public ingress, no TLS, no rate limiting, no abuse handling were added — the threat model is unchanged (`/CLAUDE.md` §3).
 - One new env var (`NAVIDROME_URL`). One new endpoint (`POST /auth/login`). One new admin endpoint (`POST /admin/users`). Two new migrations (0004 + 0005) plus one structural index swap (0006). The bulk of the work is per-user filtering on existing endpoints.
 
-**Why v3.0.0-rc1 and not v0.2.0:**
+**Why v3.0.0 and not v0.2.0:**
 - Required new env var: `NAVIDROME_URL` (boot fails fast without it) — backwards-incompatible at deploy time.
 - Token wire-format unchanged but issuance flow new: paste-from-CLI → POST /auth/login on the Android client (Phase S). Existing tokens keep working through the `system-admin` backfill, but new tokens are minted differently.
 - `jobs.user_id` is now part of dedup semantics; existing scripts that POST `/download` will see deduped semantics shift from "global URI" to "per-user URI". That's user-observable behavior changing.
