@@ -77,7 +77,7 @@ ADR: `DECISIONLOG.md` 2026-06-16 ("X4b: gapless playback via `useLazyPreparation
 | # | Item | Status |
 |---|------|--------|
 | S1–S10 | Multi-user profiles via Navidrome IdP (registry, migration, login, active-profile provider, dio wiring, isolation audit, Settings UI, docs). | ✅ shipped 2026-06-17 |
-| S11 | v3.0.0 smoke + bump (deferred to on-device verification once backend J6 is live). | ⏳ pending backend J6 + on-device smoke |
+| S11 | v3.0.0 smoke + bump. Backend J6–J12 already live at `3.0.0-rc1`; the only gate left is the 7-step on-device smoke on the Pixel 7 against the home Navidrome. Promote `v3.0.0-rc1` → `v3.0.0` after it passes. | ⏳ pending on-device smoke only |
 
 ADR: `DECISIONLOG.md` 2026-06-17 ("Multi-user profiles via Navidrome IdP — heerr v3.0.0").
 
