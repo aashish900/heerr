@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../models/profile.dart';
+import 'profiles/active_profile.dart';
 import 'secure_storage.dart';
 
 part 'settings.g.dart';
@@ -97,6 +99,15 @@ class Settings extends _$Settings {
   @override
   Future<SettingsValue> build() async {
     final SecureStorage store = ref.read(secureStorageProvider);
+    // S8: when an active Profile exists, it is the canonical source for
+    // all per-server credentials. The legacy single-set keys remain the
+    // fallback for the brief window between app launch and registry
+    // hydration, and for unmigrated pre-S installs (S3 partial state).
+    // Overlaying here means every existing chokepoint that hashes
+    // `(navidromeBaseUrl, navidromeUsername)` into a serverKey (L1
+    // offline paths, L5 library cache, P1 NowPlaying persistence) sees
+    // the active profile's identity without needing to be rewired.
+    final Profile? active = ref.watch(activeProfileProvider);
     final String? url = await store.read(_kKeyUrl);
     final String? token = await store.read(_kKeyToken);
     final String? nUrl = await store.read(_kKeyNavidromeUrl);
@@ -108,11 +119,11 @@ class Settings extends _$Settings {
     final String? offPoll = await store.read(_kKeyOfflinePollIntervalMin);
     final String? offCharging = await store.read(_kKeyOfflineChargingOnly);
     return (
-      backendBaseUrl: url,
-      bearerToken: token,
-      navidromeBaseUrl: nUrl,
-      navidromeUsername: nUser,
-      navidromePassword: nPass,
+      backendBaseUrl: active?.heerrBaseUrl ?? url,
+      bearerToken: active?.heerrBearerToken ?? token,
+      navidromeBaseUrl: active?.navidromeBaseUrl ?? nUrl,
+      navidromeUsername: active?.navidromeUsername ?? nUser,
+      navidromePassword: active?.navidromePassword ?? nPass,
       offlineEnabled: _parseBool(offEnabled, _kDefaultOfflineEnabled),
       offlineSyncAll: _parseBool(offSyncAll, _kDefaultOfflineSyncAll),
       offlineWifiOnly: _parseBool(offWifiOnly, _kDefaultOfflineWifiOnly),
