@@ -148,7 +148,7 @@ A revoked token immediately fails `bearer_token()` (returns 401) on every subseq
 
 All endpoints live under `/api/v1`. JSON in/out. UUIDv4 ids. ISO-8601 UTC timestamps.
 
-The frozen contract lives in `docs/PLAN.md`. The summary below is enough to drive the client; consult `PLAN.md` for the locked decisions.
+The summary below is enough to drive the client; consult `docs/DECISIONLOG.md` for the locked decisions and `/api/v1/openapi.json` for the source-of-truth schema.
 
 ### Request ID & access log
 
@@ -334,7 +334,7 @@ curl -X POST http://localhost:8000/api/v1/admin/jobs/<job_id>/retry \
 
 ### Error format
 
-FastAPI default `{"detail": "…"}` for now. PLAN's `{"error","code"}` envelope is deferred until there's a UI consumer that needs machine-readable codes — see `docs/PLAN.md` "Error format" + `docs/CHANGELOG.md`.
+FastAPI default `{"detail": "…"}` for now. A structured `{"error","code"}` envelope is deferred until there's a UI consumer that needs machine-readable codes.
 
 ---
 
@@ -405,8 +405,8 @@ backend/
     ├── CONTEXT.md             standing facts (env, constraints, server, deps)
     ├── DECISIONLOG.md         ADRs (newest at bottom)
     ├── CHANGELOG.md           per-task append-only log
-    ├── PLAN.md                frozen API + schema v1 contract
-    └── ROADMAP.md             17-milestone build sequence (A1 → H1)
+    ├── DEBT.md                outstanding tech debt (post v2.0.0-rc1)
+    └── ROADMAP.md             milestone build sequence (A1 → J12)
 ```
 
 ---
@@ -460,6 +460,6 @@ PRs targeting `main` that touch `backend/**` or the workflow file build the imag
 | `../CLAUDE.md` | Project-wide rules (session discipline, hard architectural rules) — read this first if you're a future Claude session. |
 | `docs/CONTEXT.md` | Standing facts: server env, architecture, hard learnings. |
 | `docs/DECISIONLOG.md` | ADRs — every "we chose X over Y because Z" decision with alternatives considered. |
-| `docs/PLAN.md` | Frozen v1 contract: endpoints, schema, implementation strategy. |
-| `docs/ROADMAP.md` | 17-milestone build sequence with per-milestone commit messages. |
+| `docs/ROADMAP.md` | Milestone build sequence with per-milestone commit messages. |
 | `docs/CHANGELOG.md` | Append-only log of every task's changes. |
+| `docs/DEBT.md` | Outstanding tech debt tracked post v2.0.0-rc1. |

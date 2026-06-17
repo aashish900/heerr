@@ -12,8 +12,8 @@ These will mislead a future Claude session reading the bootstrap docs.
 
 | # | Item | Where | Notes |
 |---|------|-------|-------|
-| D1 | `app.title`/`version` hardcoded `"0.1.0"` in `app/main.py:12`; `pyproject.toml` is `2.0.0-rc1`. Misleads OpenAPI clients and Android Phase S. | `app/main.py:12` | Read from `pyproject` or package version (e.g. `importlib.metadata.version("heerr-backend")`). |
-| D2 | `backend/docs/PLAN.md` referenced from `CLAUDE.md` as the "frozen v1 contract" predates Phase J. No mention of `/auth/login`, per-user filtering, `NAVIDROME_URL`. | `docs/PLAN.md` | Either retire PLAN.md or append a "Phase J amendments" section. CLAUDE.md staleness rule applies. |
+| ~~D1~~ | ~~`app.title`/`version` hardcoded `"0.1.0"` in `app/main.py:12`; `pyproject.toml` is `2.0.0-rc1`. Misleads OpenAPI clients and Android Phase S.~~ | `app/main.py:12` | Read from `pyproject` or package version (e.g. `importlib.metadata.version("heerr-backend")`). |
+| ~~D2~~ | ~~`backend/docs/PLAN.md` referenced from `CLAUDE.md` as the "frozen v1 contract" predates Phase J.~~ Resolved 2026-06-16: PLAN.md was deleted in 47d6575; stale references scrubbed from `/CLAUDE.md`, `backend/CLAUDE.md`, `backend/README.md`, `backend/docs/ROADMAP.md`. DECISIONLOG / CHANGELOG references left intact as frozen-in-time records. | — | — |
 
 ---
 
@@ -25,7 +25,7 @@ These will mislead a future Claude session reading the bootstrap docs.
 | C2 | **No boot-recovery for orphaned `running` jobs.** Container restart mid-download leaves rows in `running` forever until admin manually retries each. | Add a startup hook that marks rows with `state='running' AND started_at < now() - interval 'X minutes'` as `failed` (or re-enqueue once C1 lands). | S |
 | C3 | **Job cancellation is impossible.** No `cancel-job` endpoint; no PID/Task tracking; only way to stop a spotDL subprocess is killing the container. | Track `asyncio.Task` per `job_id` (or process handle once C1 lands). Add `POST /jobs/{id}/cancel`. | M |
 | C4 | **No token expiry.** Tokens are revocable-only. Once minted they live forever. Multi-user makes a stolen-token incident permanent. Adding `expires_at` now is a 2-column migration; after Phase S Android ships it's a coordinated client/server release. | `tokens.expires_at` + check in `bearer_token`. Optional refresh-token flow. | S |
-| C5 | **No `/auth/logout`.** A user can't revoke their own session from the device. Combined with C4 this is a real footgun. | `POST /auth/logout` sets `revoked_at = now()` on the current token. | XS |
+| ~~C5~~ | ~~**No `/auth/logout`.**~~ Resolved 2026-06-16: `POST /api/v1/auth/logout` sets `revoked_at = now()` on the current token; returns 204. Subsequent calls with the same token return 401 (already revoked) via the existing `bearer_token` check. | — | — |
 | C6 | **`POST /auth/login` has no rate limit.** Brute-forcing Navidrome credentials through heerr is unmitigated. Tailscale narrows the threat to tailnet members but does not eliminate it. | Per-IP + per-username sliding-window in Postgres (or fastapi-limiter / slowapi). Lockout after N failures. | M |
 
 ---
@@ -80,15 +80,15 @@ These will mislead a future Claude session reading the bootstrap docs.
 | # | Item | Notes |
 |---|------|-------|
 | P1 | **No `backend/docs/DEBT.md`** — fixed by this file. | ✅ 2026-06-16. |
-| P2 | PLAN.md drift (also listed as D2). | |
-| P3 | `docker-compose.snippet.yml` doesn't explicitly call out `NAVIDROME_URL` as required. Boot fails fast — fine — but undocumented. | One-line comment in the compose snippet. |
+| ~~P2~~ | ~~PLAN.md drift (also listed as D2).~~ Resolved 2026-06-16 alongside D2. | |
+| ~~P3~~ | ~~`docker-compose.snippet.yml` doesn't explicitly call out `NAVIDROME_URL` as required.~~ Resolved 2026-06-16: header now lists `NAVIDROME_URL` (and the rest of the required vars) explicitly. | |
 
 ---
 
 ## Priority order (suggested attack sequence)
 
-1. **D1, D2, P3** — paperwork. Mins each.
-2. **C5** — `/auth/logout`. XS effort, real UX win.
+1. ~~**D1, D2, P3** — paperwork. Mins each.~~ Done.
+2. ~~**C5** — `/auth/logout`.~~ Done 2026-06-16.
 3. **C4** — token expiry. S effort, unlocks "session timeout" semantics. Coordinate with Android Phase S so the client renews tokens.
 4. **C2 + T1 + T3** — boot recovery for orphaned `running` jobs. Small fix, prevents support-by-SQL.
 5. **M1 + T4** — add a regression test that catches missing `user_id` on INSERT, then plan the migration to drop the `system_admin_user_id()` default once Phase S ships.

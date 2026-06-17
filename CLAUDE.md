@@ -20,7 +20,7 @@ Every app under this repo follows the same structure:
     ├── CONTEXT.md       project brief — architecture, constraints, env
     ├── DECISIONLOG.md   ADR log (newest at bottom)
     ├── CHANGELOG.md     append-only per-task change log
-    ├── PLAN.md          frozen contract / design
+    ├── DEBT.md          (optional) outstanding tech debt
     └── ROADMAP.md       milestone sequence
 ```
 
@@ -42,7 +42,7 @@ At the start of every session, before non-trivial answers or proposals, identify
 3. `<app>/docs/DECISIONLOG.md`
 4. `<app>/docs/CHANGELOG.md`
 
-Consult `<app>/docs/PLAN.md` and `<app>/docs/ROADMAP.md` for questions about contract or build sequence, and `<app>/README.md` for operational lookup ("how do I run / call / test it").
+Consult `<app>/docs/ROADMAP.md` for build sequence, `<app>/docs/DEBT.md` (if present) for outstanding work, and `<app>/README.md` for operational lookup ("how do I run / call / test it").
 
 If the question is purely project-wide (not bound to a single app), this file is sufficient.
 

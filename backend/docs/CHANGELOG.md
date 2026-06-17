@@ -573,3 +573,26 @@ Human-readable label persisted alongside each job so the Android queue UI shows 
 - **`backend/pyproject.toml`** — `starlette = ">=0.49.1"` → `">=1.3.1"`. Pin raised to satisfy `CVE-2026-54283` (HIGH; `request.form()` limits silently ignored for `application/x-www-form-urlencoded` → DoS). Resolved version: `1.3.1` (was `1.2.1`).
 - **`backend/poetry.lock`** — re-resolved; only starlette changed.
 - Suite: 292 passing. No code changes; this is a dependency bump only.
+
+## 2026-06-16 — D2: retire stale `PLAN.md` references
+
+- **`/CLAUDE.md`** — repo-layout block drops `PLAN.md` (replaced with optional `DEBT.md`); session-bootstrap line points at `ROADMAP.md` + `DEBT.md` instead of `PLAN.md`.
+- **`backend/CLAUDE.md`** — bootstrap pointer to `docs/PLAN.md` replaced with pointers to `docs/ROADMAP.md` and `docs/DEBT.md`.
+- **`backend/README.md`** — three references scrubbed: API-reference intro now points at `DECISIONLOG.md` + OpenAPI; the "Error format" note no longer cites `PLAN.md`; `docs/` tree listing + "Further reading" table swap `PLAN.md` for `DEBT.md`.
+- **`backend/docs/ROADMAP.md`** — three references scrubbed (intro, H1 test-gate, cross-cutting reminder).
+- **`backend/docs/DEBT.md`** — D2 + P2 marked resolved with date and pointer to this entry.
+- Historical references in `backend/docs/DECISIONLOG.md` and earlier `CHANGELOG.md` entries left intact — they describe past state and are frozen-in-time records, not navigation aids.
+- No code changes; documentation hygiene only.
+
+## 2026-06-16 — P3: document required env vars in compose snippet
+
+- **`docker-compose.snippet.yml`** — header comment now enumerates the required env vars (`POSTGRES_*`, `DATABASE_URL`, `MUSIC_OUTPUT_DIR`, `NAVIDROME_URL`) with a one-line note that boot fails fast if `NAVIDROME_URL` is unset and that it must be a tailnet URL.
+- **`backend/docs/DEBT.md`** — P3 marked resolved.
+- No service definitions changed; documentation hygiene only.
+
+## 2026-06-16 — C5: POST /auth/logout — token self-revoke
+
+- **`backend/app/api/v1/auth.py`** — new `POST /api/v1/auth/logout` route. Depends on the existing `bearer_token` dependency; sets `tok.revoked_at = now(UTC)`; returns 204 No Content. Subsequent calls with the same token are 401 via the existing revoked-token check in `bearer_token`. A user can now revoke their own session from the device without the operator having to mint a CLI admin token and hit `/admin/tokens/{id}/revoke`.
+- **Tests:** `backend/tests/test_auth_logout.py` — 4 cases: happy path (204 + `revoked_at` set in DB), second call returns 401, missing auth returns 401, alice's logout does not touch bob's token.
+- **`backend/docs/DEBT.md`** — C5 marked resolved.
+- Suite: 296 passing (was 292; +4 new). `ruff` + `ruff format --check` + `mypy app/` all clean.

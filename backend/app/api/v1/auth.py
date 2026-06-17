@@ -12,10 +12,11 @@ import secrets
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import bearer_token
 from app.config import Settings, get_settings
 from app.db import get_session
 from app.models import Token, User
@@ -97,3 +98,14 @@ async def login(
         navidrome_url=settings.navidrome_url,
         navidrome_username=req.username,
     )
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    tok: Token = Depends(bearer_token),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    tok.revoked_at = datetime.now(UTC)
+    session.add(tok)
+    await session.flush()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

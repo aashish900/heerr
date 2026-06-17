@@ -2,7 +2,7 @@
 
 Track progress through the backend build. Each milestone = one git commit with a green test gate (where applicable). Tick the box when committed.
 
-See `PLAN.md` and `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file is the *how* / *when*.
+See `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file is the *how* / *when*.
 
 **Status (2026-06-16):** Phases A–G complete (16/17 milestones, A1 through G2). **H1 pending** — requires running the deployed stack on the home server; deferred until next on-site session. Phase I (recommendations engine, I1–I5) shipped. **Phase J (multi-user via Navidrome IdP, J1–J10) planned — not started.**
 
@@ -166,7 +166,7 @@ See `PLAN.md` and `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file 
 ### [x] H1. Smoke on the home server
 **Files:** optional `docs/smoke.md` capturing commands + output.
 **Deliverable:** Real Navidrome lists a track downloaded via the API.
-**Test gate:** manual; the 8 verification steps in project `PLAN.md`.
+**Test gate:** manual; run `/health`, mint a token, `POST /search`, `POST /download`, poll `/status`, confirm the file lands under `/data/media/music/` and Navidrome indexes it.
 **Done when:** Step 5 (file under `/data/media/music/...`) + step 6 (Navidrome lists it) both confirmed.
 **Commit:** `chore: e2e smoke verified` (optional — only if recording output).
 **Status (2026-06-09):** Cannot run from current location. All prior milestones (A1–G2) merged on `main`; CI Docker Hub workflow live. Run after deploying the image / compose snippet onto the arr-stack host.
@@ -334,7 +334,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 
 - **`.env` never committed.** Only `.env.example`.
 - **Logging at every request:** include `token.owner_label`; never log raw tokens or hashes.
-- **DECISIONLOG drift:** any contract/schema change → update `DECISIONLOG.md` + `PLAN.md` in the same commit (CLAUDE.md staleness rule).
+- **DECISIONLOG drift:** any contract/schema change → append a new ADR to `DECISIONLOG.md` and update `CONTEXT.md` in the same commit (CLAUDE.md staleness rule).
 - **Green-before, green-after:** run `poetry run pytest` before starting each milestone and before declaring done.
 
 ---

@@ -14,8 +14,8 @@ In order:
 5. `backend/docs/CHANGELOG.md` (per-task history)
 
 For operational lookup: `backend/README.md`.
-For the locked v1 contract: `backend/docs/PLAN.md`.
 For the build sequence: `backend/docs/ROADMAP.md`.
+For outstanding work: `backend/docs/DEBT.md`.
 
 ---
 

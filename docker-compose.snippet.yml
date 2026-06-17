@@ -9,6 +9,14 @@
 # Connectivity: Tailscale-only — no host port publication. The arr-stack
 # subnet (172.39.0.0/24) is expected to be Tailscale-routable from the
 # tailnet via the host's tailscaled.
+#
+# Required env vars in `.env` (see `.env.example` for the full list):
+#   POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB
+#   DATABASE_URL
+#   MUSIC_OUTPUT_DIR
+#   NAVIDROME_URL              ← identity provider; backend boot fails fast
+#                                if unset. Use the tailnet URL of Navidrome,
+#                                never a public address.
 # ==========================================================================
 
 services:
