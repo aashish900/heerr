@@ -10,6 +10,7 @@ import '../offline/offline_paths.dart';
 import '../offline/offline_settings.dart';
 import '../offline/offline_size_estimator.dart';
 import '../offline/offline_sync.dart';
+import '../providers/profiles/active_profile.dart';
 import '../providers/recommendations.dart';
 import '../providers/settings.dart';
 import '../router.dart';
@@ -41,16 +42,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        children: const <Widget>[
-          ProfilesSection(),
-          Divider(),
-          _OfflineSection(),
-          Divider(),
-          _ServersTile(),
-          Divider(),
-          _RecommendationsSection(),
-        ],
+      body: Consumer(
+        builder: (BuildContext ctx, WidgetRef ref, _) {
+          // S-followup: hide the pre-Phase-S "Servers" tile when an
+          // active Profile exists. The Profile already carries every
+          // server credential the legacy Servers screen used to collect,
+          // so showing both surfaces is confusing — users were tapping
+          // "Servers" thinking they still had to fill in URL + token by
+          // hand after logging in. We keep the tile available for
+          // unmigrated installs (no active Profile yet) until they hit
+          // /login.
+          final bool hasActive = ref.watch(activeProfileProvider) != null;
+          return ListView(
+            children: <Widget>[
+              const ProfilesSection(),
+              const Divider(),
+              const _OfflineSection(),
+              if (!hasActive) ...<Widget>[
+                const Divider(),
+                const _ServersTile(),
+              ],
+              const Divider(),
+              const _RecommendationsSection(),
+            ],
+          );
+        },
       ),
     );
   }
