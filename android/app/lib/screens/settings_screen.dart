@@ -15,6 +15,7 @@ import '../providers/settings.dart';
 import '../router.dart';
 import '../theme.dart';
 import '../widgets/error_snackbar.dart';
+import 'settings/profiles_section.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -42,6 +43,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: const <Widget>[
+          ProfilesSection(),
+          Divider(),
           _OfflineSection(),
           Divider(),
           _ServersTile(),
