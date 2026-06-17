@@ -71,7 +71,7 @@ class _HeerrAppState extends ConsumerState<HeerrApp> {
   @override
   void initState() {
     super.initState();
-    _router = buildHeerrRouter();
+    _router = buildHeerrRouter(container: ProviderScope.containerOf(context));
   }
 
   @override

@@ -10,7 +10,9 @@ import 'offline/offline_manifest.dart';
 import 'offline/offline_settings.dart';
 import 'offline/offline_sync.dart';
 import 'player/now_playing_persistence.dart';
+import 'providers/profiles/profile_registry.dart';
 import 'providers/recommendations.dart';
+import 'screens/auth/login_screen.dart';
 import 'screens/downloads_screen.dart';
 import 'screens/job_detail_screen.dart';
 import 'screens/library/album_detail_screen.dart';
@@ -35,6 +37,7 @@ class Routes {
   static const String queue = '/queue';
   static const String settings = '/settings';
   static const String servers = '/settings/servers';
+  static const String login = '/login';
 
   // Library detail (Subsonic via Navidrome). Nested under the library
   // route so the URL shape and the navigation hierarchy match.
@@ -49,10 +52,33 @@ class Routes {
 
 /// Builds the app's `GoRouter`. Lives at module scope so widget tests can
 /// reuse the exact router config the app boots with.
-GoRouter buildHeerrRouter() {
+///
+/// [container] (optional) wires the S5 first-launch redirect: when no
+/// profile is active, every navigation outside `/login` is rewritten to
+/// `/login`. Tests that don't exercise the redirect can omit it.
+GoRouter buildHeerrRouter({ProviderContainer? container}) {
   return GoRouter(
     initialLocation: Routes.home,
+    redirect: container == null
+        ? null
+        : (BuildContext context, GoRouterState state) {
+            final AsyncValue<ProfileRegistryState> async =
+                container.read(profileRegistryProvider);
+            final ProfileRegistryState? value = async.valueOrNull;
+            // While the registry is still loading, don't redirect — let
+            // the destination screen render a loading state.
+            if (value == null) return null;
+            final bool atLogin = state.matchedLocation == Routes.login;
+            if (value.activeId == null && !atLogin) return Routes.login;
+            if (value.activeId != null && atLogin) return Routes.home;
+            return null;
+          },
     routes: <RouteBase>[
+      GoRoute(
+        path: Routes.login,
+        builder: (BuildContext context, GoRouterState state) =>
+            const LoginScreen(),
+      ),
       ShellRoute(
         builder: (BuildContext context, GoRouterState state, Widget child) {
           return _ShellScaffold(location: state.matchedLocation, child: child);
