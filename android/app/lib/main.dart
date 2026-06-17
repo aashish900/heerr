@@ -10,6 +10,7 @@ import 'player/heerr_audio_handler.dart';
 import 'player/now_playing_persistence.dart';
 import 'player/player_provider.dart';
 import 'player/scrobble_provider.dart';
+import 'providers/profiles/legacy_migration.dart';
 import 'router.dart';
 import 'theme.dart';
 
@@ -32,11 +33,20 @@ Future<void> main() async {
     ),
   );
 
+  // S3: one-shot migration of legacy single-set credentials into a Phase-S
+  // Profile. No-op on fresh installs and on already-migrated installs.
+  // Runs against a parent ProviderContainer that ProviderScope adopts so
+  // any work done here is observable to the rest of the app.
+  final ProviderContainer rootContainer = ProviderContainer(
+    overrides: <Override>[
+      audioHandlerProvider.overrideWithValue(handler),
+    ],
+  );
+  await migrateLegacyCreds(rootContainer);
+
   runApp(
-    ProviderScope(
-      overrides: <Override>[
-        audioHandlerProvider.overrideWithValue(handler),
-      ],
+    UncontrolledProviderScope(
+      container: rootContainer,
       child: const HeerrApp(),
     ),
   );
