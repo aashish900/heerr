@@ -613,3 +613,11 @@ Human-readable label persisted alongside each job so the Android queue UI shows 
 - **`backend/docs/ROADMAP.md`** — J12 checkbox flipped to `[x]`.
 - **`backend/docs/smoke-test.md`** — temporary runbook deleted (was marked for deletion on success per its own header).
 - No code or test changes; this is the manual verification gate for Phase J.
+
+## 2026-06-17 — DEBT: N13 + N14 from J12 smoke findings
+
+- **`backend/docs/DEBT.md`** — two minor items added:
+  - **N13:** `/auth/login` returns 500 instead of 503 when `NAVIDROME_URL` is missing/malformed. Operator misconfig should look like "Navidrome unreachable", not "backend crashed".
+  - **N14:** Backend does not canonicalize YouTube Music URLs before handing to spotDL. URLs with `&list=...` / `&index=...` drive spotDL into a broken `KeyError: 'videoDetails'` path; bare `watch?v=<id>` works.
+- Both surfaced during the J12 smoke and are listed in the J12 CHANGELOG entry above; promoted to formal DEBT items here.
+- No code changes.
