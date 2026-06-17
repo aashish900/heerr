@@ -27,7 +27,7 @@ A native mobile app where I search for songs (via YouTube Music) and, if found, 
 ## Hard constraints / learnings (don't re-litigate)
 - spotDL **cannot run on the phone**: fails on iOS entirely; on Android via Termux it dies on a `libpthread.so.0` / tls-client dependency. Backend-only.
 - Spotify search was replaced by YouTube Music (2026-06-10): spotDL's Spotify→YouTube matching produced wrong songs for regional/non-English tracks. Passing `music.youtube.com/watch?v=` URLs directly to spotDL bypasses all matching.
-- Small multi-user, single-tailnet (Phase J, v3.0.0-rc1): one heerr instance per family. Authentication is delegated to Navidrome via `POST /auth/login` (Subsonic ping handshake) — heerr stores **no passwords**. Per-user isolation on `/queue`, `/status`, `/search` dedup hints, and `/download` idempotency. Files in `MUSIC_OUTPUT_DIR` are shared (one Navidrome library). **No Redis/Celery needed** — FastAPI BackgroundTasks + Postgres job table remain the queue substrate. Add a real queue only if outgrown.
+- Small multi-user, single-tailnet (Phase J, v3.0.0): one heerr instance per family. Authentication is delegated to Navidrome via `POST /auth/login` (Subsonic ping handshake) — heerr stores **no passwords**. Per-user isolation on `/queue`, `/status`, `/search` dedup hints, and `/download` idempotency. Files in `MUSIC_OUTPUT_DIR` are shared (one Navidrome library). **No Redis/Celery needed** — FastAPI BackgroundTasks + Postgres job table remain the queue substrate. Add a real queue only if outgrown.
 - spotDL invoked via subprocess (not library import) — isolation + cancellability + no version-coupling. Installed in `/opt/spotdl-venv` in the Docker image.
 
 ## Server environment (already running)

@@ -568,6 +568,16 @@ Human-readable label persisted alongside each job so the Android queue UI shows 
 - **`backend/pyproject.toml`** — `0.1.0` → `3.0.0-rc1`. Major-version jump because the new required env var, the new auth flow, and the per-user dedup shift in `/download` are all backwards-incompatible at deploy time. `-rc1` because Android Phase S and the J12 home-server smoke are still pending.
 - **Phase J: J1–J11 shipped.** Suite at J11: 292 passing. `mypy app/` clean. `ruff` clean.
 
+## 2026-06-17 — J12 + v3.0.0 promotion: backend smoke verified end-to-end
+
+- **`backend/pyproject.toml`** — `3.0.0-rc1` → `3.0.0`. RC1 promoted to
+  the clean tag after the J12 multi-user home-server smoke passed
+  (alice + bob real Navidrome users; per-user `/queue` isolation +
+  admin-token bypass observed; CLI-minted token unaffected) and the
+  Android v3.0.0 client paired against it end-to-end (login → Library
+  → download → queue → Now Playing across both profiles).
+- **`backend/docs/CONTEXT.md`** — version reference bumped to `v3.0.0`.
+
 ## 2026-06-16 — sec: bump starlette ≥ 1.3.1 (CVE-2026-54283)
 
 - **`backend/pyproject.toml`** — `starlette = ">=0.49.1"` → `">=1.3.1"`. Pin raised to satisfy `CVE-2026-54283` (HIGH; `request.form()` limits silently ignored for `application/x-www-form-urlencoded` → DoS). Resolved version: `1.3.1` (was `1.2.1`).
