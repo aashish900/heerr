@@ -49,11 +49,11 @@ These will mislead a future Claude session reading the bootstrap docs.
 
 | # | Item | Notes |
 |---|------|-------|
-| N1 | No `GET /admin/users` list / `DELETE /admin/users/{id}`. J10 added create-or-get but no list/remove. Operator inspects via raw SQL. | |
-| N2 | No `GET /admin/jobs` with filtering. Same. | |
+| ~~N1~~ | ~~No `GET /admin/users` list / `DELETE /admin/users/{id}`.~~ Resolved 2026-06-18: `GET /admin/users` lists every user; `DELETE /admin/users/{id}` removes orphan users only — blocked by 409 if the user has tokens or jobs (FK is `ON DELETE RESTRICT`), and `system-admin` cannot be deleted. | — |
+| ~~N2~~ | ~~No `GET /admin/jobs` with filtering.~~ Resolved 2026-06-18: `GET /admin/jobs?state=&user=&limit=` filters by job state, by `navidrome_username` (404 if unknown), and caps at `limit` (1-500, default 100). Sorted newest-first. | — |
 | ~~N3~~ | ~~No `tokens.last_used_at`.~~ Resolved 2026-06-17: migration 0007 added the column; `bearer_token` stamps `now()` on every authenticated request. | — |
 | ~~N4~~ | ~~CLI `list-tokens` has no `--user` filter.~~ Resolved 2026-06-18: `list-tokens --user=<navidrome_username>` filters to that user's tokens; errors clearly (`unknown user: <name>`, exit 1) on a missing user, prints `(no tokens)` when the user has none. | — |
-| N5 | No CORS configuration. Future admin web UI from a tailnet browser will be blocked. | |
+| ~~N5~~ | ~~No CORS configuration.~~ Deferred 2026-06-18: no web UI planned. Flutter is a native HTTP client and does not trigger CORS. Revisit only if a browser-based admin UI ever lands. | — |
 | ~~N6~~ | ~~No request body size limits.~~ Resolved 2026-06-17: `MaxBodySizeMiddleware` enforces a 1 MiB `Content-Length` cap; returns 413 before FastAPI body parsing. | — |
 | ~~N7~~ | ~~`/health` returns `200 {"status":"ok"}` unconditionally — doesn't verify DB.~~ Resolved 2026-06-17: split into `/health` (unconditional 200) + `/ready` (runs `SELECT 1`, returns 503 on failure). | — |
 | N8 | OpenAPI docs at `/api/v1/docs` are unauthenticated and expose admin endpoint shapes. | Tailscale-only mitigates; still sloppy. |

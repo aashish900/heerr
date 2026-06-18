@@ -4,7 +4,8 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_admin
@@ -61,6 +62,70 @@ async def create_or_get_user(
         created_at=user.created_at,
         last_login_at=user.last_login_at,
     )
+
+
+@router.get("/users", response_model=list[UserView])
+async def list_users(
+    session: AsyncSession = Depends(get_session),
+    _admin: Token = Depends(require_admin),
+) -> list[UserView]:
+    rows = (
+        await session.execute(select(User).order_by(User.created_at.asc()))
+    ).scalars().all()
+    return [
+        UserView(
+            id=u.id,
+            navidrome_username=u.navidrome_username,
+            created_at=u.created_at,
+            last_login_at=u.last_login_at,
+        )
+        for u in rows
+    ]
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _admin: Token = Depends(require_admin),
+) -> None:
+    user = await session.get(User, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"user {user_id} not found",
+        )
+    if user.navidrome_username == "system-admin":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="cannot delete the synthetic system-admin user",
+        )
+    token_count = (
+        await session.execute(
+            select(func.count()).select_from(Token).where(Token.user_id == user.id)
+        )
+    ).scalar_one()
+    job_count = (
+        await session.execute(
+            select(func.count()).select_from(Job).where(Job.user_id == user.id)
+        )
+    ).scalar_one()
+    if token_count or job_count:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"user has {token_count} token(s) and {job_count} job(s); "
+                "revoke tokens and clear jobs before deletion"
+            ),
+        )
+    await session.delete(user)
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="user has dependent rows that prevent deletion",
+        ) from exc
 
 
 # ---- tokens ---------------------------------------------------------------
@@ -148,6 +213,48 @@ async def revoke_token(
 
 
 # ---- jobs -----------------------------------------------------------------
+
+
+@router.get("/jobs", response_model=list[JobView])
+async def list_jobs(
+    state: str | None = None,
+    user: str | None = None,
+    limit: int = 100,
+    session: AsyncSession = Depends(get_session),
+    _admin: Token = Depends(require_admin),
+) -> list[JobView]:
+    """Operator job listing with optional filters.
+
+    `state` filters by job state (`queued|running|done|failed`).
+    `user` filters by `navidrome_username` (404 if the user does not exist).
+    `limit` caps the result set (1-500, default 100).
+    """
+    if limit < 1 or limit > 500:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="limit must be between 1 and 500",
+        )
+    if state is not None and state not in ("queued", "running", "done", "failed"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"invalid state: {state}",
+        )
+    stmt = select(Job)
+    if user is not None:
+        target = (
+            await session.execute(select(User).where(User.navidrome_username == user))
+        ).scalar_one_or_none()
+        if target is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"unknown navidrome_username: {user}",
+            )
+        stmt = stmt.where(Job.user_id == target.id)
+    if state is not None:
+        stmt = stmt.where(Job.state == state)
+    stmt = stmt.order_by(Job.created_at.desc()).limit(limit)
+    jobs = (await session.execute(stmt)).scalars().all()
+    return [to_view(j, None) for j in jobs]
 
 
 @router.post("/jobs/{job_id}/retry", response_model=JobView)

@@ -740,3 +740,14 @@ All 21 checks in SMOKE-TEST.md passed. Two bugs surfaced during smoke and fixed:
 - **`backend/docs/DEBT.md`** — N4 marked resolved.
 - 325/325 tests green; ruff + mypy clean.
 
+## 2026-06-18 — DEBT N1 + N2 + N5: admin user/job listings; defer CORS
+
+- **`backend/app/api/v1/admin.py`** — three new endpoints (admin-only):
+  - `GET /admin/users` — list all users (`UserView[]`).
+  - `DELETE /admin/users/{id}` — delete an orphan user. 404 if missing; 409 if the user owns any tokens or jobs (FK is `ON DELETE RESTRICT`); 409 if the user is the synthetic `system-admin` (load-bearing).
+  - `GET /admin/jobs?state=&user=&limit=` — list jobs with optional state filter (`queued|running|done|failed`, else 422), optional `user=<navidrome_username>` filter (404 if unknown), and `limit` (1-500, default 100; else 422). Sorted newest-first.
+- **`backend/app/api/v1/admin.py`** — minor: switched `HTTP_422_UNPROCESSABLE_ENTITY` → `HTTP_422_UNPROCESSABLE_CONTENT` on the new validation paths (silences Starlette deprecation warning).
+- **`backend/tests/test_admin.py`** — auth gate extended to cover the three new endpoints; ~12 new tests covering the happy + edge paths (filter by state, by user, unknown user, limit out of range, system-admin delete blocked, user-with-tokens/jobs delete blocked, orphan-user delete succeeds).
+- **`backend/docs/DEBT.md`** — N1 + N2 marked resolved; N5 deferred (no web UI planned; Flutter is a native HTTP client and does not trigger CORS).
+- 338/338 tests green; ruff + mypy clean.
+

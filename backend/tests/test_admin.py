@@ -84,6 +84,9 @@ async def test_admin_endpoints_require_auth(client):
         ("POST", f"/api/v1/admin/tokens/{uuid.uuid4()}/revoke"),
         ("POST", f"/api/v1/admin/jobs/{uuid.uuid4()}/retry"),
         ("POST", "/api/v1/admin/users"),
+        ("GET", "/api/v1/admin/users"),
+        ("DELETE", f"/api/v1/admin/users/{uuid.uuid4()}"),
+        ("GET", "/api/v1/admin/jobs"),
     ]:
         r = await client.request(method, path, json={})
         assert r.status_code == 401, f"{method} {path}"
@@ -428,4 +431,281 @@ async def test_create_user_validates_input(client, make_token, cleanup):
             json={"navidrome_username": "x", "extra": 1},
             headers=h,
         )
+    ).status_code == 422
+
+
+# ---- N1: GET /admin/users + DELETE /admin/users/{id} ----------------------
+
+
+async def test_list_users_returns_seeded_and_created_rows(client, make_token, cleanup):
+    import uuid as _uuid
+
+    raw_admin = await make_token(is_admin=True)
+    h = {"Authorization": f"Bearer {raw_admin}"}
+
+    name = f"listme-{_uuid.uuid4().hex[:8]}"
+    await client.post("/api/v1/admin/users", json={"navidrome_username": name}, headers=h)
+
+    r = await client.get("/api/v1/admin/users", headers=h)
+    assert r.status_code == 200
+    usernames = {u["navidrome_username"] for u in r.json()}
+    # Backfill migration seeds system-admin and legacy-admin.
+    assert "system-admin" in usernames
+    assert name in usernames
+
+
+async def test_delete_user_removes_orphan_user(client, make_token, app_sm, cleanup):
+    import uuid as _uuid
+
+    from sqlalchemy import text as _text
+
+    raw_admin = await make_token(is_admin=True)
+    h = {"Authorization": f"Bearer {raw_admin}"}
+    name = f"todelete-{_uuid.uuid4().hex[:8]}"
+
+    r1 = await client.post(
+        "/api/v1/admin/users",
+        json={"navidrome_username": name},
+        headers=h,
+    )
+    user_id = r1.json()["id"]
+
+    r2 = await client.delete(f"/api/v1/admin/users/{user_id}", headers=h)
+    assert r2.status_code == 204
+
+    async with app_sm() as s:
+        n = (
+            await s.execute(
+                _text("SELECT count(*) FROM users WHERE id = :i"), {"i": user_id}
+            )
+        ).scalar_one()
+        assert n == 0
+
+
+async def test_delete_unknown_user_returns_404(client, make_token, cleanup):
+    raw_admin = await make_token(is_admin=True)
+    h = {"Authorization": f"Bearer {raw_admin}"}
+    r = await client.delete(f"/api/v1/admin/users/{uuid.uuid4()}", headers=h)
+    assert r.status_code == 404
+
+
+async def test_delete_user_with_tokens_returns_409(
+    client, make_token, app_sm, cleanup
+):
+    import uuid as _uuid
+
+    from sqlalchemy import text as _text
+
+    raw_admin = await make_token(is_admin=True)
+    h = {"Authorization": f"Bearer {raw_admin}"}
+    name = f"hastokens-{_uuid.uuid4().hex[:8]}"
+    r1 = await client.post(
+        "/api/v1/admin/users",
+        json={"navidrome_username": name},
+        headers=h,
+    )
+    user_id = r1.json()["id"]
+    await client.post(
+        "/api/v1/admin/tokens",
+        headers=h,
+        json={
+            "owner_label": "admin-test-blocker",
+            "scopes": ["read"],
+            "navidrome_username": name,
+        },
+    )
+
+    r = await client.delete(f"/api/v1/admin/users/{user_id}", headers=h)
+    assert r.status_code == 409
+    assert "token" in r.json()["detail"].lower()
+
+    # Cleanup the FK chain so the cleanup fixture can drop the user row.
+    async with app_sm() as s:
+        await s.execute(
+            _text("DELETE FROM tokens WHERE user_id = :i"), {"i": user_id}
+        )
+        await s.execute(_text("DELETE FROM users WHERE id = :i"), {"i": user_id})
+        await s.commit()
+
+
+async def test_delete_user_with_jobs_returns_409(client, make_token, app_sm, cleanup):
+    import uuid as _uuid
+
+    from sqlalchemy import text as _text
+
+    raw_admin = await make_token(is_admin=True)
+    h = {"Authorization": f"Bearer {raw_admin}"}
+    name = f"hasjobs-{_uuid.uuid4().hex[:8]}"
+    r1 = await client.post(
+        "/api/v1/admin/users",
+        json={"navidrome_username": name},
+        headers=h,
+    )
+    user_id = uuid.UUID(r1.json()["id"])
+
+    # Seed a job under this user using the admin token's id.
+    admin_token_id = await _token_id_for(app_sm, raw_admin)
+    job = Job(
+        source_url=f"https://www.youtube.com/watch?v=delme-{_uuid.uuid4().hex[:6]}",
+        source_type="song",
+        state="done",
+        created_by_token_id=admin_token_id,
+        user_id=user_id,
+    )
+    async with app_sm() as s:
+        s.add(job)
+        await s.commit()
+
+    r = await client.delete(f"/api/v1/admin/users/{user_id}", headers=h)
+    assert r.status_code == 409
+    assert "job" in r.json()["detail"].lower()
+
+    async with app_sm() as s:
+        await s.execute(
+            _text("DELETE FROM jobs WHERE user_id = :i"), {"i": user_id}
+        )
+        await s.execute(_text("DELETE FROM users WHERE id = :i"), {"i": user_id})
+        await s.commit()
+
+
+async def test_delete_system_admin_user_is_blocked(client, make_token, app_sm, cleanup):
+    from sqlalchemy import text as _text
+
+    raw_admin = await make_token(is_admin=True)
+    h = {"Authorization": f"Bearer {raw_admin}"}
+    async with app_sm() as s:
+        sys_id = (
+            await s.execute(
+                _text("SELECT id FROM users WHERE navidrome_username = 'system-admin'")
+            )
+        ).scalar_one()
+
+    r = await client.delete(f"/api/v1/admin/users/{sys_id}", headers=h)
+    assert r.status_code == 409
+    assert "system-admin" in r.json()["detail"]
+
+
+# ---- N2: GET /admin/jobs (list + filters) ---------------------------------
+
+
+async def test_list_jobs_non_admin_returns_403(client, make_token, cleanup):
+    raw = await make_token(is_admin=False)
+    h = {"Authorization": f"Bearer {raw}"}
+    r = await client.get("/api/v1/admin/jobs", headers=h)
+    assert r.status_code == 403
+
+
+async def test_list_jobs_returns_all_states_no_filter(
+    client, make_token, app_sm, cleanup
+):
+    raw_admin = await make_token(is_admin=True)
+    token_id = await _token_id_for(app_sm, raw_admin)
+    await _seed_job(
+        app_sm, token_id=token_id, source_url="https://www.youtube.com/watch?v=q1", state="queued"
+    )
+    await _seed_job(
+        app_sm, token_id=token_id, source_url="https://www.youtube.com/watch?v=d1", state="done"
+    )
+    await _seed_job(
+        app_sm, token_id=token_id, source_url="https://www.youtube.com/watch?v=f1", state="failed"
+    )
+
+    h = {"Authorization": f"Bearer {raw_admin}"}
+    r = await client.get("/api/v1/admin/jobs", headers=h)
+    assert r.status_code == 200
+    states = {j["state"] for j in r.json()}
+    assert {"queued", "done", "failed"}.issubset(states)
+
+
+async def test_list_jobs_filter_by_state(client, make_token, app_sm, cleanup):
+    raw_admin = await make_token(is_admin=True)
+    token_id = await _token_id_for(app_sm, raw_admin)
+    await _seed_job(
+        app_sm, token_id=token_id, source_url="https://www.youtube.com/watch?v=s-q", state="queued"
+    )
+    await _seed_job(
+        app_sm, token_id=token_id, source_url="https://www.youtube.com/watch?v=s-d", state="done"
+    )
+
+    h = {"Authorization": f"Bearer {raw_admin}"}
+    r = await client.get("/api/v1/admin/jobs?state=queued", headers=h)
+    assert r.status_code == 200
+    body = r.json()
+    assert all(j["state"] == "queued" for j in body)
+    urls = {j["source_url"] for j in body}
+    assert "https://www.youtube.com/watch?v=s-q" in urls
+    assert "https://www.youtube.com/watch?v=s-d" not in urls
+
+
+async def test_list_jobs_invalid_state_returns_422(client, make_token, cleanup):
+    raw_admin = await make_token(is_admin=True)
+    h = {"Authorization": f"Bearer {raw_admin}"}
+    r = await client.get("/api/v1/admin/jobs?state=bogus", headers=h)
+    assert r.status_code == 422
+
+
+async def test_list_jobs_filter_by_user(client, make_token, app_sm, cleanup):
+    import uuid as _uuid
+
+    from sqlalchemy import text as _text
+
+    raw_admin = await make_token(is_admin=True)
+    h = {"Authorization": f"Bearer {raw_admin}"}
+    name = f"jobuser-{_uuid.uuid4().hex[:8]}"
+    r1 = await client.post(
+        "/api/v1/admin/users",
+        json={"navidrome_username": name},
+        headers=h,
+    )
+    other_uid = uuid.UUID(r1.json()["id"])
+
+    admin_token_id = await _token_id_for(app_sm, raw_admin)
+    # Job for the other user.
+    j_other = Job(
+        source_url="https://www.youtube.com/watch?v=other-job",
+        source_type="song",
+        state="done",
+        created_by_token_id=admin_token_id,
+        user_id=other_uid,
+    )
+    # Job for system-admin.
+    await _seed_job(
+        app_sm,
+        token_id=admin_token_id,
+        source_url="https://www.youtube.com/watch?v=sysadm-job",
+        state="done",
+    )
+    async with app_sm() as s:
+        s.add(j_other)
+        await s.commit()
+
+    r = await client.get(f"/api/v1/admin/jobs?user={name}", headers=h)
+    assert r.status_code == 200
+    urls = {j["source_url"] for j in r.json()}
+    assert "https://www.youtube.com/watch?v=other-job" in urls
+    assert "https://www.youtube.com/watch?v=sysadm-job" not in urls
+
+    async with app_sm() as s:
+        await s.execute(
+            _text("DELETE FROM jobs WHERE user_id = :i"), {"i": other_uid}
+        )
+        await s.execute(_text("DELETE FROM users WHERE id = :i"), {"i": other_uid})
+        await s.commit()
+
+
+async def test_list_jobs_unknown_user_returns_404(client, make_token, cleanup):
+    raw_admin = await make_token(is_admin=True)
+    h = {"Authorization": f"Bearer {raw_admin}"}
+    r = await client.get("/api/v1/admin/jobs?user=nobody-here", headers=h)
+    assert r.status_code == 404
+
+
+async def test_list_jobs_limit_out_of_range_returns_422(client, make_token, cleanup):
+    raw_admin = await make_token(is_admin=True)
+    h = {"Authorization": f"Bearer {raw_admin}"}
+    assert (
+        await client.get("/api/v1/admin/jobs?limit=0", headers=h)
+    ).status_code == 422
+    assert (
+        await client.get("/api/v1/admin/jobs?limit=501", headers=h)
     ).status_code == 422
