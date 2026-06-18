@@ -78,22 +78,49 @@ def create_token(
 
 
 @app.command("list-tokens")
-def list_tokens() -> None:
+def list_tokens(
+    user: str | None = typer.Option(
+        None,
+        "--user",
+        help="Filter to tokens belonging to this navidrome_username.",
+    ),
+) -> None:
     """List tokens (id, user, owner, scopes, admin, state). Never prints hashes."""
     from sqlalchemy.orm import selectinload
 
-    async def _run() -> list[Token]:
+    async def _run() -> tuple[list[Token], str | None]:
         engine, sm = _make_sessionmaker()
         try:
             async with sm() as session:
-                result = await session.execute(
-                    select(Token).options(selectinload(Token.user)).order_by(Token.created_at)
-                )
-                return list(result.scalars().all())
+                if user is not None:
+                    target = (
+                        await session.execute(
+                            select(User).where(User.navidrome_username == user)
+                        )
+                    ).scalar_one_or_none()
+                    if target is None:
+                        return [], f"unknown user: {user}"
+                    stmt = (
+                        select(Token)
+                        .options(selectinload(Token.user))
+                        .where(Token.user_id == target.id)
+                        .order_by(Token.created_at)
+                    )
+                else:
+                    stmt = (
+                        select(Token)
+                        .options(selectinload(Token.user))
+                        .order_by(Token.created_at)
+                    )
+                result = await session.execute(stmt)
+                return list(result.scalars().all()), None
         finally:
             await engine.dispose()
 
-    rows = asyncio.run(_run())
+    rows, err = asyncio.run(_run())
+    if err is not None:
+        typer.echo(err, err=True)
+        raise typer.Exit(code=1)
     if not rows:
         typer.echo("(no tokens)")
         return

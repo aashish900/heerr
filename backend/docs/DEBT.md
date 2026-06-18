@@ -52,7 +52,7 @@ These will mislead a future Claude session reading the bootstrap docs.
 | N1 | No `GET /admin/users` list / `DELETE /admin/users/{id}`. J10 added create-or-get but no list/remove. Operator inspects via raw SQL. | |
 | N2 | No `GET /admin/jobs` with filtering. Same. | |
 | ~~N3~~ | ~~No `tokens.last_used_at`.~~ Resolved 2026-06-17: migration 0007 added the column; `bearer_token` stamps `now()` on every authenticated request. | — |
-| N4 | CLI `list-tokens` has no `--user` filter. Hard to clean up after one user. | |
+| ~~N4~~ | ~~CLI `list-tokens` has no `--user` filter.~~ Resolved 2026-06-18: `list-tokens --user=<navidrome_username>` filters to that user's tokens; errors clearly (`unknown user: <name>`, exit 1) on a missing user, prints `(no tokens)` when the user has none. | — |
 | N5 | No CORS configuration. Future admin web UI from a tailnet browser will be blocked. | |
 | ~~N6~~ | ~~No request body size limits.~~ Resolved 2026-06-17: `MaxBodySizeMiddleware` enforces a 1 MiB `Content-Length` cap; returns 413 before FastAPI body parsing. | — |
 | ~~N7~~ | ~~`/health` returns `200 {"status":"ok"}` unconditionally — doesn't verify DB.~~ Resolved 2026-06-17: split into `/health` (unconditional 200) + `/ready` (runs `SELECT 1`, returns 503 on failure). | — |

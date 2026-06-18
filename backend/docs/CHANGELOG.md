@@ -730,3 +730,13 @@ All 21 checks in SMOKE-TEST.md passed. Two bugs surfaced during smoke and fixed:
 - **`backend/tests/test_worker.py`** — added `test_run_job_completes_after_creating_token_revoked`: seeds a queued job, revokes the creating token, runs the worker via `run_job`, asserts the job reaches `state=done` and a `Download` row is written. Pins the contract that revoking a token does not cancel or fail in-flight jobs it created.
 - **`backend/docs/DEBT.md`** — M4 marked resolved (struck through); C4 marked deferred ("not critical at current stage; revisit after Phase S is live"); priority-order entry for C4 struck through.
 
+## 2026-06-18 — DEBT N4: `list-tokens --user` filter
+
+- **`backend/app/cli.py`** — `list-tokens` gains an optional `--user=<navidrome_username>` flag. Resolves the user, filters tokens by `user_id`. Unknown user → exit 1 with `unknown user: <name>` on stderr (consistent with `create-token`'s unknown-user behaviour). No filter = unchanged behaviour.
+- **`backend/tests/test_cli.py`** — three new tests:
+  - `test_list_tokens_user_filter_returns_only_matching` — seeds two users, asserts the filter excludes the other user's tokens.
+  - `test_list_tokens_user_filter_no_matches` — filtered to a real user with zero tokens; output is `(no tokens)`.
+  - `test_list_tokens_user_filter_unknown_user_fails` — non-existent user → exit code != 0 + `unknown user` message.
+- **`backend/docs/DEBT.md`** — N4 marked resolved.
+- 325/325 tests green; ruff + mypy clean.
+

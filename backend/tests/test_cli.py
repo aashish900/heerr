@@ -254,3 +254,49 @@ def test_list_tokens_includes_user_column(cli_env, cli_app):
     lst = runner.invoke(cli_app, ["list-tokens"])
     assert lst.exit_code == 0
     assert "user=system-admin" in lst.stdout
+
+
+# ---- N4: list-tokens --user filter ---------------------------------------
+
+
+def test_list_tokens_user_filter_returns_only_matching(cli_env, cli_app):
+    # Seed a second user so we have two distinct buckets.
+    with psycopg.connect(cli_env) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO users (navidrome_username) VALUES (%s) ON CONFLICT DO NOTHING",
+                ("bob-cli",),
+            )
+        conn.commit()
+
+    r1 = runner.invoke(cli_app, ["create-token", "--owner", "ops-sys"])
+    assert r1.exit_code == 0
+    r2 = runner.invoke(cli_app, ["create-token", "--owner", "ops-bob", "--user", "bob-cli"])
+    assert r2.exit_code == 0
+
+    lst = runner.invoke(cli_app, ["list-tokens", "--user", "bob-cli"])
+    assert lst.exit_code == 0
+    assert "owner=ops-bob" in lst.stdout
+    assert "owner=ops-sys" not in lst.stdout
+
+
+def test_list_tokens_user_filter_no_matches(cli_env, cli_app):
+    with psycopg.connect(cli_env) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO users (navidrome_username) VALUES (%s) ON CONFLICT DO NOTHING",
+                ("carol-cli",),
+            )
+        conn.commit()
+
+    r = runner.invoke(cli_app, ["create-token", "--owner", "ops"])
+    assert r.exit_code == 0
+    lst = runner.invoke(cli_app, ["list-tokens", "--user", "carol-cli"])
+    assert lst.exit_code == 0
+    assert "(no tokens)" in lst.stdout
+
+
+def test_list_tokens_user_filter_unknown_user_fails(cli_env, cli_app):
+    r = runner.invoke(cli_app, ["list-tokens", "--user", "nobody-here"])
+    assert r.exit_code != 0
+    assert "unknown user" in r.stdout.lower()
