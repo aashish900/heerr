@@ -713,3 +713,14 @@ Knocked out the three lowest-effort items from DEBT.md.
 - Full suite green (321/321). ruff + mypy clean.
 
 **Operator note:** if you previously called `POST /admin/tokens` from a script with `{"owner_label", "scopes", "is_admin"}`, you must now also pass `"navidrome_username"`. The CLI subcommand `python -m app.cli create-token --user=<username>` was already FK-aware (J10) — no change there.
+
+## 2026-06-18 — v3.1.0-rc1 smoke on home server — 2 bugs fixed
+
+All 21 checks in SMOKE-TEST.md passed. Two bugs surfaced during smoke and fixed:
+
+- **`backend/app/main.py`** — C2 bug: `lifespan` was iterating `get_session()` with `async for`, which never triggered the generator's post-yield `commit()`. The orphan-recovery UPDATE executed but was never committed — the row stayed `running` after restart. Fixed by using `_sessionmaker()()` directly with an explicit `await session.commit()` / `rollback()`.
+- **`backend/app/main.py`** — N13 bug: `get_settings()` was called lazily (first incoming request), so a malformed `NAVIDROME_URL` didn't kill the container at boot. Fixed by calling `get_settings()` at the top of `lifespan()` before `yield`; uvicorn treats a pre-yield exception as startup failure and exits.
+- **`backend/app/main.py`** — version string bumped to `3.1.0-rc1`; `pyproject.toml` version also updated to `3.1.0-rc1`.
+- **`backend/docs/DEBT.md`** — C2 and N13 resolution notes updated to describe the smoke-fix.
+- **`backend/docs/ROADMAP.md`** — H1 status and preamble updated to reflect smoke passing.
+- 321/321 tests green. Tagged and pushed as `v3.1.0-rc1`.

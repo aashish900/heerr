@@ -4,7 +4,7 @@ Track progress through the backend build. Each milestone = one git commit with a
 
 See `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file is the *how* / *when*.
 
-**Status (2026-06-16):** Phases A–G complete (16/17 milestones, A1 through G2). **H1 pending** — requires running the deployed stack on the home server; deferred until next on-site session. Phase I (recommendations engine, I1–I5) shipped. **Phase J (multi-user via Navidrome IdP, J1–J10) planned — not started.**
+**Status (2026-06-18):** Phases A–H complete (17/17 milestones, A1 through H1). H1 v3.1.0-rc1 smoke passed on home server 2026-06-18. Phase I (recommendations engine, I1–I5) shipped. **Phase J (multi-user via Navidrome IdP, J1–J10) planned — not started.**
 
 **Conventions:**
 - TDD per CLAUDE.md §2 — tests written first, land in same commit as code.
@@ -169,7 +169,7 @@ See `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file is the *how* /
 **Test gate:** manual; run `/health`, mint a token, `POST /search`, `POST /download`, poll `/status`, confirm the file lands under `/data/media/music/` and Navidrome indexes it.
 **Done when:** Step 5 (file under `/data/media/music/...`) + step 6 (Navidrome lists it) both confirmed.
 **Commit:** `chore: e2e smoke verified` (optional — only if recording output).
-**Status (2026-06-09):** Cannot run from current location. All prior milestones (A1–G2) merged on `main`; CI Docker Hub workflow live. Run after deploying the image / compose snippet onto the arr-stack host.
+**Status (2026-06-18):** ✅ Smoke passed on home server against v3.1.0-rc1. All 21 checks in SMOKE-TEST.md green. Two bugs found and fixed during smoke: (1) lifespan used `async for session in get_session()` which never committed the orphan-recovery UPDATE (C2); (2) `get_settings()` was not called eagerly so a bad `NAVIDROME_URL` didn't kill the container at boot (N13). Both fixed, 321/321 tests green, re-tagged and pushed.
 
 ---
 
