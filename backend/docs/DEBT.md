@@ -21,7 +21,7 @@ These will mislead a future Claude session reading the bootstrap docs.
 
 | # | Item | Triggered by | Effort |
 |---|------|--------------|--------|
-| C1 | **No real job queue.** `FastAPI BackgroundTasks` does not survive container restart, has no concurrency cap, no retry policy, no scheduled work. Two `/download` calls = two concurrent spotDL subprocesses. **First thing to fail under real multi-user load.** | Migration to arq / Celery / RQ. Worker needs DB session, settings, spotDL runner, `request_id` propagation. | L |
+| C1 | **No real job queue.** `FastAPI BackgroundTasks` does not survive container restart, has no concurrency cap, no retry policy, no scheduled work. Two `/download` calls = two concurrent spotDL subprocesses. **First thing to fail under real multi-user load.** **Deferred 2026-06-18: not tackling new infra components right now; revisit when multi-user load actually surfaces the issue.** | Migration to arq / Celery / RQ. Worker needs DB session, settings, spotDL runner, `request_id` propagation. | L |
 | ~~C2~~ | ~~No boot-recovery for orphaned `running` jobs.~~ Resolved 2026-06-17: `recover_orphaned_jobs()` runs in the FastAPI lifespan; every `state='running'` row at boot is marked `failed` with `error_msg='orphaned at boot'`. No grace window — if the worker process is gone, the row is by definition orphaned. **Smoke fix 2026-06-18:** lifespan was using `async for session in get_session()` which never triggered the generator's post-yield `commit()`; replaced with `_sessionmaker()()` + explicit `await session.commit()`. | — | — |
 | C3 | **Job cancellation is impossible.** No `cancel-job` endpoint; no PID/Task tracking; only way to stop a spotDL subprocess is killing the container. | Track `asyncio.Task` per `job_id` (or process handle once C1 lands). Add `POST /jobs/{id}/cancel`. | M |
 | C4 | **No token expiry.** Tokens are revocable-only. Once minted they live forever. Multi-user makes a stolen-token incident permanent. Adding `expires_at` now is a 2-column migration; after Phase S Android ships it's a coordinated client/server release. **Deferred 2026-06-18: not critical at current stage; revisit after Phase S is live.** | `tokens.expires_at` + check in `bearer_token`. Optional refresh-token flow. | S |
@@ -95,7 +95,7 @@ These will mislead a future Claude session reading the bootstrap docs.
 4. **C2 + T1 + T3** — boot recovery for orphaned `running` jobs. Small fix, prevents support-by-SQL.
 5. **M1 + T4** — add a regression test that catches missing `user_id` on INSERT, then plan the migration to drop the `system_admin_user_id()` default once Phase S ships.
 6. **C6 + M8** — login + `/download` rate limiting. Mitigates the biggest credible abuse vectors.
-7. **C1 + C3 + N12 + M7** — real queue substrate. Largest single piece of work; everything else gets easier once it's in place.
+7. ~~**C1 + C3 + N12 + M7** — real queue substrate.~~ C1 deferred 2026-06-18 (no new components). C3 / N12 / M7 stay blocked on C1; revisit together.
 8. **M5** — per-user recommendation engine config. Unblocks per-user Last.fm/ListenBrainz scrobbling (already a deferred item on the Android side).
 9. **Everything else** — opportunistically, as features that need them land.
 
