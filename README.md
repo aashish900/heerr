@@ -1,6 +1,6 @@
 # heerr
 
-**Seerr, but for music.** Search YouTube Music from your phone, dispatch downloads to your home server, watch the queue as tracks land in Navidrome.
+**Your self-hosted music pipeline, end to end.** Discover tracks on YouTube Music, dispatch downloads straight to your home server with a tap, save them offline on your phone, and stream your growing library through Navidrome — all without touching a desktop or exposing anything to the public internet.
 
 [![backend CI](https://github.com/aashish900/heerr/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/aashish900/heerr/actions/workflows/backend-ci.yml)
 [![Docker publish](https://github.com/aashish900/heerr/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/aashish900/heerr/actions/workflows/docker-publish.yml)
