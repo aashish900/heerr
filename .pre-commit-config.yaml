@@ -1,0 +1,24 @@
+# Pre-commit hooks. Mirrors the gates in `.github/workflows/backend-ci.yml`
+# so the same checks run locally before a commit ever leaves your machine.
+#
+# One-time setup per clone:
+#   pipx install pre-commit && pre-commit install
+#
+# Manual run across the whole tree:
+#   pre-commit run --all-files
+#
+# Ruff is pinned to match `backend/poetry.lock` exactly. Bumping ruff in
+# `backend/pyproject.toml` MUST bump `rev:` here in the same commit — a
+# drift here is what makes "passes locally, fails on CI" come back.
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.4
+    hooks:
+      - id: ruff
+        name: ruff (lint, autofix)
+        args: [--fix]
+        files: ^backend/.*\.py$
+      - id: ruff-format
+        name: ruff-format
+        files: ^backend/.*\.py$

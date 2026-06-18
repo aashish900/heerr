@@ -21,11 +21,13 @@ on:
     paths:
       - "backend/**"
       - ".github/workflows/backend-ci.yml"
+      - ".pre-commit-config.yaml"
   push:
     branches: [main]
     paths:
       - "backend/**"
       - ".github/workflows/backend-ci.yml"
+      - ".pre-commit-config.yaml"
 
 # Cancel an older run for the same PR when a new commit lands — saves
 # minutes on quick fixup pushes.
@@ -72,11 +74,16 @@ jobs:
       - name: Install dependencies
         run: poetry install --no-interaction --no-ansi
 
-      - name: Ruff (lint)
-        run: poetry run ruff check .
-
-      - name: Ruff (format check)
-        run: poetry run ruff format --check .
+      # Single source of truth for ruff lint + format. Same hooks, same
+      # pinned ruff version as `.pre-commit-config.yaml` — so this CI gate
+      # is what every local pre-commit hook also runs, in lockstep. Catches
+      # `--no-verify` commits and contributors who never ran
+      # `pre-commit install`. Read-only — never modifies the repo.
+      - name: Pre-commit hooks (ruff lint + format)
+        working-directory: ${{ github.workspace }}
+        run: |
+          pipx install pre-commit
+          pre-commit run --all-files --show-diff-on-failure
 
       - name: Mypy
         run: poetry run mypy app/

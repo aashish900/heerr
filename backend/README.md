@@ -351,9 +351,26 @@ poetry run mypy app/                    # type-check (excludes tests/, alembic/v
 ```
 
 Lint + type-check configs live in `pyproject.toml` (`[tool.ruff]`, `[tool.mypy]`).
-The same four gates (`ruff check`, `ruff format --check`, `mypy app/`,
-`pytest`) run in CI on every PR via [`.github/workflows/backend-ci.yml`](../.github/workflows/backend-ci.yml)
+The same four gates (ruff lint, ruff format, `mypy app/`, `pytest`) run in
+CI on every PR via [`.github/workflows/backend-ci.yml`](../.github/workflows/backend-ci.yml)
 — keep them green locally before pushing.
+
+### Pre-commit hook (one-time per clone)
+
+Ruff lint + format is wired through [pre-commit](https://pre-commit.com).
+Install once and `git commit` will auto-fix formatting before the commit
+lands, so you never push a ruff-format failure:
+
+```bash
+pipx install pre-commit       # or `pip install --user pre-commit`
+pre-commit install            # writes .git/hooks/pre-commit
+pre-commit run --all-files    # one-time sweep over the whole tree
+```
+
+The hook config is at `../.pre-commit-config.yaml` (repo root). Ruff is
+pinned there to match `poetry.lock` exactly — if you bump ruff in
+`pyproject.toml`, bump `rev:` there in the same commit. CI runs the same
+hooks read-only, so a `--no-verify` commit still gets caught at PR time.
 
 **Architecture:**
 - Real Postgres via [`testcontainers-postgres`](https://testcontainers-python.readthedocs.io/) — session-scoped `pgvector/pgvector:pg17` container; the image is cached locally after the first run (~1.9s spin-up).
