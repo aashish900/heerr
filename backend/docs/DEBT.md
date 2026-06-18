@@ -21,12 +21,11 @@ These will mislead a future Claude session reading the bootstrap docs.
 
 | # | Item | Triggered by | Effort |
 |---|------|--------------|--------|
-| ~~C1~~ | ~~**No real job queue.** `FastAPI BackgroundTasks` does not survive container restart, has no concurrency cap, no retry policy, no scheduled work. Two `/download` calls = two concurrent spotDL subprocesses.~~ Deferred 2026-06-18: not tackling new infra components right now; revisit when multi-user load actually surfaces the issue. | Migration to arq / Celery / RQ. Worker needs DB session, settings, spotDL runner, `request_id` propagation. | L |
 | ~~C2~~ | ~~No boot-recovery for orphaned `running` jobs.~~ Resolved 2026-06-17: `recover_orphaned_jobs()` runs in the FastAPI lifespan; every `state='running'` row at boot is marked `failed` with `error_msg='orphaned at boot'`. No grace window — if the worker process is gone, the row is by definition orphaned. **Smoke fix 2026-06-18:** lifespan was using `async for session in get_session()` which never triggered the generator's post-yield `commit()`; replaced with `_sessionmaker()()` + explicit `await session.commit()`. | — | — |
 | C3 | **Job cancellation is impossible.** No `cancel-job` endpoint; no PID/Task tracking; only way to stop a spotDL subprocess is killing the container. | Track `asyncio.Task` per `job_id` (or process handle once C1 lands). Add `POST /jobs/{id}/cancel`. | M |
-| ~~C4~~ | ~~**No token expiry.** Tokens are revocable-only. Once minted they live forever. Multi-user makes a stolen-token incident permanent.~~ Deferred 2026-06-18: not critical at current stage; revisit after Phase S is live. | `tokens.expires_at` + check in `bearer_token`. Optional refresh-token flow. | S |
 | ~~C5~~ | ~~**No `/auth/logout`.**~~ Resolved 2026-06-16: `POST /api/v1/auth/logout` sets `revoked_at = now()` on the current token; returns 204. Subsequent calls with the same token return 401 (already revoked) via the existing `bearer_token` check. | — | — |
-| ~~C6~~ | ~~**`POST /auth/login` has no rate limit.** Brute-forcing Navidrome credentials through heerr is unmitigated.~~ Deferred 2026-06-18: tailnet-only posture + small family user base; not warranted at current stage. | Per-IP + per-username sliding-window in Postgres (or fastapi-limiter / slowapi). Lockout after N failures. | M |
+
+> C1, C4, C6 moved to §7 (Deferred).
 
 ---
 
@@ -40,8 +39,8 @@ These will mislead a future Claude session reading the bootstrap docs.
 | ~~M4~~ | ~~`jobs.created_by_token_id` semantics under multi-user are undocumented.~~ Resolved 2026-06-18: `tests/test_worker.py::test_run_job_completes_after_creating_token_revoked` pins the contract — revoking a token does not cancel or fail in-flight jobs it created; worker holds the job by id and does not recheck token validity. | — |
 | M5 | **No per-user recommendation engine config.** `RECOMMENDATION_ENGINE`, `LASTFM_*`, `LISTENBRAINZ_*` are global env vars. Multi-user backend = single-user recommendations. | Needs a `user_settings` table (or JSONB column on `users`) + factory rewrite. |
 | M6 | **Album/playlist jobs write zero `Download` rows.** Documented decision; multi-user makes the gap worse because per-user history is the only signal. Fix requires parsing spotDL `--save-file metadata.json`, which DECISIONLOG explicitly rejected. | Revisit only if users actually report missing dedup hints for tracks inside previously-downloaded albums. |
-| ~~M7~~ | ~~**No per-user quota.**~~ Deferred 2026-06-18 alongside C6/M8: tailnet-only family-scale app; revisit if disk pressure or abuse actually surfaces. | Postgres-backed counter + middleware. Couples with C1. |
-| ~~M8~~ | ~~**No per-user `/download` rate limit.**~~ Deferred 2026-06-18 alongside C6: tailnet-only family-scale app; revisit if abuse actually surfaces. | Same mechanism as C6 / M7. |
+
+> M7, M8 moved to §7 (Deferred).
 
 ---
 
@@ -53,7 +52,6 @@ These will mislead a future Claude session reading the bootstrap docs.
 | ~~N2~~ | ~~No `GET /admin/jobs` with filtering.~~ Resolved 2026-06-18: `GET /admin/jobs?state=&user=&limit=` filters by job state, by `navidrome_username` (404 if unknown), and caps at `limit` (1-500, default 100). Sorted newest-first. | — |
 | ~~N3~~ | ~~No `tokens.last_used_at`.~~ Resolved 2026-06-17: migration 0007 added the column; `bearer_token` stamps `now()` on every authenticated request. | — |
 | ~~N4~~ | ~~CLI `list-tokens` has no `--user` filter.~~ Resolved 2026-06-18: `list-tokens --user=<navidrome_username>` filters to that user's tokens; errors clearly (`unknown user: <name>`, exit 1) on a missing user, prints `(no tokens)` when the user has none. | — |
-| ~~N5~~ | ~~No CORS configuration.~~ Deferred 2026-06-18: no web UI planned. Flutter is a native HTTP client and does not trigger CORS. Revisit only if a browser-based admin UI ever lands. | — |
 | ~~N6~~ | ~~No request body size limits.~~ Resolved 2026-06-17: `MaxBodySizeMiddleware` enforces a 1 MiB `Content-Length` cap; returns 413 before FastAPI body parsing. | — |
 | ~~N7~~ | ~~`/health` returns `200 {"status":"ok"}` unconditionally — doesn't verify DB.~~ Resolved 2026-06-17: split into `/health` (unconditional 200) + `/ready` (runs `SELECT 1`, returns 503 on failure). | — |
 | N8 | OpenAPI docs at `/api/v1/docs` are unauthenticated and expose admin endpoint shapes. | Tailscale-only mitigates; still sloppy. |
@@ -98,6 +96,23 @@ These will mislead a future Claude session reading the bootstrap docs.
 7. ~~**C1 + C3 + N12 + M7** — real queue substrate.~~ C1 + M7 deferred 2026-06-18 (no new components, family-scale). C3 / N12 stay blocked on C1; revisit together.
 8. **M5** — per-user recommendation engine config. Unblocks per-user Last.fm/ListenBrainz scrobbling (already a deferred item on the Android side).
 9. **Everything else** — opportunistically, as features that need them land.
+
+---
+
+## 7. Deferred — not pursuing at current stage
+
+Rows assessed and explicitly parked. They retain their original ID (from the 2026-06-16 architecture audit) for traceability. The `[DEFERRED]` prefix is a tag, not a status field — every row in this section is deferred. Revisit when the stated trigger actually materialises.
+
+| # | Item | Reason / revisit when | Original section |
+|---|------|-----------------------|------------------|
+| ~~[DEFERRED] C1~~ | No real job queue (`FastAPI BackgroundTasks`). | Not tackling new infra components right now; revisit when multi-user load actually surfaces the issue. | §2 Critical |
+| ~~[DEFERRED] C4~~ | No token expiry — tokens are revocable-only. | Not critical at current stage; revisit after Phase S (Android multi-user client) is live. N5 / Android may want it then. | §2 Critical |
+| ~~[DEFERRED] C6~~ | `POST /auth/login` has no rate limit. | Tailnet-only posture + small family user base; not warranted at current stage. | §2 Critical |
+| ~~[DEFERRED] M7~~ | No per-user download quota. | Tailnet-only family-scale app; revisit if disk pressure or abuse actually surfaces. Couples with C1. | §3 Major |
+| ~~[DEFERRED] M8~~ | No per-user `/download` rate limit. | Tailnet-only family-scale app; revisit if abuse actually surfaces. Same mechanism as C6 / M7. | §3 Major |
+| ~~[DEFERRED] N5~~ | No CORS configuration. | No web UI planned; Flutter is a native HTTP client and does not trigger CORS. Revisit only if a browser-based admin UI ever lands. | §4 Minor |
+
+All deferral decisions dated 2026-06-18.
 
 ---
 
