@@ -759,3 +759,9 @@ All 21 checks in SMOKE-TEST.md passed. Two bugs surfaced during smoke and fixed:
 - **`backend/docs/DEBT.md`** — N8 marked resolved.
 - 345/345 tests green; ruff + mypy clean.
 
+## 2026-06-18 — v3.1.0-rc2 smoke-tested green on home server
+
+- Ran the full 12-section SMOKE-TEST.md checklist against the freshly published `aashish010/heerr-backend:v3.1.0-rc2` image on the arr-stack host over Tailscale. All sections passed: image pull, `heerr-migrate` exit 0, backend `(healthy)`, `/health` + `/ready` 200, admin token mint, N8 docs-gate regression (`404 404 / 401 401 / 200 200`), Navidrome `/auth/login` 200 with `raw_token`, `/search` returned results, end-to-end `/download` reached state `done` and Navidrome indexed the file, all three admin listings 200, smoke token revoked and 401 on re-use.
+- **One doc fix during the run:** SMOKE-TEST.md §7 had the wrong request field name — used `navidrome_username` (response field) instead of `username` (request field per `app/schemas/auth.py::LoginRequest`). Patched inline.
+- **`backend/docs/SMOKE-TEST.md`** removed: served its purpose for the v3.1.0-rc2 rollout; not retaining as living doc since the procedure is mostly one-shot and largely encoded in `README.md` + this CHANGELOG. Re-author if a multi-release smoke runbook is needed later.
+
