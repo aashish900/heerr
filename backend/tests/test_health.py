@@ -22,13 +22,14 @@ async def test_health_ignores_auth_header():
     assert r.status_code == 200
 
 
-async def test_openapi_served_at_versioned_path():
+async def test_openapi_versioned_path_requires_admin():
+    # N8: /api/v1/openapi.json is now admin-gated; the unversioned path is
+    # disabled outright. Full auth-positive coverage lives in test_docs_gate.py.
     transport = ASGITransport(app=create_app())
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        ok = await c.get("/api/v1/openapi.json")
+        gated = await c.get("/api/v1/openapi.json")
         legacy = await c.get("/openapi.json")
-    assert ok.status_code == 200
-    assert ok.json()["info"]["title"]
+    assert gated.status_code == 401
     assert legacy.status_code == 404
 
 

@@ -751,3 +751,11 @@ All 21 checks in SMOKE-TEST.md passed. Two bugs surfaced during smoke and fixed:
 - **`backend/docs/DEBT.md`** — N1 + N2 marked resolved; N5 deferred (no web UI planned; Flutter is a native HTTP client and does not trigger CORS).
 - 338/338 tests green; ruff + mypy clean.
 
+## 2026-06-18 — DEBT N8: admin-gate OpenAPI + Swagger UI
+
+- **`backend/app/main.py`** — disabled FastAPI's default `docs_url` / `redoc_url` / `openapi_url`. New `_mount_admin_docs()` mounts admin-only replacements: `GET /api/v1/openapi.json` (returns `app.openapi()` as JSON) and `GET /api/v1/docs` (Swagger UI with the spec inlined into the HTML so the browser does not have to fire a second unauthenticated fetch for the spec). Both gates use `require_admin`.
+- **`backend/tests/test_docs_gate.py`** — new file. 7 tests: default `/docs`, `/redoc`, `/openapi.json` return 404; gated `/api/v1/openapi.json` and `/api/v1/docs` each return 401 unauth, 403 for a non-admin token, 200 for an admin token (spec JSON / Swagger HTML).
+- **`backend/tests/test_health.py`** — `test_openapi_served_at_versioned_path` renamed and updated to assert 401 on `/api/v1/openapi.json` (was asserting unauth 200; that's exactly the regression N8 closes).
+- **`backend/docs/DEBT.md`** — N8 marked resolved.
+- 345/345 tests green; ruff + mypy clean.
+
