@@ -94,9 +94,7 @@ def list_tokens(
             async with sm() as session:
                 if user is not None:
                     target = (
-                        await session.execute(
-                            select(User).where(User.navidrome_username == user)
-                        )
+                        await session.execute(select(User).where(User.navidrome_username == user))
                     ).scalar_one_or_none()
                     if target is None:
                         return [], f"unknown user: {user}"
@@ -108,9 +106,7 @@ def list_tokens(
                     )
                 else:
                     stmt = (
-                        select(Token)
-                        .options(selectinload(Token.user))
-                        .order_by(Token.created_at)
+                        select(Token).options(selectinload(Token.user)).order_by(Token.created_at)
                     )
                 result = await session.execute(stmt)
                 return list(result.scalars().all()), None

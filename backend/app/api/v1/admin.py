@@ -69,9 +69,7 @@ async def list_users(
     session: AsyncSession = Depends(get_session),
     _admin: Token = Depends(require_admin),
 ) -> list[UserView]:
-    rows = (
-        await session.execute(select(User).order_by(User.created_at.asc()))
-    ).scalars().all()
+    rows = (await session.execute(select(User).order_by(User.created_at.asc()))).scalars().all()
     return [
         UserView(
             id=u.id,
@@ -106,9 +104,7 @@ async def delete_user(
         )
     ).scalar_one()
     job_count = (
-        await session.execute(
-            select(func.count()).select_from(Job).where(Job.user_id == user.id)
-        )
+        await session.execute(select(func.count()).select_from(Job).where(Job.user_id == user.id))
     ).scalar_one()
     if token_count or job_count:
         raise HTTPException(

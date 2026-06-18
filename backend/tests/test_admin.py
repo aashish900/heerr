@@ -475,9 +475,7 @@ async def test_delete_user_removes_orphan_user(client, make_token, app_sm, clean
 
     async with app_sm() as s:
         n = (
-            await s.execute(
-                _text("SELECT count(*) FROM users WHERE id = :i"), {"i": user_id}
-            )
+            await s.execute(_text("SELECT count(*) FROM users WHERE id = :i"), {"i": user_id})
         ).scalar_one()
         assert n == 0
 
@@ -489,9 +487,7 @@ async def test_delete_unknown_user_returns_404(client, make_token, cleanup):
     assert r.status_code == 404
 
 
-async def test_delete_user_with_tokens_returns_409(
-    client, make_token, app_sm, cleanup
-):
+async def test_delete_user_with_tokens_returns_409(client, make_token, app_sm, cleanup):
     import uuid as _uuid
 
     from sqlalchemy import text as _text
@@ -521,9 +517,7 @@ async def test_delete_user_with_tokens_returns_409(
 
     # Cleanup the FK chain so the cleanup fixture can drop the user row.
     async with app_sm() as s:
-        await s.execute(
-            _text("DELETE FROM tokens WHERE user_id = :i"), {"i": user_id}
-        )
+        await s.execute(_text("DELETE FROM tokens WHERE user_id = :i"), {"i": user_id})
         await s.execute(_text("DELETE FROM users WHERE id = :i"), {"i": user_id})
         await s.commit()
 
@@ -561,9 +555,7 @@ async def test_delete_user_with_jobs_returns_409(client, make_token, app_sm, cle
     assert "job" in r.json()["detail"].lower()
 
     async with app_sm() as s:
-        await s.execute(
-            _text("DELETE FROM jobs WHERE user_id = :i"), {"i": user_id}
-        )
+        await s.execute(_text("DELETE FROM jobs WHERE user_id = :i"), {"i": user_id})
         await s.execute(_text("DELETE FROM users WHERE id = :i"), {"i": user_id})
         await s.commit()
 
@@ -575,9 +567,7 @@ async def test_delete_system_admin_user_is_blocked(client, make_token, app_sm, c
     h = {"Authorization": f"Bearer {raw_admin}"}
     async with app_sm() as s:
         sys_id = (
-            await s.execute(
-                _text("SELECT id FROM users WHERE navidrome_username = 'system-admin'")
-            )
+            await s.execute(_text("SELECT id FROM users WHERE navidrome_username = 'system-admin'"))
         ).scalar_one()
 
     r = await client.delete(f"/api/v1/admin/users/{sys_id}", headers=h)
@@ -595,9 +585,7 @@ async def test_list_jobs_non_admin_returns_403(client, make_token, cleanup):
     assert r.status_code == 403
 
 
-async def test_list_jobs_returns_all_states_no_filter(
-    client, make_token, app_sm, cleanup
-):
+async def test_list_jobs_returns_all_states_no_filter(client, make_token, app_sm, cleanup):
     raw_admin = await make_token(is_admin=True)
     token_id = await _token_id_for(app_sm, raw_admin)
     await _seed_job(
@@ -686,9 +674,7 @@ async def test_list_jobs_filter_by_user(client, make_token, app_sm, cleanup):
     assert "https://www.youtube.com/watch?v=sysadm-job" not in urls
 
     async with app_sm() as s:
-        await s.execute(
-            _text("DELETE FROM jobs WHERE user_id = :i"), {"i": other_uid}
-        )
+        await s.execute(_text("DELETE FROM jobs WHERE user_id = :i"), {"i": other_uid})
         await s.execute(_text("DELETE FROM users WHERE id = :i"), {"i": other_uid})
         await s.commit()
 
@@ -703,9 +689,5 @@ async def test_list_jobs_unknown_user_returns_404(client, make_token, cleanup):
 async def test_list_jobs_limit_out_of_range_returns_422(client, make_token, cleanup):
     raw_admin = await make_token(is_admin=True)
     h = {"Authorization": f"Bearer {raw_admin}"}
-    assert (
-        await client.get("/api/v1/admin/jobs?limit=0", headers=h)
-    ).status_code == 422
-    assert (
-        await client.get("/api/v1/admin/jobs?limit=501", headers=h)
-    ).status_code == 422
+    assert (await client.get("/api/v1/admin/jobs?limit=0", headers=h)).status_code == 422
+    assert (await client.get("/api/v1/admin/jobs?limit=501", headers=h)).status_code == 422

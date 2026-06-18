@@ -283,9 +283,7 @@ async def test_run_job_completes_after_creating_token_revoked(
     job_id = await _seed_queued_job(app_sm, token_id, uri)
 
     async with app_sm() as s:
-        await s.execute(
-            text("UPDATE tokens SET revoked_at = now() WHERE id = :i"), {"i": token_id}
-        )
+        await s.execute(text("UPDATE tokens SET revoked_at = now() WHERE id = :i"), {"i": token_id})
         await s.commit()
 
     file_path = str(tmp_path / "post-revoke.mp3")
