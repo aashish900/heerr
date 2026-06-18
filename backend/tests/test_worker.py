@@ -269,3 +269,35 @@ async def test_run_job_non_queued_job_is_noop(app_sm, token_id, tmp_path, cleanu
     async with app_sm() as s:
         j = await s.get(Job, job_id)
         assert j.state == "running"  # state unchanged
+
+
+async def test_run_job_completes_after_creating_token_revoked(
+    app_sm, token_id, tmp_path, cleanup_jobs
+):
+    """DEBT M4: revoking a token must not cancel in-flight jobs it created.
+
+    Worker holds the job by id and does not recheck token validity. Pinning
+    this contract so future auth changes do not silently break it.
+    """
+    uri = "https://www.youtube.com/watch?v=after-revoke"
+    job_id = await _seed_queued_job(app_sm, token_id, uri)
+
+    async with app_sm() as s:
+        await s.execute(
+            text("UPDATE tokens SET revoked_at = now() WHERE id = :i"), {"i": token_id}
+        )
+        await s.commit()
+
+    file_path = str(tmp_path / "post-revoke.mp3")
+
+    async def fake_runner(source_url, output_dir):
+        return [DownloadedFile(path=file_path, size_bytes=999)]
+
+    await run_job(job_id, sm=app_sm, runner=fake_runner, output_dir=str(tmp_path))
+
+    async with app_sm() as s:
+        j = await s.get(Job, job_id)
+        assert j.state == "done"
+        assert j.error_msg is None
+        dl = (await s.execute(select(Download).where(Download.job_id == job_id))).scalar_one()
+        assert dl.output_path == file_path

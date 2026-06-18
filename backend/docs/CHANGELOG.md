@@ -724,3 +724,9 @@ All 21 checks in SMOKE-TEST.md passed. Two bugs surfaced during smoke and fixed:
 - **`backend/docs/DEBT.md`** — C2 and N13 resolution notes updated to describe the smoke-fix.
 - **`backend/docs/ROADMAP.md`** — H1 status and preamble updated to reflect smoke passing.
 - 321/321 tests green. Tagged and pushed as `v3.1.0-rc1`.
+
+## 2026-06-18 — DEBT M4: pin worker / revoked-token contract; defer C4
+
+- **`backend/tests/test_worker.py`** — added `test_run_job_completes_after_creating_token_revoked`: seeds a queued job, revokes the creating token, runs the worker via `run_job`, asserts the job reaches `state=done` and a `Download` row is written. Pins the contract that revoking a token does not cancel or fail in-flight jobs it created.
+- **`backend/docs/DEBT.md`** — M4 marked resolved (struck through); C4 marked deferred ("not critical at current stage; revisit after Phase S is live"); priority-order entry for C4 struck through.
+
