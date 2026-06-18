@@ -1,8 +1,16 @@
 import pytest
 
 from app.services.spotdl_runner import (
+    AgeGatedError,
     DownloadedFile,
+    NetworkError,
+    RateLimitedError,
+    RegionLockedError,
     SpotdlError,
+    TranscodeError,
+    UnknownSpotdlError,
+    VideoUnavailableError,
+    _classify_error,
     run_spotdl,
 )
 
@@ -205,3 +213,62 @@ async def test_stderr_tail_truncated(tmp_path, monkeypatch):
     with pytest.raises(SpotdlError) as exc:
         await run_spotdl("spotify:track:noisy", tmp_path)
     assert len(exc.value.stderr_tail) <= 4_000
+
+
+# ---- N10: typed error classification --------------------------------------
+
+
+@pytest.mark.parametrize(
+    "tail,expected_cls",
+    [
+        ("ConnectionError: could not resolve youtube.com", NetworkError),
+        ("requests.exceptions.ConnectionError: Max retries exceeded", NetworkError),
+        ("urllib3.exceptions.NewConnectionError: connection refused", NetworkError),
+        ("socket.timeout: timed out", NetworkError),
+        ("ssl.SSLError: TLS handshake failure", NetworkError),
+        ("HTTP Error 429: Too Many Requests", RateLimitedError),
+        ("yt_dlp rate limit exceeded", RateLimitedError),
+        ("ERROR: Video unavailable", VideoUnavailableError),
+        ("This video is not available in this app", VideoUnavailableError),
+        ("Private video. Sign in if you've been granted access", VideoUnavailableError),
+        ("This video is not available in your country", RegionLockedError),
+        ("Geo restricted content", RegionLockedError),
+        ("Sign in to confirm your age", AgeGatedError),
+        ("This video is age-restricted", AgeGatedError),
+        ("ffmpeg returned non-zero exit code", TranscodeError),
+        ("Invalid data found when processing input", TranscodeError),
+        ("KeyError: 'videoDetails'", UnknownSpotdlError),
+        ("", UnknownSpotdlError),
+    ],
+)
+def test_classify_error_matches_expected_subclass(tail, expected_cls):
+    assert _classify_error(1, tail) is expected_cls
+
+
+def test_classify_rate_limit_wins_over_network():
+    # Rate-limited responses often include socket-y noise in the trace.
+    tail = "HTTP Error 429: Too Many Requests\nConnectionError during retry"
+    assert _classify_error(1, tail) is RateLimitedError
+
+
+async def test_run_spotdl_raises_classified_subclass(tmp_path, monkeypatch):
+    async def fake_spawn(cmd):
+        return FakeProc(returncode=1, stderr=b"HTTP Error 429: Too Many Requests")
+
+    monkeypatch.setattr("app.services.spotdl_runner._spawn", fake_spawn)
+
+    with pytest.raises(RateLimitedError) as exc:
+        await run_spotdl("spotify:track:throttled", tmp_path)
+    # Subclass is also a SpotdlError — preserves existing `except SpotdlError`.
+    assert isinstance(exc.value, SpotdlError)
+    assert exc.value.exit_code == 1
+
+
+async def test_run_spotdl_unknown_classification_falls_back(tmp_path, monkeypatch):
+    async def fake_spawn(cmd):
+        return FakeProc(returncode=2, stderr=b"weird internal panic xyz")
+
+    monkeypatch.setattr("app.services.spotdl_runner._spawn", fake_spawn)
+
+    with pytest.raises(UnknownSpotdlError):
+        await run_spotdl("spotify:track:weird", tmp_path)

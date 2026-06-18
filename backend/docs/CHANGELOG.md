@@ -765,3 +765,12 @@ All 21 checks in SMOKE-TEST.md passed. Two bugs surfaced during smoke and fixed:
 - **One doc fix during the run:** SMOKE-TEST.md §7 had the wrong request field name — used `navidrome_username` (response field) instead of `username` (request field per `app/schemas/auth.py::LoginRequest`). Patched inline.
 - **`backend/docs/SMOKE-TEST.md`** removed: served its purpose for the v3.1.0-rc2 rollout; not retaining as living doc since the procedure is mostly one-shot and largely encoded in `README.md` + this CHANGELOG. Re-author if a multi-release smoke runbook is needed later.
 
+
+## 2026-06-18 — N10: typed `SpotdlError` subclasses
+
+- **`app/services/spotdl_runner.py`**: `SpotdlError` is now a base; added `NetworkError`, `RateLimitedError`, `VideoUnavailableError`, `RegionLockedError`, `AgeGatedError`, `TranscodeError`, `UnknownSpotdlError` as subclasses. `_classify_error(exit_code, output_tail)` lower-cases the captured tail and pattern-matches against per-category keyword tuples. `run_spotdl` raises the classified subclass on non-zero exit.
+- Order in the classifier: rate-limit → region → video-unavailable → age-gate → transcode → network → unknown. Region check is intentionally before video-unavailable because "not available in your country" co-occurs with the generic "video unavailable" phrase and is the more specific signal.
+- All subclasses inherit from `SpotdlError`, so the existing `except SpotdlError` paths (`workers.py`, integration tests) keep working unchanged. `error_msg` written by the worker already records `type(e).__name__`, so the subclass name now lands in `jobs.error_msg` for free.
+- **`tests/test_spotdl_runner.py`**: 18-case parametrised classifier test, a rate-limit-wins-over-network precedence test, and two end-to-end `run_spotdl` tests that assert the classified subclass is raised (and that it is still an instance of `SpotdlError` to pin the inheritance contract).
+- **`backend/docs/DEBT.md`**: N10 struck through with resolution note pointing at the next natural step — auto-retry policy (transient → backoff, permanent → fail) keyed off the subclass.
+- Full suite: 366 passed. ruff lint+format clean. mypy clean.
