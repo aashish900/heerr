@@ -40,7 +40,7 @@ These will mislead a future Claude session reading the bootstrap docs.
 | ~~M4~~ | ~~`jobs.created_by_token_id` semantics under multi-user are undocumented.~~ Resolved 2026-06-18: `tests/test_worker.py::test_run_job_completes_after_creating_token_revoked` pins the contract — revoking a token does not cancel or fail in-flight jobs it created; worker holds the job by id and does not recheck token validity. | — |
 | M5 | **No per-user recommendation engine config.** `RECOMMENDATION_ENGINE`, `LASTFM_*`, `LISTENBRAINZ_*` are global env vars. Multi-user backend = single-user recommendations. | Needs a `user_settings` table (or JSONB column on `users`) + factory rewrite. |
 | M6 | **Album/playlist jobs write zero `Download` rows.** Documented decision; multi-user makes the gap worse because per-user history is the only signal. Fix requires parsing spotDL `--save-file metadata.json`, which DECISIONLOG explicitly rejected. | Revisit only if users actually report missing dedup hints for tracks inside previously-downloaded albums. |
-| M7 | **No per-user quota.** Any logged-in user can fill `/data/media/music`. No `MAX_DOWNLOADS_PER_USER`, no `MAX_BYTES_PER_USER`. | Postgres-backed counter + middleware. Couples with C1. |
+| ~~M7~~ | ~~**No per-user quota.**~~ Deferred 2026-06-18 alongside C6/M8: tailnet-only family-scale app; revisit if disk pressure or abuse actually surfaces. | Postgres-backed counter + middleware. Couples with C1. |
 | ~~M8~~ | ~~**No per-user `/download` rate limit.**~~ Deferred 2026-06-18 alongside C6: tailnet-only family-scale app; revisit if abuse actually surfaces. | Same mechanism as C6 / M7. |
 
 ---
@@ -95,7 +95,7 @@ These will mislead a future Claude session reading the bootstrap docs.
 4. **C2 + T1 + T3** — boot recovery for orphaned `running` jobs. Small fix, prevents support-by-SQL.
 5. **M1 + T4** — add a regression test that catches missing `user_id` on INSERT, then plan the migration to drop the `system_admin_user_id()` default once Phase S ships.
 6. ~~**C6 + M8** — login + `/download` rate limiting.~~ Deferred 2026-06-18: tailnet-only family-scale app; revisit if abuse surfaces.
-7. ~~**C1 + C3 + N12 + M7** — real queue substrate.~~ C1 deferred 2026-06-18 (no new components). C3 / N12 / M7 stay blocked on C1; revisit together.
+7. ~~**C1 + C3 + N12 + M7** — real queue substrate.~~ C1 + M7 deferred 2026-06-18 (no new components, family-scale). C3 / N12 stay blocked on C1; revisit together.
 8. **M5** — per-user recommendation engine config. Unblocks per-user Last.fm/ListenBrainz scrobbling (already a deferred item on the Android side).
 9. **Everything else** — opportunistically, as features that need them land.
 
