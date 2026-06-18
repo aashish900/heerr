@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Any
 
-from app.api.context import owner_label_var, request_id_var
+from app.api.context import request_id_var, username_var
 
 
 class _ContextFilter(logging.Filter):
@@ -10,7 +10,7 @@ class _ContextFilter(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:
         record.request_id = request_id_var.get()
-        record.owner_label = owner_label_var.get()
+        record.username = username_var.get()
         return True
 
 
@@ -42,7 +42,7 @@ _STANDARD_LOGRECORD_ATTRS = {
     "message",
     "asctime",
     "request_id",
-    "owner_label",
+    "username",
 }
 
 
@@ -56,7 +56,7 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "msg": record.getMessage(),
             "request_id": getattr(record, "request_id", "-"),
-            "owner_label": getattr(record, "owner_label", "-"),
+            "username": getattr(record, "username", "-"),
         }
         # Surface any caller-supplied `extra={...}` fields, skipping forbidden
         # keys and the stdlib LogRecord internals.
@@ -75,7 +75,7 @@ def setup_logging(level: str = "INFO") -> None:
     """Install JSON formatter on the root logger; silence uvicorn.access.
 
     Called once at app startup. The middleware emits the per-request access
-    line we actually want (with owner_label), so uvicorn's default access log
+    line we actually want (with username), so uvicorn's default access log
     is suppressed to avoid duplicate noise.
     """
     handler = logging.StreamHandler()

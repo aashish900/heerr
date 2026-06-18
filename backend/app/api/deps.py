@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.context import owner_label_var
+from app.api.context import username_var
 from app.db import get_session
 from app.models import Token, User
 
@@ -47,7 +47,7 @@ async def bearer_token(
             detail="session invalidated",
             headers=_UNAUTH_HEADERS,
         )
-    owner_label_var.set(tok.owner_label)
+    username_var.set(tok.user.navidrome_username)
     tok.last_used_at = datetime.now(UTC)
     return tok
 

@@ -25,8 +25,8 @@ def test_tokens_scopes_check_rejects_invalid(db_conn):
     cur = db_conn.cursor()
     with pytest.raises(pg_errors.CheckViolation):
         cur.execute(
-            "INSERT INTO tokens (token_hash, owner_label, scopes, user_id) VALUES (%s, %s, %s, system_admin_user_id())",
-            ("hash-bad-scope", "owner", ["read", "bogus"]),
+            "INSERT INTO tokens (token_hash, scopes, user_id) VALUES (%s, %s, system_admin_user_id())",
+            ("hash-bad-scope", ["read", "bogus"]),
         )
 
 

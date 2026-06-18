@@ -22,7 +22,6 @@ def _make_sessionmaker() -> tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
 @app.command("create-token")
 def create_token(
-    owner: str = typer.Option(..., "--owner", help="Owner label."),
     scopes: str = typer.Option(
         "read,download",
         "--scopes",
@@ -59,7 +58,6 @@ def create_token(
                 session.add(
                     Token(
                         token_hash=h,
-                        owner_label=owner,
                         scopes=parsed,
                         is_admin=admin,
                         user_id=target.id,
@@ -85,7 +83,7 @@ def list_tokens(
         help="Filter to tokens belonging to this navidrome_username.",
     ),
 ) -> None:
-    """List tokens (id, user, owner, scopes, admin, state). Never prints hashes."""
+    """List tokens (id, user, scopes, admin, state). Never prints hashes."""
     from sqlalchemy.orm import selectinload
 
     async def _run() -> tuple[list[Token], str | None]:
@@ -124,7 +122,7 @@ def list_tokens(
         state = "revoked" if t.revoked_at is not None else "active"
         username = t.user.navidrome_username if t.user is not None else "?"
         typer.echo(
-            f"{t.id} user={username} owner={t.owner_label} scopes={sorted(t.scopes)} "
+            f"{t.id} user={username} scopes={sorted(t.scopes)} "
             f"admin={t.is_admin} state={state} created_at={t.created_at.isoformat()}"
         )
 

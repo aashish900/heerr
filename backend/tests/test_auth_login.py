@@ -53,7 +53,13 @@ async def cleanup(app_sm):
     yield
     async with app_sm() as s:
         await s.execute(text("DELETE FROM jobs"))
-        await s.execute(text("DELETE FROM tokens WHERE owner_label NOT LIKE 'admin-test-%'"))
+        await s.execute(
+            text(
+                "DELETE FROM tokens WHERE user_id IN"
+                " (SELECT id FROM users WHERE navidrome_username NOT IN"
+                " ('legacy-admin', 'system-admin'))"
+            )
+        )
         await s.execute(
             text(
                 "DELETE FROM users WHERE navidrome_username NOT IN"
@@ -109,7 +115,6 @@ async def test_login_new_user_happy_path(app_sm, cleanup):
         h = hashlib.sha256(body["token"].encode()).hexdigest()
         tok = (await s.execute(select(Token).where(Token.token_hash == h))).scalar_one()
         assert tok.user_id == user.id
-        assert tok.owner_label == username
         assert sorted(tok.scopes) == ["download", "read"]
         assert tok.is_admin is False
 

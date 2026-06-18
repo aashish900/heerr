@@ -29,7 +29,12 @@ async def cleanup(app_sm):
     yield
     async with app_sm() as s:
         await s.execute(text("DELETE FROM jobs"))
-        await s.execute(text("DELETE FROM tokens WHERE owner_label LIKE 'logout-test-%'"))
+        await s.execute(
+            text(
+                "DELETE FROM tokens WHERE user_id IN "
+                "(SELECT id FROM users WHERE navidrome_username LIKE 'logout-test-%')"
+            )
+        )
         await s.execute(text("DELETE FROM users WHERE navidrome_username LIKE 'logout-test-%'"))
         await s.commit()
 
@@ -60,7 +65,6 @@ async def _seed_token(app_sm, *, username: str) -> str:
         s.add(
             Token(
                 token_hash=hashlib.sha256(raw.encode()).hexdigest(),
-                owner_label=username,
                 scopes=["read", "download"],
                 is_admin=False,
                 user_id=user.id,

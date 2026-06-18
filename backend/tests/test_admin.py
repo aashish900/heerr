@@ -56,14 +56,31 @@ async def client(admin_app):
 
 @pytest.fixture
 async def cleanup(app_sm):
-    """Wipe rows the test creates so tests don't see each other's tokens/jobs."""
+    """Wipe rows the test creates so tests don't see each other's tokens/jobs.
+
+    Tokens created via `POST /admin/tokens` in these tests are FK-linked to
+    a dedicated `admin-test-target` user (seeded here), so cleanup can scope
+    the delete by that user_id without colliding with make_token-owned rows
+    (which are linked to `system-admin` and cleaned up by the fixture).
+    """
+    async with app_sm() as s:
+        await s.execute(
+            text(
+                "INSERT INTO users (navidrome_username) VALUES ('admin-test-target') "
+                "ON CONFLICT (navidrome_username) DO NOTHING"
+            )
+        )
+        await s.commit()
     yield
     async with app_sm() as s:
         await s.execute(text("DELETE FROM downloads"))
         await s.execute(text("DELETE FROM jobs"))
-        # tokens created by admin endpoint stay until end-of-test;
-        # delete everything except those owned by make_token (which has its own cleanup).
-        await s.execute(text("DELETE FROM tokens WHERE owner_label LIKE 'admin-test-%'"))
+        await s.execute(
+            text(
+                "DELETE FROM tokens WHERE user_id IN "
+                "(SELECT id FROM users WHERE navidrome_username = 'admin-test-target')"
+            )
+        )
         await s.commit()
 
 
@@ -109,16 +126,15 @@ async def test_create_token_returns_raw_once_and_persists_hash(client, make_toke
         "/api/v1/admin/tokens",
         headers=h,
         json={
-            "owner_label": "admin-test-aashish",
             "scopes": ["read", "download"],
             "is_admin": False,
-            "navidrome_username": "system-admin",
+            "navidrome_username": "admin-test-target",
         },
     )
     assert r.status_code == 201, r.text
     body = r.json()
     assert body["raw_token"]
-    assert body["owner_label"] == "admin-test-aashish"
+    assert body["navidrome_username"] == "admin-test-target"
     assert set(body["scopes"]) == {"read", "download"}
     assert body["is_admin"] is False
 
@@ -127,12 +143,15 @@ async def test_create_token_returns_raw_once_and_persists_hash(client, make_toke
     async with app_sm() as s:
         rec = (
             await s.execute(
-                text("SELECT token_hash, owner_label FROM tokens " "WHERE token_hash = :h"),
+                text(
+                    "SELECT t.token_hash, u.navidrome_username FROM tokens t "
+                    "JOIN users u ON u.id = t.user_id WHERE t.token_hash = :h"
+                ),
                 {"h": raw_hash},
             )
         ).first()
         assert rec is not None
-        assert rec.owner_label == "admin-test-aashish"
+        assert rec.navidrome_username == "admin-test-target"
 
     # raw should NOT appear stored anywhere
     async with app_sm() as s:
@@ -151,7 +170,7 @@ async def test_create_token_invalid_scope_returns_422(client, make_token, cleanu
     r = await client.post(
         "/api/v1/admin/tokens",
         headers=h,
-        json={"owner_label": "x", "scopes": ["bogus"], "navidrome_username": "system-admin"},
+        json={"scopes": ["bogus"], "navidrome_username": "admin-test-target"},
     )
     assert r.status_code == 422
 
@@ -162,7 +181,7 @@ async def test_create_token_empty_scopes_returns_422(client, make_token, cleanup
     r = await client.post(
         "/api/v1/admin/tokens",
         headers=h,
-        json={"owner_label": "x", "scopes": [], "navidrome_username": "system-admin"},
+        json={"scopes": [], "navidrome_username": "admin-test-target"},
     )
     assert r.status_code == 422
 
@@ -177,9 +196,8 @@ async def test_list_tokens_does_not_leak_hash_or_raw(client, make_token, cleanup
         "/api/v1/admin/tokens",
         headers=h,
         json={
-            "owner_label": "admin-test-listed",
             "scopes": ["read"],
-            "navidrome_username": "system-admin",
+            "navidrome_username": "admin-test-target",
         },
     )
     raw_new = r1.json()["raw_token"]
@@ -188,7 +206,7 @@ async def test_list_tokens_does_not_leak_hash_or_raw(client, make_token, cleanup
     r2 = await client.get("/api/v1/admin/tokens", headers=h)
     assert r2.status_code == 200
     body = r2.json()
-    assert any(t["owner_label"] == "admin-test-listed" for t in body)
+    assert any(t["navidrome_username"] == "admin-test-target" for t in body)
     # Neither the raw nor the hash should appear in the JSON
     serialized = r2.text
     assert raw_new not in serialized
@@ -205,9 +223,8 @@ async def test_revoke_token_sets_revoked_at(client, make_token, cleanup):
         "/api/v1/admin/tokens",
         headers=h,
         json={
-            "owner_label": "admin-test-revoke",
             "scopes": ["read"],
-            "navidrome_username": "system-admin",
+            "navidrome_username": "admin-test-target",
         },
     )
     token_id = create_r.json()["id"]
@@ -234,9 +251,8 @@ async def test_revoke_already_revoked_returns_409(client, make_token, cleanup):
         "/api/v1/admin/tokens",
         headers=h,
         json={
-            "owner_label": "admin-test-dblrev",
             "scopes": ["read"],
-            "navidrome_username": "system-admin",
+            "navidrome_username": "admin-test-target",
         },
     )
     token_id = create_r.json()["id"]
@@ -505,7 +521,6 @@ async def test_delete_user_with_tokens_returns_409(client, make_token, app_sm, c
         "/api/v1/admin/tokens",
         headers=h,
         json={
-            "owner_label": "admin-test-blocker",
             "scopes": ["read"],
             "navidrome_username": name,
         },

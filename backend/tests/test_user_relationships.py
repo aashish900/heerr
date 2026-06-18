@@ -16,7 +16,6 @@ async def test_user_navigates_to_tokens_and_jobs(app_sm):
 
         token = Token(
             token_hash=f"hash-{uuid.uuid4()}",
-            owner_label="rel-test",
             scopes=["read", "download"],
             user_id=user.id,
         )

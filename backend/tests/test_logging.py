@@ -5,11 +5,12 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from app.api.context import owner_label_var, request_id_var
+from app.api.context import request_id_var, username_var
 from app.api.middleware import RequestLoggingMiddleware
 from app.api.v1.router import api_v1
 from app.db import get_session
 from app.logging_config import JsonFormatter, _ContextFilter
+from app.models import User
 from app.services.workers import get_enqueuer
 
 # ---- JsonFormatter unit tests --------------------------------------------
@@ -34,7 +35,7 @@ def test_json_formatter_emits_required_keys():
     fmt = JsonFormatter()
     payload = json.loads(fmt.format(_make_record()))
 
-    for required in ("ts", "level", "logger", "msg", "request_id", "owner_label"):
+    for required in ("ts", "level", "logger", "msg", "request_id", "username"):
         assert required in payload, f"missing key: {required}"
     assert payload["level"] == "INFO"
     assert payload["msg"] == "hello"
@@ -66,17 +67,17 @@ def test_context_filter_injects_contextvars():
     flt = _ContextFilter()
 
     token_rid = request_id_var.set("rid-xyz")
-    token_owner = owner_label_var.set("alice")
+    token_user = username_var.set("alice")
     try:
         rec = _make_record()
         assert flt.filter(rec) is True
         payload = json.loads(fmt.format(rec))
     finally:
         request_id_var.reset(token_rid)
-        owner_label_var.reset(token_owner)
+        username_var.reset(token_user)
 
     assert payload["request_id"] == "rid-xyz"
-    assert payload["owner_label"] == "alice"
+    assert payload["username"] == "alice"
 
 
 # ---- Middleware integration tests ----------------------------------------
@@ -174,23 +175,28 @@ async def test_access_log_emitted_per_request(client, access_log):
     assert isinstance(rec.duration_ms, float)
 
 
-async def test_access_log_owner_label_dash_for_unauth(client, access_log):
-    """Unauthenticated /health → owner_label sentinel '-' (never None)."""
+async def test_access_log_username_dash_for_unauth(client, access_log):
+    """Unauthenticated /health → username sentinel '-' (never None)."""
     await client.get("/api/v1/health")
 
     rec = next(r for r in access_log.records if r.name == "heerr.access")
     flt = _ContextFilter()
     flt.filter(rec)
-    assert rec.owner_label == "-"
+    assert rec.username == "-"
 
 
-async def test_access_log_owner_label_set_after_auth(client, access_log, make_token):
-    """Authenticated GET /queue → owner_label == token owner.
+async def test_access_log_username_set_after_auth(client, access_log, make_token, app_sm):
+    """Authenticated GET /queue → username == token's owning user.
 
     /queue is used (not /search) because /search hits a Spotify config that
     isn't loaded in this test setup; /queue only needs the auth dependency.
     """
-    raw = await make_token(owner="alice-test")
+    async with app_sm() as s:
+        user = User(navidrome_username="alice-log-test")
+        s.add(user)
+        await s.commit()
+        user_id = user.id
+    raw = await make_token(user_id=user_id)
     r = await client.get(
         "/api/v1/queue",
         headers={"Authorization": f"Bearer {raw}"},
@@ -200,17 +206,17 @@ async def test_access_log_owner_label_set_after_auth(client, access_log, make_to
     rec = next(r for r in access_log.records if r.name == "heerr.access")
     flt = _ContextFilter()
     flt.filter(rec)
-    assert rec.owner_label == "alice-test"
+    assert rec.username == "alice-log-test"
 
 
 async def test_admin_create_token_does_not_leak_raw_token_in_logs(client, access_log, make_token):
     """The raw token returned by POST /admin/tokens must never appear in logs."""
-    admin_raw = await make_token(owner="admin", is_admin=True)
+    admin_raw = await make_token(is_admin=True)
 
     r = await client.post(
         "/api/v1/admin/tokens",
         headers={"Authorization": f"Bearer {admin_raw}"},
-        json={"owner_label": "newuser", "scopes": ["read"], "navidrome_username": "system-admin"},
+        json={"scopes": ["read"], "navidrome_username": "system-admin"},
     )
     assert r.status_code in (200, 201)
     raw_returned = r.json()["raw_token"]

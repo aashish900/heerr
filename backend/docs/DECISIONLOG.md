@@ -317,3 +317,20 @@ Sub-decisions locked across J1–J10:
 **Trade-off:** The `system_admin_user_id()` server default is a transitional bridge. While it exists, an app bug that forgets to pass `user_id` on a `tokens` / `jobs` INSERT will silently route to `system-admin` instead of erroring. Mitigated by per-user-isolation tests (J8 + J9) that would catch any cross-user leakage produced by such a bug. Dropping the default is a J9 follow-up tracked in DEBT after Phase S smoke proves the app side wires `user_id` on every code path.
 
 **Reference:** Implementation across `backend/alembic/versions/{0004_users.py,0005_backfill_users.py,0006_per_user_jobs_index.py}`, `backend/app/{models/user.py,services/navidrome_auth.py,api/v1/auth.py,schemas/{auth,user}.py}`, plus the per-user filter additions in `backend/app/{api/v1/{queue,status,search,download,admin}.py,services/jobs.py,services/workers.py,api/deps.py,cli.py}`. CHANGELOG entries `2026-06-16 — J1` through `J10` enumerate the per-milestone deltas. Phase J on the Android side ("Phase S") is the next slice (`android/docs/ROADMAP.md`).
+
+## 2026-06-18 — Drop `tokens.owner_label` (DEBT M2)
+
+**Context:** Pre-J6, `tokens.owner_label` was a free-text operator label attached to each token. J6 introduced the `users` table and the `tokens.user_id` FK; from that point on, both `POST /auth/login` and `POST /admin/tokens` set `owner_label = req.username` / `owner_label = req.owner_label` while *also* FK-linking the row to a `users` row carrying the canonical `navidrome_username`. The audit (DEBT.md, 2026-06-16) flagged the duplication: two columns will drift the moment any code path forgets to set one of them.
+
+**Decision:** Drop the column outright (migration 0009). The structured access-log key `owner_label` is renamed to `username` and sourced from `tok.user.navidrome_username`. `POST /admin/tokens` request body drops `owner_label`; the response and `TokenView` expose `navidrome_username` instead. The CLI's `create-token --owner` flag is removed; `list-tokens` output replaces `owner=<label>` with `user=<navidrome_username>`.
+
+**Why:**
+- After J6, `owner_label` carries no information `users.navidrome_username` does not. Keeping it would be a forever-correctness trap (Two Sources of Truth) for negligible reward.
+- The repo rule is "no backwards-compat shims when you can just change the code". Dropping the column is the smaller diff than carrying a parallel field whose only purpose is to outlive its semantics.
+- Operator-visible log shape changes (`owner_label` → `username`) and admin-API request-body changes (`owner_label` removed) are acceptable now — there is no Android client in production yet, and the heerr operator is the only consumer of the admin API.
+
+**Alternatives considered:**
+- **Repurpose `owner_label` as a device label** (`"alice-pixel-7"`) to unlock a future "log out my other sessions" UX. Rejected: (a) C5 (`/auth/logout`) is already done, (b) the future endpoint that would consume a device label (`GET/DELETE /auth/sessions`) does not exist and is not on the roadmap, (c) populating the field would require the Flutter client to send a `device_label` field on `POST /auth/login` — a contract change blocked on Phase S which has not started, (d) the access log would still need a separate `username` field to keep per-user identity, so we'd be doing the rename work anyway, and (e) a proper "sessions" model belongs in its own table (`token_id`, `device_id`, `user_agent`, `last_seen_at`) when that need actually surfaces.
+- **Keep the log key `owner_label`, source it silently from `tok.user.navidrome_username`.** Rejected: a field name that says "owner label" but holds a username lies to the operator reading the log line.
+
+**Reference:** Migration `backend/alembic/versions/0009_drop_tokens_owner_label.py`; model `backend/app/models/token.py`; schemas `backend/app/schemas/token.py`; admin endpoint `backend/app/api/v1/admin.py`; login endpoint `backend/app/api/v1/auth.py`; CLI `backend/app/cli.py`; access-log plumbing `backend/app/api/{context.py,deps.py,middleware.py}` + `backend/app/logging_config.py`. CHANGELOG entry `2026-06-18 — M2: drop tokens.owner_label`.

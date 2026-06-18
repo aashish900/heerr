@@ -54,9 +54,8 @@ def seed_token(db_conn):
     cur.execute("SELECT system_admin_user_id()")
     sys_admin = cur.fetchone()[0]
     cur.execute(
-        "INSERT INTO tokens (token_hash, owner_label, scopes, user_id) "
-        "VALUES (%s, %s, %s, %s) RETURNING id",
-        (f"hash-{uuid.uuid4()}", "test", ["read", "download"], sys_admin),
+        "INSERT INTO tokens (token_hash, scopes, user_id) " "VALUES (%s, %s, %s) RETURNING id",
+        (f"hash-{uuid.uuid4()}", ["read", "download"], sys_admin),
     )
     return cur.fetchone()[0]
 
@@ -95,7 +94,6 @@ async def make_token(app_sm, system_admin_user_id):
     inserted_hashes: list[str] = []
 
     async def _make(
-        owner: str = "test",
         scopes: tuple[str, ...] = ("read", "download"),
         is_admin: bool = False,
         revoked: bool = False,
@@ -107,7 +105,6 @@ async def make_token(app_sm, system_admin_user_id):
             s.add(
                 Token(
                     token_hash=h,
-                    owner_label=owner,
                     scopes=list(scopes),
                     is_admin=is_admin,
                     revoked_at=datetime.now(UTC) if revoked else None,

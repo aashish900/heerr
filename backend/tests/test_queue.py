@@ -322,13 +322,11 @@ async def test_queue_only_shows_current_users_jobs(client, app_sm, cleanup):
         raw_b = f"raw-{secrets.token_urlsafe(16)}"
         tok_a = Token(
             token_hash=hashlib.sha256(raw_a.encode()).hexdigest(),
-            owner_label=ua.navidrome_username,
             scopes=["read", "download"],
             user_id=ua.id,
         )
         tok_b = Token(
             token_hash=hashlib.sha256(raw_b.encode()).hexdigest(),
-            owner_label=ub.navidrome_username,
             scopes=["read", "download"],
             user_id=ub.id,
         )
@@ -382,7 +380,6 @@ async def test_admin_token_sees_all_users_jobs(client, app_sm, make_token, clean
         s.add(
             Token(
                 token_hash=hashlib.sha256(raw_u.encode()).hexdigest(),
-                owner_label=u.navidrome_username,
                 scopes=["read", "download"],
                 user_id=u.id,
             )

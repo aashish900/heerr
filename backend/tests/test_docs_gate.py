@@ -44,7 +44,7 @@ async def test_openapi_json_requires_auth(client):
 
 
 async def test_openapi_json_rejects_non_admin(client, make_token):
-    raw = await make_token(owner="reader", is_admin=False)
+    raw = await make_token(is_admin=False)
     r = await client.get(
         "/api/v1/openapi.json",
         headers={"Authorization": f"Bearer {raw}"},
@@ -53,7 +53,7 @@ async def test_openapi_json_rejects_non_admin(client, make_token):
 
 
 async def test_openapi_json_admin_returns_spec(client, make_token):
-    raw = await make_token(owner="ops", is_admin=True)
+    raw = await make_token(is_admin=True)
     r = await client.get(
         "/api/v1/openapi.json",
         headers={"Authorization": f"Bearer {raw}"},
@@ -70,7 +70,7 @@ async def test_swagger_ui_requires_auth(client):
 
 
 async def test_swagger_ui_rejects_non_admin(client, make_token):
-    raw = await make_token(owner="reader", is_admin=False)
+    raw = await make_token(is_admin=False)
     r = await client.get(
         "/api/v1/docs",
         headers={"Authorization": f"Bearer {raw}"},
@@ -79,7 +79,7 @@ async def test_swagger_ui_rejects_non_admin(client, make_token):
 
 
 async def test_swagger_ui_admin_returns_html(client, make_token):
-    raw = await make_token(owner="ops", is_admin=True)
+    raw = await make_token(is_admin=True)
     r = await client.get(
         "/api/v1/docs",
         headers={"Authorization": f"Bearer {raw}"},

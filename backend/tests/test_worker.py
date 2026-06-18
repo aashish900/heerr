@@ -19,7 +19,6 @@ async def token_id(app_sm):
         tok = Token(
             token_hash=h,
             user_id=sa.func.system_admin_user_id(),
-            owner_label="worker-test",
             scopes=["read", "download"],
         )
         s.add(tok)

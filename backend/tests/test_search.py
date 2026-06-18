@@ -394,13 +394,11 @@ async def test_search_hints_scoped_to_current_user(client, app_sm, fake_ytmusic)
         raw_b = f"raw-{secrets.token_urlsafe(16)}"
         tok_a = Token(
             token_hash=hashlib.sha256(raw_a.encode()).hexdigest(),
-            owner_label=ua.navidrome_username,
             scopes=["read", "download"],
             user_id=ua.id,
         )
         tok_b = Token(
             token_hash=hashlib.sha256(raw_b.encode()).hexdigest(),
-            owner_label=ub.navidrome_username,
             scopes=["read", "download"],
             user_id=ub.id,
         )

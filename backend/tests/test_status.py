@@ -307,7 +307,6 @@ async def test_status_404_for_other_users_job(client, app_sm, cleanup):
         s.add(
             Token(
                 token_hash=hashlib.sha256(raw_a.encode()).hexdigest(),
-                owner_label=ua.navidrome_username,
                 scopes=["read", "download"],
                 user_id=ua.id,
             )
@@ -318,12 +317,11 @@ async def test_status_404_for_other_users_job(client, app_sm, cleanup):
         tok_b_id = (
             await s.execute(
                 text(
-                    "INSERT INTO tokens (token_hash, owner_label, scopes, user_id)"
-                    " VALUES (:h, :o, ARRAY['read','download']::text[], :u) RETURNING id"
+                    "INSERT INTO tokens (token_hash, scopes, user_id)"
+                    " VALUES (:h, ARRAY['read','download']::text[], :u) RETURNING id"
                 ),
                 {
                     "h": hashlib.sha256(secrets.token_urlsafe(16).encode()).hexdigest(),
-                    "o": ub.navidrome_username,
                     "u": str(ub.id),
                 },
             )
@@ -361,12 +359,11 @@ async def test_status_admin_can_read_any_users_job(client, app_sm, make_token, c
         tok_id = (
             await s.execute(
                 text(
-                    "INSERT INTO tokens (token_hash, owner_label, scopes, user_id)"
-                    " VALUES (:h, :o, ARRAY['read','download']::text[], :u) RETURNING id"
+                    "INSERT INTO tokens (token_hash, scopes, user_id)"
+                    " VALUES (:h, ARRAY['read','download']::text[], :u) RETURNING id"
                 ),
                 {
                     "h": hashlib.sha256(secrets.token_urlsafe(16).encode()).hexdigest(),
-                    "o": u.navidrome_username,
                     "u": str(u.id),
                 },
             )

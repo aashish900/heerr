@@ -44,8 +44,8 @@ def test_insert_token_without_user_id_raises_not_null(db_conn):
     cur = db_conn.cursor()
     with pytest.raises(pg_errors.NotNullViolation):
         cur.execute(
-            "INSERT INTO tokens (token_hash, owner_label, scopes)" " VALUES (%s, %s, %s)",
-            (f"hash-{uuid.uuid4()}", "no-user", ["read"]),
+            "INSERT INTO tokens (token_hash, scopes)" " VALUES (%s, %s)",
+            (f"hash-{uuid.uuid4()}", ["read"]),
         )
 
 

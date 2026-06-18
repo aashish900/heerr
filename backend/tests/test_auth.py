@@ -24,7 +24,7 @@ async def auth_app(app_sm):
 
     @app.get("/whoami")
     async def whoami(tok=Depends(bearer_token)):
-        return {"owner": tok.owner_label, "scopes": tok.scopes}
+        return {"owner": tok.user.navidrome_username, "scopes": tok.scopes}
 
     @app.get("/needs-download")
     async def needs_download(tok=Depends(require_scope("download"))):
@@ -80,11 +80,11 @@ async def test_revoked_token_returns_401(client, make_token):
 
 
 async def test_valid_token_returns_owner(client, make_token):
-    raw = await make_token(owner="aashish")
+    raw = await make_token()
     r = await client.get("/whoami", headers={"Authorization": f"Bearer {raw}"})
     assert r.status_code == 200
     body = r.json()
-    assert body["owner"] == "aashish"
+    assert body["owner"] == "system-admin"
     assert set(body["scopes"]) == {"read", "download"}
 
 
@@ -147,7 +147,7 @@ async def test_admin_route_still_requires_auth(client):
 async def test_cli_minted_token_resolves_to_system_admin(client, make_token):
     """Tokens minted without explicit user_id (CLI / pre-J6) use the system_admin
     server-default and must therefore resolve to the system-admin user."""
-    raw = await make_token(owner="cli-user")
+    raw = await make_token()
     r = await client.get("/whoami-user", headers={"Authorization": f"Bearer {raw}"})
     assert r.status_code == 200
     assert r.json()["navidrome_username"] == "system-admin"
@@ -171,7 +171,6 @@ async def test_login_minted_token_resolves_to_logged_in_user(app_sm, client):
         s.add(
             Token(
                 token_hash=hashlib.sha256(raw.encode()).hexdigest(),
-                owner_label=username,
                 scopes=["read", "download"],
                 user_id=user.id,
             )
@@ -195,7 +194,7 @@ async def test_bearer_token_bumps_last_used_at(client, make_token, app_sm):
 
     from app.models import Token
 
-    raw = await make_token(owner="last-used-probe")
+    raw = await make_token()
     token_hash = hashlib.sha256(raw.encode()).hexdigest()
 
     # Pre-condition: brand-new token has NULL last_used_at.
@@ -234,7 +233,6 @@ async def test_dangling_user_returns_401(client, app_sm):
             Token(
                 token_hash=token_hash,
                 user_id=sa.func.system_admin_user_id(),
-                owner_label="dangling-probe",
                 scopes=["read", "download"],
             )
         )

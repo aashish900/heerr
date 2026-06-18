@@ -333,7 +333,7 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 ## Cross-cutting reminders
 
 - **`.env` never committed.** Only `.env.example`.
-- **Logging at every request:** include `token.owner_label`; never log raw tokens or hashes.
+- **Logging at every request:** include the authenticated user's `navidrome_username` (log key: `username`); never log raw tokens or hashes.
 - **DECISIONLOG drift:** any contract/schema change → append a new ADR to `DECISIONLOG.md` and update `CONTEXT.md` in the same commit (CLAUDE.md staleness rule).
 - **Green-before, green-after:** run `poetry run pytest` before starting each milestone and before declaring done.
 

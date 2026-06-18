@@ -41,8 +41,7 @@ def _fetch_token(libpq_url: str, token_hash: str):
     with psycopg.connect(libpq_url) as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT id, owner_label, scopes, is_admin, revoked_at "
-                "FROM tokens WHERE token_hash = %s",
+                "SELECT id, scopes, is_admin, revoked_at " "FROM tokens WHERE token_hash = %s",
                 (token_hash,),
             )
             return cur.fetchone()
@@ -53,8 +52,6 @@ def test_create_token_prints_raw_and_persists_hash(cli_env, cli_app):
         cli_app,
         [
             "create-token",
-            "--owner",
-            "aashish",
             "--scopes",
             "read,download",
         ],
@@ -66,8 +63,7 @@ def test_create_token_prints_raw_and_persists_hash(cli_env, cli_app):
     h = _hash(raw)
     row = _fetch_token(cli_env, h)
     assert row is not None, "token row missing from DB"
-    _id, owner, scopes, is_admin, revoked_at = row
-    assert owner == "aashish"
+    _id, scopes, is_admin, revoked_at = row
     assert set(scopes) == {"read", "download"}
     assert is_admin is False
     assert revoked_at is None
@@ -84,8 +80,6 @@ def test_create_token_admin_flag(cli_env, cli_app):
         cli_app,
         [
             "create-token",
-            "--owner",
-            "admin1",
             "--scopes",
             "read,download",
             "--admin",
@@ -95,27 +89,25 @@ def test_create_token_admin_flag(cli_env, cli_app):
     raw = result.stdout.strip()
     row = _fetch_token(cli_env, _hash(raw))
     assert row is not None
-    assert row[3] is True  # is_admin
+    assert row[2] is True  # is_admin
 
 
 def test_create_token_invalid_scope_fails(cli_env, cli_app):
     result = runner.invoke(
         cli_app,
-        ["create-token", "--owner", "x", "--scopes", "bogus,read"],
+        ["create-token", "--scopes", "bogus,read"],
     )
     # DB CHECK constraint should reject; CLI propagates non-zero exit
     assert result.exit_code != 0
 
 
 def test_list_tokens_shows_rows(cli_env, cli_app):
-    r1 = runner.invoke(cli_app, ["create-token", "--owner", "u1", "--scopes", "read"])
+    r1 = runner.invoke(cli_app, ["create-token", "--scopes", "read"])
     assert r1.exit_code == 0
     r2 = runner.invoke(
         cli_app,
         [
             "create-token",
-            "--owner",
-            "u2",
             "--scopes",
             "read,download",
             "--admin",
@@ -125,12 +117,12 @@ def test_list_tokens_shows_rows(cli_env, cli_app):
 
     result = runner.invoke(cli_app, ["list-tokens"])
     assert result.exit_code == 0
-    assert "u1" in result.stdout
-    assert "u2" in result.stdout
+    assert "system-admin" in result.stdout
+    assert "admin=True" in result.stdout
 
 
 def test_list_tokens_does_not_leak_raw_or_hash(cli_env, cli_app):
-    r1 = runner.invoke(cli_app, ["create-token", "--owner", "u", "--scopes", "read"])
+    r1 = runner.invoke(cli_app, ["create-token", "--scopes", "read"])
     raw = r1.stdout.strip()
     h = _hash(raw)
 
@@ -141,7 +133,7 @@ def test_list_tokens_does_not_leak_raw_or_hash(cli_env, cli_app):
 
 
 def test_revoke_token_sets_revoked_at(cli_env, cli_app):
-    r = runner.invoke(cli_app, ["create-token", "--owner", "u", "--scopes", "read"])
+    r = runner.invoke(cli_app, ["create-token", "--scopes", "read"])
     raw = r.stdout.strip()
     row = _fetch_token(cli_env, _hash(raw))
     token_id = str(row[0])
@@ -161,7 +153,7 @@ def test_revoke_token_unknown_id_fails(cli_env, cli_app):
 
 
 def test_revoke_token_already_revoked_fails(cli_env, cli_app):
-    r = runner.invoke(cli_app, ["create-token", "--owner", "u", "--scopes", "read"])
+    r = runner.invoke(cli_app, ["create-token", "--scopes", "read"])
     raw = r.stdout.strip()
     row = _fetch_token(cli_env, _hash(raw))
     token_id = str(row[0])
@@ -192,7 +184,7 @@ def _user_id_for(libpq_url: str, navidrome_username: str):
 
 
 def test_create_token_defaults_user_to_system_admin(cli_env, cli_app):
-    r = runner.invoke(cli_app, ["create-token", "--owner", "ops"])
+    r = runner.invoke(cli_app, ["create-token"])
     assert r.exit_code == 0, r.stdout
     raw = r.stdout.strip()
     h = _hash(raw)
@@ -219,7 +211,7 @@ def test_create_token_with_explicit_user(cli_env, cli_app):
 
     r = runner.invoke(
         cli_app,
-        ["create-token", "--owner", "alice-cli", "--user", "alice-cli"],
+        ["create-token", "--user", "alice-cli"],
     )
     assert r.exit_code == 0, r.stdout
     raw = r.stdout.strip()
@@ -233,15 +225,12 @@ def test_create_token_with_explicit_user(cli_env, cli_app):
                 (h,),
             )
             assert cur.fetchone()[0] == "alice-cli"
-        # The user row is kept between tests — the INSERT in the seed step is
-        # idempotent (ON CONFLICT DO NOTHING). Deleting it here would race the
-        # fixture-level `DELETE FROM tokens` ordering against the FK.
 
 
 def test_create_token_unknown_user_fails(cli_env, cli_app):
     r = runner.invoke(
         cli_app,
-        ["create-token", "--owner", "x", "--user", "nobody-here"],
+        ["create-token", "--user", "nobody-here"],
     )
     assert r.exit_code != 0
     # CliRunner merges stderr into stdout by default — that's what we asserted.
@@ -249,7 +238,7 @@ def test_create_token_unknown_user_fails(cli_env, cli_app):
 
 
 def test_list_tokens_includes_user_column(cli_env, cli_app):
-    r = runner.invoke(cli_app, ["create-token", "--owner", "ops"])
+    r = runner.invoke(cli_app, ["create-token"])
     assert r.exit_code == 0
     lst = runner.invoke(cli_app, ["list-tokens"])
     assert lst.exit_code == 0
@@ -269,15 +258,20 @@ def test_list_tokens_user_filter_returns_only_matching(cli_env, cli_app):
             )
         conn.commit()
 
-    r1 = runner.invoke(cli_app, ["create-token", "--owner", "ops-sys"])
+    r1 = runner.invoke(cli_app, ["create-token"])
     assert r1.exit_code == 0
-    r2 = runner.invoke(cli_app, ["create-token", "--owner", "ops-bob", "--user", "bob-cli"])
+    raw_sys = r1.stdout.strip()
+    sys_id = str(_fetch_token(cli_env, _hash(raw_sys))[0])
+    r2 = runner.invoke(cli_app, ["create-token", "--user", "bob-cli"])
     assert r2.exit_code == 0
+    raw_bob = r2.stdout.strip()
+    bob_id = str(_fetch_token(cli_env, _hash(raw_bob))[0])
 
     lst = runner.invoke(cli_app, ["list-tokens", "--user", "bob-cli"])
     assert lst.exit_code == 0
-    assert "owner=ops-bob" in lst.stdout
-    assert "owner=ops-sys" not in lst.stdout
+    assert "user=bob-cli" in lst.stdout
+    assert bob_id in lst.stdout
+    assert sys_id not in lst.stdout
 
 
 def test_list_tokens_user_filter_no_matches(cli_env, cli_app):
@@ -289,7 +283,7 @@ def test_list_tokens_user_filter_no_matches(cli_env, cli_app):
             )
         conn.commit()
 
-    r = runner.invoke(cli_app, ["create-token", "--owner", "ops"])
+    r = runner.invoke(cli_app, ["create-token"])
     assert r.exit_code == 0
     lst = runner.invoke(cli_app, ["list-tokens", "--user", "carol-cli"])
     assert lst.exit_code == 0

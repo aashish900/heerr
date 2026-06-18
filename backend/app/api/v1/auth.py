@@ -84,7 +84,6 @@ async def login(
     raw = secrets.token_urlsafe(32)
     token = Token(
         token_hash=hashlib.sha256(raw.encode()).hexdigest(),
-        owner_label=req.username,
         scopes=list(_DEFAULT_SCOPES),
         is_admin=False,
         user_id=user.id,

@@ -149,7 +149,6 @@ async def create_token(
     h = hashlib.sha256(raw.encode()).hexdigest()
     tok = Token(
         token_hash=h,
-        owner_label=req.owner_label,
         scopes=req.scopes,
         is_admin=req.is_admin,
         user_id=target.id,
@@ -159,7 +158,7 @@ async def create_token(
     return CreateTokenResponse(
         id=tok.id,
         raw_token=raw,
-        owner_label=tok.owner_label,
+        navidrome_username=target.navidrome_username,
         scopes=list(tok.scopes),
         is_admin=tok.is_admin,
         created_at=tok.created_at,
@@ -171,11 +170,21 @@ async def list_tokens(
     session: AsyncSession = Depends(get_session),
     _admin: Token = Depends(require_admin),
 ) -> list[TokenView]:
-    rows = (await session.execute(select(Token).order_by(Token.created_at.asc()))).scalars().all()
+    from sqlalchemy.orm import selectinload
+
+    rows = (
+        (
+            await session.execute(
+                select(Token).options(selectinload(Token.user)).order_by(Token.created_at.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
     return [
         TokenView(
             id=t.id,
-            owner_label=t.owner_label,
+            navidrome_username=t.user.navidrome_username,
             scopes=list(t.scopes),
             is_admin=t.is_admin,
             created_at=t.created_at,

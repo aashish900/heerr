@@ -8,7 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class CreateTokenRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    owner_label: str = Field(..., min_length=1)
     scopes: list[Literal["read", "download"]] = Field(..., min_length=1)
     is_admin: bool = False
     navidrome_username: str = Field(..., min_length=1)
@@ -22,7 +21,7 @@ class CreateTokenRequest(BaseModel):
 class CreateTokenResponse(BaseModel):
     id: UUID
     raw_token: str
-    owner_label: str
+    navidrome_username: str
     scopes: list[str]
     is_admin: bool
     created_at: datetime
@@ -30,7 +29,7 @@ class CreateTokenResponse(BaseModel):
 
 class TokenView(BaseModel):
     id: UUID
-    owner_label: str
+    navidrome_username: str
     scopes: list[str]
     is_admin: bool
     created_at: datetime

@@ -27,8 +27,8 @@ def test_tokens_has_nullable_user_id(db_conn):
     cur.execute("SELECT user_id FROM tokens LIMIT 0")
     # Insert without user_id must still work (nullable in 0004; J2 will flip to NOT NULL)
     cur.execute(
-        "INSERT INTO tokens (token_hash, owner_label, scopes, user_id) VALUES (%s, %s, %s, system_admin_user_id()) RETURNING id",
-        (f"hash-{uuid.uuid4()}", "no-user", ["read"]),
+        "INSERT INTO tokens (token_hash, scopes, user_id) VALUES (%s, %s, system_admin_user_id()) RETURNING id",
+        (f"hash-{uuid.uuid4()}", ["read"]),
     )
     cur.fetchone()
 

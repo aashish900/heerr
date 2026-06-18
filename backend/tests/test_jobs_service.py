@@ -24,7 +24,6 @@ async def token_id(app_sm, system_admin_user_id):
     async with app_sm() as s:
         tok = Token(
             token_hash=h,
-            owner_label="test",
             scopes=["read", "download"],
             user_id=system_admin_user_id,
         )

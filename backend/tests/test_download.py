@@ -337,7 +337,6 @@ async def test_download_same_url_different_users_creates_separate_jobs(
         s.add(
             Token(
                 token_hash=hashlib.sha256(raw_a.encode()).hexdigest(),
-                owner_label=ua.navidrome_username,
                 scopes=["read", "download"],
                 user_id=ua.id,
             )
@@ -345,7 +344,6 @@ async def test_download_same_url_different_users_creates_separate_jobs(
         s.add(
             Token(
                 token_hash=hashlib.sha256(raw_b.encode()).hexdigest(),
-                owner_label=ub.navidrome_username,
                 scopes=["read", "download"],
                 user_id=ub.id,
             )

@@ -5,7 +5,7 @@ from collections.abc import Awaitable, Callable
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from app.api.context import owner_label_var, request_id_var
+from app.api.context import request_id_var, username_var
 
 logger = logging.getLogger("heerr.access")
 
@@ -14,7 +14,7 @@ _REQUEST_ID_HEADER = "x-request-id"
 
 class RequestLoggingMiddleware:
     """Pure ASGI middleware: assigns X-Request-ID, emits one structured access
-    log per request, and surfaces `owner_label` (set by the auth dependency).
+    log per request, and surfaces `username` (set by the auth dependency).
 
     Note: implemented as a pure ASGI middleware (not Starlette's
     BaseHTTPMiddleware) so that ContextVar mutations made by downstream
@@ -34,7 +34,7 @@ class RequestLoggingMiddleware:
         incoming = headers.get(_REQUEST_ID_HEADER.encode())
         request_id = incoming.decode() if incoming else uuid.uuid4().hex
         request_id_var.set(request_id)
-        owner_label_var.set("-")
+        username_var.set("-")
 
         start = time.perf_counter()
         status_code = 500

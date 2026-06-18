@@ -774,3 +774,22 @@ All 21 checks in SMOKE-TEST.md passed. Two bugs surfaced during smoke and fixed:
 - **`tests/test_spotdl_runner.py`**: 18-case parametrised classifier test, a rate-limit-wins-over-network precedence test, and two end-to-end `run_spotdl` tests that assert the classified subclass is raised (and that it is still an instance of `SpotdlError` to pin the inheritance contract).
 - **`backend/docs/DEBT.md`**: N10 struck through with resolution note pointing at the next natural step — auto-retry policy (transient → backoff, permanent → fail) keyed off the subclass.
 - Full suite: 366 passed. ruff lint+format clean. mypy clean.
+
+## 2026-06-18 — M2: drop `tokens.owner_label`
+
+- **`backend/alembic/versions/0009_drop_tokens_owner_label.py`** — new migration. `upgrade()` drops `tokens.owner_label`; `downgrade()` re-adds it as nullable, backfills from the FK-linked `users.navidrome_username`, then flips back to NOT NULL.
+- **`backend/app/models/token.py`** — `owner_label` Mapped column removed.
+- **`backend/app/schemas/token.py`** — `CreateTokenRequest.owner_label` removed; `CreateTokenResponse` and `TokenView` now expose `navidrome_username` (sourced from the FK-linked user) instead.
+- **`backend/app/api/v1/admin.py`** — `POST /admin/tokens` no longer accepts or returns `owner_label`; `GET /admin/tokens` eager-loads `Token.user` so the listing can surface `navidrome_username`.
+- **`backend/app/api/v1/auth.py`** — `POST /auth/login` no longer writes `owner_label` on the minted Token.
+- **`backend/app/cli.py`** — `create-token --owner` flag dropped; `list-tokens` output format changed from `owner=<label>` to user-only (`user=<navidrome_username>`).
+- **`backend/app/api/context.py`** — `owner_label_var` renamed to `username_var`.
+- **`backend/app/api/deps.py`** — `bearer_token` now stamps `username_var` from `tok.user.navidrome_username` (relies on the existing `selectinload(Token.user)`).
+- **`backend/app/api/middleware.py`** — middleware initialises `username_var` (was `owner_label_var`); access-log mandate description updated.
+- **`backend/app/logging_config.py`** — JSON access-log key renamed `owner_label` → `username`. Reserved-attribute set updated.
+- **Tests** — every `Token(owner_label=...)` and `INSERT INTO tokens(... owner_label ...)` site swept (`test_admin.py`, `test_auth.py`, `test_auth_login.py`, `test_auth_logout.py`, `test_cli.py`, `test_docs_gate.py`, `test_download.py`, `test_jobs_service.py`, `test_logging.py`, `test_migration_0001.py`, `test_migration_0004.py`, `test_migration_0005.py`, `test_migration_0008.py`, `test_queue.py`, `test_search.py`, `test_status.py`, `test_user_relationships.py`, `test_worker.py`, `tests/conftest.py`). `make_token` fixture lost its `owner=` arg. `test_admin.py::cleanup` now scopes by a dedicated `admin-test-target` user_id instead of an `owner_label LIKE` pattern. `test_auth_login.py` + `test_auth_logout.py` cleanups switched to user-FK filters. `test_logging.py` JsonFormatter assertions check the new `username` key; the auth-time access-log test now seeds a real `User` and asserts `rec.username == user.navidrome_username`.
+- **`backend/tests/test_migration_0009.py`** — new. Asserts the column is gone at HEAD and an INSERT without `owner_label` succeeds. The downgrade roundtrip is not exercised in-suite (would race autovacuum / shared-container AEL); the downgrade SQL is short and reviewable in the migration file.
+- **`backend/README.md`** — access-log shape doc updated (`username` instead of `owner_label`); `POST /admin/tokens` body documented as `{scopes, navidrome_username, is_admin?}`; CLI `create-token` flags doc dropped `--owner` and now documents `--user`; `list-tokens` sample output updated.
+- **`backend/docs/ROADMAP.md`** — cross-cutting "Logging at every request" reminder updated to name `navidrome_username` (log key: `username`).
+- **`backend/docs/DEBT.md`** — M2 struck through with the resolution note.
+- 369/369 tests green.

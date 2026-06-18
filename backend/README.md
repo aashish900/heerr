@@ -71,7 +71,6 @@ poetry run uvicorn app.main:app --reload --port 8000
 
 ```bash
 poetry run python -m app.cli create-token \
-    --owner=$(whoami) \
     --scopes=read,download \
     --admin
 # prints the raw token ONCE — save it somewhere. The DB stores only sha256(raw).
@@ -107,13 +106,12 @@ Generate a token. Raw value is printed once on stdout; only its `sha256` is pers
 
 ```bash
 python -m app.cli create-token \
-    --owner=aashish \
     --scopes=read,download \
     --admin
 ```
 
 Flags:
-- `--owner <label>` — required. Free-text label that appears in `list-tokens` and request logs.
+- `--user <navidrome_username>` — owning user. Defaults to `system-admin` (the operator account seeded by migration 0005). Must already exist.
 - `--scopes <csv>` — comma-separated subset of `{read, download}`. Default `read,download`.
 - `--admin` — flag. Sets `is_admin=true`, which gates `/admin/*`.
 
@@ -123,7 +121,7 @@ Exit codes: `0` on success; `1` if DB CHECK rejects (e.g. invalid scope name).
 
 ```bash
 python -m app.cli list-tokens
-# 7f1d… owner=aashish scopes=['read', 'download'] admin=True state=active created_at=2026-06-08T17:42:09+00:00
+# 7f1d… user=system-admin scopes=['read', 'download'] admin=True state=active created_at=2026-06-08T17:42:09+00:00
 ```
 
 Never prints the raw token or its hash.
@@ -159,12 +157,12 @@ the server emits for that request:
 
 ```
 {"ts":"…","level":"INFO","logger":"heerr.access","msg":"request",
- "request_id":"…","owner_label":"aashish","method":"POST",
+ "request_id":"…","username":"aashish","method":"POST",
  "path":"/api/v1/download","status_code":202,"duration_ms":12.34,"client":"…"}
 ```
 
-`owner_label` is the value from `tokens.owner_label` for the authenticated
-request, or `"-"` for `/health` (no auth) and 401 responses (auth failed
+`username` is `users.navidrome_username` for the authenticated request's
+token, or `"-"` for `/health` (no auth) and 401 responses (auth failed
 before the dependency could resolve a token).
 
 ### Authentication
@@ -311,7 +309,7 @@ No query params in v1.
 
 | Method | Path | Body / args | Returns |
 |---|---|---|---|
-| `POST` | `/api/v1/admin/tokens` | `{owner_label, scopes, is_admin?}` | `201` with `raw_token` (shown once) |
+| `POST` | `/api/v1/admin/tokens` | `{scopes, navidrome_username, is_admin?}` | `201` with `raw_token` (shown once) |
 | `GET` | `/api/v1/admin/tokens` | — | `200` array of `TokenView` (no raw, no hash) |
 | `POST` | `/api/v1/admin/tokens/{id}/revoke` | — | `204` (or `404` / `409` already-revoked) |
 | `POST` | `/api/v1/admin/jobs/{id}/retry` | — | `200` `JobView`; `404` unknown; `409` if `state != "failed"` OR another active job for the same URI exists |
@@ -319,12 +317,13 @@ No query params in v1.
 Examples:
 
 ```bash
-# create a non-admin user
+# create a non-admin user (the user must already exist — pre-create it with
+# POST /api/v1/admin/users if needed)
 curl -X POST http://localhost:8000/api/v1/admin/tokens \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"owner_label":"sister","scopes":["read","download"],"is_admin":false}'
-# → 201 { "id":"…", "raw_token":"…", "owner_label":"sister", … }
+  -d '{"navidrome_username":"sister","scopes":["read","download"],"is_admin":false}'
+# → 201 { "id":"…", "raw_token":"…", "navidrome_username":"sister", … }
 
 # retry a failed job
 curl -X POST http://localhost:8000/api/v1/admin/jobs/<job_id>/retry \
