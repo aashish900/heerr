@@ -105,12 +105,12 @@ Rows assessed and explicitly parked. They retain their original ID (from the 202
 
 | # | Item | Reason / revisit when | Original section |
 |---|------|-----------------------|------------------|
-| ~~[DEFERRED] C1~~ | No real job queue (`FastAPI BackgroundTasks`). | Not tackling new infra components right now; revisit when multi-user load actually surfaces the issue. | §2 Critical |
-| ~~[DEFERRED] C4~~ | No token expiry — tokens are revocable-only. | Not critical at current stage; revisit after Phase S (Android multi-user client) is live. N5 / Android may want it then. | §2 Critical |
-| ~~[DEFERRED] C6~~ | `POST /auth/login` has no rate limit. | Tailnet-only posture + small family user base; not warranted at current stage. | §2 Critical |
-| ~~[DEFERRED] M7~~ | No per-user download quota. | Tailnet-only family-scale app; revisit if disk pressure or abuse actually surfaces. Couples with C1. | §3 Major |
-| ~~[DEFERRED] M8~~ | No per-user `/download` rate limit. | Tailnet-only family-scale app; revisit if abuse actually surfaces. Same mechanism as C6 / M7. | §3 Major |
-| ~~[DEFERRED] N5~~ | No CORS configuration. | No web UI planned; Flutter is a native HTTP client and does not trigger CORS. Revisit only if a browser-based admin UI ever lands. | §4 Minor |
+| C1 | No real job queue (`FastAPI BackgroundTasks`). | Not tackling new infra components right now; revisit when multi-user load actually surfaces the issue. | §2 Critical |
+| C4 | No token expiry — tokens are revocable-only. | Not critical at current stage; revisit after Phase S (Android multi-user client) is live. N5 / Android may want it then. | §2 Critical |
+| C6 | `POST /auth/login` has no rate limit. | Tailnet-only posture + small family user base; not warranted at current stage. | §2 Critical |
+| M7 | No per-user download quota. | Tailnet-only family-scale app; revisit if disk pressure or abuse actually surfaces. Couples with C1. | §3 Major |
+| M8 | No per-user `/download` rate limit. | Tailnet-only family-scale app; revisit if abuse actually surfaces. Same mechanism as C6 / M7. | §3 Major |
+| N5 | No CORS configuration. | No web UI planned; Flutter is a native HTTP client and does not trigger CORS. Revisit only if a browser-based admin UI ever lands. | §4 Minor |
 
 All deferral decisions dated 2026-06-18.
 
