@@ -26,7 +26,7 @@ These will mislead a future Claude session reading the bootstrap docs.
 | C3 | **Job cancellation is impossible.** No `cancel-job` endpoint; no PID/Task tracking; only way to stop a spotDL subprocess is killing the container. | Track `asyncio.Task` per `job_id` (or process handle once C1 lands). Add `POST /jobs/{id}/cancel`. | M |
 | C4 | **No token expiry.** Tokens are revocable-only. Once minted they live forever. Multi-user makes a stolen-token incident permanent. Adding `expires_at` now is a 2-column migration; after Phase S Android ships it's a coordinated client/server release. **Deferred 2026-06-18: not critical at current stage; revisit after Phase S is live.** | `tokens.expires_at` + check in `bearer_token`. Optional refresh-token flow. | S |
 | ~~C5~~ | ~~**No `/auth/logout`.**~~ Resolved 2026-06-16: `POST /api/v1/auth/logout` sets `revoked_at = now()` on the current token; returns 204. Subsequent calls with the same token return 401 (already revoked) via the existing `bearer_token` check. | — | — |
-| C6 | **`POST /auth/login` has no rate limit.** Brute-forcing Navidrome credentials through heerr is unmitigated. Tailscale narrows the threat to tailnet members but does not eliminate it. | Per-IP + per-username sliding-window in Postgres (or fastapi-limiter / slowapi). Lockout after N failures. | M |
+| C6 | **`POST /auth/login` has no rate limit.** Brute-forcing Navidrome credentials through heerr is unmitigated. Tailscale narrows the threat to tailnet members but does not eliminate it. **Deferred 2026-06-18: tailnet-only posture + small family user base; not warranted at current stage.** | Per-IP + per-username sliding-window in Postgres (or fastapi-limiter / slowapi). Lockout after N failures. | M |
 
 ---
 
@@ -41,7 +41,7 @@ These will mislead a future Claude session reading the bootstrap docs.
 | M5 | **No per-user recommendation engine config.** `RECOMMENDATION_ENGINE`, `LASTFM_*`, `LISTENBRAINZ_*` are global env vars. Multi-user backend = single-user recommendations. | Needs a `user_settings` table (or JSONB column on `users`) + factory rewrite. |
 | M6 | **Album/playlist jobs write zero `Download` rows.** Documented decision; multi-user makes the gap worse because per-user history is the only signal. Fix requires parsing spotDL `--save-file metadata.json`, which DECISIONLOG explicitly rejected. | Revisit only if users actually report missing dedup hints for tracks inside previously-downloaded albums. |
 | M7 | **No per-user quota.** Any logged-in user can fill `/data/media/music`. No `MAX_DOWNLOADS_PER_USER`, no `MAX_BYTES_PER_USER`. | Postgres-backed counter + middleware. Couples with C1. |
-| M8 | **No per-user `/download` rate limit.** A user can dispatch hundreds of `/download` calls in a tight loop, each spawning a spotDL subprocess. | Same mechanism as C6 / M7. |
+| ~~M8~~ | ~~**No per-user `/download` rate limit.**~~ Deferred 2026-06-18 alongside C6: tailnet-only family-scale app; revisit if abuse actually surfaces. | Same mechanism as C6 / M7. |
 
 ---
 
@@ -94,7 +94,7 @@ These will mislead a future Claude session reading the bootstrap docs.
 3. ~~**C4** — token expiry. Deferred 2026-06-18; revisit after Phase S is live.~~
 4. **C2 + T1 + T3** — boot recovery for orphaned `running` jobs. Small fix, prevents support-by-SQL.
 5. **M1 + T4** — add a regression test that catches missing `user_id` on INSERT, then plan the migration to drop the `system_admin_user_id()` default once Phase S ships.
-6. **C6 + M8** — login + `/download` rate limiting. Mitigates the biggest credible abuse vectors.
+6. ~~**C6 + M8** — login + `/download` rate limiting.~~ Deferred 2026-06-18: tailnet-only family-scale app; revisit if abuse surfaces.
 7. ~~**C1 + C3 + N12 + M7** — real queue substrate.~~ C1 deferred 2026-06-18 (no new components). C3 / N12 / M7 stay blocked on C1; revisit together.
 8. **M5** — per-user recommendation engine config. Unblocks per-user Last.fm/ListenBrainz scrobbling (already a deferred item on the Android side).
 9. **Everything else** — opportunistically, as features that need them land.
