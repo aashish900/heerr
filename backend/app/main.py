@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from app.api.middleware import MaxBodySizeMiddleware, RequestLoggingMiddleware
 from app.api.v1.router import api_v1
+from app.config import get_settings
 from app.db import _sessionmaker
 from app.logging_config import setup_logging
 from app.services.jobs import recover_orphaned_jobs
@@ -16,6 +17,7 @@ _log = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    get_settings()  # fail fast on misconfigured env before serving any requests (N13)
     async with _sessionmaker()() as session:
         try:
             recovered = await recover_orphaned_jobs(session)
