@@ -12,7 +12,7 @@ import '../../player/playback_actions.dart';
 import '../../player/player_provider.dart';
 import '../../providers/library/library_playlist.dart';
 import '../../providers/library/playlist_mutations.dart';
-import '../../providers/settings.dart';
+import '../../providers/server_creds.dart';
 import '../../theme.dart';
 import '../../widgets/add_to_playlist_sheet.dart';
 import '../../widgets/empty_state.dart';
@@ -254,11 +254,9 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
     final bool isMarked =
         manifest?.markedPlaylists.contains(widget.playlistId) ?? false;
 
-    final SettingsValue? settings =
-        ref.watch(settingsProvider).valueOrNull;
+    final ServerCreds settings = ref.watch(serverCredsProvider);
     final Playlist? loaded = async.valueOrNull;
     final bool canEdit = loaded != null &&
-        settings != null &&
         loaded.owner != null &&
         loaded.owner == settings.navidromeUsername;
 

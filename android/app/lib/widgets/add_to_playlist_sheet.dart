@@ -8,7 +8,7 @@ import '../models/subsonic/playlist.dart';
 import '../providers/library/library_playlists.dart';
 import '../providers/library/playlist_mutations.dart';
 import '../providers/recommendations.dart';
-import '../providers/settings.dart';
+import '../providers/server_creds.dart';
 import '../router.dart';
 import 'error_snackbar.dart';
 import 'playlist_dialogs.dart';
@@ -146,8 +146,8 @@ class AddToPlaylistSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<List<Playlist>> playlistsAsync =
         ref.watch(libraryPlaylistsProvider);
-    final SettingsValue? settings = ref.watch(settingsProvider).valueOrNull;
-    final String? username = settings?.navidromeUsername;
+    final ServerCreds settings = ref.watch(serverCredsProvider);
+    final String? username = settings.navidromeUsername;
 
     return SafeArea(
       child: Padding(

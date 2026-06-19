@@ -29,7 +29,7 @@ final nowPlayingPersistenceProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef NowPlayingPersistenceRef = FutureProviderRef<NowPlayingPersistence>;
-String _$nowPlayingRestoreHash() => r'83688ee3bdede823e12357c806dbf30be26aee97';
+String _$nowPlayingRestoreHash() => r'78f781a52da1b78063dbb646ea6090d8fe8b3e51';
 
 /// Cold-start queue restore. Runs once at app boot via a keep-alive
 /// provider watched by [HeerrApp] for its side effect.

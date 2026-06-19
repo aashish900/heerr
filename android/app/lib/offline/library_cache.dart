@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../providers/settings.dart';
+import '../providers/server_creds.dart';
 import 'offline_paths.dart';
 
 part 'library_cache.g.dart';
@@ -75,7 +75,7 @@ class LibraryCache {
   /// Never throws — corrupt cache is reported via [debugPrint] and degrades
   /// to a cache miss.
   Future<Map<String, dynamic>?> read(
-    SettingsValue settings,
+    ServerCreds settings,
     String key,
   ) async {
     final File? file = _paths.libraryCacheFile(settings, key);
@@ -97,7 +97,7 @@ class LibraryCache {
   /// Atomic write via tmp-file + rename. Caller passes a JSON-serializable
   /// `Map<String, dynamic>`. No-op when Navidrome creds are missing.
   Future<void> write(
-    SettingsValue settings,
+    ServerCreds settings,
     String key,
     Map<String, dynamic> value,
   ) async {
@@ -148,10 +148,10 @@ Future<T> cacheAware<T>({
   // path_provider in tests, no Navidrome creds yet), proceed without it —
   // the user just gets the original online-only behavior. This keeps the
   // wrapper a pure side-effect layer over the existing provider contract.
-  SettingsValue? settings;
+  ServerCreds? settings;
   LibraryCache? cache;
   try {
-    settings = await ref.read(settingsProvider.future);
+    settings = ref.read(serverCredsProvider);
     cache = await ref.read(libraryCacheProvider.future);
   } catch (e) {
     debugPrint('library_cache: infra unavailable, bypassing for $cacheKey: $e');

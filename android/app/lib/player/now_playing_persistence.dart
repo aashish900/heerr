@@ -12,7 +12,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/subsonic/song.dart';
 import '../offline/local_uri.dart';
-import '../providers/settings.dart';
+import '../providers/server_creds.dart';
 import 'heerr_audio_handler.dart';
 import 'now_playing_snapshot.dart';
 import 'now_playing_store.dart';
@@ -204,7 +204,7 @@ Future<void> nowPlayingRestore(NowPlayingRestoreRef ref) async {
     final NowPlayingSnapshot? snapshot = await store.load();
     if (snapshot == null || snapshot.songs.isEmpty) return;
 
-    final SettingsValue settings = await ref.read(settingsProvider.future);
+    final ServerCreds settings = ref.read(serverCredsProvider);
     final String? baseUrl = settings.navidromeBaseUrl;
     final String? username = settings.navidromeUsername;
     final String? password = settings.navidromePassword;

@@ -12,7 +12,6 @@ import 'package:heerr/offline/offline_size_estimator.dart';
 import 'package:heerr/providers/prefs_storage.dart';
 import 'package:heerr/providers/recommendations.dart';
 import 'package:heerr/providers/secure_storage.dart';
-import 'package:heerr/providers/settings.dart';
 import 'package:heerr/screens/settings_screen.dart';
 
 /// Stub estimator that returns a fixed byte count without walking the
@@ -264,9 +263,9 @@ void main() {
       addTearDown(c.dispose);
       await c.read(offlineSettingsProvider.future);
       await c.read(offlineSettingsProvider.notifier).setEnabled(true);
-      final SettingsValue settings =
-          await c.read(settingsProvider.future);
-      expect(settings.offlineEnabled, isTrue);
+      final OfflineSettingsValue settings =
+          await c.read(offlineSettingsProvider.future);
+      expect(settings.enabled, isTrue);
       expect(store.snapshot['offline_enabled'], 'true');
     });
   });

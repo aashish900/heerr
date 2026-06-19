@@ -492,3 +492,28 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Reference:** `android/app/lib/{providers/{settings,prefs_storage}.dart, api/{client,subsonic_client}.dart, screens/{settings_screen,auth/login_screen}.dart, widgets/error_snackbar.dart, router.dart, main.dart}`. Tests: `android/app/test/{providers/settings_test.dart, api/{client,subsonic_client}_test.dart, support/cred_test_support.dart, offline/*, screens/library/*, widgets/{add_to_playlist_sheet,error_snackbar}_test.dart}`. Debt items A1/A4/A5 in `docs/DEBT.md` §5.
 
 ---
+
+## 2026-06-19 — Split `SettingsValue`: creds via `ServerCreds`, offline prefs standalone (debt A6/A7)
+
+**Context:** The 2026-06-18 audit (`docs/DEBT.md` §5, A6) flagged `SettingsValue` as a 12-field tuple mixing per-server credentials with the five offline-download prefs. Riverpod rebuilds every watcher of the whole record on any field change, so credential consumers rebuilt on offline-toggle changes and offline screens rebuilt on token rotation. The A1 band (2026-06-19) had already made the active `Profile` the sole credential source, so `SettingsValue`'s credential fields were a redundant copy — and the heerr-creds fields (`backendBaseUrl`/`bearerToken`) had **zero** `settingsProvider` consumers left (the dio clients read `activeProfileProvider` directly since S7). A pre-existing redundancy (A6 note): `OfflineSettings` existed only to re-slice `SettingsValue` into the offline fields, so offline prefs flowed through two providers.
+
+**Decision:**
+1. **Delete `Settings`/`SettingsValue`** (`providers/settings.dart`). Credentials come from a thin synchronous `ServerCreds` re-slice over `activeProfileProvider` (`providers/server_creds.dart`) carrying only the Navidrome `(baseUrl, username, password)` slice — the fields the offline serverKey chokepoints, the streaming/Now-Playing paths, and the owner-check providers actually read.
+2. **`OfflineSettings`** (`offline/offline_settings.dart`) becomes the sole owner of the offline prefs — it reads/writes `PrefsStorage` directly (absorbing the key constants, defaults, `Future.wait` batch, and per-key writes from the deleted `Settings`). The re-slice is gone.
+3. **No `HeerrCredsValue`.** The literal DEBT proposal (three providers: heerr-creds / navidrome-creds / offline-prefs) predated A1 and was stale — a `HeerrCredsValue` provider would have had no consumers. Code is the source of truth (CLAUDE.md staleness rule), so the DEBT wording was corrected to the as-built shape rather than the reverse.
+
+**Why:**
+- **Finishes the consolidation A1 started.** One credential source (the active profile); the `ServerCreds` re-slice is a pure projection of it, not a second store to keep in sync. The literal 3-way split would have re-introduced a copy-and-sync layer A1 deleted.
+- **Kills the cascading rebuilds A6 names.** Cred consumers watch `serverCredsProvider` (rebuild only on profile switch); offline-pref consumers watch `offlineSettingsProvider` (rebuild only on a pref change). Neither rebuilds the other.
+- **Net −1 provider** (delete `Settings`, fold the re-slice into `OfflineSettings`) vs. the +3 the literal proposal implied. The offline path-layer helpers (`OfflinePaths.*`, `OfflineManifestStore.load/save`, `library_cache`, `offline_downloader`, etc.) change parameter type `SettingsValue` → `ServerCreds`; their bodies are untouched since the field names match.
+
+**Alternatives considered:**
+- **Literal 3-way re-slice keeping `settings.dart`.** Rejected: re-introduces a profile-copy layer, ships a consumer-less `heerrCredsProvider`, and adds providers rather than removing them. Matches stale DEBT text, not the A1 model.
+- **Pass the whole `Profile` to the offline helpers instead of a `ServerCreds` slice.** Rejected: couples the path layer to the full profile model (display name, timestamps, heerr creds). A narrow 3-field record keeps the layering clean and the test fakes small.
+- **Split `SettingsValue` into separate freezed classes now (A19).** Deferred: `ServerCreds` / `OfflineSettingsValue` stay records for now; the freezed migration is tracked as A19.
+
+**Trade-off:** `serverCredsProvider` is synchronous (it re-slices the already-loaded `activeProfileProvider`), so the offline serverKey chokepoints that previously did `await ref.read(settingsProvider.future)` now do a plain `ref.read(serverCredsProvider)`. One behavioral nuance surfaced in `background_sync_test`: a bare (un-overridden) container used to throw at the async creds read and surface as a `false` WorkManager retry; with the synchronous, null-degrading slice it instead no-ops gracefully to "no creds" / `true`. The infra-error → retry contract is still real and is now tested by forcing a downstream provider (`applicationDocumentsDirectoryProvider`) to throw with valid creds present.
+
+**Reference:** `android/app/lib/{providers/{server_creds}.dart (new), offline/{offline_settings,offline_paths,offline_manifest,library_cache,offline_downloader,offline_marker,offline_size_estimator,offline_sync}.dart, player/{playback_actions,now_playing_persistence}.dart, providers/library/favourites.dart, screens/{settings_screen,library/playlist_detail_screen}.dart, widgets/{add_to_playlist_sheet,library_cover_art}.dart}`; `providers/settings.dart` deleted. Tests: `test/support/cred_test_support.dart` (`testCreds()` added), `test/offline/*`, `test/providers/seed_collection_provider_test.dart`, `test/screens/{settings_screen,library/playlist_detail_screen}_test.dart`; `test/providers/settings_test.dart` deleted. Debt A6/A7 in `docs/DEBT.md` §5.
+
+---

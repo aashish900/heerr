@@ -9,7 +9,7 @@ import 'package:heerr/models/subsonic/song.dart';
 import 'package:heerr/offline/offline_downloader.dart';
 import 'package:heerr/offline/offline_manifest.dart';
 import 'package:heerr/offline/offline_paths.dart';
-import 'package:heerr/providers/settings.dart';
+import 'package:heerr/providers/server_creds.dart';
 
 class _StubAdapter implements HttpClientAdapter {
   _StubAdapter(this.responder);
@@ -50,17 +50,11 @@ ResponseBody _bodyOfBytes(
   );
 }
 
-SettingsValue _settings({String url = 'http://navi:4533', String? user = 'me', String? pass = 'pw'}) {
+ServerCreds _settings({String url = 'http://navi:4533', String? user = 'me', String? pass = 'pw'}) {
   return (
-    backendBaseUrl: null,
-    bearerToken: null,
     navidromeBaseUrl: url,
     navidromeUsername: user,
     navidromePassword: pass,
-    offlineEnabled: true,
-    offlineSyncAll: false,
-    offlineWifiOnly: true,
-    offlinePollIntervalMin: 15, offlineChargingOnly: false,
   );
 }
 
@@ -84,7 +78,7 @@ void main() {
       final _StubAdapter adapter = _StubAdapter(
         (RequestOptions o) => _bodyOfBytes(payload),
       );
-      final SettingsValue settings = _settings();
+      final ServerCreds settings = _settings();
       const Song song = Song(
         id: 'so-1',
         title: 't',

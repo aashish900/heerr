@@ -104,9 +104,9 @@ final offlineManifestStoreProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef OfflineManifestStoreRef = FutureProviderRef<OfflineManifestStore>;
-String _$offlineManifestHash() => r'635704af1e0ab39e4b0755d7219b1019351f3d9e';
+String _$offlineManifestHash() => r'dfba5553252cb5aeb2b50e7c968b5694115c058c';
 
-/// Current manifest for the active server profile. Watches `settingsProvider`
+/// Current manifest for the active server profile. Watches `serverCredsProvider`
 /// so a profile-switch reloads the manifest under the new server-key.
 ///
 /// Copied from [offlineManifest].

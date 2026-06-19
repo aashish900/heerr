@@ -1,6 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../providers/settings.dart';
+import '../providers/server_creds.dart';
 import 'offline_manifest.dart';
 
 part 'offline_marker.g.dart';
@@ -84,8 +84,7 @@ class OfflineMarker extends _$OfflineMarker {
   Future<void> _mutate(
     OfflineManifest Function(OfflineManifest) transform,
   ) async {
-    final SettingsValue settings =
-        await ref.read(settingsProvider.future);
+    final ServerCreds settings = ref.read(serverCredsProvider);
     final OfflineManifestStore store =
         await ref.read(offlineManifestStoreProvider.future);
     final OfflineManifest current = await store.load(settings);

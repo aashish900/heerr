@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../providers/settings.dart';
+import '../providers/server_creds.dart';
 import 'offline_paths.dart';
 
 part 'offline_manifest.freezed.dart';
@@ -75,7 +75,7 @@ class OfflineManifestStore {
 
   final OfflinePaths _paths;
 
-  Future<OfflineManifest> load(SettingsValue settings) async {
+  Future<OfflineManifest> load(ServerCreds settings) async {
     final File? file = _paths.manifestFile(settings);
     if (file == null) return const OfflineManifest();
     if (!await file.exists()) return const OfflineManifest();
@@ -94,7 +94,7 @@ class OfflineManifestStore {
     }
   }
 
-  Future<void> save(SettingsValue settings, OfflineManifest manifest) async {
+  Future<void> save(ServerCreds settings, OfflineManifest manifest) async {
     final File? file = _paths.manifestFile(settings);
     if (file == null) {
       throw StateError(
@@ -116,12 +116,11 @@ Future<OfflineManifestStore> offlineManifestStore(
   return OfflineManifestStore(paths);
 }
 
-/// Current manifest for the active server profile. Watches `settingsProvider`
+/// Current manifest for the active server profile. Watches `serverCredsProvider`
 /// so a profile-switch reloads the manifest under the new server-key.
 @Riverpod(keepAlive: true)
 Future<OfflineManifest> offlineManifest(OfflineManifestRef ref) async {
-  final SettingsValue settings =
-      await ref.watch(settingsProvider.future);
+  final ServerCreds settings = ref.watch(serverCredsProvider);
   final OfflineManifestStore store =
       await ref.watch(offlineManifestStoreProvider.future);
   return store.load(settings);

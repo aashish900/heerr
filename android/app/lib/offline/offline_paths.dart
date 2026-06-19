@@ -5,7 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../providers/settings.dart';
+import '../providers/server_creds.dart';
 
 part 'offline_paths.g.dart';
 
@@ -45,7 +45,7 @@ class OfflinePaths {
   }
 
   /// Returns `null` when Navidrome creds are missing. Caller skips the tick.
-  Directory? serverRoot(SettingsValue settings) {
+  Directory? serverRoot(ServerCreds settings) {
     final String? url = settings.navidromeBaseUrl;
     final String? user = settings.navidromeUsername;
     if (url == null || user == null || url.isEmpty || user.isEmpty) {
@@ -55,19 +55,19 @@ class OfflinePaths {
     return Directory('${offlineRoot.path}/$key');
   }
 
-  File? manifestFile(SettingsValue settings) {
+  File? manifestFile(ServerCreds settings) {
     final Directory? root = serverRoot(settings);
     if (root == null) return null;
     return File('${root.path}/manifest.json');
   }
 
-  Directory? songsDir(SettingsValue settings) {
+  Directory? songsDir(ServerCreds settings) {
     final Directory? root = serverRoot(settings);
     if (root == null) return null;
     return Directory('${root.path}/songs');
   }
 
-  File? songFile(SettingsValue settings, String songId, String suffix) {
+  File? songFile(ServerCreds settings, String songId, String suffix) {
     final Directory? dir = songsDir(settings);
     if (dir == null) return null;
     // Suffix is server-supplied; strip a leading dot if Navidrome gave one.
@@ -77,13 +77,13 @@ class OfflinePaths {
 
   /// L5: directory holding JSON snapshots of Subsonic library responses.
   /// One file per logical key (`albums.json`, `album_<id>.json`, etc).
-  Directory? libraryCacheDir(SettingsValue settings) {
+  Directory? libraryCacheDir(ServerCreds settings) {
     final Directory? root = serverRoot(settings);
     if (root == null) return null;
     return Directory('${root.path}/library_cache');
   }
 
-  File? libraryCacheFile(SettingsValue settings, String key) {
+  File? libraryCacheFile(ServerCreds settings, String key) {
     final Directory? dir = libraryCacheDir(settings);
     if (dir == null) return null;
     return File('${dir.path}/$key.json');
@@ -93,7 +93,7 @@ class OfflinePaths {
   /// Subsonic `coverArtId` (NOT the album id — Navidrome surfaces the
   /// cover id separately so the same cover can be shared by multiple
   /// albums).
-  Directory? coversDir(SettingsValue settings) {
+  Directory? coversDir(ServerCreds settings) {
     final Directory? root = serverRoot(settings);
     if (root == null) return null;
     // `_hi` is a one-time cache-bust: covers were originally fetched at
@@ -105,7 +105,7 @@ class OfflinePaths {
     return Directory('${root.path}/covers_hi');
   }
 
-  File? coverFile(SettingsValue settings, String coverArtId) {
+  File? coverFile(ServerCreds settings, String coverArtId) {
     final Directory? dir = coversDir(settings);
     if (dir == null) return null;
     // coverArtId can contain forbidden filesystem chars on edge cases. Most

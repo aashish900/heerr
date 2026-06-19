@@ -5,7 +5,7 @@ import '../models/subsonic/album.dart';
 import '../models/subsonic/song.dart';
 import '../providers/library/library_album.dart';
 import '../providers/library/library_albums.dart';
-import '../providers/settings.dart';
+import '../providers/server_creds.dart';
 import 'offline_manifest.dart';
 
 part 'offline_size_estimator.g.dart';
@@ -29,8 +29,7 @@ const Duration _kEstimateTtl = Duration(hours: 1);
 class OfflineSizeEstimate extends _$OfflineSizeEstimate {
   @override
   Future<int?> build() async {
-    final SettingsValue settings =
-        await ref.watch(settingsProvider.future);
+    final ServerCreds settings = ref.watch(serverCredsProvider);
     if (settings.navidromeBaseUrl == null) return null;
 
     final OfflineManifestStore store =
@@ -54,8 +53,7 @@ class OfflineSizeEstimate extends _$OfflineSizeEstimate {
   Future<int?> refresh() async {
     state = const AsyncValue<int?>.loading();
     try {
-      final SettingsValue settings =
-          await ref.read(settingsProvider.future);
+      final ServerCreds settings = ref.read(serverCredsProvider);
       if (settings.navidromeBaseUrl == null) {
         state = const AsyncValue<int?>.data(null);
         return null;
@@ -73,7 +71,7 @@ class OfflineSizeEstimate extends _$OfflineSizeEstimate {
   }
 
   Future<int?> _walkAndCache(
-    SettingsValue settings,
+    ServerCreds settings,
     OfflineManifestStore store,
     OfflineManifest manifest,
   ) async {

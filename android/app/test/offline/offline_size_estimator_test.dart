@@ -13,7 +13,7 @@ import 'package:heerr/offline/offline_size_estimator.dart';
 import 'package:heerr/providers/library/library_album.dart';
 import 'package:heerr/providers/library/library_albums.dart';
 import 'package:heerr/providers/secure_storage.dart';
-import 'package:heerr/providers/settings.dart';
+import 'package:heerr/providers/server_creds.dart';
 
 import '../support/cred_test_support.dart';
 
@@ -126,8 +126,8 @@ void main() {
     expect(first, 4321);
 
     // Manifest should now hold the cached result.
-    final SettingsValue settings =
-        await c.read(settingsProvider.future);
+    final ServerCreds settings =
+        c.read(serverCredsProvider);
     final OfflineManifestStore store =
         await c.read(offlineManifestStoreProvider.future);
     final OfflineManifest m = await store.load(settings);
@@ -159,8 +159,8 @@ void main() {
     // Mark an album — OfflineMarker clears estimatedTotalBytes / estimatedAt.
     await c.read(offlineMarkerProvider.notifier).markAlbum('al-1');
 
-    final SettingsValue settings =
-        await c.read(settingsProvider.future);
+    final ServerCreds settings =
+        c.read(serverCredsProvider);
     final OfflineManifestStore store =
         await c.read(offlineManifestStoreProvider.future);
     final OfflineManifest m = await store.load(settings);
@@ -182,8 +182,8 @@ void main() {
     await c.read(offlineSizeEstimateProvider.future);
     await c.read(offlineSettingsProvider.notifier).setSyncAll(true);
 
-    final SettingsValue settings =
-        await c.read(settingsProvider.future);
+    final ServerCreds settings =
+        c.read(serverCredsProvider);
     final OfflineManifestStore store =
         await c.read(offlineManifestStoreProvider.future);
     final OfflineManifest m = await store.load(settings);

@@ -17,7 +17,7 @@ import '../offline/local_uri.dart';
 import '../providers/library/library_album.dart';
 import '../providers/library/library_artist.dart';
 import '../providers/library/library_playlist.dart';
-import '../providers/settings.dart';
+import '../providers/server_creds.dart';
 import '../widgets/error_snackbar.dart';
 import 'player_provider.dart';
 import 'song_to_media_item.dart';
@@ -32,7 +32,7 @@ class _Creds {
 }
 
 Future<_Creds?> _resolveCreds(WidgetRef ref) async {
-  final SettingsValue settings = await ref.read(settingsProvider.future);
+  final ServerCreds settings = ref.read(serverCredsProvider);
   final String? url = settings.navidromeBaseUrl;
   final String? user = settings.navidromeUsername;
   final String? pass = settings.navidromePassword;

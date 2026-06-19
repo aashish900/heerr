@@ -15,7 +15,7 @@ import '../providers/library/library_albums.dart';
 import '../providers/library/library_artist.dart';
 import '../providers/library/library_playlist.dart';
 import '../providers/library/library_playlists.dart';
-import '../providers/settings.dart';
+import '../providers/server_creds.dart';
 import 'offline_downloader.dart';
 import 'offline_manifest.dart';
 import 'offline_paths.dart';
@@ -169,8 +169,7 @@ class OfflineSync extends _$OfflineSync {
     }
     _running = true;
     try {
-      final SettingsValue settings =
-          await ref.read(settingsProvider.future);
+      final ServerCreds settings = ref.read(serverCredsProvider);
       if (settings.navidromeBaseUrl == null ||
           settings.navidromeUsername == null ||
           settings.navidromePassword == null) {
@@ -391,7 +390,7 @@ class OfflineSync extends _$OfflineSync {
   Future<({Map<String, OfflineSongEntry> songs, int sweptCount})>
       _sweepUnreferenced({
     required OfflinePaths paths,
-    required SettingsValue settings,
+    required ServerCreds settings,
     required Map<String, OfflineSongEntry> manifestSongs,
     required Set<String> targetIds,
   }) async {
@@ -455,8 +454,7 @@ class OfflineSync extends _$OfflineSync {
 
   Future<({int readyCount, int failedCount, int targetCount})>
       _countsFromManifest() async {
-    final SettingsValue settings =
-        await ref.read(settingsProvider.future);
+    final ServerCreds settings = ref.read(serverCredsProvider);
     if (settings.navidromeBaseUrl == null) {
       return (readyCount: 0, failedCount: 0, targetCount: 0);
     }

@@ -1822,3 +1822,24 @@ analyze` clean; `flutter test` green (567 tests).
   `SubsonicAuthInterceptor` still capture the token by value at
   Dio-construction time (rebuild-on-profile-change). The full
   stateless-interceptor refactor (A3) is left for a follow-up.
+
+## 2026-06-19 — V5 smoke passed + v3.1.1 tagged
+
+- On-device smoke for the A1/A4/A5 credential + offline-prefs band verified on the Pixel 7 against the home Navidrome with backend `3.0.0`:
+  - Upgrade from v3.0.0: silent re-login; offline prefs survived migration.
+  - No Servers tile or `/settings/servers` route present.
+  - Profile add / switch / remove all correct.
+  - Auth-error (401) redirects to `/login`.
+  - Fresh-install boots to `/login` with empty profile registry.
+- `pubspec.yaml` tagged `v3.1.1`.
+- `DEBT.md`: V5 marked ✅; A7 already marked ✅ (resolved as part of the A1 band — `ServerProfile` deleted, `Profile` (freezed) is now the only profile model).
+
+## 2026-06-19 — A6: split SettingsValue (creds via ServerCreds, offline prefs standalone)
+
+- **New `lib/providers/server_creds.dart`.** `ServerCreds` record (Navidrome `baseUrl`/`username`/`password`) + synchronous `serverCredsProvider` re-slicing `activeProfileProvider`.
+- **Deleted `lib/providers/settings.dart`** (`Settings` notifier + `SettingsValue`) and its generated `settings.g.dart`.
+- **`lib/offline/offline_settings.dart`** is now the sole offline-prefs owner: reads/writes `PrefsStorage` directly (absorbed the key constants, defaults, `_parseBool`/`_parseInt`, `Future.wait` batch read, and per-key writes from the deleted `Settings`). Mutators (`setEnabled`/`setSyncAll`/…) write prefs directly; `_clearEstimateCacheFor` takes `ServerCreds`. The re-slice over `Settings` is gone.
+- **Offline path layer retyped `SettingsValue` → `ServerCreds`** (bodies unchanged — field names match): `offline_paths.dart` (8 helpers), `offline_manifest.dart` (`load`/`save` + `offlineManifestProvider` now watches `serverCredsProvider`), `library_cache.dart`, `offline_downloader.dart`, `offline_marker.dart`, `offline_size_estimator.dart`, `offline_sync.dart` (cred reads).
+- **Credential consumers outside offline** repointed to `serverCredsProvider`: `player/playback_actions.dart`, `player/now_playing_persistence.dart`, `providers/library/favourites.dart`, `screens/library/playlist_detail_screen.dart`, `widgets/add_to_playlist_sheet.dart`, `widgets/library_cover_art.dart`, `screens/settings_screen.dart` (clear-downloads path).
+- **Tests.** Deleted `test/providers/settings_test.dart` (provider gone; offline-pref behavior covered by `offline_settings_test.dart`). `test/support/cred_test_support.dart` gained a `testCreds()` helper; `activeProfileOverride()` now feeds `serverCredsProvider` transitively. Offline tests that built `SettingsValue` literals now build `ServerCreds`; `seed_collection_provider_test` switched from a `_FakeSettings`/`settingsProvider` override to `activeProfileOverride`. `background_sync_test`'s "container error → false" case rewired to force a downstream throw (the sync creds read is now graceful, not throwing). `flutter analyze` clean; 558 tests green.
+- **Note (A19):** `ServerCreds` / `OfflineSettingsValue` remain `typedef` records — the freezed migration stays tracked as A19.

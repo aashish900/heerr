@@ -24,7 +24,7 @@ import 'package:heerr/providers/library/library_playlists.dart';
 import 'package:heerr/providers/prefs_storage.dart';
 import 'package:heerr/providers/profiles/active_profile.dart';
 import 'package:heerr/providers/secure_storage.dart';
-import 'package:heerr/providers/settings.dart';
+import 'package:heerr/providers/server_creds.dart';
 
 // ---------------------------------------------------------------------------
 // Stubs (mirror offline_sync_test.dart so the Q1 test exercises the same
@@ -152,7 +152,7 @@ ProviderContainer _buildContainer({
 }
 
 Future<void> _seedMarker(ProviderContainer c, String albumId) async {
-  final SettingsValue settings = await c.read(settingsProvider.future);
+  final ServerCreds settings = c.read(serverCredsProvider);
   final OfflineManifestStore store =
       await c.read(offlineManifestStoreProvider.future);
   await store.save(
@@ -207,12 +207,35 @@ void main() {
     });
 
     test('returns false (does not throw) on container error', () async {
-      // Container with no overrides → providers crash on `path_provider` /
-      // secure-storage method channels under the test binding. The runner
-      // must swallow the throw and surface it as a `false` retry signal.
-      final bool ok = await runBackgroundSyncTask(
-        container: ProviderContainer(),
+      // A6: creds now resolve via the synchronous `serverCredsProvider`, which
+      // degrades to null on a registry miss — so a bare container no-ops to
+      // `true` instead of throwing. To still exercise the infra-error → retry
+      // contract, give the tick valid creds (so it passes the creds gate) but
+      // make a downstream provider throw. The runner must swallow it and
+      // surface a `false` retry signal.
+      final DateTime t = DateTime.utc(2026, 6, 19);
+      final Profile profile = Profile(
+        id: 'p1',
+        displayName: 'me',
+        heerrBaseUrl: 'http://x:8000/api/v1',
+        heerrBearerToken: 'tok',
+        navidromeBaseUrl: 'http://navi:4533',
+        navidromeUsername: 'me',
+        navidromePassword: 'pw',
+        createdAt: t,
+        lastUsedAt: t,
       );
+      final ProviderContainer c = ProviderContainer(
+        overrides: <Override>[
+          activeProfileProvider.overrideWith((Ref<Profile?> ref) => profile),
+          applicationDocumentsDirectoryProvider.overrideWith(
+            (ApplicationDocumentsDirectoryRef ref) async =>
+                throw StateError('docs dir unavailable'),
+          ),
+        ],
+      );
+      addTearDown(c.dispose);
+      final bool ok = await runBackgroundSyncTask(container: c);
       expect(ok, isFalse);
     });
   });
@@ -468,7 +491,7 @@ void main() {
       await runBackgroundSyncTask(container: bg);
 
       // Resolve the on-disk manifest path the same way OfflinePaths does.
-      final SettingsValue settings = await bg.read(settingsProvider.future);
+      final ServerCreds settings = bg.read(serverCredsProvider);
       final OfflinePaths paths =
           await bg.read(offlinePathsProvider.future);
       final File manifestFile = paths.manifestFile(settings)!;

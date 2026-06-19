@@ -7,7 +7,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../api/api_error.dart';
 import '../api/subsonic_client.dart';
 import '../models/subsonic/song.dart';
-import '../providers/settings.dart';
+import '../providers/server_creds.dart';
 import 'offline_manifest.dart';
 import 'offline_paths.dart';
 
@@ -31,7 +31,7 @@ part 'offline_downloader.g.dart';
 /// `Dio` adapter + a temp [OfflinePaths] root.
 Future<OfflineSongEntry> downloadSong({
   required Song song,
-  required SettingsValue settings,
+  required ServerCreds settings,
   required OfflinePaths paths,
   required Dio downloadDio,
 }) async {

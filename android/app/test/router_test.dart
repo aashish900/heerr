@@ -10,7 +10,7 @@ import 'package:heerr/screens/home/home_screen.dart';
 import 'package:heerr/theme.dart';
 
 // In-memory fake for `flutter_secure_storage`. Needed because the real
-// SettingsScreen (B3) reads `settingsProvider` at build time → which hits
+// SettingsScreen (B3) reads the profile registry at build time → which hits
 // the platform channel; widget tests don't have one and hang in
 // `pumpAndSettle`.
 class _NoopStorage implements SecureStorage {

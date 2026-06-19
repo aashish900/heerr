@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:heerr/offline/library_cache.dart';
 import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/providers/secure_storage.dart';
-import 'package:heerr/providers/settings.dart';
+import 'package:heerr/providers/server_creds.dart';
 
 import '../support/cred_test_support.dart';
 
@@ -77,7 +77,7 @@ void main() {
       addTearDown(c.dispose);
 
       final LibraryCache cache = await c.read(libraryCacheProvider.future);
-      final SettingsValue settings = await c.read(settingsProvider.future);
+      final ServerCreds settings = c.read(serverCredsProvider);
 
       await cache.write(settings, 'albums', <String, dynamic>{
         'items': <Map<String, dynamic>>[
@@ -100,7 +100,7 @@ void main() {
       addTearDown(c.dispose);
 
       final LibraryCache cache = await c.read(libraryCacheProvider.future);
-      final SettingsValue settings = await c.read(settingsProvider.future);
+      final ServerCreds settings = c.read(serverCredsProvider);
       expect(await cache.read(settings, 'nope'), isNull);
     });
 
@@ -109,7 +109,7 @@ void main() {
       addTearDown(c.dispose);
 
       final LibraryCache cache = await c.read(libraryCacheProvider.future);
-      final SettingsValue settings = await c.read(settingsProvider.future);
+      final ServerCreds settings = c.read(serverCredsProvider);
 
       // Write a corrupt file directly.
       final OfflinePaths paths =
@@ -128,7 +128,7 @@ void main() {
       addTearDown(ca.dispose);
       final LibraryCache cacheA =
           await ca.read(libraryCacheProvider.future);
-      final SettingsValue sA = await ca.read(settingsProvider.future);
+      final ServerCreds sA = ca.read(serverCredsProvider);
       await cacheA.write(sA, 'albums', <String, dynamic>{'origin': 'A'});
 
       // Server B writes "albums" with different content.
@@ -136,7 +136,7 @@ void main() {
       addTearDown(cb.dispose);
       final LibraryCache cacheB =
           await cb.read(libraryCacheProvider.future);
-      final SettingsValue sB = await cb.read(settingsProvider.future);
+      final ServerCreds sB = cb.read(serverCredsProvider);
       await cacheB.write(sB, 'albums', <String, dynamic>{'origin': 'B'});
 
       // Each server reads its own data; no cross-contamination.
@@ -149,7 +149,7 @@ void main() {
       addTearDown(c.dispose);
 
       final LibraryCache cache = await c.read(libraryCacheProvider.future);
-      final SettingsValue settings = await c.read(settingsProvider.future);
+      final ServerCreds settings = c.read(serverCredsProvider);
 
       await cache.write(settings, 'k', <String, dynamic>{'a': 1});
 
@@ -172,7 +172,7 @@ void main() {
       addTearDown(c.dispose);
 
       final LibraryCache cache = await c.read(libraryCacheProvider.future);
-      final SettingsValue settings = await c.read(settingsProvider.future);
+      final ServerCreds settings = c.read(serverCredsProvider);
 
       // Should not throw.
       await cache.write(settings, 'k', <String, dynamic>{'a': 1});
@@ -204,7 +204,7 @@ void main() {
       expect(value, const _Sample(id: 'sm-1', n: 7));
 
       final LibraryCache cache = await c.read(libraryCacheProvider.future);
-      final SettingsValue settings = await c.read(settingsProvider.future);
+      final ServerCreds settings = c.read(serverCredsProvider);
       final Map<String, dynamic>? cached =
           await cache.read(settings, 'sample');
       expect(cached, isNotNull);
@@ -217,7 +217,7 @@ void main() {
       addTearDown(c.dispose);
 
       final LibraryCache cache = await c.read(libraryCacheProvider.future);
-      final SettingsValue settings = await c.read(settingsProvider.future);
+      final ServerCreds settings = c.read(serverCredsProvider);
       await cache.write(
         settings,
         'sample',
@@ -277,7 +277,7 @@ void main() {
 
       // Seed the cache as if a prior online browse populated it.
       final LibraryCache cache = await c.read(libraryCacheProvider.future);
-      final SettingsValue settings = await c.read(settingsProvider.future);
+      final ServerCreds settings = c.read(serverCredsProvider);
       await cache.write(
         settings,
         'sample',
@@ -380,7 +380,7 @@ void main() {
 
       // Cache was written by the wrapper.
       final LibraryCache cache = await c.read(libraryCacheProvider.future);
-      final SettingsValue settings = await c.read(settingsProvider.future);
+      final ServerCreds settings = c.read(serverCredsProvider);
       final Map<String, dynamic>? cached =
           await cache.read(settings, 'sample');
       expect(cached, isNotNull);

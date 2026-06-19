@@ -10,7 +10,7 @@ import '../offline/offline_settings.dart';
 import '../offline/offline_size_estimator.dart';
 import '../offline/offline_sync.dart';
 import '../providers/recommendations.dart';
-import '../providers/settings.dart';
+import '../providers/server_creds.dart';
 import '../theme.dart';
 import '../widgets/error_snackbar.dart';
 import 'settings/profiles_section.dart';
@@ -465,8 +465,7 @@ class _ClearAllActionState extends ConsumerState<_ClearAllAction> {
     try {
       final OfflinePaths paths =
           await ref.read(offlinePathsProvider.future);
-      final SettingsValue settings =
-          await ref.read(settingsProvider.future);
+      final ServerCreds settings = ref.read(serverCredsProvider);
       final Directory? serverRoot = paths.serverRoot(settings);
       if (serverRoot != null && await serverRoot.exists()) {
         await serverRoot.delete(recursive: true);

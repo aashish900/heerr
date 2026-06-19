@@ -4,23 +4,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:heerr/offline/offline_paths.dart';
-import 'package:heerr/providers/settings.dart';
+import 'package:heerr/providers/server_creds.dart';
 
-SettingsValue _settings({
+ServerCreds _settings({
   String? url,
   String? user,
   String? pass,
 }) {
   return (
-    backendBaseUrl: null,
-    bearerToken: null,
     navidromeBaseUrl: url,
     navidromeUsername: user,
     navidromePassword: pass,
-    offlineEnabled: false,
-    offlineSyncAll: false,
-    offlineWifiOnly: true,
-    offlinePollIntervalMin: 15, offlineChargingOnly: false,
   );
 }
 
@@ -87,7 +81,7 @@ void main() {
 
     test('returns null when Navidrome creds are missing', () {
       final OfflinePaths paths = OfflinePaths(docsRoot);
-      final SettingsValue s = _settings();
+      final ServerCreds s = _settings();
       expect(paths.serverRoot(s), isNull);
       expect(paths.manifestFile(s), isNull);
       expect(paths.songFile(s, 'so-1', 'mp3'), isNull);
@@ -95,7 +89,7 @@ void main() {
 
     test('serverRoot lands under <docs>/offline/<server-key>', () {
       final OfflinePaths paths = OfflinePaths(docsRoot);
-      final SettingsValue s = _settings(
+      final ServerCreds s = _settings(
         url: 'http://navi:4533',
         user: 'me',
         pass: 'pw',
@@ -112,7 +106,7 @@ void main() {
 
     test('manifestFile is <serverRoot>/manifest.json', () {
       final OfflinePaths paths = OfflinePaths(docsRoot);
-      final SettingsValue s = _settings(
+      final ServerCreds s = _settings(
         url: 'http://navi:4533',
         user: 'me',
         pass: 'pw',
@@ -126,7 +120,7 @@ void main() {
 
     test('songFile is <serverRoot>/songs/<id>.<suffix>', () {
       final OfflinePaths paths = OfflinePaths(docsRoot);
-      final SettingsValue s = _settings(
+      final ServerCreds s = _settings(
         url: 'http://navi:4533',
         user: 'me',
         pass: 'pw',
@@ -139,7 +133,7 @@ void main() {
 
     test('songFile strips a leading dot from the suffix', () {
       final OfflinePaths paths = OfflinePaths(docsRoot);
-      final SettingsValue s = _settings(
+      final ServerCreds s = _settings(
         url: 'http://navi:4533',
         user: 'me',
         pass: 'pw',

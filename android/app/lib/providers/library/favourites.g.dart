@@ -7,7 +7,7 @@ part of 'favourites.dart';
 // **************************************************************************
 
 String _$favouritesPlaylistHash() =>
-    r'ea97933f9db7dcdf6ad5c0ad2862b3fc865eab60';
+    r'1e9a00a307f6e5fd93267a73bd32ebaa3beed136';
 
 /// Locates the user's Favourites playlist by matching
 /// [kFavouritesPlaylistName] against [libraryPlaylistsProvider] for the

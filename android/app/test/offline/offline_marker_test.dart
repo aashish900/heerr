@@ -7,7 +7,7 @@ import 'package:heerr/offline/offline_manifest.dart';
 import 'package:heerr/offline/offline_marker.dart';
 import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/providers/secure_storage.dart';
-import 'package:heerr/providers/settings.dart';
+import 'package:heerr/providers/server_creds.dart';
 
 import '../support/cred_test_support.dart';
 
@@ -143,8 +143,8 @@ void main() {
       await env.container.read(offlineMarkerProvider.future);
       final OfflineManifestStore store = await env.container
           .read(offlineManifestStoreProvider.future);
-      final SettingsValue settings =
-          await env.container.read(settingsProvider.future);
+      final ServerCreds settings =
+          env.container.read(serverCredsProvider);
       await store.save(
         settings,
         OfflineManifest(

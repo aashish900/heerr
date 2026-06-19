@@ -2,7 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../models/subsonic/playlist.dart';
 import '../../models/subsonic/song.dart';
-import '../settings.dart';
+import '../server_creds.dart';
 import 'library_playlist.dart';
 import 'library_playlists.dart';
 
@@ -25,7 +25,7 @@ const String kFavouritesPlaylistName = 'Favourites';
 /// `removeSongsAtIndices` invalidation.
 @riverpod
 Future<Playlist?> favouritesPlaylist(FavouritesPlaylistRef ref) async {
-  final SettingsValue settings = await ref.watch(settingsProvider.future);
+  final ServerCreds settings = ref.watch(serverCredsProvider);
   final String? username = settings.navidromeUsername;
   if (username == null) return null;
   final List<Playlist> playlists =

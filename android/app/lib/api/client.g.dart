@@ -6,12 +6,12 @@ part of 'client.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$dioClientHash() => r'd5d4692efef4198177e5597b23a6dfec6277326e';
+String _$dioClientHash() => r'212e816b46c8224e2536d813923a2015405f8c56';
 
-/// Builds the app's `Dio` instance from the currently-loaded settings.
-/// Depends on `settingsProvider` so the dio rebuilds whenever the user
-/// saves a new backend URL or token. Returns a `Future` because settings
-/// are loaded asynchronously from secure storage.
+/// Builds the app's `Dio` instance from the active [Profile]. Depends on
+/// `activeProfileProvider` so the dio rebuilds whenever the active profile
+/// (and therefore the backend URL / bearer token) changes. Returns a
+/// `Future` so the large set of existing `.future` call sites are unchanged.
 ///
 /// Copied from [dioClient].
 @ProviderFor(dioClient)

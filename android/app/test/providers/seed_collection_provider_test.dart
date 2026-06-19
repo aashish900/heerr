@@ -9,7 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:heerr/api/subsonic_client.dart';
 import 'package:heerr/models/seed_track.dart';
 import 'package:heerr/providers/recommendations.dart';
-import 'package:heerr/providers/settings.dart';
+
+import '../support/cred_test_support.dart';
 
 // Reuses the route-by-path adapter shape from
 // test/providers/library/playlist_mutations_test.dart — kept local so this
@@ -107,21 +108,9 @@ ResponseBody _playlistDetail({
   });
 }
 
-const SettingsValue _kSettingsWithUsername = (
-  backendBaseUrl: null,
-  bearerToken: null,
-  navidromeBaseUrl: 'http://navi.test',
-  navidromeUsername: 'aashish',
-  navidromePassword: 'p',
-  offlineEnabled: false,
-  offlineSyncAll: false,
-  offlineWifiOnly: true,
-  offlinePollIntervalMin: 15, offlineChargingOnly: false,
-);
-
 ProviderContainer _container(
   _RouterAdapter adapter, {
-  SettingsValue? settings,
+  bool withUsername = false,
 }) {
   return ProviderContainer(
     overrides: <Override>[
@@ -132,17 +121,15 @@ ProviderContainer _container(
           return dio;
         },
       ),
-      if (settings != null) settingsProvider.overrideWith(() => _FakeSettings(settings)),
+      // A6: the favourites fallback reads `navidromeUsername` via
+      // `serverCredsProvider`, which derives from the active profile.
+      if (withUsername)
+        activeProfileOverride(
+          navidromeBaseUrl: 'http://navi.test',
+          navidromeUsername: 'aashish',
+        ),
     ],
   );
-}
-
-class _FakeSettings extends Settings {
-  _FakeSettings(this._value);
-  final SettingsValue _value;
-
-  @override
-  Future<SettingsValue> build() async => _value;
 }
 
 void main() {
@@ -162,7 +149,7 @@ void main() {
       },
     );
     final ProviderContainer c =
-        _container(adapter, settings: _kSettingsWithUsername);
+        _container(adapter, withUsername: true);
     addTearDown(c.dispose);
 
     await c.read(seedCollectionProvider.future);
@@ -196,7 +183,7 @@ void main() {
       },
     );
     final ProviderContainer c =
-        _container(adapter, settings: _kSettingsWithUsername);
+        _container(adapter, withUsername: true);
     addTearDown(c.dispose);
 
     final List<SeedTrack> seeds =
@@ -249,7 +236,7 @@ void main() {
       },
     );
     final ProviderContainer c =
-        _container(adapter, settings: _kSettingsWithUsername);
+        _container(adapter, withUsername: true);
     addTearDown(c.dispose);
 
     final List<SeedTrack> seeds =
@@ -273,7 +260,7 @@ void main() {
       },
     );
     final ProviderContainer c =
-        _container(adapter, settings: _kSettingsWithUsername);
+        _container(adapter, withUsername: true);
     addTearDown(c.dispose);
 
     await c.read(seedCollectionProvider.future);
@@ -293,7 +280,7 @@ void main() {
       },
     );
     final ProviderContainer c =
-        _container(adapter, settings: _kSettingsWithUsername);
+        _container(adapter, withUsername: true);
     addTearDown(c.dispose);
 
     final List<SeedTrack> seeds =

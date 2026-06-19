@@ -22,7 +22,7 @@ import 'package:heerr/providers/library/library_playlists.dart';
 import 'package:heerr/providers/prefs_storage.dart';
 import 'package:heerr/providers/profiles/active_profile.dart';
 import 'package:heerr/providers/secure_storage.dart';
-import 'package:heerr/providers/settings.dart';
+import 'package:heerr/providers/server_creds.dart';
 
 // ---------------------------------------------------------------------------
 // Stubs
@@ -208,7 +208,7 @@ Future<void> _seedMarkers(
   Set<String> albums = const <String>{},
   Set<String> playlists = const <String>{},
 }) async {
-  final SettingsValue settings = await c.read(settingsProvider.future);
+  final ServerCreds settings = c.read(serverCredsProvider);
   final OfflineManifestStore store =
       await c.read(offlineManifestStoreProvider.future);
   await store.save(

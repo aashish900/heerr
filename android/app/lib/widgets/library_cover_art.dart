@@ -9,7 +9,7 @@ import '../api/subsonic_client.dart';
 import '../offline/library_cache.dart';
 import '../offline/offline_downloader.dart';
 import '../offline/offline_paths.dart';
-import '../providers/settings.dart';
+import '../providers/server_creds.dart';
 
 /// Renders a Subsonic `coverArt` image.
 ///
@@ -66,8 +66,7 @@ class _LibraryCoverArtState extends ConsumerState<LibraryCoverArt> {
     try {
       final OfflinePaths paths =
           await ref.read(offlinePathsProvider.future);
-      final SettingsValue settings =
-          await ref.read(settingsProvider.future);
+      final ServerCreds settings = ref.read(serverCredsProvider);
       final File? file = paths.coverFile(settings, id);
       if (file == null) return;
       if (await file.exists()) {

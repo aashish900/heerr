@@ -119,8 +119,8 @@ Widget _wrap(String id, List<Override> overrides) {
   );
 }
 
-/// Variant of [_wrap] that wires an active profile so `settingsProvider`
-/// resolves [navidromeUsername] (A1: creds come from the active profile).
+/// Variant of [_wrap] that wires an active profile so `serverCredsProvider`
+/// resolves [navidromeUsername] (A1/A6: creds come from the active profile).
 /// Required for the owner-gated edit-mode tests at M2. A null [username]
 /// leaves the active profile unset → `navidromeUsername` is null → non-owner.
 Widget _wrapWithUser(
@@ -214,7 +214,7 @@ void main() {
 
   // ---------------------------------------------------------------------
   // M2: edit menu (rename / delete) — owner-gated by Playlist.owner
-  // matching SettingsValue.navidromeUsername.
+  // matching ServerCreds.navidromeUsername.
   // ---------------------------------------------------------------------
   group('edit overflow menu (M2)', () {
     setUp(_StubPlaylistMutations.reset);

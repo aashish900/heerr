@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:heerr/offline/offline_manifest.dart';
 import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/providers/secure_storage.dart';
-import 'package:heerr/providers/settings.dart';
+import 'package:heerr/providers/server_creds.dart';
 
 import '../support/cred_test_support.dart';
 
@@ -29,16 +29,10 @@ class _FakeSecureStorage implements SecureStorage {
   }
 }
 
-SettingsValue _navidromeOnly() => (
-      backendBaseUrl: null,
-      bearerToken: null,
+ServerCreds _navidromeOnly() => (
       navidromeBaseUrl: 'http://navi:4533',
       navidromeUsername: 'me',
       navidromePassword: 'pw',
-      offlineEnabled: false,
-      offlineSyncAll: false,
-      offlineWifiOnly: true,
-      offlinePollIntervalMin: 15, offlineChargingOnly: false,
     );
 
 void main() {
@@ -166,16 +160,10 @@ void main() {
     });
 
     test('save throws when Navidrome creds are missing', () async {
-      const SettingsValue noCreds = (
-        backendBaseUrl: null,
-        bearerToken: null,
+      const ServerCreds noCreds = (
         navidromeBaseUrl: null,
         navidromeUsername: null,
         navidromePassword: null,
-        offlineEnabled: false,
-        offlineSyncAll: false,
-        offlineWifiOnly: true,
-        offlinePollIntervalMin: 15, offlineChargingOnly: false,
       );
 
       expect(
@@ -222,7 +210,7 @@ void main() {
       final OfflineManifestStore store =
           await c.read(offlineManifestStoreProvider.future);
       await store.save(
-        await c.read(settingsProvider.future),
+        c.read(serverCredsProvider),
         const OfflineManifest(markedAlbums: <String>{'al-1'}),
       );
       c.invalidate(offlineManifestProvider);

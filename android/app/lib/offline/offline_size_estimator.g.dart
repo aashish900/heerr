@@ -7,7 +7,7 @@ part of 'offline_size_estimator.dart';
 // **************************************************************************
 
 String _$offlineSizeEstimateHash() =>
-    r'6aa69b4ec6e0d8c465edda39be9846f142770503';
+    r'ebb18bf31ed655d30a180e37ad72da336f32ac73';
 
 /// Walks the full library and sums `song.size` across every album. Returns
 /// `null` when there are no Navidrome creds (the Settings UI shows

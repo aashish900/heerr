@@ -7,7 +7,7 @@ import 'package:heerr/models/profile.dart';
 import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/providers/profiles/profile_registry.dart';
 import 'package:heerr/providers/secure_storage.dart';
-import 'package:heerr/providers/settings.dart';
+import 'package:heerr/providers/server_creds.dart';
 
 import '../support/cred_test_support.dart';
 
@@ -59,7 +59,7 @@ void main() {
     });
 
     test(
-        'settingsProvider reflects active profile creds — switching '
+        'serverCredsProvider reflects active profile creds — switching '
         'active profile produces a new serverKey via the existing '
         'chokepoint', () async {
       final _FakeSecureStorage fake = _FakeSecureStorage();
@@ -79,13 +79,13 @@ void main() {
 
       // No active profile yet — settings echo whatever legacy keys held
       // (nothing in this test).
-      SettingsValue v = await c.read(settingsProvider.future);
+      ServerCreds v = c.read(serverCredsProvider);
       expect(v.navidromeBaseUrl, isNull);
       expect(v.navidromeUsername, isNull);
 
       // Activate alice → settings sees alice's URL + username.
       await c.read(profileRegistryProvider.notifier).setActive(a.id);
-      v = await c.read(settingsProvider.future);
+      v = c.read(serverCredsProvider);
       expect(v.navidromeBaseUrl, a.navidromeBaseUrl);
       expect(v.navidromeUsername, a.navidromeUsername);
 
@@ -96,7 +96,7 @@ void main() {
 
       // Switch to bob → settings rebuilds with bob's identity.
       await c.read(profileRegistryProvider.notifier).setActive(b.id);
-      v = await c.read(settingsProvider.future);
+      v = c.read(serverCredsProvider);
       expect(v.navidromeBaseUrl, b.navidromeBaseUrl);
       expect(v.navidromeUsername, b.navidromeUsername);
 
@@ -133,7 +133,7 @@ void main() {
       await c.read(profileRegistryProvider.notifier).setActive(a.id);
 
       final OfflinePaths paths = await c.read(offlinePathsProvider.future);
-      SettingsValue v = await c.read(settingsProvider.future);
+      ServerCreds v = c.read(serverCredsProvider);
       final Directory? rootA = paths.serverRoot(v);
       expect(rootA, isNotNull);
 
@@ -144,7 +144,7 @@ void main() {
 
       // Switch to bob.
       await c.read(profileRegistryProvider.notifier).setActive(b.id);
-      v = await c.read(settingsProvider.future);
+      v = c.read(serverCredsProvider);
       final Directory? rootB = paths.serverRoot(v);
       expect(rootB, isNotNull);
       expect(rootB!.path, isNot(rootA.path));
@@ -154,7 +154,7 @@ void main() {
 
       // Switching back to alice → her file is still on disk.
       await c.read(profileRegistryProvider.notifier).setActive(a.id);
-      v = await c.read(settingsProvider.future);
+      v = c.read(serverCredsProvider);
       final Directory? rootAAgain = paths.serverRoot(v);
       expect(rootAAgain!.path, rootA.path);
       expect(aMarker.existsSync(), isTrue);
