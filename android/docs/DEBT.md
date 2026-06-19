@@ -28,6 +28,7 @@ Manual smokes called out as deferred in the CHANGELOG. No written log required �
 | V2 | O (home screen) | ✅ 2026-06-15 — verified on-device as part of v1.5.0 smoke. |
 | V3 | P (v1.5.0 polish) | ✅ 2026-06-15 — P1/P2/P3 all passed; bug fixes for nav reset + LRCLib fallback also verified. `v1.5.0` tagged. |
 | V4 | Q (v2.0.0 background sync) | ✅ 2026-06-16 — mark album → background → worker fires → downloads complete; WiFi-off gate skips worker; charging-only toggle gates correctly. `v2.0.0` tagged. |
+| V5 | A1/A4/A5 credential + offline-prefs band (v3.1.1) | ⏳ Pending — on-device smoke not yet run. Checklist: upgrade from v3.0.0 (silent re-login + offline prefs survive); no Servers tile/route; profile add/switch/remove; auth-error redirects to `/login`; fresh-install defaults. See `SMOKE-TEST.md` (now deleted) for the full checklist. |
 
 ---
 
