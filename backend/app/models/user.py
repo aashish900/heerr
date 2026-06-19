@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -31,6 +31,13 @@ class User(Base):
     )
     last_login_at: Mapped[datetime | None] = mapped_column(
         sa.TIMESTAMP(timezone=True), nullable=True
+    )
+    # Per-user recommendation config (lastfm_username, listenbrainz_token, ...).
+    # Always an object — NOT NULL with a '{}' server default (migration 0011).
+    settings: Mapped[dict[str, Any]] = mapped_column(
+        postgresql.JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
     )
 
     tokens: Mapped[list[Token]] = relationship(back_populates="user")

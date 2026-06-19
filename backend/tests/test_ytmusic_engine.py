@@ -253,30 +253,30 @@ async def test_non_youtube_source_url_falls_back_to_search():
 
 def test_factory_default_returns_ytmusic_engine(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("RECOMMENDATION_ENGINE", raising=False)
-    from app.services.recommenders.factory import get_recommendation_engine
+    from app.services.recommenders.factory import build_recommendation_engine
 
-    engine = get_recommendation_engine()
+    engine = build_recommendation_engine()
     assert isinstance(engine, YTMusicEngine)
 
 
 def test_factory_ytmusic_name_returns_ytmusic_engine(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("RECOMMENDATION_ENGINE", "ytmusic")
-    from app.services.recommenders.factory import get_recommendation_engine
+    from app.services.recommenders.factory import build_recommendation_engine
 
-    assert isinstance(get_recommendation_engine(), YTMusicEngine)
+    assert isinstance(build_recommendation_engine(), YTMusicEngine)
 
 
 def test_factory_empty_value_raises(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("RECOMMENDATION_ENGINE", "")
-    from app.services.recommenders.factory import get_recommendation_engine
+    from app.services.recommenders.factory import build_recommendation_engine
 
     with pytest.raises(RuntimeError, match="empty"):
-        get_recommendation_engine()
+        build_recommendation_engine()
 
 
 def test_factory_unknown_name_raises(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("RECOMMENDATION_ENGINE", "nope-engine")
-    from app.services.recommenders.factory import get_recommendation_engine
+    from app.services.recommenders.factory import build_recommendation_engine
 
     with pytest.raises(RuntimeError, match="nope-engine"):
-        get_recommendation_engine()
+        build_recommendation_engine()

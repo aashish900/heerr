@@ -256,29 +256,29 @@ def test_engine_requires_token():
 def test_factory_listenbrainz_without_token_raises(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("RECOMMENDATION_ENGINE", "listenbrainz")
     monkeypatch.delenv("LISTENBRAINZ_USER_TOKEN", raising=False)
-    from app.services.recommenders.factory import get_recommendation_engine
+    from app.services.recommenders.factory import build_recommendation_engine
 
     with pytest.raises(RuntimeError, match="LISTENBRAINZ_USER_TOKEN"):
-        get_recommendation_engine()
+        build_recommendation_engine()
 
 
 def test_factory_listenbrainz_with_token_returns_engine(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("RECOMMENDATION_ENGINE", "listenbrainz")
     monkeypatch.setenv("LISTENBRAINZ_USER_TOKEN", "abc-token")
-    from app.services.recommenders.factory import get_recommendation_engine
+    from app.services.recommenders.factory import build_recommendation_engine
 
-    engine = get_recommendation_engine()
+    engine = build_recommendation_engine()
     assert isinstance(engine, ListenBrainzEngine)
 
 
 def test_factory_listenbrainz_in_chain(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("RECOMMENDATION_ENGINE", "listenbrainz,ytmusic")
     monkeypatch.setenv("LISTENBRAINZ_USER_TOKEN", "abc-token")
-    from app.services.recommenders.factory import get_recommendation_engine
+    from app.services.recommenders.factory import build_recommendation_engine
     from app.services.recommenders.fallback_engine import FallbackEngine
     from app.services.recommenders.ytmusic_engine import YTMusicEngine
 
-    engine = get_recommendation_engine()
+    engine = build_recommendation_engine()
     assert isinstance(engine, FallbackEngine)
     types = [type(e) for e in engine.engines]
     assert types == [ListenBrainzEngine, YTMusicEngine]

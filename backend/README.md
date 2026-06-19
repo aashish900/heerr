@@ -305,6 +305,36 @@ curl http://localhost:8000/api/v1/queue \
 
 No query params in v1.
 
+#### `GET` / `PATCH /api/v1/settings` (any valid token)
+
+Per-user recommendation config (DEBT M5). Each token manages **its own** user's
+settings; there is no cross-user access. Operator-global config
+(`RECOMMENDATION_ENGINE`, `LASTFM_API_KEY`) is not exposed here — it stays in `.env`.
+
+```bash
+# read
+curl http://localhost:8000/api/v1/settings -H "Authorization: Bearer $TOKEN"
+# → { "lastfm_username": null, "listenbrainz_token_set": false }
+
+# set (partial — only the keys you send are changed)
+curl -X PATCH http://localhost:8000/api/v1/settings \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"lastfm_username":"alice","listenbrainz_token":"lb-xxxx"}'
+# → { "lastfm_username": "alice", "listenbrainz_token_set": true }
+
+# clear a key — send explicit null
+curl -X PATCH http://localhost:8000/api/v1/settings \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"lastfm_username":null}'
+```
+
+- Managed keys: `lastfm_username`, `listenbrainz_token`. The per-user value
+  overrides the matching global env var (`LASTFM_USERNAME` / `LISTENBRAINZ_USER_TOKEN`);
+  the env var is the fallback when a user has set nothing.
+- The ListenBrainz token is a **secret** — never echoed back. The read shape
+  surfaces only `listenbrainz_token_set: bool`.
+- `extra` fields → `422`.
+
 #### Admin endpoints (require `is_admin=true`)
 
 | Method | Path | Body / args | Returns |
@@ -406,6 +436,7 @@ backend/
 │   │       ├── download.py    POST /download
 │   │       ├── status.py      GET /status/{id}
 │   │       ├── queue.py       GET /queue
+│   │       ├── settings.py    GET/PATCH /settings (per-user recommendation config)
 │   │       └── admin.py       /admin/tokens + /admin/jobs/{id}/retry
 │   ├── models/                SQLAlchemy 2.x ORM (Token / Job / Download / Base)
 │   ├── schemas/               pydantic-v2 request/response models

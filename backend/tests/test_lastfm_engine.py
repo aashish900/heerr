@@ -273,19 +273,19 @@ async def test_engine_requires_api_key():
 def test_factory_lastfm_without_api_key_raises(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("RECOMMENDATION_ENGINE", "lastfm")
     monkeypatch.delenv("LASTFM_API_KEY", raising=False)
-    from app.services.recommenders.factory import get_recommendation_engine
+    from app.services.recommenders.factory import build_recommendation_engine
 
     with pytest.raises(RuntimeError, match="LASTFM_API_KEY"):
-        get_recommendation_engine()
+        build_recommendation_engine()
 
 
 def test_factory_lastfm_with_api_key_returns_engine(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("RECOMMENDATION_ENGINE", "lastfm")
     monkeypatch.setenv("LASTFM_API_KEY", "abc123")
     monkeypatch.delenv("LASTFM_USERNAME", raising=False)
-    from app.services.recommenders.factory import get_recommendation_engine
+    from app.services.recommenders.factory import build_recommendation_engine
 
-    engine = get_recommendation_engine()
+    engine = build_recommendation_engine()
     assert isinstance(engine, LastFMEngine)
 
 
@@ -293,8 +293,8 @@ def test_factory_lastfm_username_threaded_through(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setenv("RECOMMENDATION_ENGINE", "lastfm")
     monkeypatch.setenv("LASTFM_API_KEY", "abc123")
     monkeypatch.setenv("LASTFM_USERNAME", "aashish")
-    from app.services.recommenders.factory import get_recommendation_engine
+    from app.services.recommenders.factory import build_recommendation_engine
 
-    engine = get_recommendation_engine()
+    engine = build_recommendation_engine()
     assert isinstance(engine, LastFMEngine)
     assert engine._username == "aashish"

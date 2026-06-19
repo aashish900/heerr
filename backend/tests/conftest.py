@@ -13,9 +13,32 @@ from testcontainers.postgres import PostgresContainer
 from alembic import command
 from alembic.config import Config
 from app.models import Token
+from tests.migration_guard import verify_db_at_head_or_repair
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
+
+
+@pytest.fixture(autouse=True)
+def _guard_db_at_head(request, monkeypatch):
+    """T1: any test that runs `alembic downgrade` must leave the DB at head.
+
+    Wraps `alembic.command.downgrade` to detect when a test moved the schema;
+    on teardown, if a downgrade ran, asserts the DB is back at head (repairing
+    it first so a single forgetful test cannot poison the rest of the session).
+    Zero DB cost for the vast majority of tests, which never downgrade.
+    """
+    downgraded = {"flag": False}
+    real_downgrade = command.downgrade
+
+    def _tracked(*args, **kwargs):
+        downgraded["flag"] = True
+        return real_downgrade(*args, **kwargs)
+
+    monkeypatch.setattr(command, "downgrade", _tracked)
+    yield
+    if downgraded["flag"]:
+        verify_db_at_head_or_repair(request.node.nodeid)
 
 
 @pytest.fixture(scope="session")

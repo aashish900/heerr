@@ -37,7 +37,7 @@ These will mislead a future Claude session reading the bootstrap docs.
 | ~~M2~~ | ~~`tokens.owner_label` is now redundant~~ — Resolved 2026-06-18: migration 0009 drops the column. Access log key renamed `owner_label` → `username`, sourced from `tok.user.navidrome_username`. `POST /admin/tokens` request body drops `owner_label`; response and `TokenView` surface `navidrome_username` instead. CLI `create-token --owner` flag removed. Repurpose-as-device-label rejected: no consumer (C5 already done, no sessions endpoint), login contract would have to grow a `device_label` field with no Phase S client to send it, and the access log would still need a separate `username` field — doing the rename anyway. | — |
 | ~~M3~~ | ~~`downloads.source_url UNIQUE` collides with the multi-user posture.~~ Resolved 2026-06-19: migration 0010 adds `downloads.user_id` (FK→`users`, `ON DELETE RESTRICT`, backfilled from the owning job), drops the global `UNIQUE` on `source_url`, and adds composite `UNIQUE (user_id, source_url)`. Worker now writes a per-user row (`ON CONFLICT (user_id, source_url) DO NOTHING`); `_hydrate_hints` and `find_download_for_song` filter `Download.user_id` directly. **This also fixed a live bug:** the old global unique meant the 2nd+ user to download a track got their `downloads` row swallowed by `ON CONFLICT (source_url)`, so their per-user `already_downloaded` hint was permanently wrong. Pinned by `test_worker.py::test_run_job_per_user_download_rows_for_shared_url` + `test_migration_0010.py`. | — |
 | ~~M4~~ | ~~`jobs.created_by_token_id` semantics under multi-user are undocumented.~~ Resolved 2026-06-18: `tests/test_worker.py::test_run_job_completes_after_creating_token_revoked` pins the contract — revoking a token does not cancel or fail in-flight jobs it created; worker holds the job by id and does not recheck token validity. | — |
-| M5 | **No per-user recommendation engine config.** `RECOMMENDATION_ENGINE`, `LASTFM_*`, `LISTENBRAINZ_*` are global env vars. Multi-user backend = single-user recommendations. | Needs a `user_settings` table (or JSONB column on `users`) + factory rewrite. |
+| ~~M5~~ | ~~No per-user recommendation engine config.~~ Resolved 2026-06-19: migration 0011 adds `users.settings JSONB NOT NULL DEFAULT '{}'`. `GET/PATCH /settings` (scoped to `current_user`) manages per-user `lastfm_username` + `listenbrainz_token` (the ListenBrainz token is never echoed — read surfaces `listenbrainz_token_set: bool`). Factory split into pure `build_recommendation_engine(*, lastfm_username, listenbrainz_token)` + `get_recommendation_engine(user=Depends(current_user))`; per-user value overrides, falls back to the global env var when unset. `RECOMMENDATION_ENGINE` + `LASTFM_API_KEY` stay operator-global. | — |
 | M6 | **Album/playlist jobs write zero `Download` rows.** Documented decision; multi-user makes the gap worse because per-user history is the only signal. Fix requires parsing spotDL `--save-file metadata.json`, which DECISIONLOG explicitly rejected. | Revisit only if users actually report missing dedup hints for tracks inside previously-downloaded albums. |
 
 > M7, M8 moved to §7 (Deferred).
@@ -68,8 +68,8 @@ These will mislead a future Claude session reading the bootstrap docs.
 
 | # | Item | Notes |
 |---|------|-------|
-| T1 | **Order-sensitive failure modes.** `test_migration_0005` downgrade/upgrade can leave the DB at the wrong revision for downstream tests (caught + fixed once already). `test_models_match_schema` only runs at session start — a test that downgrades and forgets to upgrade silently passes the schema-match. | Session-scoped autouse fixture that asserts DB is at `head` after every test that runs `command.downgrade`. |
-| T2 | No integration test for concurrent worker invocations. Worker concurrency is exercised by a single faked runner; real-world race on the same output template / Download row insert is untested. | |
+| ~~T1~~ | ~~Order-sensitive failure modes.~~ Resolved 2026-06-19: autouse `_guard_db_at_head` fixture (`tests/conftest.py` + `tests/migration_guard.py`) wraps `alembic.command.downgrade`; after any test that downgraded, it asserts the DB is back at head, auto-repairing (`upgrade head`) before raising so one forgetful test can't poison the session. Zero DB cost for the tests that never downgrade. Pinned by `tests/test_migration_head_guard.py` (detection + trip-and-repair + silent-when-clean). | — |
+| ~~T2~~ | ~~No integration test for concurrent worker invocations.~~ Resolved 2026-06-19: `tests/test_worker_concurrency.py` runs real `asyncio.gather` races against Postgres — (1) N users / same URL → N distinct per-user `downloads` rows, none clobbered; (2) duplicate dispatch of one job runs the spotDL runner exactly once (the atomic `mark_running` UPDATE wins the race, loser bails with `InvalidStateTransition`). | — |
 | ~~T3~~ | ~~No test for stale-job recovery.~~ Resolved 2026-06-17 alongside C2: `tests/test_jobs_service.py` covers the three transitions (running→failed, untouched queued/done, dedup-slot freed after recovery) plus a lifespan-integration test. | — |
 | ~~T4~~ | ~~No regression test that "an INSERT into jobs without user_id silently picks up system-admin".~~ Resolved 2026-06-17 alongside M1: tests in `test_migration_0008.py` assert NotNullViolation for both `tokens` and `jobs` INSERTs that omit `user_id`. | |
 
@@ -79,7 +79,7 @@ These will mislead a future Claude session reading the bootstrap docs.
 
 | # | Item | Notes |
 |---|------|-------|
-| P1 | **No `backend/docs/DEBT.md`** — fixed by this file. | ✅ 2026-06-16. |
+| ~~P1~~ | ~~**No `backend/docs/DEBT.md`** — fixed by this file.~~ | ✅ 2026-06-16. |
 | ~~P2~~ | ~~PLAN.md drift (also listed as D2).~~ Resolved 2026-06-16 alongside D2. | |
 | ~~P3~~ | ~~`docker-compose.snippet.yml` doesn't explicitly call out `NAVIDROME_URL` as required.~~ Resolved 2026-06-16: header now lists `NAVIDROME_URL` (and the rest of the required vars) explicitly. | |
 
@@ -94,7 +94,7 @@ These will mislead a future Claude session reading the bootstrap docs.
 5. **M1 + T4** — add a regression test that catches missing `user_id` on INSERT, then plan the migration to drop the `system_admin_user_id()` default once Phase S ships.
 6. ~~**C6 + M8** — login + `/download` rate limiting.~~ Deferred 2026-06-18: tailnet-only family-scale app; revisit if abuse surfaces.
 7. ~~**C1 + C3 + N12 + M7** — real queue substrate.~~ C1 + M7 deferred 2026-06-18 (no new components, family-scale). C3 / N12 stay blocked on C1; revisit together.
-8. **M5** — per-user recommendation engine config. Unblocks per-user Last.fm/ListenBrainz scrobbling (already a deferred item on the Android side).
+8. ~~**M5** — per-user recommendation engine config.~~ Done 2026-06-19. Unblocks per-user Last.fm/ListenBrainz scrobbling (already a deferred item on the Android side).
 9. **Everything else** — opportunistically, as features that need them land.
 
 ---

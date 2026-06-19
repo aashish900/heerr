@@ -89,8 +89,9 @@ echo "exit=$?"
 
 Expected: `exit=0`. On a host upgrading from a pre-M3 image you should see a
 `Running upgrade 0009 -> 0010` line (adds `downloads.user_id` + per-user
-unique). On a host already at head, zero upgrade lines and a clean exit. If
-migrations fail, **stop** and inspect:
+unique) followed by `0010 -> 0011` (adds `users.settings` JSONB for the M5
+per-user recommendation config). On a host already at head, zero upgrade lines
+and a clean exit. If migrations fail, **stop** and inspect:
 
 ```bash
 docker compose logs heerr-migrate --tail=200
@@ -167,7 +168,7 @@ export SMOKE_TOKEN
 ```
 
 > **Cleanup reminder.** Revoke this token at the end of the smoke test
-> (step 12). Do not leave smoke tokens active.
+> (step 13). Do not leave smoke tokens active.
 
 ---
 
@@ -354,7 +355,64 @@ docker compose exec heerr-postgres \
 
 ---
 
-## 11. Admin smoke — listings + queue visibility
+## 11. Per-user recommendation settings (DEBT M5 regression check)
+
+Proves `GET/PATCH /api/v1/settings` is per-user, partial, and never echoes the
+ListenBrainz token. Any valid token manages **its own** user's settings — uses
+`$NAV_TOKEN` (step 7, the Navidrome user) and `$SMOKE_TOKEN` (system-admin) to
+show isolation.
+
+```bash
+# 11a. Defaults for the Navidrome user — nothing set yet.
+docker run --rm $NET $IMG -s \
+  -H "Authorization: Bearer $NAV_TOKEN" $BASE/settings ; echo
+# Expect: {"lastfm_username":null,"listenbrainz_token_set":false}
+
+# 11b. Set both keys (partial PATCH — only the keys you send change).
+docker run --rm $NET $IMG -s -w '\nhttp=%{http_code}\n' \
+  -H "Authorization: Bearer $NAV_TOKEN" \
+  -H "Content-Type: application/json" \
+  -X PATCH $BASE/settings \
+  -d '{"lastfm_username":"smoke-user","listenbrainz_token":"lb-smoke-xxxx"}'
+# Expect: HTTP 200, {"lastfm_username":"smoke-user","listenbrainz_token_set":true}
+# NOTE: the response must NOT contain the raw "listenbrainz_token" value.
+
+# 11c. Read back — persisted; token surfaces only as a bool.
+docker run --rm $NET $IMG -s \
+  -H "Authorization: Bearer $NAV_TOKEN" $BASE/settings ; echo
+# Expect: {"lastfm_username":"smoke-user","listenbrainz_token_set":true}
+
+# 11d. Per-user isolation — system-admin's settings are untouched.
+docker run --rm $NET $IMG -s \
+  -H "Authorization: Bearer $SMOKE_TOKEN" $BASE/settings ; echo
+# Expect: lastfm_username is null (system-admin set nothing in 11b).
+
+# 11e. Clear a key with an explicit null.
+docker run --rm $NET $IMG -s \
+  -H "Authorization: Bearer $NAV_TOKEN" \
+  -H "Content-Type: application/json" \
+  -X PATCH $BASE/settings -d '{"lastfm_username":null}' ; echo
+# Expect: {"lastfm_username":null,"listenbrainz_token_set":true}
+
+# 11f. Unknown field is rejected.
+docker run --rm $NET $IMG -s -o /dev/null -w '%{http_code}\n' \
+  -H "Authorization: Bearer $NAV_TOKEN" \
+  -H "Content-Type: application/json" \
+  -X PATCH $BASE/settings -d '{"nope":"x"}'
+# Expect: 422
+```
+
+Expected: 11a defaults, 11b/11c the token is stored but never echoed (only
+`listenbrainz_token_set:true`), 11d system-admin is unaffected, 11e the
+`lastfm_username` clears while the token stays set, 11f returns `422`.
+
+> Leave the Navidrome user's `listenbrainz_token` set or clear it — it only
+> affects that user's `/recommend` results. No cleanup is mandatory; to reset:
+> `PATCH $BASE/settings -d '{"listenbrainz_token":null}'`.
+
+---
+
+## 12. Admin smoke — listings + queue visibility
 
 ```bash
 docker run --rm $NET $IMG -s \
@@ -371,22 +429,22 @@ Navidrome user (created lazily on first login in step 7).
 
 ---
 
-## 12. Revoke the smoke token + clean up
+## 13. Revoke the smoke token + clean up
 
 `create-token` does not print the token id, so find it via `list-tokens`
 (the smoke admin token is the newest `system-admin` row).
 
 ```bash
-# 12a. List system-admin tokens; the smoke one is the most recent `active` row.
+# 13a. List system-admin tokens; the smoke one is the most recent `active` row.
 docker compose exec heerr-backend python -m app.cli list-tokens --user=system-admin
 # Output rows look like:
 #   <uuid> user=system-admin scopes=['download','read'] admin=True state=active created_at=...
 
-# 12b. Revoke by id (UUID from 12a).
+# 13b. Revoke by id (UUID from 13a).
 docker compose exec heerr-backend python -m app.cli revoke-token <uuid>
 # Expect: "revoked"
 
-# 12c. Confirm the next request with that token returns 401.
+# 13c. Confirm the next request with that token returns 401.
 docker run --rm $NET $IMG -s -o /dev/null -w '%{http_code}\n' \
   -H "Authorization: Bearer $SMOKE_TOKEN" $BASE/admin/users
 # Expect: 401
@@ -411,25 +469,25 @@ unset SMOKE_TOKEN NAV_TOKEN NAV_USER NAV_PASS JOB_ID YT_URL
 
 ---
 
-## 13. Rollback (only if any of 3–10 failed)
+## 14. Rollback (only if any of 3–11 failed)
 
 ```bash
 cd ~/docker/arr-stack
 
-# 13a. Pin the previous tag in compose (edit the image: line), OR pull by
+# 14a. Pin the previous tag in compose (edit the image: line), OR pull by
 #      digest captured in step 1a:
 docker pull aashish010/heerr-backend@<previous-digest>
 docker tag aashish010/heerr-backend@<previous-digest> aashish010/heerr-backend:latest
 
-# 13b. Recreate the backend + migrate containers on the old image.
+# 14b. Recreate the backend + migrate containers on the old image.
 docker compose up -d --force-recreate heerr-migrate heerr-backend
 
-# 13c. Re-run steps 4 + 7 to confirm the old image is healthy again.
+# 14c. Re-run steps 4 + 7 to confirm the old image is healthy again.
 ```
 
-> **Schema caution.** If migration 0010 ran (step 2) but the API failed
+> **Schema caution.** If migrations 0010/0011 ran (step 2) but the API failed
 > afterwards, the new schema is already in place. The old image expects the
-> pre-M3 `downloads` schema and **will not** run cleanly against it. Either
+> pre-M3/pre-M5 schema and **will not** run cleanly against it. Either
 > roll forward (fix and re-deploy the new image) or restore Postgres from
 > backup before bringing the old image up — do not run the old image against
 > the 0010 schema.
@@ -442,7 +500,7 @@ A smoke is **green** when, with no manual intervention between steps:
 
 - §0 all four prerequisite checks pass.
 - §1 a new digest is pulled.
-- §2 `heerr-migrate` exits 0 (with `0009 -> 0010` on a pre-M3 host).
+- §2 `heerr-migrate` exits 0 (with `0009 -> 0010 -> 0011` on a pre-M3 host).
 - §3 `heerr-backend` is `(healthy)` within 30 s and logs show `spotdl_version`
   plus uvicorn startup.
 - §4 `/health` + `/ready` return 200.
@@ -454,8 +512,11 @@ A smoke is **green** when, with no manual intervention between steps:
   `/data/media/music` and Navidrome indexes it within ~1 min.
 - §10 (M3) the second user sees `already_downloaded:false` → `true` across
   their own download, and the URL has exactly 2 `downloads` rows.
-- §11 all three admin listings return 200 with the expected shape.
-- §12 the smoke token is revoked and re-use returns 401.
+- §11 (M5) `/settings` round-trips per-user; the ListenBrainz token is stored
+  but never echoed (`listenbrainz_token_set:true`), system-admin is unaffected,
+  and an unknown field returns `422`.
+- §12 all three admin listings return 200 with the expected shape.
+- §13 the smoke token is revoked and re-use returns 401.
 
 If any step is red, **stop the rollout** and capture
 `docker compose logs heerr-backend --tail=500` + the failing request's

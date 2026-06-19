@@ -143,10 +143,10 @@ async def test_name_joins_engine_names():
 
 def test_factory_single_name_returns_single_engine(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("RECOMMENDATION_ENGINE", "ytmusic")
-    from app.services.recommenders.factory import get_recommendation_engine
+    from app.services.recommenders.factory import build_recommendation_engine
     from app.services.recommenders.ytmusic_engine import YTMusicEngine
 
-    engine = get_recommendation_engine()
+    engine = build_recommendation_engine()
     assert isinstance(engine, YTMusicEngine)
     assert not isinstance(engine, FallbackEngine)
 
@@ -156,11 +156,11 @@ def test_factory_two_name_chain_returns_fallback_engine(
 ):
     monkeypatch.setenv("RECOMMENDATION_ENGINE", "lastfm,ytmusic")
     monkeypatch.setenv("LASTFM_API_KEY", "abc")
-    from app.services.recommenders.factory import get_recommendation_engine
+    from app.services.recommenders.factory import build_recommendation_engine
     from app.services.recommenders.lastfm_engine import LastFMEngine
     from app.services.recommenders.ytmusic_engine import YTMusicEngine
 
-    engine = get_recommendation_engine()
+    engine = build_recommendation_engine()
     assert isinstance(engine, FallbackEngine)
     assert [type(e) for e in engine.engines] == [LastFMEngine, YTMusicEngine]
     assert engine.name == "lastfm,ytmusic"
@@ -169,24 +169,24 @@ def test_factory_two_name_chain_returns_fallback_engine(
 def test_factory_tolerates_whitespace_in_chain(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("RECOMMENDATION_ENGINE", " ytmusic , lastfm ")
     monkeypatch.setenv("LASTFM_API_KEY", "abc")
-    from app.services.recommenders.factory import get_recommendation_engine
+    from app.services.recommenders.factory import build_recommendation_engine
 
-    engine = get_recommendation_engine()
+    engine = build_recommendation_engine()
     assert isinstance(engine, FallbackEngine)
     assert [e.name for e in engine.engines] == ["ytmusic", "lastfm"]
 
 
 def test_factory_unknown_name_in_chain_raises(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("RECOMMENDATION_ENGINE", "ytmusic,nope")
-    from app.services.recommenders.factory import get_recommendation_engine
+    from app.services.recommenders.factory import build_recommendation_engine
 
     with pytest.raises(RuntimeError, match="nope"):
-        get_recommendation_engine()
+        build_recommendation_engine()
 
 
 def test_factory_only_commas_raises(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("RECOMMENDATION_ENGINE", ",,,")
-    from app.services.recommenders.factory import get_recommendation_engine
+    from app.services.recommenders.factory import build_recommendation_engine
 
     with pytest.raises(RuntimeError, match="empty"):
-        get_recommendation_engine()
+        build_recommendation_engine()
