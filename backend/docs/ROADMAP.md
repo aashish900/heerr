@@ -4,7 +4,7 @@ Track progress through the backend build. Each milestone = one git commit with a
 
 See `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file is the *how* / *when*.
 
-**Status (2026-06-18):** Phases A–H complete (17/17 milestones, A1 through H1). H1 v3.1.0-rc1 smoke passed on home server 2026-06-18. Phase I (recommendations engine, I1–I5) shipped. **Phase J (multi-user via Navidrome IdP, J1–J10) planned — not started.**
+**Status (2026-06-19):** Phases A–J complete. v3.1.0 smoke passed on home server 2026-06-19 (all sections green including e2e download, per-user isolation, recommendations, and admin listings). SMOKE-TEST.md deleted — procedure served its purpose; not retained as a living doc.
 
 **Conventions:**
 - TDD per CLAUDE.md §2 — tests written first, land in same commit as code.

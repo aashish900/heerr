@@ -830,3 +830,11 @@ All 21 checks in SMOKE-TEST.md passed. Two bugs surfaced during smoke and fixed:
 - **`backend/tests/test_worker_concurrency.py`** (new, T2) — real `asyncio.gather` races against Postgres: (1) five users / one shared URL run concurrently → five `done` jobs and five distinct per-user `downloads` rows (composite unique `(user_id, source_url)` holds under contention); (2) the same `job_id` dispatched twice concurrently runs the faked spotDL runner exactly once — the atomic `mark_running` UPDATE (`WHERE state='queued'`) lets one worker win and the other bail with `InvalidStateTransition` before phase 2. Stable across repeated runs.
 - **`backend/docs/DEBT.md`** — T1 + T2 struck through with resolution notes.
 - 397/397 tests green (+6); ruff check + format + mypy clean.
+
+## 2026-06-19 — v3.1.0 smoke passed; spotdl silent-success bug fixed; promoted to v3.1.0
+
+- **`backend/app/services/workers.py`** — song jobs where spotDL exits 0 but produces no file now raise `RuntimeError("spotdl exited 0 but produced no audio file")` → `state=failed` with a clear `error_msg`. Previously these silently landed in `done` with `output_path=null` and no log output.
+- **`backend/app/services/spotdl_runner.py`** — log spotDL's combined stdout at INFO on exit 0 (`spotdl exited 0`) and WARNING on non-zero exit (`spotdl exited non-zero`), plus the list of new files found (`spotdl new files`). Previously all spotDL output was silently discarded on success.
+- **`backend/tests/test_worker.py`** — `test_run_job_track_with_no_produced_files_marks_done` renamed to `test_run_job_track_with_no_produced_files_marks_failed`; asserts `state=failed` and `"no audio file" in error_msg`.
+- **`backend/docs/SMOKE-TEST.md`** — deleted. v3.1.0 smoke passed on home server 2026-06-19 (all sections green: image pull, migrate, health, admin-docs gate, Navidrome login, search, e2e download, per-user isolation, recommendations, admin listings, revoke). Not retained as a living doc.
+- **`backend/docs/ROADMAP.md`** — status line updated: Phases A–J complete, v3.1.0 smoke green.
