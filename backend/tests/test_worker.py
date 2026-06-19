@@ -105,10 +105,10 @@ async def test_run_job_track_happy_path_writes_download_row(
         assert dl.file_size_bytes == 12345
 
 
-async def test_run_job_track_with_no_produced_files_marks_done(
+async def test_run_job_track_with_no_produced_files_marks_failed(
     app_sm, token_id, tmp_path, cleanup_jobs
 ):
-    """spotDL can legitimately exit 0 with no new files (skip path)."""
+    """spotDL exits 0 but produces no file — treat as failure, not silent done."""
     uri = "https://www.youtube.com/watch?v=noop"
     job_id = await _seed_queued_job(app_sm, token_id, uri)
 
@@ -119,7 +119,8 @@ async def test_run_job_track_with_no_produced_files_marks_done(
 
     async with app_sm() as s:
         j = await s.get(Job, job_id)
-        assert j.state == "done"
+        assert j.state == "failed"
+        assert "no audio file" in j.error_msg
     assert await _count_downloads(app_sm, job_id) == 0
 
 

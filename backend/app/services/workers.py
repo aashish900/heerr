@@ -63,7 +63,9 @@ async def run_job(
     # Phase 3: write Download row + transition running -> done
     try:
         async with sm() as s:
-            if source_type == "song" and files:
+            if source_type == "song":
+                if not files:
+                    raise RuntimeError("spotdl exited 0 but produced no audio file")
                 first = files[0]
                 # ON CONFLICT DO NOTHING on (user_id, source_url): a row may
                 # already exist for this user (e.g. a re-run/retry of a job they

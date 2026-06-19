@@ -239,8 +239,13 @@ async def run_spotdl(source_url: str, output_dir: str | Path) -> list[Downloaded
     if proc.returncode != 0:
         exit_code = proc.returncode or -1
         cls = _classify_error(exit_code, output_text)
+        _log.warning(
+            "spotdl exited non-zero", extra={"exit_code": exit_code, "output_tail": output_text}
+        )
         raise cls(exit_code=exit_code, stderr_tail=output_text)
 
+    _log.info("spotdl exited 0", extra={"output_tail": output_text})
     after = _scan_audio_files(out_path)
     new_files = sorted(after - before)
+    _log.info("spotdl new files", extra={"new_files": [str(f) for f in new_files]})
     return [DownloadedFile(path=str(f), size_bytes=f.stat().st_size) for f in new_files]
