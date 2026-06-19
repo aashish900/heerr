@@ -286,6 +286,7 @@ async def test_recent_track_has_output_path(client, make_token, app_sm, cleanup)
             Download(
                 source_url="https://www.youtube.com/watch?v=withdl",
                 job_id=job.id,
+                user_id=sa.func.system_admin_user_id(),
                 output_path="/data/media/music/withdl.mp3",
             )
         )

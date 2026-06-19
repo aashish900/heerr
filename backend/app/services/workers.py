@@ -43,6 +43,7 @@ async def run_job(
             return
         source_url = job.source_url
         source_type = job.source_type
+        user_id = job.user_id
         try:
             await mark_running(s, job_id)
         except InvalidStateTransition:
@@ -64,10 +65,11 @@ async def run_job(
         async with sm() as s:
             if source_type == "song" and files:
                 first = files[0]
-                # ON CONFLICT DO NOTHING: another user may have already downloaded
-                # the same source_url (per-user job dedupe means we don't catch
-                # that case at /download time). The file on disk is shared via
-                # Navidrome's library, so the existing Download row is canonical.
+                # ON CONFLICT DO NOTHING on (user_id, source_url): a row may
+                # already exist for this user (e.g. a re-run/retry of a job they
+                # previously completed). Download rows are now per-user — a
+                # different user downloading the same shared file gets their own
+                # row, which keeps their per-user dedupe hints correct.
                 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
                 await s.execute(
@@ -75,10 +77,11 @@ async def run_job(
                     .values(
                         source_url=source_url,
                         job_id=job_id,
+                        user_id=user_id,
                         output_path=first.path,
                         file_size_bytes=first.size_bytes,
                     )
-                    .on_conflict_do_nothing(index_elements=[Download.source_url])
+                    .on_conflict_do_nothing(index_elements=[Download.user_id, Download.source_url])
                 )
             await mark_done(s, job_id)
             await s.commit()

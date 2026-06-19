@@ -92,6 +92,7 @@ async def _seed_download(app_sm, *, job_id, source_url, path):
             Download(
                 source_url=source_url,
                 job_id=job_id,
+                user_id=sa.func.system_admin_user_id(),
                 output_path=path,
             )
         )

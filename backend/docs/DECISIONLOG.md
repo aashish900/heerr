@@ -334,3 +334,23 @@ Sub-decisions locked across J1–J10:
 - **Keep the log key `owner_label`, source it silently from `tok.user.navidrome_username`.** Rejected: a field name that says "owner label" but holds a username lies to the operator reading the log line.
 
 **Reference:** Migration `backend/alembic/versions/0009_drop_tokens_owner_label.py`; model `backend/app/models/token.py`; schemas `backend/app/schemas/token.py`; admin endpoint `backend/app/api/v1/admin.py`; login endpoint `backend/app/api/v1/auth.py`; CLI `backend/app/cli.py`; access-log plumbing `backend/app/api/{context.py,deps.py,middleware.py}` + `backend/app/logging_config.py`. CHANGELOG entry `2026-06-18 — M2: drop tokens.owner_label`.
+
+## 2026-06-19 — Per-user `downloads` rows: denormalize `user_id`, drop global `source_url` UNIQUE (DEBT M3)
+
+**Context:** Post-Phase-J the `downloads` table was still global — one row per `source_url`, `UNIQUE` on `source_url`, and the worker inserting `ON CONFLICT (source_url) DO NOTHING`. Per-user dedupe hints were derived indirectly by joining `Download → Job` and filtering `Job.user_id`. That worked for the *first* downloader of a track but silently broke for everyone after: the 2nd user's `Download` insert hit the global unique and was swallowed, so they never got a row of their own, and their `/search` `already_downloaded` + `/download` on-disk-dedupe hints were permanently `false` even for tracks they themselves had pulled through heerr. The J-phase ADR had flagged the global constraint as "fix when per-user download metadata lands" (DEBT M3); the live hint bug made it worth doing now rather than later.
+
+**Decision:** Migration 0010 — add `downloads.user_id` (FK → `users`, `ON DELETE RESTRICT`, backfilled from the owning job), drop the global `UNIQUE (source_url)`, add composite `UNIQUE (user_id, source_url)`. The worker stamps `user_id` on each row and conflicts on `(user_id, source_url)`. Both readers (`search._hydrate_hints`, `jobs.find_download_for_song`) now filter `Download.user_id` directly instead of joining through `Job`.
+
+**Why:**
+- **Denormalize `user_id` onto `downloads` rather than keep deriving it via the `job_id → jobs.user_id` join.** A per-user uniqueness *constraint* cannot span a join — enforcing "one download row per (user, URL)" at the DB level requires the column to live on `downloads`. This matches the project's standing preference for DB-enforced invariants over service-level checks (see 2026-06-08 "Schema v1" ADR: the partial unique index is "bulletproof" vs race-prone service code). The denormalization is safe: `jobs.user_id` is `NOT NULL` and immutable, so the two never drift.
+- **Composite `(user_id, source_url)` not just dropping the unique entirely.** Without it, a user could accumulate duplicate download rows for the same URL on every re-run, and `ON CONFLICT` would have no arbiter. The composite preserves per-user idempotency while allowing different users to each own the shared on-disk file.
+- **File sharing posture is unchanged.** The physical file still lands once in the shared `MUSIC_OUTPUT_DIR`; only the bookkeeping row is now per-user. `ON CONFLICT (user_id, source_url) DO NOTHING` still absorbs a same-user re-run cleanly.
+
+**Alternatives considered:**
+- **Keep the global table; fix the hint by querying `jobs` (done jobs) instead of `downloads`.** Rejected: a `done` job with no download row is exactly the broken state; and album/playlist jobs write no download rows at all, so `downloads` (not `jobs`) must stay the dedupe source of truth for songs. Adding `user_id` to `downloads` fixes the root cause instead of papering over it.
+- **Drop the unique constraint entirely, no composite.** Rejected: loses per-user idempotency and leaves `ON CONFLICT` without a target column.
+- **Derive `user_id` via the existing join and add a per-user *partial index* expression.** Rejected: Postgres unique constraints/indexes can't reference another table; the column has to be local.
+
+**Trade-off:** `downloads` now carries a denormalized `user_id` that is always equal to its job's `user_id`. Accepted for the DB-level constraint it unlocks. The 0010 downgrade re-adds the global unique and will fail if two users already share a URL — acceptable for a break-glass revert, documented in the migration file.
+
+**Reference:** `backend/alembic/versions/0010_downloads_user_id.py`; `backend/app/models/download.py`; `backend/app/services/workers.py`; `backend/app/api/v1/search.py`; `backend/app/services/jobs.py`; `backend/app/api/v1/status.py`. Tests: `backend/tests/test_migration_0010.py`, `test_worker.py::test_run_job_per_user_download_rows_for_shared_url`. CHANGELOG entry `2026-06-19 — M3`.

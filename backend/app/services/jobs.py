@@ -40,14 +40,16 @@ async def find_download_for_song(
 ) -> Download | None:
     """Return a Download row for the URL.
 
-    When `user_id` is given, only returns a Download whose owning Job belongs
-    to that user — preserves per-user request-history isolation even though
-    the file on disk is shared across the Navidrome library.
+    When `user_id` is given, only returns this user's Download row — preserves
+    per-user request-history isolation even though the file on disk is shared
+    across the Navidrome library. Download rows are per-user (composite unique
+    on `(user_id, source_url)`), so the scoped lookup yields at most one row;
+    the unscoped path may match several users and returns an arbitrary one.
     """
     stmt = select(Download).where(Download.source_url == source_url)
     if user_id is not None:
-        stmt = stmt.join(Job, Job.id == Download.job_id).where(Job.user_id == user_id)
-    r = await session.execute(stmt)
+        stmt = stmt.where(Download.user_id == user_id)
+    r = await session.execute(stmt.limit(1))
     return r.scalar_one_or_none()
 
 

@@ -41,11 +41,9 @@ async def _hydrate_hints(
     song_urls = [it.source_url for it in items if it.source_type == "song"]
     if song_urls:
         r = await session.execute(
-            select(Download.source_url)
-            .join(Job, Job.id == Download.job_id)
-            .where(
+            select(Download.source_url).where(
                 Download.source_url.in_(song_urls),
-                Job.user_id == user_id,
+                Download.user_id == user_id,
             )
         )
         downloaded = set(r.scalars().all())

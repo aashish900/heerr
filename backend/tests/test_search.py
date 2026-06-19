@@ -136,6 +136,7 @@ async def _seed_download(app_sm, token_id, source_url: str):
             Download(
                 source_url=source_url,
                 job_id=job_id,
+                user_id=sa.func.system_admin_user_id(),
                 output_path="/data/media/music/song.mp3",
             )
         )
@@ -419,6 +420,7 @@ async def test_search_hints_scoped_to_current_user(client, app_sm, fake_ytmusic)
             Download(
                 source_url="https://www.youtube.com/watch?v=shared",
                 job_id=job_a.id,
+                user_id=ua.id,
                 output_path="/data/media/music/shared.mp3",
             )
         )

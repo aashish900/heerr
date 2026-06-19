@@ -5,7 +5,8 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import func, select, text
 
-from app.models import Download, Job, Token
+from app.models import Download, Job, Token, User
+from app.services.jobs import find_download_for_song
 from app.services.spotdl_runner import DownloadedFile, SpotdlError
 from app.services.workers import run_job
 
@@ -268,6 +269,83 @@ async def test_run_job_non_queued_job_is_noop(app_sm, token_id, tmp_path, cleanu
     async with app_sm() as s:
         j = await s.get(Job, job_id)
         assert j.state == "running"  # state unchanged
+
+
+async def test_run_job_per_user_download_rows_for_shared_url(app_sm, tmp_path):
+    """DEBT M3: two users downloading the same song each get their own Download
+    row (composite unique on (user_id, source_url)), so each user's dedupe hint
+    stays correct. Pre-M3 the second user's row was swallowed by the global
+    ON CONFLICT (source_url) DO NOTHING, leaving their hint permanently wrong.
+    """
+    url = "https://www.youtube.com/watch?v=m3-shared"
+    file_path = str(tmp_path / "shared.mp3")
+
+    async def fake_runner(source_url, output_dir):
+        return [DownloadedFile(path=file_path, size_bytes=42)]
+
+    async with app_sm() as s:
+        ua = User(navidrome_username=f"alice-{uuid.uuid4().hex[:8]}")
+        ub = User(navidrome_username=f"bob-{uuid.uuid4().hex[:8]}")
+        s.add_all([ua, ub])
+        await s.flush()
+        tok_a = Token(
+            token_hash=hashlib.sha256(f"a-{uuid.uuid4()}".encode()).hexdigest(),
+            scopes=["read", "download"],
+            user_id=ua.id,
+        )
+        tok_b = Token(
+            token_hash=hashlib.sha256(f"b-{uuid.uuid4()}".encode()).hexdigest(),
+            scopes=["read", "download"],
+            user_id=ub.id,
+        )
+        s.add_all([tok_a, tok_b])
+        await s.flush()
+        job_a = Job(
+            source_url=url,
+            source_type="song",
+            state="queued",
+            created_by_token_id=tok_a.id,
+            user_id=ua.id,
+        )
+        job_b = Job(
+            source_url=url,
+            source_type="song",
+            state="queued",
+            created_by_token_id=tok_b.id,
+            user_id=ub.id,
+        )
+        s.add_all([job_a, job_b])
+        await s.commit()
+        ua_id, ub_id = ua.id, ub.id
+        tok_a_id, tok_b_id = tok_a.id, tok_b.id
+        job_a_id, job_b_id = job_a.id, job_b.id
+
+    try:
+        await run_job(job_a_id, sm=app_sm, runner=fake_runner, output_dir=str(tmp_path))
+        await run_job(job_b_id, sm=app_sm, runner=fake_runner, output_dir=str(tmp_path))
+
+        async with app_sm() as s:
+            rows = (
+                (await s.execute(select(Download).where(Download.source_url == url)))
+                .scalars()
+                .all()
+            )
+            assert len(rows) == 2
+            assert {r.user_id for r in rows} == {ua_id, ub_id}
+
+            dl_a = await find_download_for_song(s, url, user_id=ua_id)
+            dl_b = await find_download_for_song(s, url, user_id=ub_id)
+            assert dl_a is not None and dl_a.user_id == ua_id
+            assert dl_b is not None and dl_b.user_id == ub_id
+    finally:
+        async with app_sm() as s:
+            await s.execute(text("DELETE FROM downloads"))
+            await s.execute(text("DELETE FROM jobs"))
+            for tid in (tok_a_id, tok_b_id):
+                await s.execute(text("DELETE FROM tokens WHERE id = :i"), {"i": tid})
+            for uid in (ua_id, ub_id):
+                await s.execute(text("DELETE FROM users WHERE id = :i"), {"i": uid})
+            await s.commit()
 
 
 async def test_run_job_completes_after_creating_token_revoked(

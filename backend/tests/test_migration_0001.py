@@ -81,7 +81,10 @@ def test_partial_unique_allows_after_done(db_conn, seed_token):
     )
 
 
-def test_downloads_unique_source_url(db_conn, seed_token):
+def test_downloads_unique_per_user_source_url(db_conn, seed_token):
+    # The global UNIQUE on source_url was replaced by a per-user composite
+    # UNIQUE(user_id, source_url) in migration 0010 (DEBT M3). A single user
+    # still cannot have two download rows for the same URL.
     cur = db_conn.cursor()
     cur.execute(
         "INSERT INTO jobs (source_url, source_type, state, created_by_token_id, user_id)"
@@ -90,12 +93,14 @@ def test_downloads_unique_source_url(db_conn, seed_token):
     )
     job_id = cur.fetchone()[0]
     cur.execute(
-        "INSERT INTO downloads (source_url, job_id, output_path) VALUES (%s, %s, %s)",
+        "INSERT INTO downloads (source_url, job_id, user_id, output_path) "
+        "VALUES (%s, %s, system_admin_user_id(), %s)",
         ("https://www.youtube.com/watch?v=dl", job_id, "/data/media/music/dl.mp3"),
     )
     with pytest.raises(pg_errors.UniqueViolation):
         cur.execute(
-            "INSERT INTO downloads (source_url, job_id, output_path) VALUES (%s, %s, %s)",
+            "INSERT INTO downloads (source_url, job_id, user_id, output_path) "
+            "VALUES (%s, %s, system_admin_user_id(), %s)",
             ("https://www.youtube.com/watch?v=dl", job_id, "/data/media/music/dl-dup.mp3"),
         )
 

@@ -43,7 +43,7 @@ async def get_status(
         )
     output_path: str | None = None
     if job.source_type == "song":
-        dl = await find_download_for_song(session, job.source_url)
+        dl = await find_download_for_song(session, job.source_url, user_id=job.user_id)
         if dl is not None:
             output_path = dl.output_path
     return to_view(job, output_path)

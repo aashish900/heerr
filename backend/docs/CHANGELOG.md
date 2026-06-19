@@ -793,3 +793,19 @@ All 21 checks in SMOKE-TEST.md passed. Two bugs surfaced during smoke and fixed:
 - **`backend/docs/ROADMAP.md`** — cross-cutting "Logging at every request" reminder updated to name `navidrome_username` (log key: `username`).
 - **`backend/docs/DEBT.md`** — M2 struck through with the resolution note.
 - 369/369 tests green.
+
+## 2026-06-19 — M3: per-user `downloads` rows (drop global `source_url` UNIQUE)
+
+- **`backend/alembic/versions/0010_downloads_user_id.py`** — new migration. `upgrade()`: add `downloads.user_id` (nullable) → backfill `UPDATE downloads d SET user_id = j.user_id FROM jobs j WHERE d.job_id = j.id` → `SET NOT NULL` → add FK `downloads_user_id_fkey` → users(id) `ON DELETE RESTRICT` → drop the global UNIQUE on `source_url` (discovered dynamically via `pg_constraint`, since its name `downloads_spotify_track_uri_key` predates the column rename in 0003) → add composite `UNIQUE (user_id, source_url)` (`downloads_user_source_url_key`). `downgrade()` reverses; re-adding the global unique can fail if two users share a URL (inherent break-glass hazard, noted in-file).
+- **`backend/app/models/download.py`** — `source_url` loses `unique=True`; new `user_id` column; `__table_args__` gains the user FK + composite `UniqueConstraint`.
+- **`backend/app/services/workers.py`** — `run_job` captures `job.user_id` in phase 1 and writes it on the `Download` insert; `on_conflict_do_nothing` target changed from `(source_url)` to `(user_id, source_url)`.
+- **`backend/app/api/v1/search.py`** — `_hydrate_hints` filters `Download.user_id == user_id` directly instead of joining through `Job`.
+- **`backend/app/services/jobs.py`** — `find_download_for_song` filters `Download.user_id` directly (with `.limit(1)` for the unscoped admin path, which may now match several users).
+- **`backend/app/api/v1/status.py`** — passes `user_id=job.user_id` to `find_download_for_song` so the per-user row is resolved (and the unscoped multi-match is avoided).
+- **Bug fixed:** pre-M3 the 2nd+ user to download a track had their `downloads` row absorbed by `ON CONFLICT (source_url) DO NOTHING`, so their per-user `already_downloaded` / on-disk-dedupe hints were permanently wrong. Each user now owns their own row.
+- **Tests:** new `tests/test_migration_0010.py` (NOT NULL, FK reject, same-user-violates, different-users-allowed); new `tests/test_worker.py::test_run_job_per_user_download_rows_for_shared_url`; `tests/test_migration_0001.py::test_downloads_unique_source_url` repurposed to `test_downloads_unique_per_user_source_url`; `user_id` added to every `Download(...)` seed site (`test_search`, `test_download`, `test_status`, `test_queue`, `test_jobs_service`).
+- 373/373 tests green; ruff check + format + mypy clean.
+
+## 2026-06-19 — Re-add SMOKE-TEST.md (refreshed for M3)
+
+- **`backend/docs/SMOKE-TEST.md`** — recreated (was removed 2026-06-18 after the rc2 rollout). 13-section host-side runbook from image pull → migrate → health → admin-docs gate → Navidrome login → search → e2e download → admin listings → revoke → rollback. Corrected drift vs the deleted copy: `create-token --owner` → `--user` (M2); `/auth/login` body field `username` (not `navidrome_username`) and response field `token` (not `raw_token`); `list-tokens` output is `user=`; revocation flow finds the id via `list-tokens --user=system-admin`. New §10 exercises the M3 per-user download isolation (second user's `already_downloaded` flips false→true after their own download; URL ends with exactly 2 `downloads` rows). §2 + §13 note the 0009→0010 migration and the no-going-back schema caution on rollback.

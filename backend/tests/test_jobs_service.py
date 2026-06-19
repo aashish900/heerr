@@ -443,6 +443,7 @@ async def test_find_download_for_song_returns_download(
             Download(
                 source_url="https://www.youtube.com/watch?v=find-dl",
                 job_id=job.id,
+                user_id=system_admin_user_id,
                 output_path="/data/media/music/x.mp3",
             )
         )

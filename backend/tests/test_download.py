@@ -296,6 +296,7 @@ async def test_on_disk_song_returns_synthetic_done(
             Download(
                 source_url=url,
                 job_id=job_id,
+                user_id=sa.func.system_admin_user_id(),
                 output_path="/data/media/music/on-disk.mp3",
             )
         )
