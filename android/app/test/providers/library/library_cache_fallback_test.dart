@@ -17,6 +17,8 @@ import 'package:heerr/providers/library/library_playlist.dart';
 import 'package:heerr/providers/library/library_playlists.dart';
 import 'package:heerr/providers/secure_storage.dart';
 
+import '../../support/cred_test_support.dart';
+
 /// Live-network adapter for the first read, then errors-only for the
 /// second. Provides a knob to flip "behave like offline backend" between
 /// reads so a single test exercises both the cache-write and cache-read
@@ -82,6 +84,11 @@ ProviderContainer _container({
           'navidrome_password': 'p',
         }),
       ),
+      activeProfileOverride(
+        navidromeBaseUrl: 'http://navi.test',
+        navidromeUsername: 'u',
+        navidromePassword: 'p',
+      ),
       applicationDocumentsDirectoryProvider
           .overrideWith((ApplicationDocumentsDirectoryRef ref) async => tmp),
       subsonicDioClientProvider.overrideWith(
@@ -96,6 +103,7 @@ ProviderContainer _container({
 }
 
 void main() {
+  initPrefsMock();
   late Directory tmp;
 
   setUp(() async {

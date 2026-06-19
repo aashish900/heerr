@@ -8,6 +8,8 @@ import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/providers/settings.dart';
 
+import '../support/cred_test_support.dart';
+
 class _FakeStorage implements SecureStorage {
   _FakeStorage(this._data);
   final Map<String, String> _data;
@@ -24,10 +26,21 @@ class _FakeStorage implements SecureStorage {
 }
 
 ProviderContainer _container(Directory tmp, Map<String, String> seed) {
+  // A1: creds now come from the active profile, not legacy secure keys.
+  // Derive an active-profile override from the seed (empty seed → no profile,
+  // exercising the "no creds" path).
+  final String? nUrl = seed['navidrome_base_url'];
+  final String? nUser = seed['navidrome_username'];
   return ProviderContainer(
     overrides: <Override>[
       secureStorageProvider
           .overrideWith((Ref<SecureStorage> ref) => _FakeStorage(seed)),
+      if (nUrl != null && nUser != null)
+        activeProfileOverride(
+          navidromeBaseUrl: nUrl,
+          navidromeUsername: nUser,
+          navidromePassword: seed['navidrome_password'] ?? 'p',
+        ),
       applicationDocumentsDirectoryProvider
           .overrideWith((ApplicationDocumentsDirectoryRef ref) async => tmp),
     ],
@@ -47,6 +60,7 @@ const Map<String, String> _kCredsB = <String, String>{
 };
 
 void main() {
+  initPrefsMock();
   late Directory tmp;
 
   setUp(() async {
@@ -249,6 +263,10 @@ void main() {
           secureStorageProvider.overrideWith(
             (Ref<SecureStorage> ref) => _FakeStorage(_kCredsA),
           ),
+          activeProfileOverride(
+            navidromeBaseUrl: 'http://a:4533',
+            navidromeUsername: 'u',
+          ),
           applicationDocumentsDirectoryProvider
               .overrideWith((ApplicationDocumentsDirectoryRef ref) async => tmp),
           onlineCheckProvider
@@ -293,6 +311,10 @@ void main() {
           secureStorageProvider.overrideWith(
             (Ref<SecureStorage> ref) => _FakeStorage(_kCredsA),
           ),
+          activeProfileOverride(
+            navidromeBaseUrl: 'http://a:4533',
+            navidromeUsername: 'u',
+          ),
           applicationDocumentsDirectoryProvider
               .overrideWith((ApplicationDocumentsDirectoryRef ref) async => tmp),
           onlineCheckProvider
@@ -325,6 +347,10 @@ void main() {
         overrides: <Override>[
           secureStorageProvider.overrideWith(
             (Ref<SecureStorage> ref) => _FakeStorage(_kCredsA),
+          ),
+          activeProfileOverride(
+            navidromeBaseUrl: 'http://a:4533',
+            navidromeUsername: 'u',
           ),
           applicationDocumentsDirectoryProvider
               .overrideWith((ApplicationDocumentsDirectoryRef ref) async => tmp),

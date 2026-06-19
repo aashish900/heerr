@@ -109,12 +109,13 @@ void showApiError(
       router.go(Routes.settings);
     });
   } else if (error is NavidromeAuthError) {
-    // Navidrome creds live on the Servers screen, not Settings root.
+    // A1/Phase S: Navidrome creds now live in the active Profile, re-entered
+    // via the login screen — the standalone Servers screen is gone.
     Future<void>.microtask(() {
       if (!context.mounted) return;
       final GoRouter? router = GoRouter.maybeOf(context);
       if (router == null) return;
-      router.go(Routes.servers);
+      router.go(Routes.login);
     });
   }
 }

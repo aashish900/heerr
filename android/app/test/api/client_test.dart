@@ -8,8 +8,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:heerr/api/api_error.dart';
 import 'package:heerr/api/client.dart';
+import 'package:heerr/models/profile.dart';
+import 'package:heerr/providers/profiles/profile_registry.dart';
 import 'package:heerr/providers/secure_storage.dart';
-import 'package:heerr/providers/settings.dart';
 
 // ---------------------------------------------------------------------------
 // In-process HTTP adapter — much smaller than http_mock_adapter and avoids
@@ -261,21 +262,44 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
-  // dioClientProvider end-to-end: settings → dio wired with the right
-  // baseUrl + interceptor token.
+  // dioClientProvider end-to-end: active profile → dio wired with the right
+  // baseUrl + interceptor token. A1: credentials come exclusively from the
+  // active Profile; there is no longer a settings/legacy-key path.
   // -------------------------------------------------------------------------
   group('dioClientProvider', () {
-    test('builds dio with baseUrl + token from settingsProvider', () async {
-      final _InMemoryStorage store = _InMemoryStorage(<String, String>{
-        'backend_base_url': 'http://my-tailnet:8000/api/v1',
-        'bearer_token': 'tok-xyz',
-      });
-      final ProviderContainer c = ProviderContainer(
+    ProviderContainer makeContainer(_InMemoryStorage store) {
+      return ProviderContainer(
         overrides: <Override>[
           secureStorageProvider.overrideWith((Ref<SecureStorage> ref) => store),
         ],
       );
+    }
+
+    Profile profileWith({required String baseUrl, required String token}) {
+      final DateTime t = DateTime.utc(2026, 6, 19);
+      return Profile(
+        id: 'p1',
+        displayName: 'me',
+        heerrBaseUrl: baseUrl,
+        heerrBearerToken: token,
+        navidromeBaseUrl: 'http://navi:4533',
+        navidromeUsername: 'me',
+        navidromePassword: 'pw',
+        createdAt: t,
+        lastUsedAt: t,
+      );
+    }
+
+    test('builds dio with baseUrl + token from the active profile', () async {
+      final _InMemoryStorage store = _InMemoryStorage();
+      final ProviderContainer c = makeContainer(store);
       addTearDown(c.dispose);
+
+      final ProfileRegistry reg = c.read(profileRegistryProvider.notifier);
+      await reg.addProfile(
+        profileWith(baseUrl: 'http://my-tailnet:8000/api/v1', token: 'tok-xyz'),
+      );
+      await reg.setActive('p1');
 
       final Dio dio = await c.read(dioClientProvider.future);
 
@@ -286,17 +310,16 @@ void main() {
       );
     });
 
-    test('rebuilds when settings change (new token visible in dio)', () async {
-      final _InMemoryStorage store = _InMemoryStorage(<String, String>{
-        'backend_base_url': 'http://x:8000/api/v1',
-        'bearer_token': 'first',
-      });
-      final ProviderContainer c = ProviderContainer(
-        overrides: <Override>[
-          secureStorageProvider.overrideWith((Ref<SecureStorage> ref) => store),
-        ],
-      );
+    test('rebuilds when the active profile token changes', () async {
+      final _InMemoryStorage store = _InMemoryStorage();
+      final ProviderContainer c = makeContainer(store);
       addTearDown(c.dispose);
+
+      final ProfileRegistry reg = c.read(profileRegistryProvider.notifier);
+      await reg.addProfile(
+        profileWith(baseUrl: 'http://x:8000/api/v1', token: 'first'),
+      );
+      await reg.setActive('p1');
 
       Dio dio = await c.read(dioClientProvider.future);
       expect(
@@ -304,7 +327,11 @@ void main() {
         'first',
       );
 
-      await c.read(settingsProvider.notifier).save(bearerToken: 'second');
+      // Re-add the same profile id with a rotated token — activeProfile
+      // recomputes and the dio rebuilds with the new bearer.
+      await reg.addProfile(
+        profileWith(baseUrl: 'http://x:8000/api/v1', token: 'second'),
+      );
       dio = await c.read(dioClientProvider.future);
       expect(
         dio.interceptors.whereType<BearerAuthInterceptor>().single.token,

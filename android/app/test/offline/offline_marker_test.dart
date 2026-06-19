@@ -9,6 +9,8 @@ import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/providers/settings.dart';
 
+import '../support/cred_test_support.dart';
+
 class _FakeSecureStorage implements SecureStorage {
   _FakeSecureStorage([Map<String, String>? seed])
     : _data = <String, String>{...?seed};
@@ -39,6 +41,7 @@ Future<({ProviderContainer container, Directory tmp})> _makeEnv() async {
   final ProviderContainer c = ProviderContainer(
     overrides: <Override>[
       secureStorageProvider.overrideWith((Ref<SecureStorage> ref) => fake),
+      activeProfileOverride(),
       applicationDocumentsDirectoryProvider
           .overrideWith((ApplicationDocumentsDirectoryRef ref) async => tmp),
     ],
@@ -47,6 +50,7 @@ Future<({ProviderContainer container, Directory tmp})> _makeEnv() async {
 }
 
 void main() {
+  initPrefsMock();
   group('OfflineMarker', () {
     test('markAlbum adds id to manifest.markedAlbums', () async {
       final ({ProviderContainer container, Directory tmp}) env =

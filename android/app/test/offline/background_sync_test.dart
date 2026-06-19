@@ -19,7 +19,10 @@ import 'package:heerr/offline/offline_settings.dart';
 import 'package:heerr/offline/offline_sync.dart';
 import 'package:heerr/providers/library/library_album.dart';
 import 'package:heerr/providers/library/library_albums.dart';
+import 'package:heerr/models/profile.dart';
 import 'package:heerr/providers/library/library_playlists.dart';
+import 'package:heerr/providers/prefs_storage.dart';
+import 'package:heerr/providers/profiles/active_profile.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/providers/settings.dart';
 
@@ -28,7 +31,8 @@ import 'package:heerr/providers/settings.dart';
 // surface the foreground sync is verified against).
 // ---------------------------------------------------------------------------
 
-class _FakeSecureStorage implements SecureStorage {
+// A5: offline prefs moved to plain prefs — fake backs both stores.
+class _FakeSecureStorage implements SecureStorage, PrefsStorage {
   _FakeSecureStorage(this._data);
   final Map<String, String> _data;
   @override
@@ -96,21 +100,35 @@ ProviderContainer _buildContainer({
   required _BytesAdapter adapter,
   Map<String, List<Song>> albums = const <String, List<Song>>{},
 }) {
+  // A1: Navidrome creds come from the active profile. A5: offline prefs in
+  // the (same fake) prefs store.
   final _FakeSecureStorage store = _FakeSecureStorage(<String, String>{
-    'navidrome_base_url': 'http://navi:4533',
-    'navidrome_username': 'me',
-    'navidrome_password': 'pw',
     'offline_enabled': 'true',
     'offline_sync_all': 'false',
     'offline_wifi_only': 'true',
     'offline_poll_interval_min': '15',
   });
 
+  final DateTime t = DateTime.utc(2026, 6, 19);
+  final Profile profile = Profile(
+    id: 'p1',
+    displayName: 'me',
+    heerrBaseUrl: 'http://x:8000/api/v1',
+    heerrBearerToken: 'tok',
+    navidromeBaseUrl: 'http://navi:4533',
+    navidromeUsername: 'me',
+    navidromePassword: 'pw',
+    createdAt: t,
+    lastUsedAt: t,
+  );
+
   final Dio dio = Dio()..httpClientAdapter = adapter;
 
   return ProviderContainer(
     overrides: <Override>[
       secureStorageProvider.overrideWith((Ref<SecureStorage> ref) => store),
+      prefsStorageProvider.overrideWith((Ref<PrefsStorage> ref) => store),
+      activeProfileProvider.overrideWith((Ref<Profile?> ref) => profile),
       applicationDocumentsDirectoryProvider
           .overrideWith((ApplicationDocumentsDirectoryRef ref) async => tmp),
       offlineDownloadDioProvider

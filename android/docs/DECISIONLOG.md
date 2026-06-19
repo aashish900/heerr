@@ -464,3 +464,31 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Reference:** Implementation across `android/app/lib/{models/profile.dart, providers/profiles/{profile_registry,active_profile,legacy_migration}.dart, api/{auth_login,client,subsonic_client}.dart, screens/auth/login_screen.dart, screens/settings/profiles_section.dart, providers/settings.dart, main.dart, router.dart}`. Tests under `android/app/test/{models/profile_test.dart, providers/profiles/*, api/{auth_login,profile_keyed_clients}_test.dart, screens/auth/login_screen_test.dart, screens/settings/profiles_section_test.dart, offline/profile_isolation_test.dart}`. Backend J6 (`POST /auth/login`) is a hard dependency for S5.
 
 ---
+
+## 2026-06-19 — Collapse the dual credential system + relocate offline prefs (debt A1/A4/A5)
+
+**Context:** The 2026-06-18 architectural audit (`docs/DEBT.md` §5) flagged three coupled P0 items. **A1:** after Phase S the app had *three* credential stores coexisting — the Phase-S `ProfileRegistry` (`profiles_index`), the pre-S single-set secure-storage keys (`backend_base_url`, `bearer_token`, `navidrome_*`), and the even-older `ServerProfiles` notifier (`server_profiles` blob, surfaced by the still-routed `ServersScreen`). `Settings.build` overlaid the active profile on top of the single-set keys, and the legacy `ServersScreen` dual-wrote both the blob and the single-set keys. **A4:** `Settings.build` did 10 sequential `await store.read(...)` keystore round-trips on every invalidation. **A5:** five non-secret offline-download prefs lived in EncryptedSharedPreferences alongside the actual secrets. The DEBT note assumed `ServerProfiles` was dead code; inspection showed it was still reachable via `/settings/servers` (and the `_ServersTile`, gated on `!hasActive`), making it live-but-unreachable dual-write code rather than dead code.
+
+**Decision:**
+1. **The active `Profile` is the single source of every per-server credential.** Delete `ServerProfile` / `ServerProfiles` / `ServersScreen` / the `/settings/servers` route / `_ServersTile`. `Settings.build` reads creds only from `activeProfileProvider` — no legacy single-set-key fallback. `Settings.save()` no longer accepts credential parameters (logins write via the profile registry).
+2. **Both dio providers read creds only from `activeProfileProvider`.** Drop the `active?.x ?? settings.x` dual-read in `client.dart` / `subsonic_client.dart` — it was the literal `android/CLAUDE.md` "don't read creds from settingsProvider AND activeProfileProvider in the same callsite" violation, and the fallback became dead once `settings` creds derive solely from the active profile.
+3. **Offline prefs move to plain `shared_preferences`** behind a new `PrefsStorage` abstraction (same interface as `SecureStorage`), with a one-shot idempotent `migrateOfflinePrefs` in `main.dart`. Offline fields stay *in* `SettingsValue` for now — the tuple split (A6) is deferred.
+4. **`NavidromeAuthError` redirects to `/login`** (re-auth the active profile) now that the Servers screen is gone.
+
+**Why:**
+- **One credential store removes a whole class of drift.** A new screen can no longer pick the "wrong" source; the overlay-and-mirror dance is gone. The `serverKey` chokepoint (L1) still hashes `(navidromeBaseUrl, navidromeUsername)`, which now resolve from the active profile via `SettingsValue` — so every offline/cache/now-playing path stays per-profile with zero per-callsite rewiring.
+- **A4 falls out for free:** creds come from the in-memory active profile (no read), and the five offline prefs are fetched in one `Future.wait` batch — 10 sequential keystore reads → one concurrent batch.
+- **A5:** the keystore is for secrets (bearer token, Navidrome password — both in the profile registry). User prefs paying the keystore round-trip on every read was misuse; `shared_preferences` is the right backing.
+- **DevDefaults wired into `/login`** so the dev-reinstall convenience the deleted `ServersScreen` provided isn't lost (URL + username pre-fill only; never the password).
+
+**Alternatives considered:**
+- **Keep `Settings.build`'s overlay (active-over-legacy) and just delete `ServerProfiles`.** Rejected: the legacy single-set keys would linger as a write-target nobody owns; the overlay was the drift surface A1 names. Reading creds *only* from the profile is the clean end-state.
+- **Leave offline prefs in secure storage; only fix A1/A4.** Rejected: A4's sequential-read cost is dominated by the keystore; moving the offline prefs to `shared_preferences` is what makes the batch cheap, and A5 is a one-file change once the storage seam exists.
+- **Split `SettingsValue` into separate creds / offline records now (A6).** Deferred: it touches ~15 consumers and isn't required to land A1/A4/A5. Tracked as A6.
+- **Full stateless-interceptor refactor (A3).** Deferred: this band fixes the dual-*read* hard-rule violation, but the interceptors still capture the token by value at Dio-construction (rebuild-on-profile-change). A3 remains open.
+
+**Trade-off:** `shared_preferences` is a new dependency and a new platform surface. Mitigated: it's the Flutter-team-standard prefs plugin, the migration is idempotent, and `PrefsStorage` mirrors the existing `SecureStorage` seam so tests substitute a fake the same way. Test cost was real — `settings_test` was rewritten and a shared `test/support/cred_test_support.dart` helper now backs the ~10 offline/library/screen tests that previously seeded creds via legacy keys.
+
+**Reference:** `android/app/lib/{providers/{settings,prefs_storage}.dart, api/{client,subsonic_client}.dart, screens/{settings_screen,auth/login_screen}.dart, widgets/error_snackbar.dart, router.dart, main.dart}`. Tests: `android/app/test/{providers/settings_test.dart, api/{client,subsonic_client}_test.dart, support/cred_test_support.dart, offline/*, screens/library/*, widgets/{add_to_playlist_sheet,error_snackbar}_test.dart}`. Debt items A1/A4/A5 in `docs/DEBT.md` §5.
+
+---

@@ -7,7 +7,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/profile.dart';
 import '../providers/profiles/active_profile.dart';
-import '../providers/settings.dart';
 import 'api_error.dart';
 
 part 'subsonic_client.g.dart';
@@ -155,22 +154,17 @@ String buildSubsonicStreamUrl({
       .toString();
 }
 
-/// Builds a `Dio` for Subsonic calls against the user-configured Navidrome
-/// base URL. Depends on [settingsProvider] so a saved credential change
-/// invalidates and rebuilds with the new auth.
+/// Builds a `Dio` for Subsonic calls against the active [Profile]'s
+/// Navidrome base URL. Depends on [activeProfileProvider] so a profile
+/// switch invalidates and rebuilds with the new auth.
 @riverpod
 Future<Dio> subsonicDioClient(SubsonicDioClientRef ref) async {
-  // S7: active Profile is canonical; falls back to legacy settings keys
-  // for any pre-S install where a Profile hasn't been minted yet.
+  // A1: the active Profile is the single source of Navidrome credentials.
+  // The pre-S legacy single-set keys are gone.
   final Profile? active = ref.watch(activeProfileProvider);
-  final SettingsValue settings = await ref.watch(settingsProvider.future);
-
-  final String baseUrl =
-      active?.navidromeBaseUrl ?? settings.navidromeBaseUrl ?? '';
-  final String? username =
-      active?.navidromeUsername ?? settings.navidromeUsername;
-  final String? password =
-      active?.navidromePassword ?? settings.navidromePassword;
+  final String baseUrl = active?.navidromeBaseUrl ?? '';
+  final String? username = active?.navidromeUsername;
+  final String? password = active?.navidromePassword;
 
   final Dio dio = Dio(
     BaseOptions(

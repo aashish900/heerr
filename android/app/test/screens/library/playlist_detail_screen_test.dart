@@ -13,25 +13,11 @@ import 'package:heerr/screens/library/playlist_detail_screen.dart';
 import 'package:heerr/widgets/empty_state.dart';
 import 'package:heerr/widgets/skeleton.dart';
 
+import '../../support/cred_test_support.dart';
+
 class _NoopStorage implements SecureStorage {
   @override
   Future<String?> read(String key) async => null;
-  @override
-  Future<void> write(String key, String value) async {}
-  @override
-  Future<void> delete(String key) async {}
-}
-
-/// Storage stub that hands back a fixed Navidrome username so
-/// `settingsProvider` builds with `navidromeUsername == username`. Used
-/// by the M2 owner-edit tests to flip ownership on / off without
-/// hand-overriding `settingsProvider` itself.
-class _UserStorage implements SecureStorage {
-  _UserStorage(this.username);
-  final String? username;
-  @override
-  Future<String?> read(String key) async =>
-      key == 'navidrome_username' ? username : null;
   @override
   Future<void> write(String key, String value) async {}
   @override
@@ -133,9 +119,10 @@ Widget _wrap(String id, List<Override> overrides) {
   );
 }
 
-/// Variant of [_wrap] that wires a [_UserStorage] so `settingsProvider`
-/// resolves [navidromeUsername]. Required for the owner-gated edit-mode
-/// tests at M2.
+/// Variant of [_wrap] that wires an active profile so `settingsProvider`
+/// resolves [navidromeUsername] (A1: creds come from the active profile).
+/// Required for the owner-gated edit-mode tests at M2. A null [username]
+/// leaves the active profile unset → `navidromeUsername` is null → non-owner.
 Widget _wrapWithUser(
   String id,
   List<Override> overrides, {
@@ -143,7 +130,8 @@ Widget _wrapWithUser(
 }) {
   return ProviderScope(
     overrides: <Override>[
-      secureStorageProvider.overrideWithValue(_UserStorage(username)),
+      secureStorageProvider.overrideWithValue(_NoopStorage()),
+      if (username != null) activeProfileOverride(navidromeUsername: username),
       ...overrides,
     ],
     child: MaterialApp(home: PlaylistDetailScreen(playlistId: id)),
@@ -151,6 +139,7 @@ Widget _wrapWithUser(
 }
 
 void main() {
+  initPrefsMock();
   testWidgets('loading → SkeletonList', (WidgetTester tester) async {
     await tester.pumpWidget(_wrap('pl-1', <Override>[
       _playlistValue('pl-1', const AsyncLoading<Playlist>()),

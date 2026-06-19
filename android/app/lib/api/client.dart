@@ -3,7 +3,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/profile.dart';
 import '../providers/profiles/active_profile.dart';
-import '../providers/settings.dart';
 import 'api_error.dart';
 
 part 'client.g.dart';
@@ -26,21 +25,19 @@ class BearerAuthInterceptor extends Interceptor {
   }
 }
 
-/// Builds the app's `Dio` instance from the currently-loaded settings.
-/// Depends on `settingsProvider` so the dio rebuilds whenever the user
-/// saves a new backend URL or token. Returns a `Future` because settings
-/// are loaded asynchronously from secure storage.
+/// Builds the app's `Dio` instance from the active [Profile]. Depends on
+/// `activeProfileProvider` so the dio rebuilds whenever the active profile
+/// (and therefore the backend URL / bearer token) changes. Returns a
+/// `Future` so the large set of existing `.future` call sites are unchanged.
 @riverpod
 Future<Dio> dioClient(DioClientRef ref) async {
-  // S7: the active [Profile] is the source of truth when present. Falls
-  // back to the legacy `settingsProvider` single-set keys so any pre-S
-  // install whose migration didn't fire (partial creds, see S3) still
-  // works against the existing API until the user logs in.
+  // A1: the active Profile is the single source of credentials. The pre-S
+  // legacy single-set keys are gone — `migrateLegacyCreds` (S3) runs before
+  // the first `runApp`, and a null active profile means the router redirect
+  // (S5) has already sent the user to /login.
   final Profile? active = ref.watch(activeProfileProvider);
-  final SettingsValue settings = await ref.watch(settingsProvider.future);
-
-  final String baseUrl = active?.heerrBaseUrl ?? settings.backendBaseUrl ?? '';
-  final String? token = active?.heerrBearerToken ?? settings.bearerToken;
+  final String baseUrl = active?.heerrBaseUrl ?? '';
+  final String? token = active?.heerrBearerToken;
 
   final Dio dio = Dio(
     BaseOptions(

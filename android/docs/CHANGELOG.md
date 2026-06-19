@@ -1759,3 +1759,66 @@ navidromePassword)` onto `settingsProvider`.
   - Home tab gained a tappable search bar that drops into the Library
     tab's combined-search mode via a new `librarySearchAutoFocus`
     one-shot flag.
+
+## 2026-06-19 — Architectural debt band A1 + A4 + A5 (credential/prefs cleanup)
+
+Addresses the P0 architectural-debt items A1, A4, A5 from `docs/DEBT.md`
+§5 (2026-06-18 audit). Pure-Android slice; no backend change. `flutter
+analyze` clean; `flutter test` green (567 tests).
+
+- **A1 — single credential source.**
+  - `lib/providers/settings.dart`: deleted the legacy `ServerProfile`
+    class and `ServerProfiles` notifier. `Settings.build` now sources all
+    five per-server credential fields exclusively from
+    `activeProfileProvider` — the pre-S single-set secure-storage keys
+    (`backend_base_url`, `bearer_token`, `navidrome_*`) and the
+    `server_profiles` / `active_server_name` blob are no longer read or
+    written. `save()` lost its credential parameters (the only callers
+    were the deleted `ServerProfiles` methods); it now carries offline
+    prefs only.
+  - Deleted `lib/screens/servers_screen.dart` + its test; removed the
+    `/settings/servers` route, the `Routes.servers` constant, and the
+    `_ServersTile` from `settings_screen.dart` (the Phase-S
+    `ProfilesSection` is now the sole credential surface).
+  - `lib/api/client.dart` + `lib/api/subsonic_client.dart`: both dio
+    providers now read credentials only from `activeProfileProvider`,
+    removing the `active?.x ?? settings.x` dual-read that violated the
+    `android/CLAUDE.md` "don't read creds from settingsProvider AND
+    activeProfileProvider in the same callsite" rule.
+  - `lib/widgets/error_snackbar.dart`: `NavidromeAuthError` now redirects
+    to `/login` (re-auth the profile) instead of the deleted Servers
+    screen.
+  - `lib/screens/auth/login_screen.dart`: pre-fills the base-URL +
+    Navidrome-username fields from the gitignored `DevDefaults` (the
+    consumer the deleted Servers screen used to have); the password is
+    never defaulted.
+- **A5 — offline prefs out of EncryptedSharedPreferences.**
+  - New `lib/providers/prefs_storage.dart`: `PrefsStorage` abstraction
+    (same interface as `SecureStorage`) + `SharedPrefsStorage` backed by
+    the new `shared_preferences` dependency. The five offline-download
+    prefs (`offline_enabled/sync_all/wifi_only/poll_interval_min/charging_only`)
+    now live here, not in the Android keystore.
+  - `migrateOfflinePrefs` (one-shot, idempotent) runs in `main.dart`
+    after `migrateLegacyCreds`: copies the offline keys from secure
+    storage into plain prefs, then deletes them from secure storage.
+  - `pubspec.yaml`: added `shared_preferences: ^2.2.0`.
+- **A4 — collapsed `Settings.build` sequential awaits.** With creds from
+  the in-memory active profile and offline prefs read via one
+  `Future.wait` batch, `Settings.build` drops from 10 sequential
+  `await store.read(...)` calls against the keystore to a single
+  concurrent batch.
+- **Tests.** `settings_test.dart` rewritten around the active-profile +
+  prefs split (credential reads driven via an `activeProfileProvider`
+  override; offline reads/writes via a fake implementing both storage
+  interfaces). `client_test` / `subsonic_client_test` rewired to seed
+  creds via the profile registry. New shared helper
+  `test/support/cred_test_support.dart` (`initPrefsMock()` +
+  `activeProfileOverride()` + `testProfile()`) used across the offline /
+  library / screen tests that previously seeded creds via legacy keys.
+  12 legacy-credential tests removed (ServerProfile JSON round-trips,
+  credential save/clear, Servers-entry, the whole `servers_screen_test`).
+- **Note (A3 partial):** the dual-read hard-rule violation in the dio
+  providers is fixed, but `BearerAuthInterceptor` /
+  `SubsonicAuthInterceptor` still capture the token by value at
+  Dio-construction time (rebuild-on-profile-change). The full
+  stateless-interceptor refactor (A3) is left for a follow-up.

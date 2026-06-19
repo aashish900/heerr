@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../models/recommend_health.dart';
 import '../offline/offline_manifest.dart';
@@ -10,10 +9,8 @@ import '../offline/offline_paths.dart';
 import '../offline/offline_settings.dart';
 import '../offline/offline_size_estimator.dart';
 import '../offline/offline_sync.dart';
-import '../providers/profiles/active_profile.dart';
 import '../providers/recommendations.dart';
 import '../providers/settings.dart';
-import '../router.dart';
 import '../theme.dart';
 import '../widgets/error_snackbar.dart';
 import 'settings/profiles_section.dart';
@@ -42,31 +39,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
-      body: Consumer(
-        builder: (BuildContext ctx, WidgetRef ref, _) {
-          // S-followup: hide the pre-Phase-S "Servers" tile when an
-          // active Profile exists. The Profile already carries every
-          // server credential the legacy Servers screen used to collect,
-          // so showing both surfaces is confusing — users were tapping
-          // "Servers" thinking they still had to fill in URL + token by
-          // hand after logging in. We keep the tile available for
-          // unmigrated installs (no active Profile yet) until they hit
-          // /login.
-          final bool hasActive = ref.watch(activeProfileProvider) != null;
-          return ListView(
-            children: <Widget>[
-              const ProfilesSection(),
-              const Divider(),
-              const _OfflineSection(),
-              if (!hasActive) ...<Widget>[
-                const Divider(),
-                const _ServersTile(),
-              ],
-              const Divider(),
-              const _RecommendationsSection(),
-            ],
-          );
-        },
+      // A1: the legacy "Servers" tile + screen are gone. Profiles are the
+      // single credential surface — added via /login (Phase S) and managed
+      // in ProfilesSection.
+      body: ListView(
+        children: const <Widget>[
+          ProfilesSection(),
+          Divider(),
+          _OfflineSection(),
+          Divider(),
+          _RecommendationsSection(),
+        ],
       ),
     );
   }
@@ -217,21 +200,6 @@ class _FallbackBadge extends StatelessWidget {
       backgroundColor:
           Theme.of(context).colorScheme.surfaceContainerHighest,
       visualDensity: VisualDensity.compact,
-    );
-  }
-}
-
-class _ServersTile extends StatelessWidget {
-  const _ServersTile();
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: const Icon(Icons.dns_outlined),
-      title: const Text('Servers'),
-      subtitle: const Text('Manage backend connections'),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () => context.push(Routes.servers),
     );
   }
 }

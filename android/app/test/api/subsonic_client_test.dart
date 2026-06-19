@@ -8,6 +8,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:heerr/api/api_error.dart';
 import 'package:heerr/api/subsonic_client.dart';
+import 'package:heerr/models/profile.dart';
+import 'package:heerr/providers/profiles/profile_registry.dart';
 import 'package:heerr/providers/secure_storage.dart';
 
 // ---------------------------------------------------------------------------
@@ -445,20 +447,30 @@ void main() {
   });
 
   group('subsonicDioClientProvider', () {
-    test('builds dio with navidromeBaseUrl + credentials from settings', () async {
-      final _InMemoryStorage store = _InMemoryStorage(<String, String>{
-        'backend_base_url': 'http://x:8000/api/v1',
-        'bearer_token': 'tok',
-        'navidrome_base_url': 'http://navi:4533',
-        'navidrome_username': 'me',
-        'navidrome_password': 'pw',
-      });
+    test('builds dio with navidromeBaseUrl + credentials from active profile',
+        () async {
+      final _InMemoryStorage store = _InMemoryStorage();
       final ProviderContainer c = ProviderContainer(
         overrides: <Override>[
           secureStorageProvider.overrideWith((Ref<SecureStorage> ref) => store),
         ],
       );
       addTearDown(c.dispose);
+
+      final DateTime t = DateTime.utc(2026, 6, 19);
+      final ProfileRegistry reg = c.read(profileRegistryProvider.notifier);
+      await reg.addProfile(Profile(
+        id: 'p1',
+        displayName: 'me',
+        heerrBaseUrl: 'http://x:8000/api/v1',
+        heerrBearerToken: 'tok',
+        navidromeBaseUrl: 'http://navi:4533',
+        navidromeUsername: 'me',
+        navidromePassword: 'pw',
+        createdAt: t,
+        lastUsedAt: t,
+      ));
+      await reg.setActive('p1');
 
       final Dio dio = await c.read(subsonicDioClientProvider.future);
 

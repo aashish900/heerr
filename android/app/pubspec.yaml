@@ -55,6 +55,12 @@ dependencies:
   # offline/offline_paths.dart to resolve the app-private documents dir.
   path_provider: ^2.1.0
 
+  # A5: plain (non-secret) key-value store for the offline-download
+  # preferences. These aren't secrets, so they were moved out of
+  # flutter_secure_storage / EncryptedSharedPreferences to avoid the
+  # keystore round-trip on every read. See providers/prefs_storage.dart.
+  shared_preferences: ^2.2.0
+
   # WiFi-only gate for the offline sync (L2 actually uses it; landed at L1
   # so deps churn is one commit). Permission ACCESS_NETWORK_STATE is
   # implicit on Android — no AndroidManifest edit needed.

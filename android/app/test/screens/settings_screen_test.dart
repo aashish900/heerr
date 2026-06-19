@@ -9,10 +9,10 @@ import 'package:heerr/models/recommend_health.dart';
 import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/offline/offline_settings.dart';
 import 'package:heerr/offline/offline_size_estimator.dart';
+import 'package:heerr/providers/prefs_storage.dart';
 import 'package:heerr/providers/recommendations.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/providers/settings.dart';
-import 'package:heerr/screens/servers_screen.dart';
 import 'package:heerr/screens/settings_screen.dart';
 
 /// Stub estimator that returns a fixed byte count without walking the
@@ -29,7 +29,11 @@ class _StubEstimate extends OfflineSizeEstimate {
   Future<int?> refresh() async => _bytes;
 }
 
-class _InMemoryStorage implements SecureStorage {
+// A1/A5: settings state is split across two stores — credentials in secure
+// storage (via the profile registry), offline prefs in plain prefs. This
+// fake implements both interfaces so one instance backs both providers and
+// `snapshot` stays store-agnostic. See [_storage].
+class _InMemoryStorage implements SecureStorage, PrefsStorage {
   _InMemoryStorage([Map<String, String>? seed])
     : _data = <String, String>{...?seed};
 
@@ -52,6 +56,13 @@ class _InMemoryStorage implements SecureStorage {
   }
 }
 
+/// Overrides both storage providers with one fake — secure storage (creds)
+/// and plain prefs (offline) share the same in-memory map in tests.
+List<Override> _storage(_InMemoryStorage store) => <Override>[
+      secureStorageProvider.overrideWithValue(store),
+      prefsStorageProvider.overrideWithValue(store),
+    ];
+
 Widget _wrap(
   List<Override> overrides, {
   int? estimateBytes = 0,
@@ -63,12 +74,6 @@ Widget _wrap(
       GoRoute(
         path: '/settings',
         builder: (BuildContext c, GoRouterState s) => const SettingsScreen(),
-        routes: <RouteBase>[
-          GoRoute(
-            path: 'servers',
-            builder: (BuildContext c, GoRouterState s) => const ServersScreen(),
-          ),
-        ],
       ),
     ],
   );
@@ -112,25 +117,13 @@ Future<void> _useTallSurface(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('Settings screen lists a "Servers" entry', (
-    WidgetTester tester,
-  ) async {
-    await _useTallSurface(tester);
-    final SecureStorage store = _InMemoryStorage();
-    await tester.pumpWidget(_wrap(<Override>[
-      secureStorageProvider.overrideWithValue(store),
-    ]));
-    await _pumpForBuild(tester);
-    expect(find.text('Servers'), findsOneWidget);
-  });
-
   group('Offline downloads section', () {
     testWidgets('renders master switch + sub-controls', (
       WidgetTester tester,
     ) async {
       await _useTallSurface(tester);
       await tester.pumpWidget(_wrap(<Override>[
-        secureStorageProvider.overrideWithValue(_InMemoryStorage()),
+        ..._storage(_InMemoryStorage()),
       ]));
       await _pumpForBuild(tester);
       expect(find.text('Offline downloads'), findsAtLeast(1));
@@ -146,9 +139,7 @@ void main() {
     ) async {
       await _useTallSurface(tester);
       final _InMemoryStorage store = _InMemoryStorage();
-      await tester.pumpWidget(_wrap(<Override>[
-        secureStorageProvider.overrideWithValue(store),
-      ]));
+      await tester.pumpWidget(_wrap(_storage(store)));
       await _pumpForBuild(tester);
 
       // First SwitchListTile is the master.
@@ -163,11 +154,7 @@ void main() {
     ) async {
       await _useTallSurface(tester);
       await tester.pumpWidget(_wrap(
-        <Override>[
-          secureStorageProvider.overrideWithValue(_InMemoryStorage(
-            <String, String>{'offline_enabled': 'true'},
-          )),
-        ],
+        _storage(_InMemoryStorage(<String, String>{'offline_enabled': 'true'})),
         // 2 MB so the human-readable formatting hits the MB branch.
         estimateBytes: 2 * 1024 * 1024,
       ));
@@ -196,7 +183,7 @@ void main() {
         <String, String>{'offline_enabled': 'true'},
       );
       await tester.pumpWidget(_wrap(
-        <Override>[secureStorageProvider.overrideWithValue(store)],
+        _storage(store),
         estimateBytes: 1024,
       ));
       await _pumpForBuild(tester);
@@ -218,7 +205,7 @@ void main() {
         <String, String>{'offline_enabled': 'true'},
       );
       await tester.pumpWidget(_wrap(
-        <Override>[secureStorageProvider.overrideWithValue(store)],
+        _storage(store),
         estimateBytes: 1024,
       ));
       await _pumpForBuild(tester);
@@ -240,11 +227,9 @@ void main() {
       WidgetTester tester,
     ) async {
       await _useTallSurface(tester);
-      await tester.pumpWidget(_wrap(<Override>[
-        secureStorageProvider.overrideWithValue(_InMemoryStorage(
-          <String, String>{'offline_enabled': 'true'},
-        )),
-      ]));
+      await tester.pumpWidget(_wrap(
+        _storage(_InMemoryStorage(<String, String>{'offline_enabled': 'true'})),
+      ));
       await _pumpForBuild(tester);
 
       await tester.tap(find.text('Clear all downloads'));
@@ -260,7 +245,7 @@ void main() {
     test('reads default off+wifi-on+15min from fresh storage', () async {
       final ProviderContainer c = ProviderContainer(
         overrides: <Override>[
-          secureStorageProvider.overrideWithValue(_InMemoryStorage()),
+          ..._storage(_InMemoryStorage()),
         ],
       );
       addTearDown(c.dispose);
@@ -274,9 +259,7 @@ void main() {
     test('round-trip via setEnabled persists then re-reads', () async {
       final _InMemoryStorage store = _InMemoryStorage();
       final ProviderContainer c = ProviderContainer(
-        overrides: <Override>[
-          secureStorageProvider.overrideWithValue(store),
-        ],
+        overrides: _storage(store),
       );
       addTearDown(c.dispose);
       await c.read(offlineSettingsProvider.future);
@@ -297,7 +280,7 @@ void main() {
         (WidgetTester tester) async {
       await _useTallSurface(tester);
       await tester.pumpWidget(_wrap(<Override>[
-        secureStorageProvider.overrideWithValue(_InMemoryStorage()),
+        ..._storage(_InMemoryStorage()),
         recommendHealthNotifierProvider.overrideWith(
             () => _StubHealth(const RecommendHealth(
                   engine: 'ytmusic',
@@ -319,7 +302,7 @@ void main() {
         (WidgetTester tester) async {
       await _useTallSurface(tester);
       await tester.pumpWidget(_wrap(<Override>[
-        secureStorageProvider.overrideWithValue(_InMemoryStorage()),
+        ..._storage(_InMemoryStorage()),
         recommendHealthNotifierProvider.overrideWith(
             () => _StubHealth(const RecommendHealth(
                   engine: 'lastfm',
@@ -340,7 +323,7 @@ void main() {
         (WidgetTester tester) async {
       await _useTallSurface(tester);
       await tester.pumpWidget(_wrap(<Override>[
-        secureStorageProvider.overrideWithValue(_InMemoryStorage()),
+        ..._storage(_InMemoryStorage()),
         recommendHealthNotifierProvider.overrideWith(
             () => _StubHealth(const RecommendHealth(
                   engine: 'lastfm',
@@ -359,7 +342,7 @@ void main() {
         (WidgetTester tester) async {
       await _useTallSurface(tester);
       await tester.pumpWidget(_wrap(<Override>[
-        secureStorageProvider.overrideWithValue(_InMemoryStorage()),
+        ..._storage(_InMemoryStorage()),
         recommendHealthNotifierProvider.overrideWith(
             () => _StubHealth(const RecommendHealth(
                   engine: 'lastfm',

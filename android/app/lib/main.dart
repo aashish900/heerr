@@ -10,6 +10,7 @@ import 'player/heerr_audio_handler.dart';
 import 'player/now_playing_persistence.dart';
 import 'player/player_provider.dart';
 import 'player/scrobble_provider.dart';
+import 'providers/prefs_storage.dart';
 import 'providers/profiles/legacy_migration.dart';
 import 'router.dart';
 import 'theme.dart';
@@ -43,6 +44,10 @@ Future<void> main() async {
     ],
   );
   await migrateLegacyCreds(rootContainer);
+  // A5: relocate offline-download prefs out of EncryptedSharedPreferences
+  // into plain shared_preferences. Idempotent — no-op once the keys are
+  // gone from secure storage.
+  await migrateOfflinePrefs(rootContainer);
 
   runApp(
     UncontrolledProviderScope(

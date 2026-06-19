@@ -9,6 +9,8 @@ import 'package:heerr/providers/profiles/profile_registry.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/providers/settings.dart';
 
+import '../support/cred_test_support.dart';
+
 class _FakeSecureStorage implements SecureStorage {
   final Map<String, String> _data = <String, String>{};
   @override
@@ -39,6 +41,7 @@ Profile _profile(String suffix) {
 }
 
 void main() {
+  initPrefsMock();
   group('S8 — profile isolation invariants', () {
     test('serverKey differs between two profiles', () {
       final Profile a = _profile('a');

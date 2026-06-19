@@ -5,9 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/offline/offline_settings.dart';
+import 'package:heerr/providers/prefs_storage.dart';
 import 'package:heerr/providers/secure_storage.dart';
 
-class _FakeSecureStorage implements SecureStorage {
+// A5: offline prefs moved to plain prefs. The fake implements both storage
+// interfaces so one instance backs both providers and `snapshot` assertions
+// keep working regardless of which store the offline prefs land in.
+class _FakeSecureStorage implements SecureStorage, PrefsStorage {
   _FakeSecureStorage([Map<String, String>? seed])
     : _data = <String, String>{...?seed};
 
@@ -39,6 +43,7 @@ ProviderContainer _makeContainer(_FakeSecureStorage fake) {
   return ProviderContainer(
     overrides: <Override>[
       secureStorageProvider.overrideWith((Ref<SecureStorage> ref) => fake),
+      prefsStorageProvider.overrideWith((Ref<PrefsStorage> ref) => fake),
       applicationDocumentsDirectoryProvider
           .overrideWith((ApplicationDocumentsDirectoryRef ref) async => tmp),
     ],

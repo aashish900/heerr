@@ -8,6 +8,8 @@ import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/providers/settings.dart';
 
+import '../support/cred_test_support.dart';
+
 class _FakeSecureStorage implements SecureStorage {
   final Map<String, String> _data = <String, String>{};
 
@@ -40,6 +42,7 @@ SettingsValue _navidromeOnly() => (
     );
 
 void main() {
+  initPrefsMock();
   group('OfflineManifest model', () {
     test('default constructor — empty sets + empty song map', () {
       const OfflineManifest m = OfflineManifest();
@@ -203,6 +206,7 @@ void main() {
           secureStorageProvider.overrideWith(
             (Ref<SecureStorage> ref) => fake,
           ),
+          activeProfileOverride(),
           applicationDocumentsDirectoryProvider
               .overrideWith((ApplicationDocumentsDirectoryRef ref) async => tmp),
         ],

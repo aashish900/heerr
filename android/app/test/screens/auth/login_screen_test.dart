@@ -61,6 +61,12 @@ void main() {
 
     testWidgets('empty submit shows validation messages', (tester) async {
       await _pumpLogin(tester);
+      // Clear all fields explicitly: the URL + username may be pre-filled
+      // from the gitignored DevDefaults on a dev machine, so empty them to
+      // keep this test deterministic regardless of local DevDefaults values.
+      await tester.enterText(find.byType(TextFormField).at(0), '');
+      await tester.enterText(find.byType(TextFormField).at(1), '');
+      await tester.enterText(find.byType(TextFormField).at(2), '');
       await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
       await tester.pump();
       expect(find.text('Enter the heerr base URL'), findsOneWidget);

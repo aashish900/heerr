@@ -15,6 +15,8 @@ import 'package:heerr/screens/library/album_detail_screen.dart';
 import 'package:heerr/widgets/empty_state.dart';
 import 'package:heerr/widgets/skeleton.dart';
 
+import '../../support/cred_test_support.dart';
+
 class _NoopStorage implements SecureStorage {
   @override
   Future<String?> read(String key) async => null;
@@ -86,6 +88,7 @@ Widget _wrap(String id, List<Override> overrides) {
 }
 
 void main() {
+  initPrefsMock();
   testWidgets('loading → SkeletonList', (WidgetTester tester) async {
     await tester.pumpWidget(_wrap('al-1', <Override>[
       _albumValue('al-1', const AsyncLoading<Album>()),
@@ -195,12 +198,8 @@ void main() {
             overrides: <Override>[
               // navidromeUsername = 'phone' so the seeded owned playlist
               // passes the ownership filter in the sheet.
-              secureStorageProvider.overrideWith(
-                (Ref<SecureStorage> ref) =>
-                    _StaticStorage(<String, String>{
-                  'navidrome_username': 'phone',
-                }),
-              ),
+              secureStorageProvider.overrideWithValue(_NoopStorage()),
+              activeProfileOverride(navidromeUsername: 'phone'),
               _albumValue('al-1', const AsyncData<Album>(twoSongAlbum)),
               _playlistsValue(
                 const AsyncData<List<Playlist>>(<Playlist>[owned]),
@@ -235,12 +234,8 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: <Override>[
-              secureStorageProvider.overrideWith(
-                (Ref<SecureStorage> ref) =>
-                    _StaticStorage(<String, String>{
-                  'navidrome_username': 'phone',
-                }),
-              ),
+              secureStorageProvider.overrideWithValue(_NoopStorage()),
+              activeProfileOverride(navidromeUsername: 'phone'),
               _albumValue('al-1', const AsyncData<Album>(twoSongAlbum)),
               _playlistsValue(
                 const AsyncData<List<Playlist>>(<Playlist>[owned]),
@@ -280,18 +275,3 @@ void main() {
   });
 }
 
-class _StaticStorage implements SecureStorage {
-  _StaticStorage(this._values);
-  final Map<String, String> _values;
-
-  @override
-  Future<String?> read(String key) async => _values[key];
-  @override
-  Future<void> write(String key, String value) async {
-    _values[key] = value;
-  }
-  @override
-  Future<void> delete(String key) async {
-    _values.remove(key);
-  }
-}

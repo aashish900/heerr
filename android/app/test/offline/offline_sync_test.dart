@@ -17,7 +17,10 @@ import 'package:heerr/offline/offline_sync.dart';
 import 'package:heerr/providers/library/library_album.dart';
 import 'package:heerr/providers/library/library_albums.dart';
 import 'package:heerr/providers/library/library_playlist.dart';
+import 'package:heerr/models/profile.dart';
 import 'package:heerr/providers/library/library_playlists.dart';
+import 'package:heerr/providers/prefs_storage.dart';
+import 'package:heerr/providers/profiles/active_profile.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/providers/settings.dart';
 
@@ -25,7 +28,8 @@ import 'package:heerr/providers/settings.dart';
 // Stubs
 // ---------------------------------------------------------------------------
 
-class _FakeSecureStorage implements SecureStorage {
+// A5: offline prefs moved to plain prefs — fake backs both stores.
+class _FakeSecureStorage implements SecureStorage, PrefsStorage {
   _FakeSecureStorage(this._data);
   final Map<String, String> _data;
   @override
@@ -38,6 +42,24 @@ class _FakeSecureStorage implements SecureStorage {
   Future<void> delete(String key) async {
     _data.remove(key);
   }
+}
+
+/// Active profile carrying the Navidrome creds the sync tests assume. The
+/// `(navidromeBaseUrl, navidromeUsername)` pair must stay stable so the L1
+/// serverKey (and therefore the on-disk paths) matches across runs.
+Profile _navidromeProfile() {
+  final DateTime t = DateTime.utc(2026, 6, 19);
+  return Profile(
+    id: 'p1',
+    displayName: 'me',
+    heerrBaseUrl: 'http://x:8000/api/v1',
+    heerrBearerToken: 'tok',
+    navidromeBaseUrl: 'http://navi:4533',
+    navidromeUsername: 'me',
+    navidromePassword: 'pw',
+    createdAt: t,
+    lastUsedAt: t,
+  );
 }
 
 class _FakeWifi implements WifiCheck {
@@ -124,10 +146,9 @@ _Env _buildEnv({
   List<Album>? libraryAlbumList,
   List<Playlist>? libraryPlaylistList,
 }) {
+  // A1: Navidrome creds now come from the active profile, not legacy keys.
+  // A5: offline prefs live in the (same fake) prefs store.
   final _FakeSecureStorage store = _FakeSecureStorage(<String, String>{
-    'navidrome_base_url': 'http://navi:4533',
-    'navidrome_username': 'me',
-    'navidrome_password': 'pw',
     'offline_enabled': offlineEnabled.toString(),
     'offline_sync_all': syncAll.toString(),
     'offline_wifi_only': wifiOnly.toString(),
@@ -146,6 +167,8 @@ _Env _buildEnv({
 
   final List<Override> overrides = <Override>[
     secureStorageProvider.overrideWith((Ref<SecureStorage> ref) => store),
+    prefsStorageProvider.overrideWith((Ref<PrefsStorage> ref) => store),
+    activeProfileProvider.overrideWith((Ref<Profile?> ref) => _navidromeProfile()),
     applicationDocumentsDirectoryProvider
         .overrideWith((ApplicationDocumentsDirectoryRef ref) async => tmp),
     offlineDownloadDioProvider.overrideWith(
@@ -427,6 +450,9 @@ void main() {
         overrides: <Override>[
           secureStorageProvider.overrideWith(
             (Ref<SecureStorage> ref) => store,
+          ),
+          prefsStorageProvider.overrideWith(
+            (Ref<PrefsStorage> ref) => store,
           ),
           applicationDocumentsDirectoryProvider.overrideWith(
             (ApplicationDocumentsDirectoryRef ref) async => tmp,

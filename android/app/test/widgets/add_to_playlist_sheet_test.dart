@@ -10,15 +10,13 @@ import 'package:heerr/providers/library/playlist_mutations.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/widgets/add_to_playlist_sheet.dart';
 
-/// Storage stub returning a fixed Navidrome username so `settingsProvider`
-/// resolves `navidromeUsername == username`. Used to flip ownership of
-/// the seeded playlists in / out of the M3 sheet's editable filter.
-class _UserStorage implements SecureStorage {
-  _UserStorage(this.username);
-  final String? username;
+import '../support/cred_test_support.dart';
+
+/// No-op secure storage — credentials now come from the active profile (A1),
+/// supplied via [activeProfileOverride] in [_openSheet].
+class _NoopStorage implements SecureStorage {
   @override
-  Future<String?> read(String key) async =>
-      key == 'navidrome_username' ? username : null;
+  Future<String?> read(String key) async => null;
   @override
   Future<void> write(String key, String value) async {}
   @override
@@ -99,7 +97,8 @@ Future<void> _openSheet(
   await tester.pumpWidget(
     ProviderScope(
       overrides: <Override>[
-        secureStorageProvider.overrideWithValue(_UserStorage(username)),
+        secureStorageProvider.overrideWithValue(_NoopStorage()),
+        if (username != null) activeProfileOverride(navidromeUsername: username),
         ...overrides,
       ],
       child: MaterialApp(
@@ -124,6 +123,7 @@ Future<void> _openSheet(
 }
 
 void main() {
+  initPrefsMock();
   setUp(_StubPlaylistMutations.reset);
   tearDown(_StubPlaylistMutations.reset);
 

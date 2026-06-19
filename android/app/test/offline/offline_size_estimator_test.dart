@@ -15,6 +15,8 @@ import 'package:heerr/providers/library/library_albums.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/providers/settings.dart';
 
+import '../support/cred_test_support.dart';
+
 class _FakeStorage implements SecureStorage {
   _FakeStorage(this._data);
   final Map<String, String> _data;
@@ -45,6 +47,7 @@ ProviderContainer _container({
   return ProviderContainer(
     overrides: <Override>[
       secureStorageProvider.overrideWith((Ref<SecureStorage> ref) => store),
+      activeProfileOverride(),
       applicationDocumentsDirectoryProvider
           .overrideWith((ApplicationDocumentsDirectoryRef ref) async => tmp),
       libraryAlbumsProvider.overrideWith(
@@ -60,6 +63,7 @@ ProviderContainer _container({
 }
 
 void main() {
+  initPrefsMock();
   late Directory tmp;
 
   setUp(() async {

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
 import '../../api/auth_login.dart';
+import '../../dev_defaults.dart';
 import '../../models/profile.dart';
 import '../../providers/profiles/profile_registry.dart';
 import '../../router.dart';
@@ -24,8 +25,14 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final TextEditingController _baseUrlCtrl = TextEditingController();
-  final TextEditingController _usernameCtrl = TextEditingController();
+  // Pre-fill the two non-secret fields from the gitignored DevDefaults so a
+  // dev reinstall doesn't require retyping the Tailnet URL / username. The
+  // Navidrome password is never defaulted — it's the actual secret. On a
+  // fresh clone DevDefaults values are null, so the fields stay blank.
+  final TextEditingController _baseUrlCtrl =
+      TextEditingController(text: DevDefaults.backendBaseUrl ?? '');
+  final TextEditingController _usernameCtrl =
+      TextEditingController(text: DevDefaults.navidromeUsername ?? '');
   final TextEditingController _passwordCtrl = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 

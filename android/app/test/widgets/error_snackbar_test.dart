@@ -247,8 +247,10 @@ void main() {
       // No exception thrown — test passes if we get here.
     });
 
-    testWidgets('NavidromeAuthError redirects to /settings/servers',
+    testWidgets('NavidromeAuthError redirects to /login',
         (WidgetTester tester) async {
+      // A1/Phase S: Navidrome creds live in the active profile, re-entered at
+      // /login — the standalone Servers screen is gone.
       final GoRouter router = GoRouter(
         initialLocation: '/',
         routes: <RouteBase>[
@@ -267,8 +269,8 @@ void main() {
             ),
           ),
           GoRoute(
-            path: Routes.servers,
-            builder: (_, _) => const Scaffold(body: Text('SERVERS')),
+            path: Routes.login,
+            builder: (_, _) => const Scaffold(body: Text('LOGIN')),
           ),
         ],
       );
@@ -283,7 +285,7 @@ void main() {
       await tester.pump();
       await tester.pumpAndSettle();
 
-      expect(find.text('SERVERS'), findsOneWidget);
+      expect(find.text('LOGIN'), findsOneWidget);
     });
   });
 }
