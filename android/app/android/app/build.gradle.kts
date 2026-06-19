@@ -54,6 +54,15 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+            // R8 strips WorkManager's reflectively-instantiated Room database
+            // constructor in release builds, crashing at startup. Apply the
+            // keep rules in proguard-rules.pro. See that file for detail.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
