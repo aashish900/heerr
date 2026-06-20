@@ -80,7 +80,7 @@ void main() {
       expect(item.artUri.toString(), contains('id=al-101'));
     });
 
-    test('artUri is null when coverArt is missing or empty', () {
+    test('artUri falls back to app icon when coverArt is missing or empty', () {
       const Song s1 = Song(id: 'so-1', title: 't');
       const Song s2 = Song(id: 'so-2', title: 't', coverArt: '');
       for (final Song s in <Song>[s1, s2]) {
@@ -91,7 +91,10 @@ void main() {
           navidromePassword: pass,
           saltGenerator: fixedSalt,
         );
-        expect(item.artUri, isNull);
+        expect(
+          item.artUri,
+          Uri.parse('android.resource://com.aashish.heerr/mipmap/ic_launcher'),
+        );
       }
     });
 
