@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../models/profile.dart';
 import '../providers/profiles/active_profile.dart';
 import 'api_error.dart';
+import 'interceptors.dart';
 
 part 'client.g.dart';
 
@@ -50,7 +51,12 @@ Future<Dio> dioClient(DioClientRef ref) async {
       // `validateStatus` (2xx only) is the right behaviour.
     ),
   );
+  // Order: auth header first, then retry (re-issues through the whole chain on
+  // transient 503 / network blips), then logging last so it traces the final
+  // outcome. See `interceptors.dart` for the retry/backoff policy.
   dio.interceptors.add(BearerAuthInterceptor(token));
+  dio.interceptors.add(RetryInterceptor(dio: dio));
+  dio.interceptors.add(const DebugLogInterceptor(tag: 'heerr'));
   return dio;
 }
 

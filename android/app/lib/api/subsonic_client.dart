@@ -8,6 +8,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../models/profile.dart';
 import '../providers/profiles/active_profile.dart';
 import 'api_error.dart';
+import 'interceptors.dart';
 
 part 'subsonic_client.g.dart';
 
@@ -174,12 +175,18 @@ Future<Dio> subsonicDioClient(SubsonicDioClientRef ref) async {
       receiveTimeout: const Duration(seconds: 10),
     ),
   );
+  // Order mirrors the heerr dio (see `client.dart`): auth params, then retry on
+  // transient transport failures, then debug logging last. Subsonic envelope
+  // failures arrive as HTTP 200 and are handled by `subsonicCall`, not here —
+  // the retry only fires on real transport 5xx / network errors.
   dio.interceptors.add(
     SubsonicAuthInterceptor(
       username: username,
       password: password,
     ),
   );
+  dio.interceptors.add(RetryInterceptor(dio: dio));
+  dio.interceptors.add(const DebugLogInterceptor(tag: 'subsonic'));
   return dio;
 }
 

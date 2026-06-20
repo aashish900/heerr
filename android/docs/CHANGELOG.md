@@ -1861,3 +1861,12 @@ analyze` clean; `flutter test` green (567 tests).
 - `android/SMOKE-TEST.md` deleted (per convention — one-liner in DEBT.md V6 row is the record).
 - `DEBT.md`: V6 marked ✅; resolved-bugs record updated to "confirmed".
 - Promoted: `v3.1.2-rc2` → `v3.1.2`.
+
+## 2026-06-20 — A9: retry + debug-log interceptors on both dio clients
+
+- **New `lib/api/interceptors.dart`:**
+  - `RetryInterceptor` — bounded (default 2 retries / 3 attempts), backoff-based retry for *transient* dio failures. Retries connection/send/receive timeouts + connection errors (exponential backoff, base 500ms) and HTTP 503. For 503 it honours `Retry-After` only when short (`maxRetryAfter`, default 5s); a longer rate-limit is left to surface as `RateLimitedError` so the user gets the real countdown. Re-issues via `dio.fetch` (full chain re-runs, so the auth header is re-applied); recursion bounded by an attempt counter in `RequestOptions.extra`.
+  - `DebugLogInterceptor` — request/response/error tracing gated on `kDebugMode`, via `debugPrint` (no `print`), redacts the `Authorization` header to `***`.
+- **Wired into both dio builders** in interceptor order auth → retry → log: `lib/api/client.dart` (`dioClient`, tag `heerr`) and `lib/api/subsonic_client.dart` (`subsonicDioClient`, tag `subsonic`). Subsonic envelope failures arrive as HTTP 200 and remain handled by `subsonicCall`; the retry only fires on real transport 5xx / network errors there.
+- **Tests:** new `test/api/interceptors_test.dart` (8 cases) — 503-then-200, connection-error-then-200, give-up-after-maxRetries (503 → `RateLimitedError`, network → `NetworkError`), short `Retry-After` honoured, long `Retry-After` not retried, 401 + 500 not retried; each asserts the exact attempt count. `flutter analyze` clean; full suite 566 green.
+- Satisfies the `docs/CONTEXT.md` HTTP-stack promise ("Interceptors for the auth header + retry-on-503 + logging") — previously only the auth header was implemented (DEBT §5 A9).

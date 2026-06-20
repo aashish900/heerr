@@ -517,3 +517,32 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Reference:** `android/app/lib/{providers/{server_creds}.dart (new), offline/{offline_settings,offline_paths,offline_manifest,library_cache,offline_downloader,offline_marker,offline_size_estimator,offline_sync}.dart, player/{playback_actions,now_playing_persistence}.dart, providers/library/favourites.dart, screens/{settings_screen,library/playlist_detail_screen}.dart, widgets/{add_to_playlist_sheet,library_cover_art}.dart}`; `providers/settings.dart` deleted. Tests: `test/support/cred_test_support.dart` (`testCreds()` added), `test/offline/*`, `test/providers/seed_collection_provider_test.dart`, `test/screens/{settings_screen,library/playlist_detail_screen}_test.dart`; `test/providers/settings_test.dart` deleted. Debt A6/A7 in `docs/DEBT.md` §5.
 
 ---
+
+## 2026-06-20 — Retry + debug-log dio interceptors (debt A9)
+
+**Context:** `docs/CONTEXT.md` describes the HTTP stack as "Interceptors for the auth header + retry-on-503 + logging", but only the auth header (`BearerAuthInterceptor` / `SubsonicAuthInterceptor`) was ever implemented. 503s from the heerr backend (forwarded Spotify upstream rate-limits) were mapped to `RateLimitedError` with a parsed `Retry-After` and thrown straight to the caller — every transient blip became a user-visible snackbar (DEBT §5 A9).
+
+**Decision:** Add `lib/api/interceptors.dart` with two interceptors, wired into both `dioClient` and `subsonicDioClient` in order **auth → retry → log**:
+
+1. **`RetryInterceptor`** (hand-rolled, no new dependency). Bounded to `maxRetries` (default 2 ⇒ 3 attempts), attempt count stashed in `RequestOptions.extra`. Retries:
+   - connection / send / receive timeouts + connection errors — exponential backoff `backoffBase * 2^n` (default base 500ms);
+   - HTTP 503 — honours `Retry-After` **only when ≤ `maxRetryAfter`** (default 5s); a longer wait returns `null` (give up) so the `RateLimitedError` reaches the UI with the real countdown instead of the app silently hanging. Absent `Retry-After` falls back to backoff.
+   - Everything else (401/403/404/422, other 5xx, Subsonic envelope failures) flows straight through to `mapDioErrorToApiError`.
+   Re-issues via `dio.fetch(req)` so the full interceptor chain (auth header) re-runs each attempt; recursion is bounded by the attempt counter.
+2. **`DebugLogInterceptor`** — request/response/error tracing gated on `kDebugMode`, written via `debugPrint` (CLAUDE "no `print`" rule), redacting the `Authorization` header to `***`.
+
+**Why:**
+- **Hand-rolled over `dio_smart_retry`.** The policy we need (cap on honoured `Retry-After`, give-up-to-surface-`RateLimitedError`) is bespoke; a dep would still need a custom `retryEvaluator`. The repo already prefers minimal deps (see the in-process fake adapter in `client_test.dart` vs `http_mock_adapter`).
+- **Cap-then-surface on 503.** Short rate-limits (a few seconds) are best retried silently; long ones (Spotify can say 30–60s) are better shown to the user with the existing `RateLimitedError` countdown than blocking a request for a minute. 5s is the split.
+- **Both clients.** Subsonic envelope failures are HTTP 200 (handled by `subsonicCall`), but real transport 5xx / network errors on Navidrome are just as transient as on heerr, so the same retry applies.
+
+**Alternatives considered:**
+- **`dio_smart_retry` package.** Rejected — adds a dep for behaviour we'd still have to override; the give-up-to-surface semantics don't map cleanly to its retry-everything default.
+- **dio's built-in `LogInterceptor`.** Rejected — defaults to `print` and logs the `Authorization` header verbatim. The custom one uses `debugPrint` and redacts.
+- **Retry all 5xx, not just 503.** Rejected — 500/502/504 from the backend are not the documented transient class; only 503 carries the `Retry-After` contract. Network-level errors cover the genuinely-transient transport failures.
+
+**Trade-off:** retrying covers idempotent reads and the dedup-protected `POST /download` safely, but a `POST` that the server processed before a `receiveTimeout` could be re-sent. Accepted: the backend dedupes downloads, and search/recommend are side-effect-free; the alternative (no retry) is the current snackbar-on-every-blip behaviour A9 set out to fix.
+
+**Reference:** `android/app/lib/api/interceptors.dart` (new); `lib/api/client.dart`, `lib/api/subsonic_client.dart` (wiring); `test/api/interceptors_test.dart` (8 cases). DEBT §5 A9.
+
+---
