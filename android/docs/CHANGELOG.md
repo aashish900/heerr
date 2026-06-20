@@ -1851,3 +1851,13 @@ analyze` clean; `flutter test` green (567 tests).
 - **Fix:** `android/app/android/app/proguard-rules.pro` — added `-keep class com.ryanheise.audioservice.**` and `-keep class com.ryanheise.just_audio.**`.
 - **Docs:** `SMOKE-TEST.md` — bumped to `v3.1.2-rc2`; added a "must smoke a RELEASE build" banner and made §6.8–6.10 the explicit R8 regression gate. `DEBT.md` — added V6 (pending) smoke row + a "Resolved bugs" record. Replaced a stray "User Inputs" scratch note with the proper record.
 - Regression verification deferred to the V6 on-device smoke against a release APK.
+
+## 2026-06-20 — V6 smoke passed; v3.1.2 tagged
+
+- On-device smoke (v3.1.2-rc2 release APK) passed on the Pixel 7 against the home Navidrome:
+  - Lock-screen controls and pull-down media notification present (R8 regression confirmed fixed).
+  - Offline path re-keying on profile switch correct.
+  - Offline prefs survive upgrade from v3.1.1.
+- `android/SMOKE-TEST.md` deleted (per convention — one-liner in DEBT.md V6 row is the record).
+- `DEBT.md`: V6 marked ✅; resolved-bugs record updated to "confirmed".
+- Promoted: `v3.1.2-rc2` → `v3.1.2`.

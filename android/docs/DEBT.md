@@ -29,7 +29,7 @@ Manual smokes called out as deferred in the CHANGELOG. No written log required �
 | V3 | P (v1.5.0 polish) | ✅ 2026-06-15 — P1/P2/P3 all passed; bug fixes for nav reset + LRCLib fallback also verified. `v1.5.0` tagged. |
 | V4 | Q (v2.0.0 background sync) | ✅ 2026-06-16 — mark album → background → worker fires → downloads complete; WiFi-off gate skips worker; charging-only toggle gates correctly. `v2.0.0` tagged. |
 | V5 | A1/A4/A5 credential + offline-prefs band (v3.1.1) | ✅ 2026-06-19 — on-device smoke passed. Upgrade from v3.0.0: silent re-login + offline prefs survived; no Servers tile/route; profile add/switch/remove; auth-error redirects to `/login`; fresh-install defaults. Tagged `v3.1.1`. |
-| V6 | A6 SettingsValue split + R8 media-notification fix (v3.1.2) | ⏳ PENDING — `android/SMOKE-TEST.md` (`v3.1.2-rc2`). **Must run against a RELEASE APK** (R8 on). Regression gate: lock-screen + pull-down media notification (§6.8–6.10). |
+| V6 | A6 SettingsValue split + R8 media-notification fix (v3.1.2) | ✅ 2026-06-20 — on-device smoke passed. Release APK confirmed: lock-screen + pull-down media controls present; offline path re-keying on profile switch correct; offline prefs survive upgrade from v3.1.1. Tagged `v3.1.2`. |
 
 ---
 
@@ -184,5 +184,5 @@ MediaSession + notification-builder classes — so the notification + lock-scree
 silently stopped rendering. Release-only; invisible in `flutter run` (debug skips R8).
 
 **Fix (v3.1.2-rc2):** added `-keep class com.ryanheise.audioservice.**` and
-`-keep class com.ryanheise.just_audio.**` to `proguard-rules.pro`. Verified by V6 smoke
-(§6.8–6.10) against a release APK.
+`-keep class com.ryanheise.just_audio.**` to `proguard-rules.pro`. Confirmed by V6 smoke
+(§6.8–6.10) against a release APK — lock-screen + pull-down notification restored. `v3.1.2` tagged.
