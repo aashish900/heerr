@@ -649,3 +649,24 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **Expose the resolver but keep `username`/`password`/`token` fields for tests.** Rejected — two sources of truth; tests now assert via the resolver (`tokenResolver()` etc.), which is what production uses.
 
 **Reference:** `android/app/lib/api/client.dart` (`BearerAuthInterceptor`, `dioClient` select), `android/app/lib/api/subsonic_client.dart` (`SubsonicAuthInterceptor`, `subsonicDioClient` select). Tests: `test/api/client_test.dart` (A3 group). Debt A3 in `docs/DEBT.md §5`.
+
+## 2026-06-20 — Offline-sync perf + robustness: queue worker pool, bounded fan-out, connectivity-stream trigger (debt A12/A13/A14)
+
+**Context:** The 2026-06-18 audit flagged three offline-sync (`offline/offline_sync.dart`) smells: (A12) the download worker pool shared a mutable `List` via `removeAt(0)` + reassigned `songsState` across workers — race-free only by accident of the single-threaded event loop; (A13) `_resolveTargets` fanned out artist→albums and album/playlist detail fetches fully sequentially, so a sync-all serialized every album request; (A14) the Wi-Fi gate was poll-only, so a reconnect waited out the poll interval (up to 15 min).
+
+**Decision:**
+- **A12 —** pull downloads from an explicit `Queue<Song>` (`removeFirst()`), and mutate a single `songsState` map in place instead of rebuilding it via spread per worker.
+- **A13 —** add a `_forEachBounded(items, action)` helper (shared `Queue` + `_kResolveConcurrency = 4` workers) and route all three resolution loops through it.
+- **A14 —** add `Stream<bool> get onWifiChanged` to `WifiCheck` (default: `Stream.empty()`; production maps `onConnectivityChanged`), subscribe in `build`, and fire `_tick()` on a false→true transition.
+
+**Why:**
+- **Type-enforced invariants over reasoning about interleaving (A12).** A `Queue.removeFirst()` makes "each song handed to exactly one worker" structural; the previous `List.removeAt(0)` was correct only as long as nobody inserted an `await` between the `isNotEmpty` check and the removal. In-place map mutation is atomic per assignment on the single isolate, so concurrent workers can't lose updates.
+- **Bounded, not unbounded, parallelism (A13).** A naive `Future.wait` over every album would open hundreds of sockets on a large sync-all; capping at 4 keeps the device responsive and the server happy while still removing the serial bottleneck. The same `Queue`-pull pattern as A12 keeps the dedup-by-`song.id` contract intact.
+- **Event-driven Wi-Fi (A14).** `connectivity_plus` already exposes the stream; subscribing is strictly better than polling for responsiveness. Guarding on `_paused`/`_running` and letting `_runTick` re-check every gate means the trigger is cheap and idempotent — a spurious or redundant event can't double-download or run while backgrounded. The earlier deliberate avoidance of the stream (to keep fakes simple) is resolved by giving `WifiCheck` a no-op default so existing fakes only opt in when they test A14.
+
+**Alternatives considered:**
+- **A `pool`/semaphore package for A12/A13.** Rejected — a hand-rolled `Queue` + N workers is a few lines, dependency-free, and already the established pattern in `_runTick`.
+- **Run album + playlist resolution concurrently with each other (A13).** Skipped — within-loop parallelism captures the win; cross-loop concurrency adds little and muddies the (already atomic) `out` writes.
+- **Per-request base-URL/Wi-Fi re-check only, no stream (A14).** That's the status quo this item exists to fix; polling can't beat the poll interval for latency.
+
+**Reference:** `android/app/lib/offline/offline_sync.dart` (`_runTick` Queue, `_forEachBounded`, `WifiCheck.onWifiChanged`, `_subscribeWifi`). Tests: `test/offline/offline_sync_test.dart` (A14 + existing bounded-concurrency cases). Debt A12/A13/A14 in `docs/DEBT.md §5`.

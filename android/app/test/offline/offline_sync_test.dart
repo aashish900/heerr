@@ -65,8 +65,21 @@ Profile _navidromeProfile() {
 class _FakeWifi implements WifiCheck {
   _FakeWifi(this.on);
   bool on;
+
+  // A14: broadcast so the notifier's listen() doesn't consume a single-sub
+  // stream; tests push transitions via [emit].
+  final StreamController<bool> _controller = StreamController<bool>.broadcast();
+
+  void emit(bool onWifi) {
+    on = onWifi;
+    _controller.add(onWifi);
+  }
+
   @override
   Future<bool> isOnWifi() async => on;
+
+  @override
+  Stream<bool> get onWifiChanged => _controller.stream;
 }
 
 class _CountingAdapter implements HttpClientAdapter {
@@ -415,6 +428,36 @@ void main() {
           .read(offlineSyncProvider.notifier)
           .syncNow();
       expect(r.downloadedCount, 1);
+    });
+
+    test('A14: a Wi-Fi reconnect triggers an off-schedule download tick',
+        () async {
+      final _Env env = _buildEnv(
+        tmp: tmp,
+        wifi: false,
+        albumStubs: <String, List<Song>>{
+          'al-1': <Song>[_s1],
+        },
+      );
+      addTearDown(env.container.dispose);
+
+      await env.container.read(offlineSettingsProvider.future);
+      await _seedMarkers(env.container, albums: <String>{'al-1'});
+
+      // Building the keep-alive notifier runs the first tick (no WiFi → no
+      // downloads) and subscribes to onWifiChanged.
+      await env.container.read(offlineSyncProvider.future);
+      expect(env.adapter.requests, isEmpty);
+
+      // Wi-Fi comes back — the subscription should fire an off-schedule tick
+      // without waiting for the 15-min poll.
+      env.wifi.emit(true);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(env.adapter.requests, isNotEmpty);
+      final OfflineManifest m =
+          await env.container.read(offlineManifestProvider.future);
+      expect(m.songs['so-1']?.state, OfflineSongState.ready);
     });
   });
 
