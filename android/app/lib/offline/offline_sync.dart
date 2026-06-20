@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../models/profile.dart';
 import '../models/subsonic/album.dart';
 import '../models/subsonic/artist.dart';
 import '../models/subsonic/playlist.dart';
@@ -15,6 +16,7 @@ import '../providers/library/library_albums.dart';
 import '../providers/library/library_artist.dart';
 import '../providers/library/library_playlist.dart';
 import '../providers/library/library_playlists.dart';
+import '../providers/profiles/active_profile.dart';
 import '../providers/server_creds.dart';
 import 'offline_downloader.dart';
 import 'offline_manifest.dart';
@@ -97,6 +99,21 @@ class OfflineSync extends _$OfflineSync {
       _timer?.cancel();
       _timer = null;
     });
+    // A dependency change (profile switch, settings toggle) re-runs build on
+    // the same keep-alive notifier instance, so cancel any Timer left over
+    // from the previous build before deciding whether to schedule a new one.
+    _timer?.cancel();
+    _timer = null;
+
+    // A15: gate on an active profile. On a fresh install the user lingers on
+    // /login with no creds and no per-server offline state — ticking there is
+    // wasted work (every `_runTick` would early-return 'no creds'). Watching
+    // the active profile rebuilds this provider the moment the user logs in,
+    // at which point the enabled-check + first tick run normally.
+    final Profile? active = ref.watch(activeProfileProvider);
+    if (active == null) {
+      return _kIdle;
+    }
 
     final OfflineSettingsValue settings =
         await ref.watch(offlineSettingsProvider.future);

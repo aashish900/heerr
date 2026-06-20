@@ -546,3 +546,27 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Reference:** `android/app/lib/api/interceptors.dart` (new); `lib/api/client.dart`, `lib/api/subsonic_client.dart` (wiring); `test/api/interceptors_test.dart` (8 cases). DEBT §5 A9.
 
 ---
+
+## 2026-06-20 — Reactive lifecycle: router refreshListenable + offline-sync active-profile gate (debt A2/A15)
+
+**Context:** The 2026-06-18 audit (`docs/DEBT.md §5`) flagged two reactive-correctness gaps that share a root cause — state that should react to the active profile didn't:
+- **A2:** the GoRouter S5 redirect read `profileRegistryProvider` via `container.read` with no `refreshListenable`, so it only re-evaluated on navigation events. Removing the active profile in Settings left the user on a screen rendered against a torn-down profile until the next tab tap.
+- **A15:** `OfflineSync` is `@Riverpod(keepAlive: true)` and starts its Timer inside `build`. On a fresh install the user lingers on `/login` (no creds), but the keep-alive provider had already built and was ticking (each `_runTick` early-returning `'no creds'`) with no foreground lifecycle observer mounted.
+
+**Decision:**
+1. **A2 —** `buildHeerrRouter` constructs a `_RouterRefresh extends ChangeNotifier` that subscribes to `profileRegistryProvider` via `container.listen` and `notifyListeners()` on every change, and passes it as `refreshListenable:`. GoRouter re-runs the redirect whenever the registry changes — most importantly when `activeId` goes null → `/login`.
+2. **A15 —** `OfflineSync.build` now `ref.watch(activeProfileProvider)` and returns `_kIdle` when null (no `_runTick`, no Timer). It also cancels any leftover Timer at the top of every rebuild, since a watched-dependency change re-runs `build` on the same keep-alive notifier instance and `ref.onDispose` only fires on full disposal, not on rebuild.
+
+**Why:**
+- **A2 is the canonical `refreshListenable` use case.** A `ChangeNotifier` bridge is the documented go_router pattern for "re-run redirect when external auth state changes." Lifetime is self-managing: `container.listen`'s subscription auto-closes on container dispose, and GoRouter removes its own listener on `dispose()` (called in `_HeerrAppState.dispose`), so `_RouterRefresh` needs no explicit teardown and the no-arg `buildHeerrRouter()` test path is unaffected (refresh is null without a container).
+- **A15 gates the cause, not the symptom.** `_runTick` already no-ops on `'no creds'`, but it still ran and scheduled the next Timer. Watching `activeProfileProvider` makes "logged in" the precondition for ticking, and because it's a watch, login transparently rebuilds the provider and runs the first tick — no separate "kick on login" wiring.
+
+**Alternatives considered:**
+- **A2 via a periodic redirect / polling.** Rejected — `refreshListenable` is event-driven and exact; polling is wasteful and laggy.
+- **A2 listening to `activeProfileProvider` instead of `profileRegistryProvider`.** Equivalent for the null-active case, but the redirect body already reads the registry (including its loading state), so listening to the same source keeps "what triggers re-eval" and "what the redirect reads" aligned.
+- **A15 by moving the lifecycle observer to app level (A8).** That's the broader refactor tracked separately as A8; the build-gate is the minimal fix for the wasted-ticks-on-/login symptom and is independent of where the observer lives.
+- **A15 gating inside `_runTick` only.** Already present (`'no creds'`), but it doesn't stop the Timer from being scheduled — the gate has to be in `build`.
+
+**Reference:** `android/app/lib/router.dart` (`_RouterRefresh`, `refreshListenable:`), `android/app/lib/offline/offline_sync.dart` (`build` active-profile gate + Timer cancel). Tests: `test/router_test.dart` (A2 group, `_MapStorage`), `test/offline/offline_sync_test.dart` (A15 guard). Debt A2/A15 in `docs/DEBT.md §5`.
+
+---

@@ -55,8 +55,16 @@ class Routes {
 /// profile is active, every navigation outside `/login` is rewritten to
 /// `/login`. Tests that don't exercise the redirect can omit it.
 GoRouter buildHeerrRouter({ProviderContainer? container}) {
+  // A2: without a refreshListenable the redirect only re-runs on navigation
+  // events, so deleting the active profile leaves stale screens rendered
+  // against a torn-down profile until the user taps a tab. Bridging the
+  // registry provider to a Listenable makes GoRouter re-evaluate the redirect
+  // (→ /login) the instant the active profile becomes null.
+  final _RouterRefresh? refresh =
+      container == null ? null : _RouterRefresh(container);
   return GoRouter(
     initialLocation: Routes.home,
+    refreshListenable: refresh,
     redirect: container == null
         ? null
         : (BuildContext context, GoRouterState state) {
@@ -152,6 +160,23 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
       ),
     ],
   );
+}
+
+/// Bridges [profileRegistryProvider] to a [Listenable] for GoRouter's
+/// `refreshListenable` (A2). Notifies on every registry change so the
+/// first-launch / signed-out redirect re-evaluates immediately — most
+/// importantly when the active profile is removed and `activeId` goes null.
+///
+/// The `container.listen` subscription is auto-closed when the container is
+/// disposed (app teardown / test tear-down), and GoRouter removes its own
+/// listener on `dispose()`, so this needs no explicit disposal.
+class _RouterRefresh extends ChangeNotifier {
+  _RouterRefresh(ProviderContainer container) {
+    container.listen<AsyncValue<ProfileRegistryState>>(
+      profileRegistryProvider,
+      (_, _) => notifyListeners(),
+    );
+  }
 }
 
 // Bottom-nav shell. Wraps every child route with the same `NavigationBar` so

@@ -474,6 +474,48 @@ void main() {
       expect(adapter.requests, isEmpty);
     });
 
+    test('A15: no active profile → build returns idle, runs no tick '
+        'even when offline is enabled', () async {
+      // Enabled offline prefs but NO activeProfileProvider override → the
+      // active profile is null (fresh install lingering on /login). The A15
+      // gate must short-circuit build to `_kIdle` *before* `_runTick`. If the
+      // tick ran it would early-return 'no creds', surfacing as
+      // status.lastError — so a null lastError proves the gate fired first.
+      final _FakeSecureStorage store = _FakeSecureStorage(<String, String>{
+        'offline_enabled': 'true',
+        'offline_wifi_only': 'true',
+      });
+      final _CountingAdapter adapter = _CountingAdapter();
+
+      final ProviderContainer c = ProviderContainer(
+        overrides: <Override>[
+          secureStorageProvider.overrideWith(
+            (Ref<SecureStorage> ref) => store,
+          ),
+          prefsStorageProvider.overrideWith(
+            (Ref<PrefsStorage> ref) => store,
+          ),
+          applicationDocumentsDirectoryProvider.overrideWith(
+            (ApplicationDocumentsDirectoryRef ref) async => tmp,
+          ),
+          offlineDownloadDioProvider.overrideWith(
+            (OfflineDownloadDioRef ref) => _dio(adapter),
+          ),
+          wifiCheckProvider.overrideWith(
+            (WifiCheckRef ref) => _FakeWifi(true),
+          ),
+        ],
+      );
+      addTearDown(c.dispose);
+
+      final OfflineSyncStatus s =
+          await c.read(offlineSyncProvider.future);
+      expect(s.running, isFalse);
+      expect(s.lastError, isNull, reason: 'gate must skip the tick entirely');
+      expect(s.targetCount, 0);
+      expect(adapter.requests, isEmpty);
+    });
+
     test('offline disabled → build returns idle, no ticks fire', () async {
       final _Env env = _buildEnv(
         tmp: tmp,
