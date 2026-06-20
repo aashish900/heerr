@@ -6,7 +6,7 @@ part of 'library_artist.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$libraryArtistHash() => r'eb34fd5f3f063ac796f3693622afb36866d22dd0';
+String _$libraryArtistHash() => r'c668c3e848d1c14b2e6cbaa6e83bd46c276d45c9';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -29,9 +29,8 @@ class _SystemHash {
   }
 }
 
-/// Wraps `GET /rest/getArtist.view?id=<id>`. Returns one [Artist] with its
-/// `album` list populated. Family-keyed by artist id so the album-detail
-/// route can subscribe directly.
+/// Wraps `GET /rest/getArtist.view?id=<id>` (via [SubsonicLibraryService]).
+/// Returns one [Artist] with its `album` list populated. Family-keyed by id.
 ///
 /// L5: cache-aware. See [libraryAlbum] for the contract.
 ///
@@ -39,26 +38,23 @@ class _SystemHash {
 @ProviderFor(libraryArtist)
 const libraryArtistProvider = LibraryArtistFamily();
 
-/// Wraps `GET /rest/getArtist.view?id=<id>`. Returns one [Artist] with its
-/// `album` list populated. Family-keyed by artist id so the album-detail
-/// route can subscribe directly.
+/// Wraps `GET /rest/getArtist.view?id=<id>` (via [SubsonicLibraryService]).
+/// Returns one [Artist] with its `album` list populated. Family-keyed by id.
 ///
 /// L5: cache-aware. See [libraryAlbum] for the contract.
 ///
 /// Copied from [libraryArtist].
 class LibraryArtistFamily extends Family<AsyncValue<Artist>> {
-  /// Wraps `GET /rest/getArtist.view?id=<id>`. Returns one [Artist] with its
-  /// `album` list populated. Family-keyed by artist id so the album-detail
-  /// route can subscribe directly.
+  /// Wraps `GET /rest/getArtist.view?id=<id>` (via [SubsonicLibraryService]).
+  /// Returns one [Artist] with its `album` list populated. Family-keyed by id.
   ///
   /// L5: cache-aware. See [libraryAlbum] for the contract.
   ///
   /// Copied from [libraryArtist].
   const LibraryArtistFamily();
 
-  /// Wraps `GET /rest/getArtist.view?id=<id>`. Returns one [Artist] with its
-  /// `album` list populated. Family-keyed by artist id so the album-detail
-  /// route can subscribe directly.
+  /// Wraps `GET /rest/getArtist.view?id=<id>` (via [SubsonicLibraryService]).
+  /// Returns one [Artist] with its `album` list populated. Family-keyed by id.
   ///
   /// L5: cache-aware. See [libraryAlbum] for the contract.
   ///
@@ -89,17 +85,15 @@ class LibraryArtistFamily extends Family<AsyncValue<Artist>> {
   String? get name => r'libraryArtistProvider';
 }
 
-/// Wraps `GET /rest/getArtist.view?id=<id>`. Returns one [Artist] with its
-/// `album` list populated. Family-keyed by artist id so the album-detail
-/// route can subscribe directly.
+/// Wraps `GET /rest/getArtist.view?id=<id>` (via [SubsonicLibraryService]).
+/// Returns one [Artist] with its `album` list populated. Family-keyed by id.
 ///
 /// L5: cache-aware. See [libraryAlbum] for the contract.
 ///
 /// Copied from [libraryArtist].
 class LibraryArtistProvider extends AutoDisposeFutureProvider<Artist> {
-  /// Wraps `GET /rest/getArtist.view?id=<id>`. Returns one [Artist] with its
-  /// `album` list populated. Family-keyed by artist id so the album-detail
-  /// route can subscribe directly.
+  /// Wraps `GET /rest/getArtist.view?id=<id>` (via [SubsonicLibraryService]).
+  /// Returns one [Artist] with its `album` list populated. Family-keyed by id.
   ///
   /// L5: cache-aware. See [libraryAlbum] for the contract.
   ///

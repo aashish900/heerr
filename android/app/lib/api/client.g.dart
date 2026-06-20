@@ -6,7 +6,7 @@ part of 'client.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$dioClientHash() => r'212e816b46c8224e2536d813923a2015405f8c56';
+String _$dioClientHash() => r'f8f94ade3c68721ae6e117beaf3cb467fdf82912';
 
 /// Builds the app's `Dio` instance from the active [Profile]. Depends on
 /// `activeProfileProvider` so the dio rebuilds whenever the active profile

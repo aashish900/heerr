@@ -570,3 +570,26 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Reference:** `android/app/lib/router.dart` (`_RouterRefresh`, `refreshListenable:`), `android/app/lib/offline/offline_sync.dart` (`build` active-profile gate + Timer cancel). Tests: `test/router_test.dart` (A2 group, `_MapStorage`), `test/offline/offline_sync_test.dart` (A15 guard). Debt A2/A15 in `docs/DEBT.md §5`.
 
 ---
+
+## 2026-06-20 — Router god-file split + Repository/Service layer (debt A8/A10)
+
+**Context:** The 2026-06-18 audit (`docs/DEBT.md §5`) flagged two structural items:
+- **A8:** `router.dart` was a god file — its `_ShellScaffold` State class owned six unrelated app-lifecycle side-effects on top of the bottom-nav chrome (SRP violation; the shell couldn't be tested without dragging all six in).
+- **A10:** no Repository/Service layer — providers called `dio` and parsed JSON envelopes inline, coupling Riverpod state + transport + JSON shape, so transport couldn't be unit-tested without standing up a container.
+
+**Decision:**
+1. **A8 —** extracted the lifecycle concern into `lib/app/lifecycle_coordinator.dart` (`LifecycleCoordinator`, a `ConsumerStatefulWidget` with `WidgetsBindingObserver`). The ShellRoute builder wraps the shell: `LifecycleCoordinator(child: _ShellScaffold(...))`. `_ShellScaffold` is now pure nav chrome.
+2. **A10 —** introduced four service seams under `lib/services/`: `SubsonicLibraryService` (Subsonic reads), `PlaylistService` (Subsonic mutations), `BackendService` (heerr REST), `LyricsService` (two-stage lyrics). Each is a plain class holding only a `Dio`, with one method per call (issued through the existing `subsonicCall` / `apiCall` helpers) returning typed models. Each is exposed via an async `*ServiceProvider` that awaits the existing dio provider. The 15 inline-dio providers now delegate to a service; Riverpod-bound concerns (debounce, cancel tokens, dedupe, index ordering, invalidation) stay in the providers. Done as A10 **entirely** in one commit (all inline-dio providers, not a single pilot domain).
+
+**Why:**
+- **Service providers read the same dio providers**, so the injection point that every existing test already mocks (`subsonicDioClientProvider` / `dioClientProvider` overridden with a fake-adapter Dio) sits *below* the service — the whole pre-existing test suite passes unchanged, and new transport tests can construct a service directly from a Dio with no container (proven by `test/services/subsonic_library_service_test.dart`).
+- **Parsing lives in the service, orchestration in the provider.** This is the SRP split the audit asked for without rewriting the cache-aware / debounce / polling machinery that the providers already get right.
+- **The offline subsystem was already factored** — `downloadSong` takes an injected `Dio` and `offline_sync` composes existing providers — so A10 needed nothing there. The DEBT evidence line citing `offline_sync` as "transport+filesystem+state in one provider" was stale w.r.t. the current downloader seam.
+
+**Alternatives considered:**
+- **A10 as a single pilot domain (search) with the rest deferred.** Recommended in planning to bound risk, but the user chose to do A10 entirely in one commit. Feasible at low risk precisely because the test injection point is below the service layer (see Why), so behaviour is preserved by construction.
+- **One mega `SubsonicService` covering reads + mutations.** Rejected — keeping reads (`SubsonicLibraryService`) separate from mutations (`PlaylistService`) matches the query/command split and keeps each surface small.
+- **Splitting backend into `BackendJobService` + a separate search/recommend service** (the original planning grouping). Collapsed into one `BackendService` since all those calls share the single bearer-auth `dioClientProvider`; splitting them would be hair-splitting with no test or cohesion benefit.
+- **A8 keeping the observer in the shell but extracting helpers.** Rejected — the observer + its side-effects are the concern to isolate; a half-move wouldn't make the shell testable in isolation.
+
+**Reference:** `android/app/lib/app/lifecycle_coordinator.dart`, `android/app/lib/router.dart`, `android/app/lib/services/{subsonic_library_service,playlist_service,backend_service,lyrics_service}.dart`, and the delegating providers under `android/app/lib/providers/**`. Tests: `test/app/lifecycle_coordinator_test.dart`, `test/services/subsonic_library_service_test.dart`. Debt A8/A10 in `docs/DEBT.md §5`.

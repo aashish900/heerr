@@ -6,11 +6,10 @@ part of 'home_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$homeRecentHash() => r'3fd32a3b9e1215774b328db34073d5c60596524e';
+String _$homeRecentHash() => r'f581847298c440b2973da7c7b95ac43ec2fb8e4e';
 
-/// Recently-played albums (Subsonic `getAlbumList2.view?type=recent`). The
-/// Home screen's "Jump back in" section and primary quick-access grid use
-/// this. Empty list when the library hasn't been played yet.
+/// Recently-played albums (`getAlbumList2.view?type=recent`). The Home
+/// screen's "Jump back in" section and primary quick-access grid use this.
 ///
 /// Copied from [homeRecent].
 @ProviderFor(homeRecent)
@@ -27,10 +26,10 @@ final homeRecentProvider = AutoDisposeFutureProvider<List<Album>>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef HomeRecentRef = AutoDisposeFutureProviderRef<List<Album>>;
-String _$homeMostPlayedHash() => r'2141ae0ce4e424cca7a556c818b5ba78f4bcdc09';
+String _$homeMostPlayedHash() => r'aedf0b6d456a21b116838ef28f6b03e7e5a4169a';
 
-/// Most-played albums (Subsonic `getAlbumList2.view?type=frequent`). Powers
-/// the Home screen's "Most played" horizontal section.
+/// Most-played albums (`getAlbumList2.view?type=frequent`). Powers the Home
+/// screen's "Most played" horizontal section.
 ///
 /// Copied from [homeMostPlayed].
 @ProviderFor(homeMostPlayed)
@@ -47,12 +46,11 @@ final homeMostPlayedProvider = AutoDisposeFutureProvider<List<Album>>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef HomeMostPlayedRef = AutoDisposeFutureProviderRef<List<Album>>;
-String _$homeRandomSongsHash() => r'72b0c576599e763cb564bda299ae5078a1d60652';
+String _$homeRandomSongsHash() => r'c94555a3bda9d6fbae4b3dfe3649068612f1e8c7';
 
-/// Random songs from the library (Subsonic `getRandomSongs.view`). Used as
-/// the universal fallback when the backend recommendations come back empty
-/// (a fresh deploy with no scrobble history) and as a fill-in for the
-/// quick-access grid when "recently played" is empty.
+/// Random songs from the library (`getRandomSongs.view`). Used as the
+/// universal fallback when backend recommendations come back empty, and as a
+/// fill-in for the quick-access grid when "recently played" is empty.
 ///
 /// Copied from [homeRandomSongs].
 @ProviderFor(homeRandomSongs)
@@ -76,11 +74,9 @@ String _$homeRecommendationsHash() =>
 ///
 /// Primary source: [recommendationsProvider] (already library-cross-
 /// referenced via the N4 `search3` hydration step). When that returns an
-/// empty list (no seeds, engine-down with empty fallback chain, etc.) the
-/// notifier maps [homeRandomSongs] to `RecommendedTrack` shape so the
-/// section still has content. Songs are local, so `inLibrary=true` and
-/// `subsonicSongId` is populated; `sourceUrl` is empty (random songs have
-/// no upstream URL).
+/// empty list the notifier maps [homeRandomSongs] to `RecommendedTrack` shape
+/// so the section still has content. Songs are local, so `inLibrary=true` and
+/// `subsonicSongId` is populated; `sourceUrl` is empty.
 ///
 /// Copied from [homeRecommendations].
 @ProviderFor(homeRecommendations)

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -212,65 +211,6 @@ void main() {
       for (final int h in <int>[0, 2, 4]) {
         expect(greetingForHour(h), 'Good evening', reason: 'hour=$h');
       }
-    });
-  });
-
-  group('_ShellScaffold lifecycle wiring', () {
-    Future<void> sendLifecycle(WidgetTester tester, String state) async {
-      final ByteData? msg = const StringCodec().encodeMessage(state);
-      await tester.binding.defaultBinaryMessenger
-          .handlePlatformMessage('flutter/lifecycle', msg, (_) {});
-    }
-
-    testWidgets('paused → calls pause() on OfflineSync', (
-      WidgetTester tester,
-    ) async {
-      final _StubSync stub = _StubSync();
-      await tester.pumpWidget(ProviderScope(
-        overrides: <Override>[
-          secureStorageProvider
-              .overrideWith((Ref<SecureStorage> _) => _NoopStorage()),
-          offlineSyncProvider.overrideWith(() => stub),
-        ],
-        child: MaterialApp.router(
-          theme: heerrDarkTheme(),
-          routerConfig: buildHeerrRouter(),
-        ),
-      ));
-      await tester.pumpAndSettle();
-      // The microtask in _ShellScaffoldState may pre-touch the provider —
-      // we only care about counts AFTER the lifecycle event.
-      stub.resetCounts();
-
-      await sendLifecycle(tester,'AppLifecycleState.paused');
-      await tester.pumpAndSettle();
-
-      expect(stub.pauseCalls, greaterThanOrEqualTo(1));
-      expect(stub.resumeCalls, 0);
-    });
-
-    testWidgets('resumed → calls resume() on OfflineSync', (
-      WidgetTester tester,
-    ) async {
-      final _StubSync stub = _StubSync();
-      await tester.pumpWidget(ProviderScope(
-        overrides: <Override>[
-          secureStorageProvider
-              .overrideWith((Ref<SecureStorage> _) => _NoopStorage()),
-          offlineSyncProvider.overrideWith(() => stub),
-        ],
-        child: MaterialApp.router(
-          theme: heerrDarkTheme(),
-          routerConfig: buildHeerrRouter(),
-        ),
-      ));
-      await tester.pumpAndSettle();
-      stub.resetCounts();
-
-      await sendLifecycle(tester,'AppLifecycleState.resumed');
-      await tester.pumpAndSettle();
-
-      expect(stub.resumeCalls, greaterThanOrEqualTo(1));
     });
   });
 

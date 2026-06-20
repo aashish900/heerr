@@ -7,7 +7,7 @@ part of 'download.dart';
 // **************************************************************************
 
 String _$downloadDispatcherHash() =>
-    r'bf59ef5efdeaecd4b3555b62d685766b966d8e48';
+    r'030af46bce44b37a76be5f7fec173bda34ea2887';
 
 /// Tracks which `source_url`s have an in-flight `POST /download`. The state
 /// is the **set of in-flight URLs**; UI watches its own URL's membership

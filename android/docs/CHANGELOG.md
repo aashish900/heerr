@@ -1879,3 +1879,17 @@ analyze` clean; `flutter test` green (567 tests).
   - `test/router_test.dart` — new "A2" group: seed an active profile, render the app on Home, `removeProfile` without navigating → asserts redirect to `LoginScreen`. Adds a persisting `_MapStorage` secure-storage fake; reuses `_StubSync` to keep the shell's init microtask inert.
   - `test/offline/offline_sync_test.dart` — new guard "A15": offline enabled + no active profile → `build` yields idle with `lastError == null` (proving the gate skipped `_runTick`, which would otherwise have surfaced `'no creds'`) and no adapter hits.
 - `flutter analyze` clean; full suite 568 green (+2). Resolves DEBT §5 A2 + A15.
+
+## 2026-06-20 — A8 + A10: router god-file split + Repository/Service layer
+
+- **A8 — `lib/app/lifecycle_coordinator.dart` (new):** the six app-lifecycle side-effects (offline-sync kick on launch, pause/resume, Now-Playing flush, background-sync schedule/cancel, recommend-health refresh) moved out of `_ShellScaffold` into `LifecycleCoordinator` (`ConsumerStatefulWidget` + `WidgetsBindingObserver`). The ShellRoute builder composes `LifecycleCoordinator(child: _ShellScaffold(...))`. `lib/router.dart` is now nav chrome only (dropped the observer mixin + dart:async/offline/player/recommendations imports). Lifecycle tests moved to `test/app/lifecycle_coordinator_test.dart`; the now-unused `flutter/services.dart` import removed from `test/router_test.dart`.
+- **A10 — `lib/services/` (new):** transport+JSON seams so providers no longer call `dio` / parse envelopes inline:
+  - `SubsonicLibraryService` — all Subsonic reads (`getAlbum(s)`, `getArtist(s)`, `getPlaylist(s)`, `search3`, `getAlbumList`, `getRandomSongs`, `getStarredSongs`, `findLibraryMatch` for the N4 cross-ref).
+  - `PlaylistService` — Subsonic mutations (`createPlaylist`/`updatePlaylist`/`deletePlaylist`/`getPlaylistEntryIds`).
+  - `BackendService` — all heerr-REST calls (`ytmSearch`, `recommend`, `recommendHealth`, `getQueue`, `download`, `jobStatus`).
+  - `LyricsService` — two-stage Navidrome `getLyricsBySongId` → LRCLib fallback.
+  - Each exposes an async `*ServiceProvider` that reads the existing `subsonicDioClientProvider` / `dioClientProvider`, so the service uses whatever dio those providers yield — **existing dio-adapter test mocks pass unchanged**.
+- **Providers delegating now (state/orchestration only):** `library/library_album(s)`, `library/library_artist(s)`, `library/library_playlist(s)`, `library/library_search`, `library/lyrics`, `library/playlist_mutations`, `home/home_providers`, `recommendations`, `search`, `queue`, `download`, `job_status`. Debounce / cancel-token / dedupe / index-ordering / provider-invalidation stay in the providers (they need a `Ref`).
+- **Offline subsystem:** no change required — `offline/offline_downloader.downloadSong` is already an injected-`Dio` seam, and `offline/offline_sync` orchestrates via existing library providers + the `offlineDownloadDio` seam (no inline transport+JSON).
+- **Tests:** new `test/services/subsonic_library_service_test.dart` (5 cases) proves the seam is unit-testable **without a Riverpod container** (service built directly from a Dio + scripted adapter). `dart run build_runner build` regenerated `.g.dart` for the new service providers.
+- `flutter analyze` clean (only the pre-existing `main.dart:25` workmanager deprecation); full suite 573 green (+5). Resolves DEBT §5 A8 + A10.

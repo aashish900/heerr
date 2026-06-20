@@ -1,11 +1,9 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../api/client.dart';
-import '../api/endpoints.dart';
 import '../models/queue_response.dart';
+import '../services/backend_service.dart';
 
 part 'queue.g.dart';
 
@@ -73,10 +71,8 @@ class Queue extends _$Queue {
   }
 
   Future<QueueResponse> _fetch() async {
-    final Dio dio = await ref.read(dioClientProvider.future);
-    return apiCall<QueueResponse>(
-      () => dio.get<dynamic>(Endpoints.queue),
-      (dynamic data) => QueueResponse.fromJson(data as Map<String, dynamic>),
-    );
+    final BackendService backend =
+        await ref.read(backendServiceProvider.future);
+    return backend.getQueue();
   }
 }

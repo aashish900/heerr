@@ -1,17 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
-import 'offline/background_sync.dart';
-import 'offline/offline_manifest.dart';
-import 'offline/offline_settings.dart';
-import 'offline/offline_sync.dart';
-import 'player/now_playing_persistence.dart';
+import 'app/lifecycle_coordinator.dart';
 import 'providers/profiles/profile_registry.dart';
-import 'providers/recommendations.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/downloads_screen.dart';
 import 'screens/job_detail_screen.dart';
@@ -92,7 +85,12 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
       ),
       ShellRoute(
         builder: (BuildContext context, GoRouterState state, Widget child) {
-          return _ShellScaffold(location: state.matchedLocation, child: child);
+          // A8: the lifecycle host wraps the nav chrome. The shell stays a
+          // pure layout widget; all AppLifecycleState side-effects live in
+          // LifecycleCoordinator.
+          return LifecycleCoordinator(
+            child: _ShellScaffold(location: state.matchedLocation, child: child),
+          );
         },
         routes: <RouteBase>[
           GoRoute(
@@ -184,10 +182,8 @@ class _RouterRefresh extends ChangeNotifier {
 // mini-player sits above the NavigationBar; it hides itself when nothing is
 // queued.
 //
-// L3: also the lifecycle host for `offlineSyncProvider`. The shell is
-// always mounted while the app is foregrounded — Settings is a child
-// route, not a peer — so this is the right place to forward
-// AppLifecycleState changes into pause()/resume() on the sync provider.
+// A8: the lifecycle host that used to live here is now LifecycleCoordinator
+// (lib/app/lifecycle_coordinator.dart). This widget is pure nav chrome.
 class _ShellScaffold extends ConsumerStatefulWidget {
   const _ShellScaffold({required this.location, required this.child});
 
@@ -198,8 +194,7 @@ class _ShellScaffold extends ConsumerStatefulWidget {
   ConsumerState<_ShellScaffold> createState() => _ShellScaffoldState();
 }
 
-class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
-    with WidgetsBindingObserver {
+class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
   static const List<_NavTab> _tabs = <_NavTab>[
     _NavTab(
       path: Routes.home,
@@ -247,101 +242,6 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
       height: 24,
       colorFilter: ColorFilter.mode(tint, BlendMode.srcIn),
     );
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    // Kick the offline sync provider so it builds + auto-syncs on app
-    // launch. We don't watch it (would rebuild the shell on every status
-    // change) — just trigger the build.
-    Future<void>.microtask(() {
-      if (!mounted) return;
-      // ignore: unused_local_variable
-      final dynamic _ = ref.read(offlineSyncProvider);
-    });
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Forward foreground/background transitions to the sync provider's
-    // Timer. Matches the QueueScreen lifecycle pattern.
-    switch (state) {
-      case AppLifecycleState.paused:
-      case AppLifecycleState.inactive:
-      case AppLifecycleState.hidden:
-        ref.read(offlineSyncProvider.notifier).pause();
-        // P1: flush the Now Playing snapshot so position survives an
-        // OS-may-kill-us next. Best-effort — async-fire-and-forget.
-        unawaited(_flushNowPlaying());
-        // Q3: hand off to the background worker. Skips when offline is off
-        // or the manifest has no markers — the predicate lives inside
-        // `onAppBackgrounded` so the lifecycle hook stays declarative.
-        unawaited(_scheduleBackgroundSync());
-      case AppLifecycleState.resumed:
-        // Q3: cancel any in-flight background work so the foreground
-        // notifier is the sole manifest writer while the app is visible —
-        // no double-downloads. Fire-and-forget; resume() runs synchronously
-        // below regardless of how the cancel completes.
-        unawaited(_cancelBackgroundSync());
-        unawaitedResume();
-      case AppLifecycleState.detached:
-        // App is fully detaching; the provider's onDispose will cancel the
-        // timer when the container tears down.
-        break;
-    }
-  }
-
-  Future<void> _flushNowPlaying() async {
-    try {
-      final NowPlayingPersistence p =
-          await ref.read(nowPlayingPersistenceProvider.future);
-      await p.flush();
-    } catch (_) {
-      // Best-effort; swallow.
-    }
-  }
-
-  void unawaitedResume() {
-    // Fire-and-forget — resume() ticks immediately, but we don't need to
-    // await it; failures land in the manifest's lastError.
-    ref.read(offlineSyncProvider.notifier).resume();
-    // N5: also re-check the recommendation engine's health on resume. The
-    // notifier guards on a 60 s TTL so this is cheap to fire on every
-    // foreground transition.
-    ref.read(recommendHealthNotifierProvider.notifier).refreshIfStale();
-  }
-
-  Future<void> _cancelBackgroundSync() async {
-    try {
-      await onAppForegrounded(ref.read(backgroundSyncSchedulerProvider));
-    } catch (_) {
-      // Best-effort — the manifest is the source of truth either way.
-    }
-  }
-
-  Future<void> _scheduleBackgroundSync() async {
-    try {
-      final OfflineSettingsValue? offline =
-          ref.read(offlineSettingsProvider).valueOrNull;
-      final OfflineManifest? manifest =
-          ref.read(offlineManifestProvider).valueOrNull;
-      if (offline == null || manifest == null) return;
-      await onAppBackgrounded(
-        scheduler: ref.read(backgroundSyncSchedulerProvider),
-        offline: offline,
-        manifest: manifest,
-      );
-    } catch (_) {
-      // Best-effort — the next backgrounding gets another shot.
-    }
   }
 
   int _indexFor(String loc) {

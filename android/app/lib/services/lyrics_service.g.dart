@@ -1,31 +1,30 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'subsonic_client.dart';
+part of 'lyrics_service.dart';
 
 // **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 
-String _$subsonicDioClientHash() => r'f6c9e8b999197a4651813c56f0bbdd217712d33d';
+String _$lyricsServiceHash() => r'318de4e324557dc5e62afd311e47b2d67efa6c5b';
 
-/// Builds a `Dio` for Subsonic calls against the active [Profile]'s
-/// Navidrome base URL. Depends on [activeProfileProvider] so a profile
-/// switch invalidates and rebuilds with the new auth.
+/// Async provider so the service is built once the Subsonic [Dio] is ready.
+/// Tests overriding `subsonicDioClientProvider` flow through unchanged.
 ///
-/// Copied from [subsonicDioClient].
-@ProviderFor(subsonicDioClient)
-final subsonicDioClientProvider = AutoDisposeFutureProvider<Dio>.internal(
-  subsonicDioClient,
-  name: r'subsonicDioClientProvider',
+/// Copied from [lyricsService].
+@ProviderFor(lyricsService)
+final lyricsServiceProvider = AutoDisposeFutureProvider<LyricsService>.internal(
+  lyricsService,
+  name: r'lyricsServiceProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
       ? null
-      : _$subsonicDioClientHash,
+      : _$lyricsServiceHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef SubsonicDioClientRef = AutoDisposeFutureProviderRef<Dio>;
+typedef LyricsServiceRef = AutoDisposeFutureProviderRef<LyricsService>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

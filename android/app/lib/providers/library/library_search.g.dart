@@ -6,7 +6,7 @@ part of 'library_search.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$librarySearchHash() => r'5d6ac98c27552f4e6bfd555cd5ab6f63e16dd27e';
+String _$librarySearchHash() => r'a74bf7135440274278a5c65d30441e5562af6db8';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -29,50 +29,46 @@ class _SystemHash {
   }
 }
 
-/// Wraps `GET /rest/search3.view?query=<q>`. Debounced via the existing
-/// `searchDebounceProvider` (300ms by default) so rapid typing doesn't
-/// hammer Navidrome.
+/// Wraps `GET /rest/search3.view?query=<q>` (via [SubsonicLibraryService]).
+/// Debounced via the existing `searchDebounceProvider` (300ms by default) so
+/// rapid typing doesn't hammer Navidrome.
 ///
 /// Empty / whitespace-only queries short-circuit to an empty result without
-/// firing a request. Mid-flight requests are cancelled when the query
-/// changes via a `CancelToken` tied to `ref.onDispose`, mirroring the
-/// existing YouTube-Music `searchResultsProvider`.
+/// firing a request. Mid-flight requests are cancelled when the query changes
+/// via a `CancelToken` tied to `ref.onDispose`.
 ///
 /// Copied from [librarySearch].
 @ProviderFor(librarySearch)
 const librarySearchProvider = LibrarySearchFamily();
 
-/// Wraps `GET /rest/search3.view?query=<q>`. Debounced via the existing
-/// `searchDebounceProvider` (300ms by default) so rapid typing doesn't
-/// hammer Navidrome.
+/// Wraps `GET /rest/search3.view?query=<q>` (via [SubsonicLibraryService]).
+/// Debounced via the existing `searchDebounceProvider` (300ms by default) so
+/// rapid typing doesn't hammer Navidrome.
 ///
 /// Empty / whitespace-only queries short-circuit to an empty result without
-/// firing a request. Mid-flight requests are cancelled when the query
-/// changes via a `CancelToken` tied to `ref.onDispose`, mirroring the
-/// existing YouTube-Music `searchResultsProvider`.
+/// firing a request. Mid-flight requests are cancelled when the query changes
+/// via a `CancelToken` tied to `ref.onDispose`.
 ///
 /// Copied from [librarySearch].
 class LibrarySearchFamily extends Family<AsyncValue<SearchResult3>> {
-  /// Wraps `GET /rest/search3.view?query=<q>`. Debounced via the existing
-  /// `searchDebounceProvider` (300ms by default) so rapid typing doesn't
-  /// hammer Navidrome.
+  /// Wraps `GET /rest/search3.view?query=<q>` (via [SubsonicLibraryService]).
+  /// Debounced via the existing `searchDebounceProvider` (300ms by default) so
+  /// rapid typing doesn't hammer Navidrome.
   ///
   /// Empty / whitespace-only queries short-circuit to an empty result without
-  /// firing a request. Mid-flight requests are cancelled when the query
-  /// changes via a `CancelToken` tied to `ref.onDispose`, mirroring the
-  /// existing YouTube-Music `searchResultsProvider`.
+  /// firing a request. Mid-flight requests are cancelled when the query changes
+  /// via a `CancelToken` tied to `ref.onDispose`.
   ///
   /// Copied from [librarySearch].
   const LibrarySearchFamily();
 
-  /// Wraps `GET /rest/search3.view?query=<q>`. Debounced via the existing
-  /// `searchDebounceProvider` (300ms by default) so rapid typing doesn't
-  /// hammer Navidrome.
+  /// Wraps `GET /rest/search3.view?query=<q>` (via [SubsonicLibraryService]).
+  /// Debounced via the existing `searchDebounceProvider` (300ms by default) so
+  /// rapid typing doesn't hammer Navidrome.
   ///
   /// Empty / whitespace-only queries short-circuit to an empty result without
-  /// firing a request. Mid-flight requests are cancelled when the query
-  /// changes via a `CancelToken` tied to `ref.onDispose`, mirroring the
-  /// existing YouTube-Music `searchResultsProvider`.
+  /// firing a request. Mid-flight requests are cancelled when the query changes
+  /// via a `CancelToken` tied to `ref.onDispose`.
   ///
   /// Copied from [librarySearch].
   LibrarySearchProvider call(String query) {
@@ -101,25 +97,23 @@ class LibrarySearchFamily extends Family<AsyncValue<SearchResult3>> {
   String? get name => r'librarySearchProvider';
 }
 
-/// Wraps `GET /rest/search3.view?query=<q>`. Debounced via the existing
-/// `searchDebounceProvider` (300ms by default) so rapid typing doesn't
-/// hammer Navidrome.
+/// Wraps `GET /rest/search3.view?query=<q>` (via [SubsonicLibraryService]).
+/// Debounced via the existing `searchDebounceProvider` (300ms by default) so
+/// rapid typing doesn't hammer Navidrome.
 ///
 /// Empty / whitespace-only queries short-circuit to an empty result without
-/// firing a request. Mid-flight requests are cancelled when the query
-/// changes via a `CancelToken` tied to `ref.onDispose`, mirroring the
-/// existing YouTube-Music `searchResultsProvider`.
+/// firing a request. Mid-flight requests are cancelled when the query changes
+/// via a `CancelToken` tied to `ref.onDispose`.
 ///
 /// Copied from [librarySearch].
 class LibrarySearchProvider extends AutoDisposeFutureProvider<SearchResult3> {
-  /// Wraps `GET /rest/search3.view?query=<q>`. Debounced via the existing
-  /// `searchDebounceProvider` (300ms by default) so rapid typing doesn't
-  /// hammer Navidrome.
+  /// Wraps `GET /rest/search3.view?query=<q>` (via [SubsonicLibraryService]).
+  /// Debounced via the existing `searchDebounceProvider` (300ms by default) so
+  /// rapid typing doesn't hammer Navidrome.
   ///
   /// Empty / whitespace-only queries short-circuit to an empty result without
-  /// firing a request. Mid-flight requests are cancelled when the query
-  /// changes via a `CancelToken` tied to `ref.onDispose`, mirroring the
-  /// existing YouTube-Music `searchResultsProvider`.
+  /// firing a request. Mid-flight requests are cancelled when the query changes
+  /// via a `CancelToken` tied to `ref.onDispose`.
   ///
   /// Copied from [librarySearch].
   LibrarySearchProvider(String query)

@@ -6,24 +6,20 @@ part of 'playlist_mutations.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$playlistMutationsHash() => r'f98b4a63b28f719e8497eb2657a264af6a9e9415';
+String _$playlistMutationsHash() => r'cd94ea4661b027db6abd199159b220a7b76e81c4';
 
 /// Subsonic playlist-mutation notifier. Stateless: `build()` returns void
-/// and the six methods drive `createPlaylist` / `updatePlaylist` /
-/// `deletePlaylist` through [subsonicCall], invalidating the affected
-/// read providers ([libraryPlaylistsProvider], [libraryPlaylistProvider])
-/// on success so the cache-aware wrappers refetch fresh data on the next
-/// read.
+/// and the methods drive create / update / delete through [PlaylistService],
+/// invalidating the affected read providers ([libraryPlaylistsProvider],
+/// [libraryPlaylistProvider]) on success so the cache-aware wrappers refetch
+/// fresh data on the next read.
 ///
-/// Wire contract: every method goes through [subsonicDioClientProvider],
-/// so auth (`u/s/t/v/c/f`) is injected by `SubsonicAuthInterceptor`. The
-/// envelope shape is the standard `{"subsonic-response": {...}}`; failures
-/// are surfaced as the matching [ApiError] subclass (so callers compose
-/// with `reactToApiError` / `showApiError`).
+/// A10: the transport moved to [PlaylistService]; this notifier keeps the
+/// rules that need a `Ref` — dedupe, index ordering, provider invalidation,
+/// and the [toggleFavourite] orchestration.
 ///
 /// `keepAlive: true` because this notifier holds no mutable state and is
-/// referenced from short-lived UI surfaces (dialogs, snackbars). Letting
-/// it auto-dispose between calls would re-build the type for every tap.
+/// referenced from short-lived UI surfaces (dialogs, snackbars).
 ///
 /// Copied from [PlaylistMutations].
 @ProviderFor(PlaylistMutations)

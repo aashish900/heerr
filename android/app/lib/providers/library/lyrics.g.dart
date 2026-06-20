@@ -6,7 +6,7 @@ part of 'lyrics.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$lyricsForHash() => r'd5f609a4874de71426371e64ea5d5de0979559bb';
+String _$lyricsForHash() => r'606b9476c6d019f1e5a05c5e1c0f24f73ed71992';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -29,70 +29,46 @@ class _SystemHash {
   }
 }
 
-/// Wraps lyrics resolution for the Now Playing screen. P2.
+/// Wraps lyrics resolution for the Now Playing screen (P2). The two-stage
+/// strategy (Navidrome `getLyricsBySongId` → LRCLib fallback) lives in
+/// [LyricsService]; this provider is now pure state orchestration.
 ///
-/// Two-stage strategy:
-///   1. `GET /rest/getLyricsBySongId.view?id=<songId>` against Navidrome
-///      (Open Subsonic extension — uses LRCLib + embedded tags if configured).
-///      Skipped when [songId] is empty.
-///   2. If stage 1 returns null (code 70, empty list, or skipped), fall back
-///      to `GET https://lrclib.net/api/get?artist_name=<artist>&track_name=<title>`
-///      directly. Skipped when [artist] or [title] is empty.
-///
-/// Returns [Lyrics] with `value` set to plain text when lyrics are found,
-/// or `null` when neither source has them. All other [ApiError]s from
-/// Navidrome rethrow so the UI shows the error pane.
+/// Returns [Lyrics] with `value` set to plain text when lyrics are found, or
+/// `null` when neither source has them. Non-404 non-70 Navidrome [ApiError]s
+/// propagate so the UI shows the error pane.
 ///
 /// Copied from [lyricsFor].
 @ProviderFor(lyricsFor)
 const lyricsForProvider = LyricsForFamily();
 
-/// Wraps lyrics resolution for the Now Playing screen. P2.
+/// Wraps lyrics resolution for the Now Playing screen (P2). The two-stage
+/// strategy (Navidrome `getLyricsBySongId` → LRCLib fallback) lives in
+/// [LyricsService]; this provider is now pure state orchestration.
 ///
-/// Two-stage strategy:
-///   1. `GET /rest/getLyricsBySongId.view?id=<songId>` against Navidrome
-///      (Open Subsonic extension — uses LRCLib + embedded tags if configured).
-///      Skipped when [songId] is empty.
-///   2. If stage 1 returns null (code 70, empty list, or skipped), fall back
-///      to `GET https://lrclib.net/api/get?artist_name=<artist>&track_name=<title>`
-///      directly. Skipped when [artist] or [title] is empty.
-///
-/// Returns [Lyrics] with `value` set to plain text when lyrics are found,
-/// or `null` when neither source has them. All other [ApiError]s from
-/// Navidrome rethrow so the UI shows the error pane.
+/// Returns [Lyrics] with `value` set to plain text when lyrics are found, or
+/// `null` when neither source has them. Non-404 non-70 Navidrome [ApiError]s
+/// propagate so the UI shows the error pane.
 ///
 /// Copied from [lyricsFor].
 class LyricsForFamily extends Family<AsyncValue<Lyrics?>> {
-  /// Wraps lyrics resolution for the Now Playing screen. P2.
+  /// Wraps lyrics resolution for the Now Playing screen (P2). The two-stage
+  /// strategy (Navidrome `getLyricsBySongId` → LRCLib fallback) lives in
+  /// [LyricsService]; this provider is now pure state orchestration.
   ///
-  /// Two-stage strategy:
-  ///   1. `GET /rest/getLyricsBySongId.view?id=<songId>` against Navidrome
-  ///      (Open Subsonic extension — uses LRCLib + embedded tags if configured).
-  ///      Skipped when [songId] is empty.
-  ///   2. If stage 1 returns null (code 70, empty list, or skipped), fall back
-  ///      to `GET https://lrclib.net/api/get?artist_name=<artist>&track_name=<title>`
-  ///      directly. Skipped when [artist] or [title] is empty.
-  ///
-  /// Returns [Lyrics] with `value` set to plain text when lyrics are found,
-  /// or `null` when neither source has them. All other [ApiError]s from
-  /// Navidrome rethrow so the UI shows the error pane.
+  /// Returns [Lyrics] with `value` set to plain text when lyrics are found, or
+  /// `null` when neither source has them. Non-404 non-70 Navidrome [ApiError]s
+  /// propagate so the UI shows the error pane.
   ///
   /// Copied from [lyricsFor].
   const LyricsForFamily();
 
-  /// Wraps lyrics resolution for the Now Playing screen. P2.
+  /// Wraps lyrics resolution for the Now Playing screen (P2). The two-stage
+  /// strategy (Navidrome `getLyricsBySongId` → LRCLib fallback) lives in
+  /// [LyricsService]; this provider is now pure state orchestration.
   ///
-  /// Two-stage strategy:
-  ///   1. `GET /rest/getLyricsBySongId.view?id=<songId>` against Navidrome
-  ///      (Open Subsonic extension — uses LRCLib + embedded tags if configured).
-  ///      Skipped when [songId] is empty.
-  ///   2. If stage 1 returns null (code 70, empty list, or skipped), fall back
-  ///      to `GET https://lrclib.net/api/get?artist_name=<artist>&track_name=<title>`
-  ///      directly. Skipped when [artist] or [title] is empty.
-  ///
-  /// Returns [Lyrics] with `value` set to plain text when lyrics are found,
-  /// or `null` when neither source has them. All other [ApiError]s from
-  /// Navidrome rethrow so the UI shows the error pane.
+  /// Returns [Lyrics] with `value` set to plain text when lyrics are found, or
+  /// `null` when neither source has them. Non-404 non-70 Navidrome [ApiError]s
+  /// propagate so the UI shows the error pane.
   ///
   /// Copied from [lyricsFor].
   LyricsForProvider call(String songId, String artist, String title) {
@@ -119,35 +95,23 @@ class LyricsForFamily extends Family<AsyncValue<Lyrics?>> {
   String? get name => r'lyricsForProvider';
 }
 
-/// Wraps lyrics resolution for the Now Playing screen. P2.
+/// Wraps lyrics resolution for the Now Playing screen (P2). The two-stage
+/// strategy (Navidrome `getLyricsBySongId` → LRCLib fallback) lives in
+/// [LyricsService]; this provider is now pure state orchestration.
 ///
-/// Two-stage strategy:
-///   1. `GET /rest/getLyricsBySongId.view?id=<songId>` against Navidrome
-///      (Open Subsonic extension — uses LRCLib + embedded tags if configured).
-///      Skipped when [songId] is empty.
-///   2. If stage 1 returns null (code 70, empty list, or skipped), fall back
-///      to `GET https://lrclib.net/api/get?artist_name=<artist>&track_name=<title>`
-///      directly. Skipped when [artist] or [title] is empty.
-///
-/// Returns [Lyrics] with `value` set to plain text when lyrics are found,
-/// or `null` when neither source has them. All other [ApiError]s from
-/// Navidrome rethrow so the UI shows the error pane.
+/// Returns [Lyrics] with `value` set to plain text when lyrics are found, or
+/// `null` when neither source has them. Non-404 non-70 Navidrome [ApiError]s
+/// propagate so the UI shows the error pane.
 ///
 /// Copied from [lyricsFor].
 class LyricsForProvider extends AutoDisposeFutureProvider<Lyrics?> {
-  /// Wraps lyrics resolution for the Now Playing screen. P2.
+  /// Wraps lyrics resolution for the Now Playing screen (P2). The two-stage
+  /// strategy (Navidrome `getLyricsBySongId` → LRCLib fallback) lives in
+  /// [LyricsService]; this provider is now pure state orchestration.
   ///
-  /// Two-stage strategy:
-  ///   1. `GET /rest/getLyricsBySongId.view?id=<songId>` against Navidrome
-  ///      (Open Subsonic extension — uses LRCLib + embedded tags if configured).
-  ///      Skipped when [songId] is empty.
-  ///   2. If stage 1 returns null (code 70, empty list, or skipped), fall back
-  ///      to `GET https://lrclib.net/api/get?artist_name=<artist>&track_name=<title>`
-  ///      directly. Skipped when [artist] or [title] is empty.
-  ///
-  /// Returns [Lyrics] with `value` set to plain text when lyrics are found,
-  /// or `null` when neither source has them. All other [ApiError]s from
-  /// Navidrome rethrow so the UI shows the error pane.
+  /// Returns [Lyrics] with `value` set to plain text when lyrics are found, or
+  /// `null` when neither source has them. Non-404 non-70 Navidrome [ApiError]s
+  /// propagate so the UI shows the error pane.
   ///
   /// Copied from [lyricsFor].
   LyricsForProvider(String songId, String artist, String title)

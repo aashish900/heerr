@@ -1,12 +1,10 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../api/client.dart';
-import '../api/endpoints.dart';
 import '../models/enums.dart';
 import '../models/job_view.dart';
+import '../services/backend_service.dart';
 
 part 'job_status.g.dart';
 
@@ -59,10 +57,8 @@ class JobStatus extends _$JobStatus {
   }
 
   Future<JobView> _fetch(String jobId) async {
-    final Dio dio = await ref.read(dioClientProvider.future);
-    return apiCall<JobView>(
-      () => dio.get<dynamic>(Endpoints.status(jobId)),
-      (dynamic data) => JobView.fromJson(data as Map<String, dynamic>),
-    );
+    final BackendService backend =
+        await ref.read(backendServiceProvider.future);
+    return backend.jobStatus(jobId);
   }
 }
