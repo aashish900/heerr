@@ -82,8 +82,8 @@ Dio _dioWith(
   dio.httpClientAdapter = adapter;
   dio.interceptors.add(
     SubsonicAuthInterceptor(
-      username: username,
-      password: password,
+      usernameResolver: () => username,
+      passwordResolver: () => password,
       saltGenerator: salt,
     ),
   );
@@ -477,8 +477,8 @@ void main() {
       expect(dio.options.baseUrl, 'http://navi:4533');
       final SubsonicAuthInterceptor interceptor =
           dio.interceptors.whereType<SubsonicAuthInterceptor>().single;
-      expect(interceptor.username, 'me');
-      expect(interceptor.password, 'pw');
+      expect(interceptor.usernameResolver(), 'me');
+      expect(interceptor.passwordResolver(), 'pw');
     });
   });
 

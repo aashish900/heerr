@@ -59,7 +59,7 @@ Dio _dioWith(_FakeAdapter adapter, {String? token}) {
   final Dio dio = Dio(BaseOptions(baseUrl: 'http://test/api/v1'));
   dio.httpClientAdapter = adapter;
   if (token != null) {
-    dio.interceptors.add(BearerAuthInterceptor(token));
+    dio.interceptors.add(BearerAuthInterceptor(() => token));
   }
   return dio;
 }
@@ -305,15 +305,23 @@ void main() {
 
       expect(dio.options.baseUrl, 'http://my-tailnet:8000/api/v1');
       expect(
-        dio.interceptors.whereType<BearerAuthInterceptor>().single.token,
+        dio.interceptors
+            .whereType<BearerAuthInterceptor>()
+            .single
+            .tokenResolver(),
         'tok-xyz',
       );
     });
 
-    test('rebuilds when the active profile token changes', () async {
+    test('A3: token rotation on the same base URL does NOT rebuild the dio; '
+        'the interceptor resolves the new token per request', () async {
       final _InMemoryStorage store = _InMemoryStorage();
       final ProviderContainer c = makeContainer(store);
       addTearDown(c.dispose);
+
+      // Pin the provider alive so autodispose doesn't tear the dio down
+      // between reads — we want to assert the SAME instance survives.
+      c.listen(dioClientProvider, (_, _) {}, fireImmediately: true);
 
       final ProfileRegistry reg = c.read(profileRegistryProvider.notifier);
       await reg.addProfile(
@@ -321,22 +329,44 @@ void main() {
       );
       await reg.setActive('p1');
 
-      Dio dio = await c.read(dioClientProvider.future);
-      expect(
-        dio.interceptors.whereType<BearerAuthInterceptor>().single.token,
-        'first',
-      );
+      final Dio dio1 = await c.read(dioClientProvider.future);
+      final BearerAuthInterceptor interceptor =
+          dio1.interceptors.whereType<BearerAuthInterceptor>().single;
+      expect(interceptor.tokenResolver(), 'first');
 
-      // Re-add the same profile id with a rotated token — activeProfile
-      // recomputes and the dio rebuilds with the new bearer.
+      // Re-add the same profile id with a rotated token (same base URL).
       await reg.addProfile(
         profileWith(baseUrl: 'http://x:8000/api/v1', token: 'second'),
       );
-      dio = await c.read(dioClientProvider.future);
-      expect(
-        dio.interceptors.whereType<BearerAuthInterceptor>().single.token,
-        'second',
+      final Dio dio2 = await c.read(dioClientProvider.future);
+
+      // Same base URL → no rebuild (A3: dio only rebuilds on base-URL change).
+      expect(identical(dio1, dio2), isTrue);
+      // …but the interceptor now resolves the rotated token.
+      expect(interceptor.tokenResolver(), 'second');
+    });
+
+    test('A3: a base-URL change DOES rebuild the dio', () async {
+      final _InMemoryStorage store = _InMemoryStorage();
+      final ProviderContainer c = makeContainer(store);
+      addTearDown(c.dispose);
+
+      c.listen(dioClientProvider, (_, _) {}, fireImmediately: true);
+
+      final ProfileRegistry reg = c.read(profileRegistryProvider.notifier);
+      await reg.addProfile(
+        profileWith(baseUrl: 'http://x:8000/api/v1', token: 'tok'),
       );
+      await reg.setActive('p1');
+      final Dio dio1 = await c.read(dioClientProvider.future);
+
+      await reg.addProfile(
+        profileWith(baseUrl: 'http://y:8000/api/v1', token: 'tok'),
+      );
+      final Dio dio2 = await c.read(dioClientProvider.future);
+
+      expect(identical(dio1, dio2), isFalse);
+      expect(dio2.options.baseUrl, 'http://y:8000/api/v1');
     });
   });
 }

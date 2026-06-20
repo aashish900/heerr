@@ -36,21 +36,31 @@ const String _subsonicClientName = 'heerr';
 /// [saltGenerator] is injectable for deterministic unit tests; production
 /// callers should pass nothing and let the default cryptographically-strong
 /// generator fire.
+///
+/// A3: username + password are resolved **per request** via
+/// [usernameResolver] / [passwordResolver] rather than captured by value at
+/// construction, so a Navidrome credential change on the active profile does
+/// not require rebuilding the whole `Dio`. The dio only rebuilds when the
+/// Navidrome *base URL* changes (see [subsonicDioClient]).
 class SubsonicAuthInterceptor extends Interceptor {
   SubsonicAuthInterceptor({
-    required this.username,
-    required this.password,
+    required this.usernameResolver,
+    required this.passwordResolver,
     String Function()? saltGenerator,
   }) : _saltGenerator = saltGenerator ?? _randomHexSalt;
 
-  final String? username;
-  final String? password;
+  /// Returns the current Navidrome username; called on every `onRequest`.
+  final String? Function() usernameResolver;
+
+  /// Returns the current Navidrome password; called on every `onRequest`.
+  final String? Function() passwordResolver;
+
   final String Function() _saltGenerator;
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    final String? u = username;
-    final String? p = password;
+    final String? u = usernameResolver();
+    final String? p = passwordResolver();
     if (u != null && u.isNotEmpty && p != null && p.isNotEmpty) {
       final String salt = _saltGenerator();
       final String token =
@@ -175,10 +185,14 @@ String buildSubsonicStreamUrl({
 Future<Dio> subsonicDioClient(SubsonicDioClientRef ref) async {
   // A1: the active Profile is the single source of Navidrome credentials.
   // The pre-S legacy single-set keys are gone.
-  final Profile? active = ref.watch(activeProfileProvider);
-  final String baseUrl = active?.navidromeBaseUrl ?? '';
-  final String? username = active?.navidromeUsername;
-  final String? password = active?.navidromePassword;
+  //
+  // A3: watch only the Navidrome *base URL* (via `select`) so a credential
+  // change on the same server doesn't rebuild the dio — username/password are
+  // resolved per request inside the interceptor via `ref.read` below.
+  final String baseUrl = ref.watch(
+        activeProfileProvider.select((Profile? p) => p?.navidromeBaseUrl),
+      ) ??
+      '';
 
   final Dio dio = Dio(
     BaseOptions(
@@ -194,8 +208,10 @@ Future<Dio> subsonicDioClient(SubsonicDioClientRef ref) async {
   // the retry only fires on real transport 5xx / network errors.
   dio.interceptors.add(
     SubsonicAuthInterceptor(
-      username: username,
-      password: password,
+      usernameResolver: () =>
+          ref.read(activeProfileProvider)?.navidromeUsername,
+      passwordResolver: () =>
+          ref.read(activeProfileProvider)?.navidromePassword,
     ),
   );
   dio.interceptors.add(RetryInterceptor(dio: dio));

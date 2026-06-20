@@ -631,3 +631,21 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **`--fatal-infos`.** Rejected for now — would fail on the known untouched `main.dart:25` deprecation; not worth gating the whole repo on a third-party plugin's deprecation. Revisit if info-noise grows.
 
 **Reference:** `.github/workflows/android-ci.yml`; `android-publish.yml` (setup mirrored). Debt A21/A18 in `docs/DEBT.md §5`.
+
+## 2026-06-20 — Stateless auth interceptors: resolve credentials per request (debt A3)
+
+**Context:** `BearerAuthInterceptor` (and `SubsonicAuthInterceptor`) captured the bearer token / Navidrome credentials *by value* at `Dio` construction. Because `dioClient`/`subsonicDioClient` watched the whole active `Profile`, any credential change rebuilt the entire `Dio` — discarding its connection pool and re-creating the interceptor chain. In-flight requests on the old instance still sent the stale credential. (A3 was left PARTIAL after the A1 band removed the dual-read violation.)
+
+**Decision:** Make the interceptors stateless w.r.t. credentials. `BearerAuthInterceptor` takes a `String? Function() tokenResolver`; `SubsonicAuthInterceptor` takes `usernameResolver` + `passwordResolver`. Each resolves the current value from `ref.read(activeProfileProvider)` inside `onRequest`. The dio builders now `ref.watch(activeProfileProvider.select((p) => p?.<baseUrl>))`, so the `Dio` rebuilds only when the *base URL* changes.
+
+**Why:**
+- **The base URL is the only field baked into `BaseOptions`** at construction — it genuinely requires a new `Dio`. Credentials live in the per-request query/headers, so they can be resolved lazily without a rebuild. Splitting "watch base URL / read credentials" matches what actually needs a rebuild.
+- **`ref.read` inside the resolver is safe here:** the resolver only fires while a request is in flight, which means a consumer is actively using the dio (obtained via `ref.watch(...Provider.future)`), keeping the provider — and its `ref` — alive. This mirrors the existing `container.read`-in-callback pattern used by the router redirect.
+- **Result:** a token refresh / password change reuses the live `Dio` (pool + chain intact) and the next request transparently uses the new credential; only a server switch (different base URL) pays for a rebuild.
+
+**Alternatives considered:**
+- **Override `options.baseUrl` per request too (fully rebuild-free dio).** Rejected — needless; base-URL changes are rare (profile switch to a different server) and a rebuild there is correct and cheap. Per-request base-URL rewriting would complicate the interceptor for no real gain.
+- **Keep captured values but add a token-refresh hook.** Rejected — still rebuilds on every profile save and doesn't fix the in-flight-stale-token issue; the resolver is simpler and strictly better.
+- **Expose the resolver but keep `username`/`password`/`token` fields for tests.** Rejected — two sources of truth; tests now assert via the resolver (`tokenResolver()` etc.), which is what production uses.
+
+**Reference:** `android/app/lib/api/client.dart` (`BearerAuthInterceptor`, `dioClient` select), `android/app/lib/api/subsonic_client.dart` (`SubsonicAuthInterceptor`, `subsonicDioClient` select). Tests: `test/api/client_test.dart` (A3 group). Debt A3 in `docs/DEBT.md §5`.

@@ -12,13 +12,22 @@ part 'client.g.dart';
 /// token is configured. No header is added when the token is null/empty so
 /// the auth-failure path (401 → redirect to settings) stays uniform between
 /// "token not set yet" and "token rejected by server".
+///
+/// A3: the token is resolved **per request** via [tokenResolver] rather than
+/// captured by value at construction, so a token rotation on the active
+/// profile does not require rebuilding the whole `Dio` (connection pool +
+/// interceptor chain). The dio only rebuilds when the backend *base URL*
+/// changes (see [dioClient]).
 class BearerAuthInterceptor extends Interceptor {
-  BearerAuthInterceptor(this.token);
-  final String? token;
+  BearerAuthInterceptor(this.tokenResolver);
+
+  /// Returns the current bearer token (or null/empty when none is set).
+  /// Called on every `onRequest`.
+  final String? Function() tokenResolver;
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    final String? t = token;
+    final String? t = tokenResolver();
     if (t != null && t.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $t';
     }
@@ -36,9 +45,13 @@ Future<Dio> dioClient(DioClientRef ref) async {
   // legacy single-set keys are gone — `migrateLegacyCreds` (S3) runs before
   // the first `runApp`, and a null active profile means the router redirect
   // (S5) has already sent the user to /login.
-  final Profile? active = ref.watch(activeProfileProvider);
-  final String baseUrl = active?.heerrBaseUrl ?? '';
-  final String? token = active?.heerrBearerToken;
+  //
+  // A3: watch only the *base URL* (via `select`) so a token rotation on the
+  // same server doesn't rebuild the dio — the bearer token is resolved per
+  // request inside the interceptor via `ref.read` below.
+  final String baseUrl =
+      ref.watch(activeProfileProvider.select((Profile? p) => p?.heerrBaseUrl)) ??
+          '';
 
   final Dio dio = Dio(
     BaseOptions(
@@ -54,7 +67,11 @@ Future<Dio> dioClient(DioClientRef ref) async {
   // Order: auth header first, then retry (re-issues through the whole chain on
   // transient 503 / network blips), then logging last so it traces the final
   // outcome. See `interceptors.dart` for the retry/backoff policy.
-  dio.interceptors.add(BearerAuthInterceptor(token));
+  dio.interceptors.add(
+    BearerAuthInterceptor(
+      () => ref.read(activeProfileProvider)?.heerrBearerToken,
+    ),
+  );
   dio.interceptors.add(RetryInterceptor(dio: dio));
   dio.interceptors.add(const DebugLogInterceptor(tag: 'heerr'));
   return dio;
