@@ -1901,3 +1901,8 @@ analyze` clean; `flutter test` green (567 tests).
 - `SubsonicAuthInterceptor` (all API + state-mutating calls) is unchanged: it still rotates the salt per request.
 - Doc comments on both builders updated (the old "salt rotates per call → defeats cache, K1+ work" caveat is now resolved).
 - **Tests:** new "A11" group in `test/api/subsonic_client_test.dart` — cover-art URL identical across two calls, stream URL identical across two calls, explicit `saltGenerator` still overrides. `flutter analyze` clean; full suite 576 green (+3). Resolves DEBT §5 A11.
+
+## 2026-06-20 — A21 (Flutter CI) + A18 (dev_defaults leak check)
+
+- **A21 — `.github/workflows/android-ci.yml` (new):** runs `flutter analyze` + `flutter test` on PRs to `main` and pushes to `main`, path-filtered to `android/**` (+ the workflow file). Setup mirrors `android-publish.yml`: Java 17, Flutter 3.44.0, `working-directory: android/app`, seeds `lib/dev_defaults.dart` from the all-null example, `flutter pub get`, then `dart run build_runner build`. No keystore/secrets — this job never builds a signed artifact. Enforces the "green before / green after" gate from `android/CLAUDE.md §Development workflow` pre-merge instead of by hand. Resolves DEBT §5 A21.
+- **A18 — dev_defaults leak check (no code change):** verified `lib/dev_defaults.dart` is gitignored (`git check-ignore` matches), untracked, and absent from history (`git log --all` empty for it). It holds a Tailnet IP + username but no token; `dev_defaults.example.dart` is all-null. The DEBT premise ("is committed") was stale — marked accordingly, no action needed.

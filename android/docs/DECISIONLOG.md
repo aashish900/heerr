@@ -612,3 +612,22 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **A Flutter `ImageCache` / `CachedNetworkImage` layer instead.** Heavier (new dependency / disk-cache lifecycle) and orthogonal — the salt was the root cause of cache misses; fix that first.
 
 **Reference:** `android/app/lib/api/subsonic_client.dart` (`sessionStableSalt`, both builders). Tests: `test/api/subsonic_client_test.dart` (A11 group). Debt A11 in `docs/DEBT.md §5`.
+
+## 2026-06-20 — Flutter CI workflow + dev_defaults leak verification (debt A21/A18)
+
+**Context:** `android/CLAUDE.md §Development workflow` mandates `flutter analyze` + `flutter test` green before and after every task, but enforcement was manual — no CI ran them (A21). The audit also flagged `dev_defaults.dart` as a committed-secrets risk (A18).
+
+**Decision:**
+- **A21 —** add `.github/workflows/android-ci.yml` running `flutter analyze` + `flutter test`, triggered on PRs to `main` and pushes to `main`, path-filtered to `android/**`. Reuse the exact toolchain setup from `android-publish.yml` (Java 17, Flutter 3.44.0, `android/app` working dir, dev_defaults seeded from the example, pub get + codegen).
+- **A18 —** no change; verified the file is gitignored, untracked, never in history, and token-free. Corrected the stale DEBT entry.
+
+**Why:**
+- **Mirror the publish workflow rather than invent a new setup** so the CI Flutter version / codegen steps can't drift from the release build. The CI job diverges only by dropping the keystore/signing steps (not needed to analyze + test) and substituting `analyze`+`test` for `build apk`.
+- **Path filtering** keeps backend/docs PRs from spending Android CI minutes, matching the existing `backend-ci.yml` convention.
+- **`flutter analyze` info-level lints don't fail the job** (only errors/warnings do), so the pre-existing `main.dart:25` workmanager deprecation won't red the build; a real regression (error/warning) will.
+
+**Alternatives considered:**
+- **Fold analyze/test into `android-publish.yml`.** Rejected — publish is tag-triggered (post-merge); the gate has to run on PRs to block bad merges.
+- **`--fatal-infos`.** Rejected for now — would fail on the known untouched `main.dart:25` deprecation; not worth gating the whole repo on a third-party plugin's deprecation. Revisit if info-noise grows.
+
+**Reference:** `.github/workflows/android-ci.yml`; `android-publish.yml` (setup mirrored). Debt A21/A18 in `docs/DEBT.md §5`.

@@ -1,0 +1,78 @@
+# Android (Flutter) CI: analyze + test on every PR + on pushes to main.
+# Mirrors the "green before / green after" gates in android/CLAUDE.md
+# (§Development workflow) so the manual ROADMAP checkpoint is enforced
+# pre-merge instead of by hand.
+#
+# Triggers:
+#   - pull_request to main, filtered to android/** and this workflow file —
+#     so unrelated backend / docs PRs don't waste CI minutes here.
+#   - push to main, same path filter — keeps the main-branch status badge
+#     accurate even when a PR is merged via a path that skipped the PR run.
+#
+# Setup mirrors android-publish.yml (Java 17 + Flutter 3.44.0, working
+# directory android/app, dev_defaults seeded from the all-null example so
+# the tree compiles without the gitignored local copy). No keystore /
+# secrets are needed — this job never builds a signed artifact.
+
+name: android CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "android/**"
+      - ".github/workflows/android-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - ".github/workflows/android-ci.yml"
+
+jobs:
+  android:
+    name: analyze + test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: android/app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter 3.44.0
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.0"
+          channel: stable
+          cache: true
+
+      # lib/dev_defaults.dart is gitignored (holds Tailnet IPs / personal
+      # username on the developer's machine). login_screen.dart imports it
+      # directly, so CI needs a copy to compile. The committed
+      # dev_defaults.example.dart has all-null fields — same surface, no
+      # secrets — so dropping it in here is safe.
+      - name: Seed dev_defaults.dart from example (CI-only)
+        run: |
+          if [ ! -f lib/dev_defaults.dart ]; then
+            cp lib/dev_defaults.example.dart lib/dev_defaults.dart
+          fi
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run code generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
