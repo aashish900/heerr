@@ -159,7 +159,7 @@ Findings from a senior-Android-dev architectural pass over `android/app/lib/` (1
 
 ### Suggested order of attack (architectural)
 
-1. **A1 → A4 → A5** in one band: kill the dual credential system and the secure-storage misuse together; the rest of P0/P1 piggy-backs on the cleaner state shape.
+1. ✅ **A1 → A4 → A5** in one band: kill the dual credential system and the secure-storage misuse together; the rest of P0/P1 piggy-backs on the cleaner state shape.
 2. ✅ **A6 → A7** (model consolidation) — done 2026-06-19. A7 collapsed into the A1 band; A6 shipped as the `ServerCreds` + `OfflineSettings` split.
 3. **A9** (retry+logging interceptor) — small, isolated, immediate UX win on transient backend failures.
 4. **A2 + A15** — both about reactive lifecycle correctness; fix together.
