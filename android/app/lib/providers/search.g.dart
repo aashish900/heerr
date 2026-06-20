@@ -26,7 +26,7 @@ final searchDebounceProvider = Provider<Duration>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef SearchDebounceRef = ProviderRef<Duration>;
-String _$ytmSearchHash() => r'b78720deab049defe27ed65e49af0cb67f920e10';
+String _$ytmSearchHash() => r'cccfa1b6fff81377da1c9bb5927db89a1023a2b6';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -49,86 +49,58 @@ class _SystemHash {
   }
 }
 
-/// `POST /search` against the heerr backend (YouTube-Music search).
+/// `POST /search` against the heerr backend (YouTube-Music search), via
+/// [BackendService].
 ///
 /// Family-keyed by the query string so the combined-search orchestrator can
-/// pull the result for the current query directly. The standalone Search tab
-/// no longer exists (subsumed by Library at I1/I2), so the old
-/// `searchQueryProvider` + singleton `searchResultsProvider` are gone — query
-/// is now an explicit parameter.
+/// pull the result for the current query directly.
 ///
 /// Empty / whitespace-only queries short-circuit to an empty `SearchResponse`
 /// without hitting the network. Non-empty queries are debounced (default
 /// 300ms via [searchDebounceProvider]) and any in-flight request is cancelled
 /// when the family key changes via a `CancelToken` tied to `ref.onDispose`.
-///
-/// Content type is fixed to [ContentType.song] for now — the combined search
-/// UI surfaces songs/albums/artists from the library half (via Subsonic
-/// search3) and matches the YT half on songs. If we ever want to search YT
-/// albums/playlists from the library tab, lift the type into the family key.
 ///
 /// Copied from [ytmSearch].
 @ProviderFor(ytmSearch)
 const ytmSearchProvider = YtmSearchFamily();
 
-/// `POST /search` against the heerr backend (YouTube-Music search).
+/// `POST /search` against the heerr backend (YouTube-Music search), via
+/// [BackendService].
 ///
 /// Family-keyed by the query string so the combined-search orchestrator can
-/// pull the result for the current query directly. The standalone Search tab
-/// no longer exists (subsumed by Library at I1/I2), so the old
-/// `searchQueryProvider` + singleton `searchResultsProvider` are gone — query
-/// is now an explicit parameter.
+/// pull the result for the current query directly.
 ///
 /// Empty / whitespace-only queries short-circuit to an empty `SearchResponse`
 /// without hitting the network. Non-empty queries are debounced (default
 /// 300ms via [searchDebounceProvider]) and any in-flight request is cancelled
 /// when the family key changes via a `CancelToken` tied to `ref.onDispose`.
 ///
-/// Content type is fixed to [ContentType.song] for now — the combined search
-/// UI surfaces songs/albums/artists from the library half (via Subsonic
-/// search3) and matches the YT half on songs. If we ever want to search YT
-/// albums/playlists from the library tab, lift the type into the family key.
-///
 /// Copied from [ytmSearch].
 class YtmSearchFamily extends Family<AsyncValue<SearchResponse>> {
-  /// `POST /search` against the heerr backend (YouTube-Music search).
+  /// `POST /search` against the heerr backend (YouTube-Music search), via
+  /// [BackendService].
   ///
   /// Family-keyed by the query string so the combined-search orchestrator can
-  /// pull the result for the current query directly. The standalone Search tab
-  /// no longer exists (subsumed by Library at I1/I2), so the old
-  /// `searchQueryProvider` + singleton `searchResultsProvider` are gone — query
-  /// is now an explicit parameter.
+  /// pull the result for the current query directly.
   ///
   /// Empty / whitespace-only queries short-circuit to an empty `SearchResponse`
   /// without hitting the network. Non-empty queries are debounced (default
   /// 300ms via [searchDebounceProvider]) and any in-flight request is cancelled
   /// when the family key changes via a `CancelToken` tied to `ref.onDispose`.
-  ///
-  /// Content type is fixed to [ContentType.song] for now — the combined search
-  /// UI surfaces songs/albums/artists from the library half (via Subsonic
-  /// search3) and matches the YT half on songs. If we ever want to search YT
-  /// albums/playlists from the library tab, lift the type into the family key.
   ///
   /// Copied from [ytmSearch].
   const YtmSearchFamily();
 
-  /// `POST /search` against the heerr backend (YouTube-Music search).
+  /// `POST /search` against the heerr backend (YouTube-Music search), via
+  /// [BackendService].
   ///
   /// Family-keyed by the query string so the combined-search orchestrator can
-  /// pull the result for the current query directly. The standalone Search tab
-  /// no longer exists (subsumed by Library at I1/I2), so the old
-  /// `searchQueryProvider` + singleton `searchResultsProvider` are gone — query
-  /// is now an explicit parameter.
+  /// pull the result for the current query directly.
   ///
   /// Empty / whitespace-only queries short-circuit to an empty `SearchResponse`
   /// without hitting the network. Non-empty queries are debounced (default
   /// 300ms via [searchDebounceProvider]) and any in-flight request is cancelled
   /// when the family key changes via a `CancelToken` tied to `ref.onDispose`.
-  ///
-  /// Content type is fixed to [ContentType.song] for now — the combined search
-  /// UI surfaces songs/albums/artists from the library half (via Subsonic
-  /// search3) and matches the YT half on songs. If we ever want to search YT
-  /// albums/playlists from the library tab, lift the type into the family key.
   ///
   /// Copied from [ytmSearch].
   YtmSearchProvider call(String query) {
@@ -155,43 +127,29 @@ class YtmSearchFamily extends Family<AsyncValue<SearchResponse>> {
   String? get name => r'ytmSearchProvider';
 }
 
-/// `POST /search` against the heerr backend (YouTube-Music search).
+/// `POST /search` against the heerr backend (YouTube-Music search), via
+/// [BackendService].
 ///
 /// Family-keyed by the query string so the combined-search orchestrator can
-/// pull the result for the current query directly. The standalone Search tab
-/// no longer exists (subsumed by Library at I1/I2), so the old
-/// `searchQueryProvider` + singleton `searchResultsProvider` are gone — query
-/// is now an explicit parameter.
+/// pull the result for the current query directly.
 ///
 /// Empty / whitespace-only queries short-circuit to an empty `SearchResponse`
 /// without hitting the network. Non-empty queries are debounced (default
 /// 300ms via [searchDebounceProvider]) and any in-flight request is cancelled
 /// when the family key changes via a `CancelToken` tied to `ref.onDispose`.
 ///
-/// Content type is fixed to [ContentType.song] for now — the combined search
-/// UI surfaces songs/albums/artists from the library half (via Subsonic
-/// search3) and matches the YT half on songs. If we ever want to search YT
-/// albums/playlists from the library tab, lift the type into the family key.
-///
 /// Copied from [ytmSearch].
 class YtmSearchProvider extends AutoDisposeFutureProvider<SearchResponse> {
-  /// `POST /search` against the heerr backend (YouTube-Music search).
+  /// `POST /search` against the heerr backend (YouTube-Music search), via
+  /// [BackendService].
   ///
   /// Family-keyed by the query string so the combined-search orchestrator can
-  /// pull the result for the current query directly. The standalone Search tab
-  /// no longer exists (subsumed by Library at I1/I2), so the old
-  /// `searchQueryProvider` + singleton `searchResultsProvider` are gone — query
-  /// is now an explicit parameter.
+  /// pull the result for the current query directly.
   ///
   /// Empty / whitespace-only queries short-circuit to an empty `SearchResponse`
   /// without hitting the network. Non-empty queries are debounced (default
   /// 300ms via [searchDebounceProvider]) and any in-flight request is cancelled
   /// when the family key changes via a `CancelToken` tied to `ref.onDispose`.
-  ///
-  /// Content type is fixed to [ContentType.song] for now — the combined search
-  /// UI surfaces songs/albums/artists from the library half (via Subsonic
-  /// search3) and matches the YT half on songs. If we ever want to search YT
-  /// albums/playlists from the library tab, lift the type into the family key.
   ///
   /// Copied from [ytmSearch].
   YtmSearchProvider(String query)

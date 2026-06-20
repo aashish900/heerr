@@ -6,7 +6,7 @@ part of 'library_playlist.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$libraryPlaylistHash() => r'549031db9f14e89bdf9f482541445a82143cfefc';
+String _$libraryPlaylistHash() => r'9af5c3415291cd9f57904025703d2e1a86b0bac6';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -29,8 +29,8 @@ class _SystemHash {
   }
 }
 
-/// Wraps `GET /rest/getPlaylist.view?id=<id>`. Returns one [Playlist] with
-/// its `entry` list populated (each entry is a song).
+/// Wraps `GET /rest/getPlaylist.view?id=<id>` (via [SubsonicLibraryService]).
+/// Returns one [Playlist] with its `entry` list populated.
 ///
 /// L5: cache-aware. See [libraryAlbum] for the contract.
 ///
@@ -38,23 +38,23 @@ class _SystemHash {
 @ProviderFor(libraryPlaylist)
 const libraryPlaylistProvider = LibraryPlaylistFamily();
 
-/// Wraps `GET /rest/getPlaylist.view?id=<id>`. Returns one [Playlist] with
-/// its `entry` list populated (each entry is a song).
+/// Wraps `GET /rest/getPlaylist.view?id=<id>` (via [SubsonicLibraryService]).
+/// Returns one [Playlist] with its `entry` list populated.
 ///
 /// L5: cache-aware. See [libraryAlbum] for the contract.
 ///
 /// Copied from [libraryPlaylist].
 class LibraryPlaylistFamily extends Family<AsyncValue<Playlist>> {
-  /// Wraps `GET /rest/getPlaylist.view?id=<id>`. Returns one [Playlist] with
-  /// its `entry` list populated (each entry is a song).
+  /// Wraps `GET /rest/getPlaylist.view?id=<id>` (via [SubsonicLibraryService]).
+  /// Returns one [Playlist] with its `entry` list populated.
   ///
   /// L5: cache-aware. See [libraryAlbum] for the contract.
   ///
   /// Copied from [libraryPlaylist].
   const LibraryPlaylistFamily();
 
-  /// Wraps `GET /rest/getPlaylist.view?id=<id>`. Returns one [Playlist] with
-  /// its `entry` list populated (each entry is a song).
+  /// Wraps `GET /rest/getPlaylist.view?id=<id>` (via [SubsonicLibraryService]).
+  /// Returns one [Playlist] with its `entry` list populated.
   ///
   /// L5: cache-aware. See [libraryAlbum] for the contract.
   ///
@@ -85,15 +85,15 @@ class LibraryPlaylistFamily extends Family<AsyncValue<Playlist>> {
   String? get name => r'libraryPlaylistProvider';
 }
 
-/// Wraps `GET /rest/getPlaylist.view?id=<id>`. Returns one [Playlist] with
-/// its `entry` list populated (each entry is a song).
+/// Wraps `GET /rest/getPlaylist.view?id=<id>` (via [SubsonicLibraryService]).
+/// Returns one [Playlist] with its `entry` list populated.
 ///
 /// L5: cache-aware. See [libraryAlbum] for the contract.
 ///
 /// Copied from [libraryPlaylist].
 class LibraryPlaylistProvider extends AutoDisposeFutureProvider<Playlist> {
-  /// Wraps `GET /rest/getPlaylist.view?id=<id>`. Returns one [Playlist] with
-  /// its `entry` list populated (each entry is a song).
+  /// Wraps `GET /rest/getPlaylist.view?id=<id>` (via [SubsonicLibraryService]).
+  /// Returns one [Playlist] with its `entry` list populated.
   ///
   /// L5: cache-aware. See [libraryAlbum] for the contract.
   ///

@@ -517,3 +517,176 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Reference:** `android/app/lib/{providers/{server_creds}.dart (new), offline/{offline_settings,offline_paths,offline_manifest,library_cache,offline_downloader,offline_marker,offline_size_estimator,offline_sync}.dart, player/{playback_actions,now_playing_persistence}.dart, providers/library/favourites.dart, screens/{settings_screen,library/playlist_detail_screen}.dart, widgets/{add_to_playlist_sheet,library_cover_art}.dart}`; `providers/settings.dart` deleted. Tests: `test/support/cred_test_support.dart` (`testCreds()` added), `test/offline/*`, `test/providers/seed_collection_provider_test.dart`, `test/screens/{settings_screen,library/playlist_detail_screen}_test.dart`; `test/providers/settings_test.dart` deleted. Debt A6/A7 in `docs/DEBT.md` §5.
 
 ---
+
+## 2026-06-20 — Retry + debug-log dio interceptors (debt A9)
+
+**Context:** `docs/CONTEXT.md` describes the HTTP stack as "Interceptors for the auth header + retry-on-503 + logging", but only the auth header (`BearerAuthInterceptor` / `SubsonicAuthInterceptor`) was ever implemented. 503s from the heerr backend (forwarded Spotify upstream rate-limits) were mapped to `RateLimitedError` with a parsed `Retry-After` and thrown straight to the caller — every transient blip became a user-visible snackbar (DEBT §5 A9).
+
+**Decision:** Add `lib/api/interceptors.dart` with two interceptors, wired into both `dioClient` and `subsonicDioClient` in order **auth → retry → log**:
+
+1. **`RetryInterceptor`** (hand-rolled, no new dependency). Bounded to `maxRetries` (default 2 ⇒ 3 attempts), attempt count stashed in `RequestOptions.extra`. Retries:
+   - connection / send / receive timeouts + connection errors — exponential backoff `backoffBase * 2^n` (default base 500ms);
+   - HTTP 503 — honours `Retry-After` **only when ≤ `maxRetryAfter`** (default 5s); a longer wait returns `null` (give up) so the `RateLimitedError` reaches the UI with the real countdown instead of the app silently hanging. Absent `Retry-After` falls back to backoff.
+   - Everything else (401/403/404/422, other 5xx, Subsonic envelope failures) flows straight through to `mapDioErrorToApiError`.
+   Re-issues via `dio.fetch(req)` so the full interceptor chain (auth header) re-runs each attempt; recursion is bounded by the attempt counter.
+2. **`DebugLogInterceptor`** — request/response/error tracing gated on `kDebugMode`, written via `debugPrint` (CLAUDE "no `print`" rule), redacting the `Authorization` header to `***`.
+
+**Why:**
+- **Hand-rolled over `dio_smart_retry`.** The policy we need (cap on honoured `Retry-After`, give-up-to-surface-`RateLimitedError`) is bespoke; a dep would still need a custom `retryEvaluator`. The repo already prefers minimal deps (see the in-process fake adapter in `client_test.dart` vs `http_mock_adapter`).
+- **Cap-then-surface on 503.** Short rate-limits (a few seconds) are best retried silently; long ones (Spotify can say 30–60s) are better shown to the user with the existing `RateLimitedError` countdown than blocking a request for a minute. 5s is the split.
+- **Both clients.** Subsonic envelope failures are HTTP 200 (handled by `subsonicCall`), but real transport 5xx / network errors on Navidrome are just as transient as on heerr, so the same retry applies.
+
+**Alternatives considered:**
+- **`dio_smart_retry` package.** Rejected — adds a dep for behaviour we'd still have to override; the give-up-to-surface semantics don't map cleanly to its retry-everything default.
+- **dio's built-in `LogInterceptor`.** Rejected — defaults to `print` and logs the `Authorization` header verbatim. The custom one uses `debugPrint` and redacts.
+- **Retry all 5xx, not just 503.** Rejected — 500/502/504 from the backend are not the documented transient class; only 503 carries the `Retry-After` contract. Network-level errors cover the genuinely-transient transport failures.
+
+**Trade-off:** retrying covers idempotent reads and the dedup-protected `POST /download` safely, but a `POST` that the server processed before a `receiveTimeout` could be re-sent. Accepted: the backend dedupes downloads, and search/recommend are side-effect-free; the alternative (no retry) is the current snackbar-on-every-blip behaviour A9 set out to fix.
+
+**Reference:** `android/app/lib/api/interceptors.dart` (new); `lib/api/client.dart`, `lib/api/subsonic_client.dart` (wiring); `test/api/interceptors_test.dart` (8 cases). DEBT §5 A9.
+
+---
+
+## 2026-06-20 — Reactive lifecycle: router refreshListenable + offline-sync active-profile gate (debt A2/A15)
+
+**Context:** The 2026-06-18 audit (`docs/DEBT.md §5`) flagged two reactive-correctness gaps that share a root cause — state that should react to the active profile didn't:
+- **A2:** the GoRouter S5 redirect read `profileRegistryProvider` via `container.read` with no `refreshListenable`, so it only re-evaluated on navigation events. Removing the active profile in Settings left the user on a screen rendered against a torn-down profile until the next tab tap.
+- **A15:** `OfflineSync` is `@Riverpod(keepAlive: true)` and starts its Timer inside `build`. On a fresh install the user lingers on `/login` (no creds), but the keep-alive provider had already built and was ticking (each `_runTick` early-returning `'no creds'`) with no foreground lifecycle observer mounted.
+
+**Decision:**
+1. **A2 —** `buildHeerrRouter` constructs a `_RouterRefresh extends ChangeNotifier` that subscribes to `profileRegistryProvider` via `container.listen` and `notifyListeners()` on every change, and passes it as `refreshListenable:`. GoRouter re-runs the redirect whenever the registry changes — most importantly when `activeId` goes null → `/login`.
+2. **A15 —** `OfflineSync.build` now `ref.watch(activeProfileProvider)` and returns `_kIdle` when null (no `_runTick`, no Timer). It also cancels any leftover Timer at the top of every rebuild, since a watched-dependency change re-runs `build` on the same keep-alive notifier instance and `ref.onDispose` only fires on full disposal, not on rebuild.
+
+**Why:**
+- **A2 is the canonical `refreshListenable` use case.** A `ChangeNotifier` bridge is the documented go_router pattern for "re-run redirect when external auth state changes." Lifetime is self-managing: `container.listen`'s subscription auto-closes on container dispose, and GoRouter removes its own listener on `dispose()` (called in `_HeerrAppState.dispose`), so `_RouterRefresh` needs no explicit teardown and the no-arg `buildHeerrRouter()` test path is unaffected (refresh is null without a container).
+- **A15 gates the cause, not the symptom.** `_runTick` already no-ops on `'no creds'`, but it still ran and scheduled the next Timer. Watching `activeProfileProvider` makes "logged in" the precondition for ticking, and because it's a watch, login transparently rebuilds the provider and runs the first tick — no separate "kick on login" wiring.
+
+**Alternatives considered:**
+- **A2 via a periodic redirect / polling.** Rejected — `refreshListenable` is event-driven and exact; polling is wasteful and laggy.
+- **A2 listening to `activeProfileProvider` instead of `profileRegistryProvider`.** Equivalent for the null-active case, but the redirect body already reads the registry (including its loading state), so listening to the same source keeps "what triggers re-eval" and "what the redirect reads" aligned.
+- **A15 by moving the lifecycle observer to app level (A8).** That's the broader refactor tracked separately as A8; the build-gate is the minimal fix for the wasted-ticks-on-/login symptom and is independent of where the observer lives.
+- **A15 gating inside `_runTick` only.** Already present (`'no creds'`), but it doesn't stop the Timer from being scheduled — the gate has to be in `build`.
+
+**Reference:** `android/app/lib/router.dart` (`_RouterRefresh`, `refreshListenable:`), `android/app/lib/offline/offline_sync.dart` (`build` active-profile gate + Timer cancel). Tests: `test/router_test.dart` (A2 group, `_MapStorage`), `test/offline/offline_sync_test.dart` (A15 guard). Debt A2/A15 in `docs/DEBT.md §5`.
+
+---
+
+## 2026-06-20 — Router god-file split + Repository/Service layer (debt A8/A10)
+
+**Context:** The 2026-06-18 audit (`docs/DEBT.md §5`) flagged two structural items:
+- **A8:** `router.dart` was a god file — its `_ShellScaffold` State class owned six unrelated app-lifecycle side-effects on top of the bottom-nav chrome (SRP violation; the shell couldn't be tested without dragging all six in).
+- **A10:** no Repository/Service layer — providers called `dio` and parsed JSON envelopes inline, coupling Riverpod state + transport + JSON shape, so transport couldn't be unit-tested without standing up a container.
+
+**Decision:**
+1. **A8 —** extracted the lifecycle concern into `lib/app/lifecycle_coordinator.dart` (`LifecycleCoordinator`, a `ConsumerStatefulWidget` with `WidgetsBindingObserver`). The ShellRoute builder wraps the shell: `LifecycleCoordinator(child: _ShellScaffold(...))`. `_ShellScaffold` is now pure nav chrome.
+2. **A10 —** introduced four service seams under `lib/services/`: `SubsonicLibraryService` (Subsonic reads), `PlaylistService` (Subsonic mutations), `BackendService` (heerr REST), `LyricsService` (two-stage lyrics). Each is a plain class holding only a `Dio`, with one method per call (issued through the existing `subsonicCall` / `apiCall` helpers) returning typed models. Each is exposed via an async `*ServiceProvider` that awaits the existing dio provider. The 15 inline-dio providers now delegate to a service; Riverpod-bound concerns (debounce, cancel tokens, dedupe, index ordering, invalidation) stay in the providers. Done as A10 **entirely** in one commit (all inline-dio providers, not a single pilot domain).
+
+**Why:**
+- **Service providers read the same dio providers**, so the injection point that every existing test already mocks (`subsonicDioClientProvider` / `dioClientProvider` overridden with a fake-adapter Dio) sits *below* the service — the whole pre-existing test suite passes unchanged, and new transport tests can construct a service directly from a Dio with no container (proven by `test/services/subsonic_library_service_test.dart`).
+- **Parsing lives in the service, orchestration in the provider.** This is the SRP split the audit asked for without rewriting the cache-aware / debounce / polling machinery that the providers already get right.
+- **The offline subsystem was already factored** — `downloadSong` takes an injected `Dio` and `offline_sync` composes existing providers — so A10 needed nothing there. The DEBT evidence line citing `offline_sync` as "transport+filesystem+state in one provider" was stale w.r.t. the current downloader seam.
+
+**Alternatives considered:**
+- **A10 as a single pilot domain (search) with the rest deferred.** Recommended in planning to bound risk, but the user chose to do A10 entirely in one commit. Feasible at low risk precisely because the test injection point is below the service layer (see Why), so behaviour is preserved by construction.
+- **One mega `SubsonicService` covering reads + mutations.** Rejected — keeping reads (`SubsonicLibraryService`) separate from mutations (`PlaylistService`) matches the query/command split and keeps each surface small.
+- **Splitting backend into `BackendJobService` + a separate search/recommend service** (the original planning grouping). Collapsed into one `BackendService` since all those calls share the single bearer-auth `dioClientProvider`; splitting them would be hair-splitting with no test or cohesion benefit.
+- **A8 keeping the observer in the shell but extracting helpers.** Rejected — the observer + its side-effects are the concern to isolate; a half-move wouldn't make the shell testable in isolation.
+
+**Reference:** `android/app/lib/app/lifecycle_coordinator.dart`, `android/app/lib/router.dart`, `android/app/lib/services/{subsonic_library_service,playlist_service,backend_service,lyrics_service}.dart`, and the delegating providers under `android/app/lib/providers/**`. Tests: `test/app/lifecycle_coordinator_test.dart`, `test/services/subsonic_library_service_test.dart`. Debt A8/A10 in `docs/DEBT.md §5`.
+
+## 2026-06-20 — Session-stable salt for read-only Subsonic URLs (debt A11)
+
+**Context:** `buildSubsonicCoverArtUrl` / `buildSubsonicStreamUrl` generated a fresh random salt on every call (`api/subsonic_client.dart`). Because the salt is part of the query string, the URL changed on every render — so `Image.network` (URL-keyed cache) cold-fetched every cover-art tile on every Library/Home scroll. The code comment already flagged this as deferred K1+ work.
+
+**Decision:** Introduce a process-lifetime `sessionStableSalt()` (lazily initialised once per process) and make it the default salt for both read-only URL builders. The per-request `SubsonicAuthInterceptor` (every API GET + all state-mutating playlist calls) is left rotating per request.
+
+**Why:**
+- Subsonic auth tokens are `md5(password + salt)`; Navidrome validates each request independently and accepts a stable salt within a session, so a fixed salt is just as valid as a rotating one for read-only fetches.
+- A stable salt makes the cover-art URL deterministic for a given `coverArtId`+`size`, which is the precondition for Flutter's image cache to hit — the actual fix for the scroll-time cold-fetch.
+- The salt is **password-independent**: a profile switch (new password) still yields a valid token from the same salt, so the salt needs no reset on switch and the change is invisible to the multi-profile machinery.
+- Keeping per-request rotation on the interceptor preserves the conventional Subsonic posture for the calls that actually mutate state.
+
+**Alternatives considered:**
+- **A `saltPolicy` enum param** (as the DEBT note literally suggested). Rejected as over-engineered — every production caller of the read-only builders wants the stable policy, and tests already inject an explicit `saltGenerator`, so a sensible default covers both without a new parameter.
+- **Time-bucketed salt (rotate hourly).** Unnecessary complexity; a stable salt is valid for the whole session and the cache benefit is strictly better.
+- **A Flutter `ImageCache` / `CachedNetworkImage` layer instead.** Heavier (new dependency / disk-cache lifecycle) and orthogonal — the salt was the root cause of cache misses; fix that first.
+
+**Reference:** `android/app/lib/api/subsonic_client.dart` (`sessionStableSalt`, both builders). Tests: `test/api/subsonic_client_test.dart` (A11 group). Debt A11 in `docs/DEBT.md §5`.
+
+## 2026-06-20 — Flutter CI workflow + dev_defaults leak verification (debt A21/A18)
+
+**Context:** `android/CLAUDE.md §Development workflow` mandates `flutter analyze` + `flutter test` green before and after every task, but enforcement was manual — no CI ran them (A21). The audit also flagged `dev_defaults.dart` as a committed-secrets risk (A18).
+
+**Decision:**
+- **A21 —** add `.github/workflows/android-ci.yml` running `flutter analyze` + `flutter test`, triggered on PRs to `main` and pushes to `main`, path-filtered to `android/**`. Reuse the exact toolchain setup from `android-publish.yml` (Java 17, Flutter 3.44.0, `android/app` working dir, dev_defaults seeded from the example, pub get + codegen).
+- **A18 —** no change; verified the file is gitignored, untracked, never in history, and token-free. Corrected the stale DEBT entry.
+
+**Why:**
+- **Mirror the publish workflow rather than invent a new setup** so the CI Flutter version / codegen steps can't drift from the release build. The CI job diverges only by dropping the keystore/signing steps (not needed to analyze + test) and substituting `analyze`+`test` for `build apk`.
+- **Path filtering** keeps backend/docs PRs from spending Android CI minutes, matching the existing `backend-ci.yml` convention.
+- **`flutter analyze` info-level lints don't fail the job** (only errors/warnings do), so the pre-existing `main.dart:25` workmanager deprecation won't red the build; a real regression (error/warning) will.
+
+**Alternatives considered:**
+- **Fold analyze/test into `android-publish.yml`.** Rejected — publish is tag-triggered (post-merge); the gate has to run on PRs to block bad merges.
+- **`--fatal-infos`.** Rejected for now — would fail on the known untouched `main.dart:25` deprecation; not worth gating the whole repo on a third-party plugin's deprecation. Revisit if info-noise grows.
+
+**Reference:** `.github/workflows/android-ci.yml`; `android-publish.yml` (setup mirrored). Debt A21/A18 in `docs/DEBT.md §5`.
+
+## 2026-06-20 — Stateless auth interceptors: resolve credentials per request (debt A3)
+
+**Context:** `BearerAuthInterceptor` (and `SubsonicAuthInterceptor`) captured the bearer token / Navidrome credentials *by value* at `Dio` construction. Because `dioClient`/`subsonicDioClient` watched the whole active `Profile`, any credential change rebuilt the entire `Dio` — discarding its connection pool and re-creating the interceptor chain. In-flight requests on the old instance still sent the stale credential. (A3 was left PARTIAL after the A1 band removed the dual-read violation.)
+
+**Decision:** Make the interceptors stateless w.r.t. credentials. `BearerAuthInterceptor` takes a `String? Function() tokenResolver`; `SubsonicAuthInterceptor` takes `usernameResolver` + `passwordResolver`. Each resolves the current value from `ref.read(activeProfileProvider)` inside `onRequest`. The dio builders now `ref.watch(activeProfileProvider.select((p) => p?.<baseUrl>))`, so the `Dio` rebuilds only when the *base URL* changes.
+
+**Why:**
+- **The base URL is the only field baked into `BaseOptions`** at construction — it genuinely requires a new `Dio`. Credentials live in the per-request query/headers, so they can be resolved lazily without a rebuild. Splitting "watch base URL / read credentials" matches what actually needs a rebuild.
+- **`ref.read` inside the resolver is safe here:** the resolver only fires while a request is in flight, which means a consumer is actively using the dio (obtained via `ref.watch(...Provider.future)`), keeping the provider — and its `ref` — alive. This mirrors the existing `container.read`-in-callback pattern used by the router redirect.
+- **Result:** a token refresh / password change reuses the live `Dio` (pool + chain intact) and the next request transparently uses the new credential; only a server switch (different base URL) pays for a rebuild.
+
+**Alternatives considered:**
+- **Override `options.baseUrl` per request too (fully rebuild-free dio).** Rejected — needless; base-URL changes are rare (profile switch to a different server) and a rebuild there is correct and cheap. Per-request base-URL rewriting would complicate the interceptor for no real gain.
+- **Keep captured values but add a token-refresh hook.** Rejected — still rebuilds on every profile save and doesn't fix the in-flight-stale-token issue; the resolver is simpler and strictly better.
+- **Expose the resolver but keep `username`/`password`/`token` fields for tests.** Rejected — two sources of truth; tests now assert via the resolver (`tokenResolver()` etc.), which is what production uses.
+
+**Reference:** `android/app/lib/api/client.dart` (`BearerAuthInterceptor`, `dioClient` select), `android/app/lib/api/subsonic_client.dart` (`SubsonicAuthInterceptor`, `subsonicDioClient` select). Tests: `test/api/client_test.dart` (A3 group). Debt A3 in `docs/DEBT.md §5`.
+
+## 2026-06-20 — Offline-sync perf + robustness: queue worker pool, bounded fan-out, connectivity-stream trigger (debt A12/A13/A14)
+
+**Context:** The 2026-06-18 audit flagged three offline-sync (`offline/offline_sync.dart`) smells: (A12) the download worker pool shared a mutable `List` via `removeAt(0)` + reassigned `songsState` across workers — race-free only by accident of the single-threaded event loop; (A13) `_resolveTargets` fanned out artist→albums and album/playlist detail fetches fully sequentially, so a sync-all serialized every album request; (A14) the Wi-Fi gate was poll-only, so a reconnect waited out the poll interval (up to 15 min).
+
+**Decision:**
+- **A12 —** pull downloads from an explicit `Queue<Song>` (`removeFirst()`), and mutate a single `songsState` map in place instead of rebuilding it via spread per worker.
+- **A13 —** add a `_forEachBounded(items, action)` helper (shared `Queue` + `_kResolveConcurrency = 4` workers) and route all three resolution loops through it.
+- **A14 —** add `Stream<bool> get onWifiChanged` to `WifiCheck` (default: `Stream.empty()`; production maps `onConnectivityChanged`), subscribe in `build`, and fire `_tick()` on a false→true transition.
+
+**Why:**
+- **Type-enforced invariants over reasoning about interleaving (A12).** A `Queue.removeFirst()` makes "each song handed to exactly one worker" structural; the previous `List.removeAt(0)` was correct only as long as nobody inserted an `await` between the `isNotEmpty` check and the removal. In-place map mutation is atomic per assignment on the single isolate, so concurrent workers can't lose updates.
+- **Bounded, not unbounded, parallelism (A13).** A naive `Future.wait` over every album would open hundreds of sockets on a large sync-all; capping at 4 keeps the device responsive and the server happy while still removing the serial bottleneck. The same `Queue`-pull pattern as A12 keeps the dedup-by-`song.id` contract intact.
+- **Event-driven Wi-Fi (A14).** `connectivity_plus` already exposes the stream; subscribing is strictly better than polling for responsiveness. Guarding on `_paused`/`_running` and letting `_runTick` re-check every gate means the trigger is cheap and idempotent — a spurious or redundant event can't double-download or run while backgrounded. The earlier deliberate avoidance of the stream (to keep fakes simple) is resolved by giving `WifiCheck` a no-op default so existing fakes only opt in when they test A14.
+
+**Alternatives considered:**
+- **A `pool`/semaphore package for A12/A13.** Rejected — a hand-rolled `Queue` + N workers is a few lines, dependency-free, and already the established pattern in `_runTick`.
+- **Run album + playlist resolution concurrently with each other (A13).** Skipped — within-loop parallelism captures the win; cross-loop concurrency adds little and muddies the (already atomic) `out` writes.
+- **Per-request base-URL/Wi-Fi re-check only, no stream (A14).** That's the status quo this item exists to fix; polling can't beat the poll interval for latency.
+
+**Reference:** `android/app/lib/offline/offline_sync.dart` (`_runTick` Queue, `_forEachBounded`, `WifiCheck.onWifiChanged`, `_subscribeWifi`). Tests: `test/offline/offline_sync_test.dart` (A14 + existing bounded-concurrency cases). Debt A12/A13/A14 in `docs/DEBT.md §5`.
+
+## 2026-06-20 — P3 cleanup: split large screen files; triage the rest (debt A16–A22)
+
+**Context:** Final DEBT §5 band (P3 low-hanging cleanup): A16 (screen-folder convention), A17 (split large widget files), A19 (records→freezed), A20 (`clear()` scope), A22 (`app/ios/` baggage). A18/A21 were already done.
+
+**Decision:**
+- **A17 — DO.** Split the four large screen files (`now_playing` 756, `library` 615, `playlist_detail` 606, `settings` 562) using Dart `part`/`part of` sibling files, one per cohesive section. Private (`_`) widget classes keep their privacy (same library) and no caller imports change.
+- **A20, A22 — STALE.** `Settings.clear()` and the legacy keys it half-wiped were deleted in A6; `app/ios/` doesn't exist. Marked resolved, no code.
+- **A16, A19 — WON'T-FIX** (with rationale, below).
+
+**Why:**
+- **`part`/`part of` over per-widget public files (A17).** The DEBT note's stated rebuild-scope benefit already holds — these are already separate widget classes, and file location doesn't affect Flutter's rebuild granularity. So A17 is purely a readability/file-size win, and `part` files achieve it with zero behaviour risk: privacy preserved, imports stay centralised in the main library file, no caller churn, analyzer-verified. `playlist_detail` is dominated by a single 515-line `State` class that can't be widget-extracted without a real refactor, so only its header/enum moved.
+- **A16 won't-fix.** Moving 5 flat `*_screen.dart` files into per-domain subfolders rewrites ~48 internal relative imports + 5 importer files and churns git blame, for zero behaviour or rebuild benefit — purely cosmetic foldering. Not worth it; revisit only if a domain folder grows enough to need it.
+- **A19 won't-fix.** The premise is partly wrong: Dart records **already have value (`==`-by-field) equality**, so the only real gain from `freezed` is `copyWith` — and nothing needs it (these records are rebuilt wholesale every tick/read, never field-patched). Converting 7 record typedefs to freezed is high construction-site churn for marginal benefit. Revisit if a real `copyWith` need appears.
+
+**Alternatives considered:**
+- **A17 by making the widgets public in their own files.** Rejected — needlessly widens the API surface; `part` keeps them private.
+- **Do A16/A19 anyway for completeness.** Rejected per the project's blunt-engineering preference: closing low-value/high-churn items as documented won't-fix is sounder than churning ~3000 LOC for cosmetics. (Confirmed with the user.)
+
+**Reference:** new `part` files under `android/app/lib/screens/**`; DEBT §5 A16–A22 entries. This closes the DEBT §5 architectural backlog (P0/P1/P2 done earlier; P3 done/triaged here).

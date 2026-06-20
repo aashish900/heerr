@@ -41,3 +41,8 @@ backend/graphify-out/
 
 # Claude
 *.claude/
+
+# Local smoke-test working doc — never committed (any directory)
+SMOKE-TEST.md
+**/SMOKE-TEST.md
+*SMOKE-TEST.md

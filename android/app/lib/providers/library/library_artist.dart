@@ -1,16 +1,13 @@
-import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../api/subsonic_client.dart';
-import '../../api/subsonic_endpoints.dart';
 import '../../models/subsonic/artist.dart';
 import '../../offline/library_cache.dart';
+import '../../services/subsonic_library_service.dart';
 
 part 'library_artist.g.dart';
 
-/// Wraps `GET /rest/getArtist.view?id=<id>`. Returns one [Artist] with its
-/// `album` list populated. Family-keyed by artist id so the album-detail
-/// route can subscribe directly.
+/// Wraps `GET /rest/getArtist.view?id=<id>` (via [SubsonicLibraryService]).
+/// Returns one [Artist] with its `album` list populated. Family-keyed by id.
 ///
 /// L5: cache-aware. See [libraryAlbum] for the contract.
 @riverpod
@@ -19,15 +16,9 @@ Future<Artist> libraryArtist(LibraryArtistRef ref, String id) async {
     ref: ref,
     cacheKey: 'artist_$id',
     networkCall: () async {
-      final Dio dio = await ref.watch(subsonicDioClientProvider.future);
-      return subsonicCall<Artist>(
-        () => dio.get<dynamic>(
-          SubsonicEndpoints.getArtist,
-          queryParameters: <String, dynamic>{'id': id},
-        ),
-        (Map<String, dynamic> env) =>
-            Artist.fromJson(env['artist'] as Map<String, dynamic>),
-      );
+      final SubsonicLibraryService service =
+          await ref.watch(subsonicLibraryServiceProvider.future);
+      return service.getArtist(id);
     },
     encode: (Artist a) => a.toJson(),
     decode: (Map<String, dynamic> json) => Artist.fromJson(json),

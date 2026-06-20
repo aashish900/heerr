@@ -59,6 +59,8 @@ MediaItem songToMediaItem({
         saltGenerator: saltGenerator,
       ),
     );
+  } else {
+    artUri = Uri.parse('android.resource://com.aashish.heerr/mipmap/ic_launcher');
   }
 
   final int? duration = song.duration;

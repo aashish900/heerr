@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -6,6 +7,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../models/profile.dart';
 import '../models/subsonic/album.dart';
 import '../models/subsonic/artist.dart';
 import '../models/subsonic/playlist.dart';
@@ -15,6 +17,7 @@ import '../providers/library/library_albums.dart';
 import '../providers/library/library_artist.dart';
 import '../providers/library/library_playlist.dart';
 import '../providers/library/library_playlists.dart';
+import '../providers/profiles/active_profile.dart';
 import '../providers/server_creds.dart';
 import 'offline_downloader.dart';
 import 'offline_manifest.dart';
@@ -26,6 +29,12 @@ part 'offline_sync.g.dart';
 /// Bounded parallelism for per-tick downloads — keep the device responsive
 /// during a sync-all. See ROADMAP L2 §3.
 const int _kDownloadConcurrency = 3;
+
+/// A13: bounded parallelism for resolving marker ids → Song objects
+/// (artist→albums fan-out, album/playlist detail fetches). Caps concurrent
+/// library requests so a large sync-all doesn't open hundreds of sockets at
+/// once, while still collapsing the previously fully-sequential walk.
+const int _kResolveConcurrency = 4;
 
 /// Status snapshot the UI watches. `running` is true while a tick (manual or
 /// scheduled) is in flight; the counts/lastError stay populated between ticks
@@ -63,6 +72,12 @@ typedef OfflineSyncResult = ({
 /// substitute a one-method fake via `wifiCheckProvider.overrideWithValue`.
 abstract class WifiCheck {
   Future<bool> isOnWifi();
+
+  /// A14: emits `true`/`false` whenever Wi-Fi connectivity flips, so the sync
+  /// notifier can react to a Wi-Fi reconnect immediately instead of waiting
+  /// for the next poll (up to 15 min). Default implementation never emits —
+  /// fakes that don't exercise A14 can ignore it.
+  Stream<bool> get onWifiChanged => const Stream<bool>.empty();
 }
 
 class _ConnectivityPlusWifiCheck implements WifiCheck {
@@ -72,6 +87,11 @@ class _ConnectivityPlusWifiCheck implements WifiCheck {
         await Connectivity().checkConnectivity();
     return results.contains(ConnectivityResult.wifi);
   }
+
+  @override
+  Stream<bool> get onWifiChanged => Connectivity()
+      .onConnectivityChanged
+      .map((List<ConnectivityResult> r) => r.contains(ConnectivityResult.wifi));
 }
 
 @Riverpod(keepAlive: true)
@@ -84,10 +104,13 @@ Duration _intervalFromMinutes(int minutes) =>
 
 /// Reconciles the on-disk song set against the markers (or — at L4 — the
 /// full library when sync-all is on). Owns its own Timer; pause()/resume()
-/// is driven from `_ShellScaffold` (L3).
+/// is driven from `LifecycleCoordinator` (A8). A14: also reacts to Wi-Fi
+/// reconnects via `WifiCheck.onWifiChanged`.
 @Riverpod(keepAlive: true)
 class OfflineSync extends _$OfflineSync {
   Timer? _timer;
+  StreamSubscription<bool>? _wifiSub;
+  bool _lastWifi = false;
   bool _paused = false;
   bool _running = false;
 
@@ -96,7 +119,28 @@ class OfflineSync extends _$OfflineSync {
     ref.onDispose(() {
       _timer?.cancel();
       _timer = null;
+      final StreamSubscription<bool>? sub = _wifiSub;
+      _wifiSub = null;
+      if (sub != null) unawaited(sub.cancel());
     });
+    // A dependency change (profile switch, settings toggle) re-runs build on
+    // the same keep-alive notifier instance, so cancel any Timer / Wi-Fi
+    // subscription left over from the previous build before deciding whether
+    // to schedule new ones.
+    _timer?.cancel();
+    _timer = null;
+    await _wifiSub?.cancel();
+    _wifiSub = null;
+
+    // A15: gate on an active profile. On a fresh install the user lingers on
+    // /login with no creds and no per-server offline state — ticking there is
+    // wasted work (every `_runTick` would early-return 'no creds'). Watching
+    // the active profile rebuilds this provider the moment the user logs in,
+    // at which point the enabled-check + first tick run normally.
+    final Profile? active = ref.watch(activeProfileProvider);
+    if (active == null) {
+      return _kIdle;
+    }
 
     final OfflineSettingsValue settings =
         await ref.watch(offlineSettingsProvider.future);
@@ -107,7 +151,22 @@ class OfflineSync extends _$OfflineSync {
 
     final OfflineSyncResult first = await _runTick();
     _scheduleNext();
+    _subscribeWifi();
     return _statusFromResult(first, await _countsFromManifest());
+  }
+
+  /// A14: react to a Wi-Fi reconnect immediately. On a false→true transition,
+  /// fire an off-schedule tick (unless paused or a tick is already running) so
+  /// a Wi-Fi-gated sync doesn't wait out the poll interval. `_runTick`
+  /// re-checks every gate, so a spurious event is harmless/idempotent.
+  void _subscribeWifi() {
+    _wifiSub = ref.read(wifiCheckProvider).onWifiChanged.listen((bool onWifi) {
+      final bool was = _lastWifi;
+      _lastWifi = onWifi;
+      if (onWifi && !was && !_paused && !_running) {
+        unawaited(_tick());
+      }
+    });
   }
 
   void pause() {
@@ -214,7 +273,10 @@ class OfflineSync extends _$OfflineSync {
         manifestSongs: currentManifest.songs,
         targetIds: targetIds,
       );
-      Map<String, OfflineSongEntry> songsState = swept.songs;
+      // Mutable working copy — the download workers update it in place
+      // (single-isolate, so `map[k] = v` is atomic; no read-modify race).
+      final Map<String, OfflineSongEntry> songsState =
+          <String, OfflineSongEntry>{...swept.songs};
 
       // WiFi gate.
       if (offline.wifiOnly) {
@@ -235,38 +297,35 @@ class OfflineSync extends _$OfflineSync {
         }
       }
 
-      // Pick songs to download — anything not yet `ready`.
-      final List<Song> toDownload = <Song>[];
+      // Pick songs to download — anything not yet `ready`. A12: an explicit
+      // Queue is the shared work source; each worker pulls atomically via
+      // `removeFirst()` (no await between the emptiness check and the pull),
+      // so the "no double-download" invariant is enforced by the type rather
+      // than by reasoning about interleaving on a mutable List + removeAt(0).
+      final Queue<Song> queue = Queue<Song>();
       for (final String id in targetIds) {
         final OfflineSongEntry? entry = songsState[id];
         if (entry == null || entry.state != OfflineSongState.ready) {
-          toDownload.add(targets[id]!);
+          queue.add(targets[id]!);
         }
       }
 
       int downloadedCount = 0;
       int failedCount = 0;
 
-      if (toDownload.isNotEmpty) {
+      if (queue.isNotEmpty) {
         final Dio dio = ref.read(offlineDownloadDioProvider);
         final List<Future<void>> workers =
             List<Future<void>>.generate(_kDownloadConcurrency, (_) async {
-          while (true) {
-            Song? next;
-            if (toDownload.isNotEmpty) {
-              next = toDownload.removeAt(0);
-            }
-            if (next == null) return;
+          while (queue.isNotEmpty) {
+            final Song next = queue.removeFirst();
             final OfflineSongEntry result = await downloadSong(
               song: next,
               settings: settings,
               paths: paths,
               downloadDio: dio,
             );
-            songsState = <String, OfflineSongEntry>{
-              ...songsState,
-              next.id: result,
-            };
+            songsState[next.id] = result;
             if (result.state == OfflineSongState.ready) {
               downloadedCount += 1;
             } else {
@@ -321,7 +380,8 @@ class OfflineSync extends _$OfflineSync {
     // has. New albums released by a marked artist get picked up on the
     // next tick — that's the entire reason artists are tracked as their
     // own set rather than fanned out at mark time.
-    for (final String artistId in manifest.markedArtists) {
+    // A13: bounded-parallel — `albumIds.add` is atomic on the single isolate.
+    await _forEachBounded<String>(manifest.markedArtists, (String artistId) async {
       try {
         final Artist artist =
             await ref.read(libraryArtistProvider(artistId).future);
@@ -331,7 +391,7 @@ class OfflineSync extends _$OfflineSync {
       } catch (e) {
         debugPrint('offline_sync: resolve artist $artistId failed: $e');
       }
-    }
+    });
 
     if (offline.syncAll) {
       try {
@@ -355,9 +415,12 @@ class OfflineSync extends _$OfflineSync {
       }
     }
 
+    // A13: resolve album + playlist details with bounded parallelism. `out`
+    // is mutated in place; `out[id] = song` is atomic on the single isolate so
+    // the dedup-by-key contract holds even with concurrent workers.
     final Map<String, Song> out = <String, Song>{};
 
-    for (final String albumId in albumIds) {
+    await _forEachBounded<String>(albumIds, (String albumId) async {
       try {
         final Album album =
             await ref.read(libraryAlbumProvider(albumId).future);
@@ -368,9 +431,9 @@ class OfflineSync extends _$OfflineSync {
         // Tolerate a single album resolution failure — other markers still sync.
         debugPrint('offline_sync: resolve album $albumId failed: $e');
       }
-    }
+    });
 
-    for (final String playlistId in playlistIds) {
+    await _forEachBounded<String>(playlistIds, (String playlistId) async {
       try {
         final Playlist p =
             await ref.read(libraryPlaylistProvider(playlistId).future);
@@ -380,9 +443,28 @@ class OfflineSync extends _$OfflineSync {
       } catch (e) {
         debugPrint('offline_sync: resolve playlist $playlistId failed: $e');
       }
-    }
+    });
 
     return out;
+  }
+
+  /// Run [action] over [items] with at most [_kResolveConcurrency] in flight.
+  /// Workers pull atomically from a shared [Queue] (no await between the
+  /// emptiness check and the pull), so each item is handled exactly once.
+  Future<void> _forEachBounded<T>(
+    Iterable<T> items,
+    Future<void> Function(T item) action,
+  ) async {
+    final Queue<T> q = Queue<T>.of(items);
+    final List<Future<void>> workers = List<Future<void>>.generate(
+      _kResolveConcurrency,
+      (_) async {
+        while (q.isNotEmpty) {
+          await action(q.removeFirst());
+        }
+      },
+    );
+    await Future.wait(workers);
   }
 
   /// Delete `songs/*` files + manifest entries that the target set no longer

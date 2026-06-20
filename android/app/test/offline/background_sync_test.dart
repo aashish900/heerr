@@ -50,6 +50,9 @@ class _FakeSecureStorage implements SecureStorage, PrefsStorage {
 class _FakeWifi implements WifiCheck {
   @override
   Future<bool> isOnWifi() async => true;
+
+  @override
+  Stream<bool> get onWifiChanged => const Stream<bool>.empty();
 }
 
 class _RecordingScheduler implements BackgroundSyncScheduler {

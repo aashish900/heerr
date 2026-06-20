@@ -27,7 +27,7 @@ final queuePollIntervalProvider = Provider<Duration>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef QueuePollIntervalRef = ProviderRef<Duration>;
-String _$queueHash() => r'2944b1801a44682d612c1bfa8ab5d9a3b00f5e16';
+String _$queueHash() => r'7cf3102f5161b9081e686cdb0c23c76ab5f39d0b';
 
 /// Polls `GET /queue` on a schedule (PLAN.md §8 — 3s default, pauses on app
 /// background). Implemented as an `AsyncNotifier` rather than a

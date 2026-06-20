@@ -6,11 +6,11 @@ part of 'library_playlists.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$libraryPlaylistsHash() => r'd2d54f7774731da5efb42bb145781fb38b1ccf2d';
+String _$libraryPlaylistsHash() => r'945f75e1e94c51741db05876cc71c00a7bdbdefd';
 
-/// Wraps `GET /rest/getPlaylists.view`. Returns the user's playlists as a
-/// flat list. Each [Playlist] here has no `entry` populated — the detail
-/// payload comes from `libraryPlaylist(id)`.
+/// Wraps `GET /rest/getPlaylists.view` (via [SubsonicLibraryService]). Returns
+/// the user's playlists as a flat list; each [Playlist] here has no `entry`
+/// populated — the detail payload comes from `libraryPlaylist(id)`.
 ///
 /// L5: cache-aware. See [libraryAlbums] for the list-encoding shape.
 ///

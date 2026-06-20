@@ -1,11 +1,9 @@
-import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../api/subsonic_client.dart';
-import '../../api/subsonic_endpoints.dart';
 import '../../models/recommended_track.dart';
 import '../../models/subsonic/album.dart';
 import '../../models/subsonic/song.dart';
+import '../../services/subsonic_library_service.dart';
 import '../recommendations.dart';
 
 part 'home_providers.g.dart';
@@ -21,65 +19,32 @@ const int _kHomeAlbumSectionSize = 8;
 /// worth which Navidrome maps from these random songs.
 const int _kHomeRandomSongsSize = 20;
 
-/// Recently-played albums (Subsonic `getAlbumList2.view?type=recent`). The
-/// Home screen's "Jump back in" section and primary quick-access grid use
-/// this. Empty list when the library hasn't been played yet.
+/// Recently-played albums (`getAlbumList2.view?type=recent`). The Home
+/// screen's "Jump back in" section and primary quick-access grid use this.
 @riverpod
 Future<List<Album>> homeRecent(HomeRecentRef ref) async {
-  final Dio dio = await ref.watch(subsonicDioClientProvider.future);
-  return subsonicCall<List<Album>>(
-    () => dio.get<dynamic>(
-      SubsonicEndpoints.getAlbumList2,
-      queryParameters: <String, dynamic>{
-        'type': 'recent',
-        'size': _kHomeAlbumSectionSize,
-      },
-    ),
-    _parseAlbumList2,
-  );
+  final SubsonicLibraryService service =
+      await ref.watch(subsonicLibraryServiceProvider.future);
+  return service.getAlbumList(type: 'recent', size: _kHomeAlbumSectionSize);
 }
 
-/// Most-played albums (Subsonic `getAlbumList2.view?type=frequent`). Powers
-/// the Home screen's "Most played" horizontal section.
+/// Most-played albums (`getAlbumList2.view?type=frequent`). Powers the Home
+/// screen's "Most played" horizontal section.
 @riverpod
 Future<List<Album>> homeMostPlayed(HomeMostPlayedRef ref) async {
-  final Dio dio = await ref.watch(subsonicDioClientProvider.future);
-  return subsonicCall<List<Album>>(
-    () => dio.get<dynamic>(
-      SubsonicEndpoints.getAlbumList2,
-      queryParameters: <String, dynamic>{
-        'type': 'frequent',
-        'size': _kHomeAlbumSectionSize,
-      },
-    ),
-    _parseAlbumList2,
-  );
+  final SubsonicLibraryService service =
+      await ref.watch(subsonicLibraryServiceProvider.future);
+  return service.getAlbumList(type: 'frequent', size: _kHomeAlbumSectionSize);
 }
 
-/// Random songs from the library (Subsonic `getRandomSongs.view`). Used as
-/// the universal fallback when the backend recommendations come back empty
-/// (a fresh deploy with no scrobble history) and as a fill-in for the
-/// quick-access grid when "recently played" is empty.
+/// Random songs from the library (`getRandomSongs.view`). Used as the
+/// universal fallback when backend recommendations come back empty, and as a
+/// fill-in for the quick-access grid when "recently played" is empty.
 @riverpod
 Future<List<Song>> homeRandomSongs(HomeRandomSongsRef ref) async {
-  final Dio dio = await ref.watch(subsonicDioClientProvider.future);
-  return subsonicCall<List<Song>>(
-    () => dio.get<dynamic>(
-      SubsonicEndpoints.getRandomSongs,
-      queryParameters: <String, dynamic>{
-        'size': _kHomeRandomSongsSize,
-      },
-    ),
-    (Map<String, dynamic> env) {
-      final dynamic block = env['randomSongs'];
-      if (block is! Map<String, dynamic>) return <Song>[];
-      final dynamic songs = block['song'];
-      if (songs is! List) return <Song>[];
-      return songs
-          .map((dynamic e) => Song.fromJson(e as Map<String, dynamic>))
-          .toList();
-    },
-  );
+  final SubsonicLibraryService service =
+      await ref.watch(subsonicLibraryServiceProvider.future);
+  return service.getRandomSongs(_kHomeRandomSongsSize);
 }
 
 /// Discriminated result shape for [homeRecommendations]. `isFallback` is
@@ -95,11 +60,9 @@ typedef HomeRecommendations = ({
 ///
 /// Primary source: [recommendationsProvider] (already library-cross-
 /// referenced via the N4 `search3` hydration step). When that returns an
-/// empty list (no seeds, engine-down with empty fallback chain, etc.) the
-/// notifier maps [homeRandomSongs] to `RecommendedTrack` shape so the
-/// section still has content. Songs are local, so `inLibrary=true` and
-/// `subsonicSongId` is populated; `sourceUrl` is empty (random songs have
-/// no upstream URL).
+/// empty list the notifier maps [homeRandomSongs] to `RecommendedTrack` shape
+/// so the section still has content. Songs are local, so `inLibrary=true` and
+/// `subsonicSongId` is populated; `sourceUrl` is empty.
 @riverpod
 Future<HomeRecommendations> homeRecommendations(
     HomeRecommendationsRef ref) async {
@@ -121,14 +84,4 @@ Future<HomeRecommendations> homeRecommendations(
           ))
       .toList();
   return (tracks: mapped, isFallback: true);
-}
-
-List<Album> _parseAlbumList2(Map<String, dynamic> env) {
-  final dynamic block = env['albumList2'];
-  if (block is! Map<String, dynamic>) return <Album>[];
-  final dynamic albums = block['album'];
-  if (albums is! List) return <Album>[];
-  return albums
-      .map((dynamic e) => Album.fromJson(e as Map<String, dynamic>))
-      .toList();
 }

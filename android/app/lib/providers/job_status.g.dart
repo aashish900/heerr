@@ -27,7 +27,7 @@ final jobStatusPollIntervalProvider = Provider<Duration>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef JobStatusPollIntervalRef = ProviderRef<Duration>;
-String _$jobStatusHash() => r'c2ace2535b2bcf6258f5885555114b947cf3b489';
+String _$jobStatusHash() => r'54022e83d35e82bd9bd12a5aecf2d3b87ffffb7c';
 
 /// Copied from Dart SDK
 class _SystemHash {

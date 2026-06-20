@@ -1861,3 +1861,80 @@ analyze` clean; `flutter test` green (567 tests).
 - `android/SMOKE-TEST.md` deleted (per convention — one-liner in DEBT.md V6 row is the record).
 - `DEBT.md`: V6 marked ✅; resolved-bugs record updated to "confirmed".
 - Promoted: `v3.1.2-rc2` → `v3.1.2`.
+
+## 2026-06-20 — A9: retry + debug-log interceptors on both dio clients
+
+- **New `lib/api/interceptors.dart`:**
+  - `RetryInterceptor` — bounded (default 2 retries / 3 attempts), backoff-based retry for *transient* dio failures. Retries connection/send/receive timeouts + connection errors (exponential backoff, base 500ms) and HTTP 503. For 503 it honours `Retry-After` only when short (`maxRetryAfter`, default 5s); a longer rate-limit is left to surface as `RateLimitedError` so the user gets the real countdown. Re-issues via `dio.fetch` (full chain re-runs, so the auth header is re-applied); recursion bounded by an attempt counter in `RequestOptions.extra`.
+  - `DebugLogInterceptor` — request/response/error tracing gated on `kDebugMode`, via `debugPrint` (no `print`), redacts the `Authorization` header to `***`.
+- **Wired into both dio builders** in interceptor order auth → retry → log: `lib/api/client.dart` (`dioClient`, tag `heerr`) and `lib/api/subsonic_client.dart` (`subsonicDioClient`, tag `subsonic`). Subsonic envelope failures arrive as HTTP 200 and remain handled by `subsonicCall`; the retry only fires on real transport 5xx / network errors there.
+- **Tests:** new `test/api/interceptors_test.dart` (8 cases) — 503-then-200, connection-error-then-200, give-up-after-maxRetries (503 → `RateLimitedError`, network → `NetworkError`), short `Retry-After` honoured, long `Retry-After` not retried, 401 + 500 not retried; each asserts the exact attempt count. `flutter analyze` clean; full suite 566 green.
+- Satisfies the `docs/CONTEXT.md` HTTP-stack promise ("Interceptors for the auth header + retry-on-503 + logging") — previously only the auth header was implemented (DEBT §5 A9).
+
+## 2026-06-20 — A2 + A15: reactive-lifecycle correctness (router redirect + offline-sync gate)
+
+- **A2 — `lib/router.dart`:** `buildHeerrRouter` now passes `refreshListenable:` a new `_RouterRefresh` `ChangeNotifier` that bridges `profileRegistryProvider` (via `container.listen`) to GoRouter. The first-launch/signed-out redirect previously re-evaluated only on navigation events, so removing the active profile left stale screens rendered against a torn-down profile until the next tab tap. The redirect now fires to `/login` the instant `activeId` goes null. Subscription is auto-closed on container dispose; GoRouter removes its own listener on `dispose()`, so no explicit teardown is needed.
+- **A15 — `lib/offline/offline_sync.dart`:** `OfflineSync.build` now `ref.watch(activeProfileProvider)` and returns `_kIdle` (no `_runTick`, no Timer scheduled) when it's null — so the keep-alive sync provider no longer ticks while the user lingers on `/login` with no creds. Also cancels any leftover Timer at the top of every rebuild (a profile switch / settings toggle re-runs `build` on the same notifier instance). Login flips `activeProfile` non-null → `build` re-runs → normal enabled-check + first tick.
+- **Tests:**
+  - `test/router_test.dart` — new "A2" group: seed an active profile, render the app on Home, `removeProfile` without navigating → asserts redirect to `LoginScreen`. Adds a persisting `_MapStorage` secure-storage fake; reuses `_StubSync` to keep the shell's init microtask inert.
+  - `test/offline/offline_sync_test.dart` — new guard "A15": offline enabled + no active profile → `build` yields idle with `lastError == null` (proving the gate skipped `_runTick`, which would otherwise have surfaced `'no creds'`) and no adapter hits.
+- `flutter analyze` clean; full suite 568 green (+2). Resolves DEBT §5 A2 + A15.
+
+## 2026-06-20 — A8 + A10: router god-file split + Repository/Service layer
+
+- **A8 — `lib/app/lifecycle_coordinator.dart` (new):** the six app-lifecycle side-effects (offline-sync kick on launch, pause/resume, Now-Playing flush, background-sync schedule/cancel, recommend-health refresh) moved out of `_ShellScaffold` into `LifecycleCoordinator` (`ConsumerStatefulWidget` + `WidgetsBindingObserver`). The ShellRoute builder composes `LifecycleCoordinator(child: _ShellScaffold(...))`. `lib/router.dart` is now nav chrome only (dropped the observer mixin + dart:async/offline/player/recommendations imports). Lifecycle tests moved to `test/app/lifecycle_coordinator_test.dart`; the now-unused `flutter/services.dart` import removed from `test/router_test.dart`.
+- **A10 — `lib/services/` (new):** transport+JSON seams so providers no longer call `dio` / parse envelopes inline:
+  - `SubsonicLibraryService` — all Subsonic reads (`getAlbum(s)`, `getArtist(s)`, `getPlaylist(s)`, `search3`, `getAlbumList`, `getRandomSongs`, `getStarredSongs`, `findLibraryMatch` for the N4 cross-ref).
+  - `PlaylistService` — Subsonic mutations (`createPlaylist`/`updatePlaylist`/`deletePlaylist`/`getPlaylistEntryIds`).
+  - `BackendService` — all heerr-REST calls (`ytmSearch`, `recommend`, `recommendHealth`, `getQueue`, `download`, `jobStatus`).
+  - `LyricsService` — two-stage Navidrome `getLyricsBySongId` → LRCLib fallback.
+  - Each exposes an async `*ServiceProvider` that reads the existing `subsonicDioClientProvider` / `dioClientProvider`, so the service uses whatever dio those providers yield — **existing dio-adapter test mocks pass unchanged**.
+- **Providers delegating now (state/orchestration only):** `library/library_album(s)`, `library/library_artist(s)`, `library/library_playlist(s)`, `library/library_search`, `library/lyrics`, `library/playlist_mutations`, `home/home_providers`, `recommendations`, `search`, `queue`, `download`, `job_status`. Debounce / cancel-token / dedupe / index-ordering / provider-invalidation stay in the providers (they need a `Ref`).
+- **Offline subsystem:** no change required — `offline/offline_downloader.downloadSong` is already an injected-`Dio` seam, and `offline/offline_sync` orchestrates via existing library providers + the `offlineDownloadDio` seam (no inline transport+JSON).
+- **Tests:** new `test/services/subsonic_library_service_test.dart` (5 cases) proves the seam is unit-testable **without a Riverpod container** (service built directly from a Dio + scripted adapter). `dart run build_runner build` regenerated `.g.dart` for the new service providers.
+- `flutter analyze` clean (only the pre-existing `main.dart:25` workmanager deprecation); full suite 573 green (+5). Resolves DEBT §5 A8 + A10.
+
+## 2026-06-20 — A11: session-stable salt for cover-art / stream URLs
+
+- **`lib/api/subsonic_client.dart`:** added `sessionStableSalt()` — a process-lifetime salt lazily initialised from `_randomHexSalt()`. Made it the default for both read-only URL builders (`buildSubsonicCoverArtUrl`, `buildSubsonicStreamUrl`), replacing the per-call `_randomHexSalt`. Same `coverArtId`+`size` now yields a byte-identical URL across renders, so Flutter's URL-keyed image cache hits instead of cold-fetching every tile on every Library/Home scroll.
+- The salt is independent of the password (`t = md5(password+salt)` recomputes), so a profile switch keeps producing valid tokens from the same salt — no reset needed.
+- `SubsonicAuthInterceptor` (all API + state-mutating calls) is unchanged: it still rotates the salt per request.
+- Doc comments on both builders updated (the old "salt rotates per call → defeats cache, K1+ work" caveat is now resolved).
+- **Tests:** new "A11" group in `test/api/subsonic_client_test.dart` — cover-art URL identical across two calls, stream URL identical across two calls, explicit `saltGenerator` still overrides. `flutter analyze` clean; full suite 576 green (+3). Resolves DEBT §5 A11.
+
+## 2026-06-20 — A21 (Flutter CI) + A18 (dev_defaults leak check)
+
+- **A21 — `.github/workflows/android-ci.yml` (new):** runs `flutter analyze` + `flutter test` on PRs to `main` and pushes to `main`, path-filtered to `android/**` (+ the workflow file). Setup mirrors `android-publish.yml`: Java 17, Flutter 3.44.0, `working-directory: android/app`, seeds `lib/dev_defaults.dart` from the all-null example, `flutter pub get`, then `dart run build_runner build`. No keystore/secrets — this job never builds a signed artifact. Enforces the "green before / green after" gate from `android/CLAUDE.md §Development workflow` pre-merge instead of by hand. Resolves DEBT §5 A21.
+- **A18 — dev_defaults leak check (no code change):** verified `lib/dev_defaults.dart` is gitignored (`git check-ignore` matches), untracked, and absent from history (`git log --all` empty for it). It holds a Tailnet IP + username but no token; `dev_defaults.example.dart` is all-null. The DEBT premise ("is committed") was stale — marked accordingly, no action needed.
+
+## 2026-06-20 — A3: stateless auth interceptors (resolve creds per request)
+
+- **`lib/api/client.dart`:** `BearerAuthInterceptor` now takes a `String? Function() tokenResolver` instead of a captured `token` value; `onRequest` calls it per request. `dioClient` wires `() => ref.read(activeProfileProvider)?.heerrBearerToken` and now `ref.watch(activeProfileProvider.select((p) => p?.heerrBaseUrl))` — so the dio rebuilds only when the backend base URL changes.
+- **`lib/api/subsonic_client.dart`:** `SubsonicAuthInterceptor` now takes `usernameResolver` / `passwordResolver` (was captured `username`/`password`); `subsonicDioClient` wires them to `ref.read(activeProfileProvider)` and watches `select(navidromeBaseUrl)`.
+- **Effect:** a same-server credential rotation (token refresh / Navidrome password change) no longer rebuilds the `Dio` — the connection pool + interceptor chain survive and the next request picks up the new credential. A base-URL change (different server) still rebuilds, as required.
+- **Tests:** `test/api/client_test.dart` — replaced the old "rebuilds on token change" test with an A3 pair: token rotation on the same base URL keeps the *same* dio instance while `tokenResolver()` returns the new token; a base-URL change rebuilds. `test/api/subsonic_client_test.dart` + `client_test.dart` construction sites updated to pass resolvers; the provider introspection assertions call `usernameResolver()` / `passwordResolver()` / `tokenResolver()`. `flutter analyze` clean; full suite 577 green. Resolves DEBT §5 A3.
+
+## 2026-06-20 — A12/A13/A14: offline-sync perf + robustness
+
+- **A12 — download worker pool (`offline/offline_sync.dart` `_runTick`):** the shared work source is now an explicit `Queue<Song>` (`removeFirst()` pulls atomically — no await between the emptiness check and the pull) and `songsState` is a mutable map mutated in place (`songsState[id] = result`) instead of a reassigned-via-spread `List`. The "no double-download" invariant is now enforced by the type rather than by reasoning about event-loop interleaving.
+- **A13 — target resolution (`_resolveTargets`):** new `_forEachBounded` helper (shared `Queue` + `_kResolveConcurrency = 4` workers) replaces the three fully-sequential `await` loops (artist→albums fan-out, album detail, playlist detail). Caps concurrent library requests while collapsing the previously serial walk — meaningfully faster sync-all ticks on large libraries. `albumIds.add` / `out[id] = song` are atomic on the single isolate, so the dedup-by-key contract is preserved.
+- **A14 — connectivity-stream trigger:** `WifiCheck` gained `Stream<bool> get onWifiChanged` (production maps `Connectivity().onConnectivityChanged`; the abstract default never emits). `OfflineSync.build` subscribes via `_subscribeWifi` and fires an off-schedule `_tick()` on a false→true Wi-Fi transition (guarded by `_paused`/`_running`; `_runTick` re-checks every gate so a spurious event is idempotent). The subscription is cancelled on rebuild and `onDispose` alongside the Timer.
+- **Tests:** `test/offline/offline_sync_test.dart` — new "A14" case (no-WiFi build → no downloads; `wifi.emit(true)` → off-schedule download tick). The `_FakeWifi` fake gained a broadcast `onWifiChanged` + `emit()`; `background_sync_test.dart`'s fake stubs the empty stream. `flutter analyze` clean; full suite 578 green (+1). Resolves DEBT §5 A12/A13/A14 — completes P2.
+
+## 2026-06-20 — A17: split large screen files into `part` siblings (+ P3 triage)
+
+- **A17 — widget-file splits (`part`/`part of`, privacy preserved, no caller import changes):**
+  - `screens/player/now_playing_screen.dart` 756→326; extracted `now_playing_lyrics.dart` (`_LyricsPane`, `_LyricsBox`), `now_playing_transport.dart` (`_Scrubber`, `_Transport`, `_QueueList`), `now_playing_sleep_timer.dart` (`_SleepCountdownChip`, `_SleepTimerSheet`, `_CustomMinutesDialog`).
+  - `screens/library/library_screen.dart` 615→134; extracted `library_search_results.dart` (`_SearchModeScaffold`, `_CombinedResultsBody`, `_YtmSection`, `_ErrorView`) and `library_tabs.dart` (`_ArtistsTab`, `_AlbumsTab`, `_PlaylistsTab`, `_SectionHeader`, `_SubSectionHeader`).
+  - `screens/settings_screen.dart` 562→56; extracted `settings_recommendations.dart` (`_RecommendationsSection`, `_StatusChip`, `_FallbackBadge`) and `settings_offline.dart` (`_OfflineSection`, `_SyncNowAction`, `_StorageLine`, `_ClearAllAction`, `_SyncAllTile`, `_humanBytes`).
+  - `screens/library/playlist_detail_screen.dart` 606→556; extracted `playlist_detail_header.dart` (`_PlaylistHeader`, `_PlaylistAction`) — the rest is one large `State` class, not cleanly widget-extractable.
+- **P3 triage (no code):** A20 (`Settings.clear()` half-wipe) and A22 (`app/ios/` baggage) confirmed **stale** — `providers/settings.dart` was deleted in A6 and no `app/ios/` folder exists. A16 (screen re-foldering) and A19 (records→freezed) closed **won't-fix** with rationale (cosmetic/high-churn; records already have value equality). See DECISIONLOG.
+- `flutter analyze` clean; full suite 578 green. Resolves DEBT §5 A17; closes the P3 band and the whole §5 architectural backlog.
+
+## 2026-06-20 — v3.2.0: DEBT §5 architectural backlog (refactor-only release)
+
+- On-device release-APK smoke passed (SMOKE-TEST.md §14a): service-layer (A8/A10), lifecycle (A8/A2/A15), interceptor (A3), cover-art salt (A11), and offline-sync (A12–A14) refactors verified behaviour-preserving; A17 file splits covered by the read/playback passes.
+- `DEBT.md`: V7 marked ✅; the full §5 architectural backlog (A1–A22) is closed/triaged.
+- `pubspec.yaml`: 3.1.2 → 3.2.0.
+- SMOKE-TEST.md deleted (gitignored local working doc; the committed record is the V7 row above).
+- Promoted: `v3.2.0-rc3` → `v3.2.0`.

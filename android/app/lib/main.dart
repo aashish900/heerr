@@ -31,6 +31,7 @@ Future<void> main() async {
       androidNotificationChannelName: 'heerr playback',
       androidNotificationOngoing: true,
       androidStopForegroundOnPause: true,
+      androidNotificationIcon: 'drawable/ic_launcher_foreground',
     ),
   );
 

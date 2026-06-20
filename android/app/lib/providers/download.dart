@@ -1,10 +1,7 @@
-import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../api/client.dart';
-import '../api/endpoints.dart';
-import '../models/download_request.dart';
 import '../models/download_response.dart';
+import '../services/backend_service.dart';
 
 part 'download.g.dart';
 
@@ -23,16 +20,12 @@ class DownloadDispatcher extends _$DownloadDispatcher {
   }) async {
     state = <String>{...state, sourceUrl};
     try {
-      final Dio dio = await ref.read(dioClientProvider.future);
-      final DownloadRequest body = DownloadRequest(
+      final BackendService backend =
+          await ref.read(backendServiceProvider.future);
+      return await backend.download(
         sourceUrl: sourceUrl,
         sourceType: sourceType,
         displayName: displayName,
-      );
-      return await apiCall<DownloadResponse>(
-        () => dio.post<dynamic>(Endpoints.download, data: body.toJson()),
-        (dynamic data) =>
-            DownloadResponse.fromJson(data as Map<String, dynamic>),
       );
     } finally {
       state = <String>{...state}..remove(sourceUrl);

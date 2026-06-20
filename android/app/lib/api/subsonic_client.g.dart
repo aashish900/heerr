@@ -6,7 +6,7 @@ part of 'subsonic_client.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$subsonicDioClientHash() => r'bfc16f54b4ffe05cc1263df4b5f213bf5b5d7ecb';
+String _$subsonicDioClientHash() => r'f6c9e8b999197a4651813c56f0bbdd217712d33d';
 
 /// Builds a `Dio` for Subsonic calls against the active [Profile]'s
 /// Navidrome base URL. Depends on [activeProfileProvider] so a profile

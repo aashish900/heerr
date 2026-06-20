@@ -6,18 +6,11 @@ part of 'library_artists.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$libraryArtistsHash() => r'e94529949fde6aa53186058687f509878205f443';
+String _$libraryArtistsHash() => r'1dd4e3df55e6754880e52e179972857dd1418cc0';
 
-/// Wraps `GET /rest/getArtists.view`. Subsonic groups artists into
-/// alphabetical buckets after applying `ignoredArticles`; the envelope is:
-///
-/// ```
-/// "artists": { "ignoredArticles": "...", "index": [{name, artist: [...]}, ...] }
-/// ```
-///
-/// We surface the flat `List<ArtistIndex>` — UI typically renders them
-/// sectioned, but the provider doesn't decide that. Returns an empty list
-/// when the user has no library (no `index` field).
+/// Wraps `GET /rest/getArtists.view` (via [SubsonicLibraryService]). Subsonic
+/// groups artists into alphabetical buckets; we surface the flat
+/// `List<ArtistIndex>`. Returns an empty list when the user has no library.
 ///
 /// L5: cache-aware. See [libraryAlbums] for the list-encoding shape.
 ///

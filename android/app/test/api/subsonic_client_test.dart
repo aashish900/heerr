@@ -82,8 +82,8 @@ Dio _dioWith(
   dio.httpClientAdapter = adapter;
   dio.interceptors.add(
     SubsonicAuthInterceptor(
-      username: username,
-      password: password,
+      usernameResolver: () => username,
+      passwordResolver: () => password,
       saltGenerator: salt,
     ),
   );
@@ -477,8 +477,58 @@ void main() {
       expect(dio.options.baseUrl, 'http://navi:4533');
       final SubsonicAuthInterceptor interceptor =
           dio.interceptors.whereType<SubsonicAuthInterceptor>().single;
-      expect(interceptor.username, 'me');
-      expect(interceptor.password, 'pw');
+      expect(interceptor.usernameResolver(), 'me');
+      expect(interceptor.passwordResolver(), 'pw');
+    });
+  });
+
+  group('A11 — read-only URL builders use a session-stable salt', () {
+    test('cover-art URL is identical across calls for the same id+size', () {
+      final String a = buildSubsonicCoverArtUrl(
+        baseUrl: 'http://navi.test',
+        username: 'me',
+        password: 'pw',
+        coverArtId: 'cov1',
+        size: 200,
+      );
+      final String b = buildSubsonicCoverArtUrl(
+        baseUrl: 'http://navi.test',
+        username: 'me',
+        password: 'pw',
+        coverArtId: 'cov1',
+        size: 200,
+      );
+      // Stable URL → Flutter's URL-keyed image cache hits instead of cold-
+      // fetching the same tile on every scroll.
+      expect(a, b);
+      expect(Uri.parse(a).queryParameters['s'], isNotEmpty);
+    });
+
+    test('stream URL is identical across calls for the same song id', () {
+      final String a = buildSubsonicStreamUrl(
+        baseUrl: 'http://navi.test',
+        username: 'me',
+        password: 'pw',
+        songId: 's1',
+      );
+      final String b = buildSubsonicStreamUrl(
+        baseUrl: 'http://navi.test',
+        username: 'me',
+        password: 'pw',
+        songId: 's1',
+      );
+      expect(a, b);
+    });
+
+    test('an explicit saltGenerator still overrides the session salt', () {
+      final String url = buildSubsonicCoverArtUrl(
+        baseUrl: 'http://navi.test',
+        username: 'me',
+        password: 'pw',
+        coverArtId: 'cov1',
+        saltGenerator: () => 'deadbe',
+      );
+      expect(Uri.parse(url).queryParameters['s'], 'deadbe');
     });
   });
 }

@@ -1,17 +1,14 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../api/client.dart';
-import '../api/endpoints.dart';
-import '../api/subsonic_client.dart';
-import '../api/subsonic_endpoints.dart';
 import '../models/recommend_health.dart';
 import '../models/recommended_track.dart';
 import '../models/seed_track.dart';
 import '../models/subsonic/album.dart';
 import '../models/subsonic/playlist.dart';
 import '../models/subsonic/song.dart';
+import '../services/backend_service.dart';
+import '../services/subsonic_library_service.dart';
 import 'library/favourites.dart';
 import 'library/library_playlist.dart';
 
@@ -99,23 +96,22 @@ List<SeedTrack> buildSeedCollection({
 /// Recommendation seed collection — input to the backend `POST /recommend`.
 ///
 /// Order of operations:
-///   1. `GET /rest/getStarred2.view` → starred songs.
-///   2. `GET /rest/getAlbumList2.view?type=frequent&size=30` → frequently
-///      played albums.
+///   1. `getStarred2.view` → starred songs.
+///   2. `getAlbumList2.view?type=frequent&size=30` → frequently played albums.
 ///   3. If both came back empty, read the Favourites playlist via the
 ///      existing [favouritesPlaylistProvider] + [libraryPlaylistProvider]
 ///      chain.
 ///   4. Merge via [buildSeedCollection] — starred first, dedup, cap.
 ///
 /// Errors from the Subsonic calls propagate to the caller as `AsyncError`.
-/// The Favourites fallback no-ops gracefully when no Navidrome username is
-/// configured (the provider returns an empty list).
 @riverpod
 Future<List<SeedTrack>> seedCollection(SeedCollectionRef ref) async {
-  final Dio dio = await ref.watch(subsonicDioClientProvider.future);
+  final SubsonicLibraryService service =
+      await ref.watch(subsonicLibraryServiceProvider.future);
 
-  final List<Song> starred = await _fetchStarredSongs(dio);
-  final List<Album> frequent = await _fetchFrequentAlbums(dio);
+  final List<Song> starred = await service.getStarredSongs();
+  final List<Album> frequent =
+      await service.getAlbumList(type: 'frequent', size: _kFrequentAlbumSize);
 
   List<Song> favourites = const <Song>[];
   if (starred.isEmpty && frequent.isEmpty) {
@@ -129,42 +125,6 @@ Future<List<SeedTrack>> seedCollection(SeedCollectionRef ref) async {
   );
 }
 
-Future<List<Song>> _fetchStarredSongs(Dio dio) {
-  return subsonicCall<List<Song>>(
-    () => dio.get<dynamic>(SubsonicEndpoints.getStarred2),
-    (Map<String, dynamic> env) {
-      final dynamic block = env['starred2'];
-      if (block is! Map<String, dynamic>) return <Song>[];
-      final dynamic songs = block['song'];
-      if (songs is! List) return <Song>[];
-      return songs
-          .map((dynamic e) => Song.fromJson(e as Map<String, dynamic>))
-          .toList();
-    },
-  );
-}
-
-Future<List<Album>> _fetchFrequentAlbums(Dio dio) {
-  return subsonicCall<List<Album>>(
-    () => dio.get<dynamic>(
-      SubsonicEndpoints.getAlbumList2,
-      queryParameters: <String, dynamic>{
-        'type': 'frequent',
-        'size': _kFrequentAlbumSize,
-      },
-    ),
-    (Map<String, dynamic> env) {
-      final dynamic block = env['albumList2'];
-      if (block is! Map<String, dynamic>) return <Album>[];
-      final dynamic albums = block['album'];
-      if (albums is! List) return <Album>[];
-      return albums
-          .map((dynamic e) => Album.fromJson(e as Map<String, dynamic>))
-          .toList();
-    },
-  );
-}
-
 Future<List<Song>> _fetchFavouriteSongs(SeedCollectionRef ref) async {
   final Playlist? fav = await ref.watch(favouritesPlaylistProvider.future);
   if (fav == null) return const <Song>[];
@@ -175,19 +135,15 @@ Future<List<Song>> _fetchFavouriteSongs(SeedCollectionRef ref) async {
 
 /// Recommendation results from the heerr backend (`POST /api/v1/recommend`).
 ///
-/// Reads the user's seed collection via [seedCollectionProvider] (N2),
-/// POSTs `{seeds, limit: 20}` to the backend, returns the parsed
-/// [RecommendedTrack] list for the UI.
+/// Reads the user's seed collection via [seedCollectionProvider] (N2), POSTs
+/// `{seeds, limit: 20}` to the backend, returns the parsed [RecommendedTrack]
+/// list for the UI.
 ///
-/// When the seed collection is empty (no starred / frequent / Favourites
-/// data on the server yet), still calls the backend with `seeds: []` —
-/// the listenbrainz engine drives its own history-based results, so the
-/// empty-seed case is meaningful for users running that engine. ytmusic
-/// and lastfm engines will return `[]` for empty seeds; the screen
-/// renders the empty-state widget.
-///
-/// `inLibrary` cross-reference is not done in v1 — it lands at N4. v1
-/// results all render with `inLibrary: false` and the Download button.
+/// When the seed collection is empty, still calls the backend with
+/// `seeds: []` — the listenbrainz engine drives its own history-based
+/// results, so the empty-seed case is meaningful there. ytmusic and lastfm
+/// engines will return `[]` for empty seeds; the screen renders the
+/// empty-state widget.
 @riverpod
 class Recommendations extends _$Recommendations {
   @override
@@ -200,41 +156,26 @@ class Recommendations extends _$Recommendations {
       seeds = await ref.watch(seedCollectionProvider.future);
     }
 
-    final Dio dio = await ref.watch(dioClientProvider.future);
-
-    final Map<String, dynamic> body = <String, dynamic>{
-      'seeds': seeds.map((SeedTrack s) => s.toJson()).toList(),
-      'limit': _kRecommendationsLimit,
-    };
-
-    final List<RecommendedTrack> base = await apiCall<List<RecommendedTrack>>(
-      () => dio.post<dynamic>(Endpoints.recommend, data: body),
-      (dynamic data) {
-        final Map<String, dynamic> json = data as Map<String, dynamic>;
-        final dynamic results = json['results'];
-        if (results is! List) return <RecommendedTrack>[];
-        return results
-            .map((dynamic e) =>
-                RecommendedTrack.fromJson(e as Map<String, dynamic>))
-            .toList();
-      },
-    );
+    final BackendService backend =
+        await ref.watch(backendServiceProvider.future);
+    final List<RecommendedTrack> base =
+        await backend.recommend(seeds: seeds, limit: _kRecommendationsLimit);
 
     if (base.isEmpty) return base;
 
     // Cross-reference each result against the Subsonic library via
-    // `search3.view?query=<artist> <title>&songCount=1`. Library-side
-    // failures are swallowed per result so one bad search3 doesn't kill
-    // the whole list — the result just falls through as inLibrary=false.
+    // `search3`. Library-side failures are swallowed per result so one bad
+    // search3 doesn't kill the whole list — the result just falls through as
+    // inLibrary=false.
     return _hydrateLibraryMatches(base);
   }
 
   Future<List<RecommendedTrack>> _hydrateLibraryMatches(
     List<RecommendedTrack> base,
   ) async {
-    final Dio sub;
+    final SubsonicLibraryService service;
     try {
-      sub = await ref.watch(subsonicDioClientProvider.future);
+      service = await ref.watch(subsonicLibraryServiceProvider.future);
     } catch (_) {
       // Navidrome not configured — every row stays remote-only.
       return base;
@@ -242,7 +183,8 @@ class Recommendations extends _$Recommendations {
 
     Future<RecommendedTrack> resolveOne(RecommendedTrack r) async {
       try {
-        final _LibraryMatch? match = await _searchLibraryForMatch(sub, r);
+        final SubsonicSongMatch? match =
+            await service.findLibraryMatch('${r.artist} ${r.title}');
         if (match == null) return r;
         return r.copyWith(
           inLibrary: true,
@@ -257,55 +199,12 @@ class Recommendations extends _$Recommendations {
     return Future.wait(base.map(resolveOne));
   }
 
-  Future<_LibraryMatch?> _searchLibraryForMatch(
-    Dio sub,
-    RecommendedTrack r,
-  ) async {
-    final String query = '${r.artist} ${r.title}'.trim();
-    if (query.isEmpty) return null;
-    return subsonicCall<_LibraryMatch?>(
-      () => sub.get<dynamic>(
-        SubsonicEndpoints.search3,
-        queryParameters: <String, dynamic>{
-          'query': query,
-          'songCount': 1,
-          'artistCount': 0,
-          'albumCount': 0,
-        },
-      ),
-      (Map<String, dynamic> env) {
-        final dynamic block = env['searchResult3'];
-        if (block is! Map<String, dynamic>) return null;
-        final dynamic songs = block['song'];
-        if (songs is! List || songs.isEmpty) return null;
-        final dynamic first = songs.first;
-        if (first is! Map<String, dynamic>) return null;
-        final dynamic id = first['id'];
-        if (id is! String || id.isEmpty) return null;
-        final dynamic cover = first['coverArt'];
-        return _LibraryMatch(
-          id: id,
-          coverArt: cover is String && cover.isNotEmpty ? cover : null,
-        );
-      },
-    );
-  }
-
   /// UI helper for pull-to-refresh. Invalidates self so seedCollection
   /// + recommend are both re-fetched on the next read.
   Future<void> refresh() async {
     ref.invalidateSelf();
     await future;
   }
-}
-
-/// Result of one row's `search3` library probe: the Navidrome song id +
-/// (optionally) the album-cover id to render on the Home recommendation
-/// card without a second `getSong` round-trip.
-class _LibraryMatch {
-  const _LibraryMatch({required this.id, this.coverArt});
-  final String id;
-  final String? coverArt;
 }
 
 /// Default freshness window for [RecommendHealthNotifier]. Calls to
@@ -320,8 +219,7 @@ const Duration _kHealthMaxAge = Duration(seconds: 60);
 ///   - Keep-alive so the cached payload survives Settings tab switches.
 ///   - [refreshIfStale] is the hook for "events that should trigger a
 ///     re-fetch" — currently called on Settings screen open and on app
-///     resume (router shell). 60 s TTL prevents thrashing when those
-///     events fire in rapid succession.
+///     resume (lifecycle coordinator). 60 s TTL prevents thrashing.
 ///
 /// Failures propagate as `AsyncError`; the Settings widget renders an
 /// "unknown" chip in that case rather than a hard error pane.
@@ -332,17 +230,13 @@ class RecommendHealthNotifier extends _$RecommendHealthNotifier {
   @override
   Future<RecommendHealth> build() async {
     _lastFetchAt = DateTime.now();
-    final Dio dio = await ref.watch(dioClientProvider.future);
-    return apiCall<RecommendHealth>(
-      () => dio.get<dynamic>(Endpoints.recommendHealth),
-      (dynamic data) =>
-          RecommendHealth.fromJson(data as Map<String, dynamic>),
-    );
+    final BackendService backend =
+        await ref.watch(backendServiceProvider.future);
+    return backend.recommendHealth();
   }
 
-  /// Re-fetch when the cached payload is older than [maxAge]. No-ops
-  /// when the cache is fresh — cheap to call from app-resume / screen-
-  /// open paths without thrashing the backend.
+  /// Re-fetch when the cached payload is older than [maxAge]. No-ops when the
+  /// cache is fresh — cheap to call from app-resume / screen-open paths.
   void refreshIfStale({Duration maxAge = _kHealthMaxAge}) {
     final DateTime? last = _lastFetchAt;
     if (last != null && DateTime.now().difference(last) < maxAge) return;

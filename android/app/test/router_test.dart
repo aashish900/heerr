@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:heerr/offline/offline_sync.dart';
+import 'package:heerr/providers/profiles/profile_registry.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/router.dart';
+import 'package:heerr/screens/auth/login_screen.dart';
 import 'package:heerr/screens/home/home_screen.dart';
 import 'package:heerr/theme.dart';
+
+import 'support/cred_test_support.dart';
 
 // In-memory fake for `flutter_secure_storage`. Needed because the real
 // SettingsScreen (B3) reads the profile registry at build time → which hits
@@ -211,64 +214,69 @@ void main() {
     });
   });
 
-  group('_ShellScaffold lifecycle wiring', () {
-    Future<void> sendLifecycle(WidgetTester tester, String state) async {
-      final ByteData? msg = const StringCodec().encodeMessage(state);
-      await tester.binding.defaultBinaryMessenger
-          .handlePlatformMessage('flutter/lifecycle', msg, (_) {});
-    }
-
-    testWidgets('paused → calls pause() on OfflineSync', (
-      WidgetTester tester,
-    ) async {
-      final _StubSync stub = _StubSync();
-      await tester.pumpWidget(ProviderScope(
+  group('A2 — redirect reacts to registry changes via refreshListenable', () {
+    testWidgets('removing the active profile redirects to /login with no '
+        'manual navigation', (WidgetTester tester) async {
+      initPrefsMock();
+      final _MapStorage store = _MapStorage();
+      final ProviderContainer container = ProviderContainer(
         overrides: <Override>[
-          secureStorageProvider
-              .overrideWith((Ref<SecureStorage> _) => _NoopStorage()),
-          offlineSyncProvider.overrideWith(() => stub),
+          secureStorageProvider.overrideWith((Ref<SecureStorage> _) => store),
+          // Neutralize offline sync so the shell's init microtask is inert.
+          offlineSyncProvider.overrideWith(() => _StubSync()),
         ],
-        child: MaterialApp.router(
-          theme: heerrDarkTheme(),
-          routerConfig: buildHeerrRouter(),
+      );
+      addTearDown(container.dispose);
+
+      // Seed one active profile. Empty URLs keep Home network-free (the
+      // dio clients short-circuit on an empty base, same as the signed-out
+      // path) so `pumpAndSettle` doesn't wait on real HTTP.
+      final ProfileRegistry reg =
+          container.read(profileRegistryProvider.notifier);
+      await reg.addProfile(
+        testProfile(id: 'p1', heerrBaseUrl: '', navidromeBaseUrl: ''),
+      );
+      await reg.setActive('p1');
+      await container.read(profileRegistryProvider.future);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            theme: heerrDarkTheme(),
+            routerConfig: buildHeerrRouter(container: container),
+          ),
         ),
-      ));
-      await tester.pumpAndSettle();
-      // The microtask in _ShellScaffoldState may pre-touch the provider —
-      // we only care about counts AFTER the lifecycle event.
-      stub.resetCounts();
-
-      await sendLifecycle(tester,'AppLifecycleState.paused');
+      );
       await tester.pumpAndSettle();
 
-      expect(stub.pauseCalls, greaterThanOrEqualTo(1));
-      expect(stub.resumeCalls, 0);
-    });
+      // Logged in → Home is shown, not Login.
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.byType(LoginScreen), findsNothing);
 
-    testWidgets('resumed → calls resume() on OfflineSync', (
-      WidgetTester tester,
-    ) async {
-      final _StubSync stub = _StubSync();
-      await tester.pumpWidget(ProviderScope(
-        overrides: <Override>[
-          secureStorageProvider
-              .overrideWith((Ref<SecureStorage> _) => _NoopStorage()),
-          offlineSyncProvider.overrideWith(() => stub),
-        ],
-        child: MaterialApp.router(
-          theme: heerrDarkTheme(),
-          routerConfig: buildHeerrRouter(),
-        ),
-      ));
-      await tester.pumpAndSettle();
-      stub.resetCounts();
-
-      await sendLifecycle(tester,'AppLifecycleState.resumed');
+      // Remove the active profile WITHOUT navigating. The refreshListenable
+      // must drive the redirect to /login on its own (pre-A2 this only
+      // happened on the next navigation event).
+      await reg.removeProfile('p1');
       await tester.pumpAndSettle();
 
-      expect(stub.resumeCalls, greaterThanOrEqualTo(1));
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(HomeScreen), findsNothing);
     });
   });
+}
+
+// Persisting in-memory secure storage — unlike `_NoopStorage` it remembers
+// writes, so the profile registry round-trips (needed by the A2 redirect test).
+class _MapStorage implements SecureStorage {
+  final Map<String, String> _data = <String, String>{};
+
+  @override
+  Future<String?> read(String key) async => _data[key];
+  @override
+  Future<void> write(String key, String value) async => _data[key] = value;
+  @override
+  Future<void> delete(String key) async => _data.remove(key);
 }
 
 class _StubSync extends OfflineSync {
