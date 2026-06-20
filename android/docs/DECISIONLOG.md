@@ -670,3 +670,23 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **Per-request base-URL/Wi-Fi re-check only, no stream (A14).** That's the status quo this item exists to fix; polling can't beat the poll interval for latency.
 
 **Reference:** `android/app/lib/offline/offline_sync.dart` (`_runTick` Queue, `_forEachBounded`, `WifiCheck.onWifiChanged`, `_subscribeWifi`). Tests: `test/offline/offline_sync_test.dart` (A14 + existing bounded-concurrency cases). Debt A12/A13/A14 in `docs/DEBT.md §5`.
+
+## 2026-06-20 — P3 cleanup: split large screen files; triage the rest (debt A16–A22)
+
+**Context:** Final DEBT §5 band (P3 low-hanging cleanup): A16 (screen-folder convention), A17 (split large widget files), A19 (records→freezed), A20 (`clear()` scope), A22 (`app/ios/` baggage). A18/A21 were already done.
+
+**Decision:**
+- **A17 — DO.** Split the four large screen files (`now_playing` 756, `library` 615, `playlist_detail` 606, `settings` 562) using Dart `part`/`part of` sibling files, one per cohesive section. Private (`_`) widget classes keep their privacy (same library) and no caller imports change.
+- **A20, A22 — STALE.** `Settings.clear()` and the legacy keys it half-wiped were deleted in A6; `app/ios/` doesn't exist. Marked resolved, no code.
+- **A16, A19 — WON'T-FIX** (with rationale, below).
+
+**Why:**
+- **`part`/`part of` over per-widget public files (A17).** The DEBT note's stated rebuild-scope benefit already holds — these are already separate widget classes, and file location doesn't affect Flutter's rebuild granularity. So A17 is purely a readability/file-size win, and `part` files achieve it with zero behaviour risk: privacy preserved, imports stay centralised in the main library file, no caller churn, analyzer-verified. `playlist_detail` is dominated by a single 515-line `State` class that can't be widget-extracted without a real refactor, so only its header/enum moved.
+- **A16 won't-fix.** Moving 5 flat `*_screen.dart` files into per-domain subfolders rewrites ~48 internal relative imports + 5 importer files and churns git blame, for zero behaviour or rebuild benefit — purely cosmetic foldering. Not worth it; revisit only if a domain folder grows enough to need it.
+- **A19 won't-fix.** The premise is partly wrong: Dart records **already have value (`==`-by-field) equality**, so the only real gain from `freezed` is `copyWith` — and nothing needs it (these records are rebuilt wholesale every tick/read, never field-patched). Converting 7 record typedefs to freezed is high construction-site churn for marginal benefit. Revisit if a real `copyWith` need appears.
+
+**Alternatives considered:**
+- **A17 by making the widgets public in their own files.** Rejected — needlessly widens the API surface; `part` keeps them private.
+- **Do A16/A19 anyway for completeness.** Rejected per the project's blunt-engineering preference: closing low-value/high-churn items as documented won't-fix is sounder than churning ~3000 LOC for cosmetics. (Confirmed with the user.)
+
+**Reference:** new `part` files under `android/app/lib/screens/**`; DEBT §5 A16–A22 entries. This closes the DEBT §5 architectural backlog (P0/P1/P2 done earlier; P3 done/triaged here).

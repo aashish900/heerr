@@ -22,6 +22,9 @@ import '../../widgets/playlist_dialogs.dart';
 import '../../widgets/skeleton.dart';
 import '../../widgets/song_row_actions.dart';
 
+// A17: the playlist header widget + action enum live in a sibling part file.
+part 'playlist_detail_header.dart';
+
 /// Playlist detail. Mirrors [AlbumDetailScreen] for the read path: header
 /// + song list, tap to play. M2 added rename / delete via the AppBar
 /// overflow. M4 layers an edit mode on top — pencil icon in the AppBar
@@ -551,56 +554,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
           ),
         ),
       ],
-    );
-  }
-}
-
-enum _PlaylistAction { rename, delete }
-
-class _PlaylistHeader extends StatelessWidget {
-  const _PlaylistHeader({required this.playlist});
-
-  final Playlist playlist;
-
-  @override
-  Widget build(BuildContext context) {
-    final TextTheme tt = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          LibraryCoverArt(coverArtId: playlist.coverArt, size: 120),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  playlist.name,
-                  style: tt.titleLarge,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (playlist.owner != null) ...<Widget>[
-                  const SizedBox(height: 4),
-                  Text(
-                    'by ${playlist.owner}',
-                    style: tt.bodyMedium,
-                  ),
-                ],
-                if (playlist.songCount != null) ...<Widget>[
-                  const SizedBox(height: 4),
-                  Text(
-                    '${playlist.songCount} songs',
-                    style: tt.bodySmall,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
