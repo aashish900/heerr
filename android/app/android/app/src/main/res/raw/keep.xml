@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The media-notification small icon is referenced only at runtime by
+     audio_service via Resources.getIdentifier(), which the R8 resource
+     shrinker (shrinkResources=true) cannot see. Without this keep rule the
+     drawable is stripped from release builds, producing a notification with
+     no valid small icon and crashing playback on start. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_heerr" />

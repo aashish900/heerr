@@ -1938,3 +1938,13 @@ analyze` clean; `flutter test` green (567 tests).
 - `pubspec.yaml`: 3.1.2 → 3.2.0.
 - SMOKE-TEST.md deleted (gitignored local working doc; the committed record is the V7 row above).
 - Promoted: `v3.2.0-rc3` → `v3.2.0`.
+
+## 2026-06-21 — v3.2.1: fix media-notification / lockscreen / AOD app icon (issue #23)
+
+- **Symptom:** the media notification rendered a blank white circle for the app icon on the lockscreen and always-on display (AOD) instead of the heerr mark.
+- **`lib/main.dart`:** set `AudioServiceConfig.androidNotificationIcon` to `'drawable/ic_stat_heerr'` (the default `mipmap/ic_launcher` silhouettes the full-colour adaptive icon into a solid blob). Also dropped the deprecated `isInDebugMode:` arg from `Workmanager().initialize` (it had no effect and tripped `flutter analyze`, failing CI).
+- **`lib/player/song_to_media_item.dart`:** when a song has no `coverArt`, fall back to `artUri = android.resource://com.aashish.heerr/mipmap/ic_launcher` so the media-card large-icon area is never blank. `test/player/song_to_media_item_test.dart` updated to expect the fallback.
+- **Status-bar / lockscreen small icon:** added `res/drawable-*dpi/ic_stat_heerr.png` (white monochrome silhouette of the app mark, derived from the 1024² source art) at all five densities. Notification small icons must be alpha-only — a colour icon renders as a blob.
+- **Resource-shrinker keep rule (`res/raw/keep.xml`):** `ic_stat_heerr` is referenced only at runtime via audio_service's `Resources.getIdentifier()`, invisible to R8 `shrinkResources`. Without `tools:keep="@drawable/ic_stat_heerr"` the release build stripped it, producing a notification with no valid small icon → `IllegalArgumentException` crash on play. This was the root cause of the "playing any song crashes" regression.
+- **AOD app badge (`res/mipmap-anydpi-v26/ic_launcher.xml`):** added a `<monochrome>` layer (`res/drawable-*dpi/ic_launcher_monochrome.png`, all densities). Android 13+ uses the adaptive icon's monochrome layer for the themed app badge on AOD; its absence was the blank white circle on the always-on display.
+- **`pubspec.yaml`:** 3.2.0 → 3.2.1.
