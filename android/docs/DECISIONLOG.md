@@ -593,3 +593,22 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **A8 keeping the observer in the shell but extracting helpers.** Rejected — the observer + its side-effects are the concern to isolate; a half-move wouldn't make the shell testable in isolation.
 
 **Reference:** `android/app/lib/app/lifecycle_coordinator.dart`, `android/app/lib/router.dart`, `android/app/lib/services/{subsonic_library_service,playlist_service,backend_service,lyrics_service}.dart`, and the delegating providers under `android/app/lib/providers/**`. Tests: `test/app/lifecycle_coordinator_test.dart`, `test/services/subsonic_library_service_test.dart`. Debt A8/A10 in `docs/DEBT.md §5`.
+
+## 2026-06-20 — Session-stable salt for read-only Subsonic URLs (debt A11)
+
+**Context:** `buildSubsonicCoverArtUrl` / `buildSubsonicStreamUrl` generated a fresh random salt on every call (`api/subsonic_client.dart`). Because the salt is part of the query string, the URL changed on every render — so `Image.network` (URL-keyed cache) cold-fetched every cover-art tile on every Library/Home scroll. The code comment already flagged this as deferred K1+ work.
+
+**Decision:** Introduce a process-lifetime `sessionStableSalt()` (lazily initialised once per process) and make it the default salt for both read-only URL builders. The per-request `SubsonicAuthInterceptor` (every API GET + all state-mutating playlist calls) is left rotating per request.
+
+**Why:**
+- Subsonic auth tokens are `md5(password + salt)`; Navidrome validates each request independently and accepts a stable salt within a session, so a fixed salt is just as valid as a rotating one for read-only fetches.
+- A stable salt makes the cover-art URL deterministic for a given `coverArtId`+`size`, which is the precondition for Flutter's image cache to hit — the actual fix for the scroll-time cold-fetch.
+- The salt is **password-independent**: a profile switch (new password) still yields a valid token from the same salt, so the salt needs no reset on switch and the change is invisible to the multi-profile machinery.
+- Keeping per-request rotation on the interceptor preserves the conventional Subsonic posture for the calls that actually mutate state.
+
+**Alternatives considered:**
+- **A `saltPolicy` enum param** (as the DEBT note literally suggested). Rejected as over-engineered — every production caller of the read-only builders wants the stable policy, and tests already inject an explicit `saltGenerator`, so a sensible default covers both without a new parameter.
+- **Time-bucketed salt (rotate hourly).** Unnecessary complexity; a stable salt is valid for the whole session and the cache benefit is strictly better.
+- **A Flutter `ImageCache` / `CachedNetworkImage` layer instead.** Heavier (new dependency / disk-cache lifecycle) and orthogonal — the salt was the root cause of cache misses; fix that first.
+
+**Reference:** `android/app/lib/api/subsonic_client.dart` (`sessionStableSalt`, both builders). Tests: `test/api/subsonic_client_test.dart` (A11 group). Debt A11 in `docs/DEBT.md §5`.

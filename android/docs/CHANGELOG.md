@@ -1893,3 +1893,11 @@ analyze` clean; `flutter test` green (567 tests).
 - **Offline subsystem:** no change required — `offline/offline_downloader.downloadSong` is already an injected-`Dio` seam, and `offline/offline_sync` orchestrates via existing library providers + the `offlineDownloadDio` seam (no inline transport+JSON).
 - **Tests:** new `test/services/subsonic_library_service_test.dart` (5 cases) proves the seam is unit-testable **without a Riverpod container** (service built directly from a Dio + scripted adapter). `dart run build_runner build` regenerated `.g.dart` for the new service providers.
 - `flutter analyze` clean (only the pre-existing `main.dart:25` workmanager deprecation); full suite 573 green (+5). Resolves DEBT §5 A8 + A10.
+
+## 2026-06-20 — A11: session-stable salt for cover-art / stream URLs
+
+- **`lib/api/subsonic_client.dart`:** added `sessionStableSalt()` — a process-lifetime salt lazily initialised from `_randomHexSalt()`. Made it the default for both read-only URL builders (`buildSubsonicCoverArtUrl`, `buildSubsonicStreamUrl`), replacing the per-call `_randomHexSalt`. Same `coverArtId`+`size` now yields a byte-identical URL across renders, so Flutter's URL-keyed image cache hits instead of cold-fetching every tile on every Library/Home scroll.
+- The salt is independent of the password (`t = md5(password+salt)` recomputes), so a profile switch keeps producing valid tokens from the same salt — no reset needed.
+- `SubsonicAuthInterceptor` (all API + state-mutating calls) is unchanged: it still rotates the salt per request.
+- Doc comments on both builders updated (the old "salt rotates per call → defeats cache, K1+ work" caveat is now resolved).
+- **Tests:** new "A11" group in `test/api/subsonic_client_test.dart` — cover-art URL identical across two calls, stream URL identical across two calls, explicit `saltGenerator` still overrides. `flutter analyze` clean; full suite 576 green (+3). Resolves DEBT §5 A11.

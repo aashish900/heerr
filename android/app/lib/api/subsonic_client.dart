@@ -80,17 +80,30 @@ String _randomHexSalt() {
       .join();
 }
 
+/// Process-lifetime salt for the read-only URL builders (cover art + stream).
+///
+/// A11: Subsonic accepts a stable salt within a session, and the salt is
+/// independent of the password (the token recomputes as `md5(password+salt)`,
+/// so a profile switch with a new password still produces a valid token from
+/// the same salt). Reusing one salt for the lifetime of the process keeps the
+/// generated URL identical across renders of the same `coverArtId`+`size`,
+/// which lets Flutter's URL-keyed image cache actually hit instead of cold-
+/// fetching every tile on every scroll. State-mutating / API calls keep
+/// rotating the salt per request via [SubsonicAuthInterceptor].
+String? _sessionSalt;
+String sessionStableSalt() => _sessionSalt ??= _randomHexSalt();
+
 /// Build a `getCoverArt.view` URL with Subsonic auth params embedded as
 /// query string. Needed because Flutter's `Image.network` does not flow
 /// through the dio interceptor — the auth params have to be baked into the
 /// URL the framework fetches directly.
 ///
 /// [saltGenerator] is injectable for deterministic tests; production callers
-/// pass nothing and let the cryptographically-strong default fire.
+/// pass nothing and let the [sessionStableSalt] default fire.
 ///
-/// Note: the salt rotates on every call, which means the URL changes per
-/// render — this defeats the framework's URL-keyed image cache. For v1
-/// (I1) that's acceptable; cover-art caching is a K1+ optimisation.
+/// A11: the default salt is **session-stable**, so repeated calls for the same
+/// `coverArtId`+`size` return an identical URL — Flutter's URL-keyed image
+/// cache hits instead of cold-fetching every tile on every scroll.
 String buildSubsonicCoverArtUrl({
   required String baseUrl,
   required String username,
@@ -99,7 +112,7 @@ String buildSubsonicCoverArtUrl({
   int? size,
   String Function()? saltGenerator,
 }) {
-  final String salt = (saltGenerator ?? _randomHexSalt)();
+  final String salt = (saltGenerator ?? sessionStableSalt)();
   final String token =
       md5.convert(utf8.encode(password + salt)).toString();
   final Map<String, String> params = <String, String>{
@@ -125,10 +138,10 @@ String buildSubsonicCoverArtUrl({
 /// it doesn't flow through the dio interceptor, so auth has to live in the
 /// URL the framework opens.
 ///
-/// Same salt-per-call caveat as [buildSubsonicCoverArtUrl]: the salt rotates
-/// per render, defeating any URL-keyed caching the player might do. That's
-/// not a real concern for audio streams (each track is opened once per
-/// playback), but worth knowing.
+/// A11: like [buildSubsonicCoverArtUrl] this defaults to [sessionStableSalt],
+/// so a stream URL is stable across renders. Not strictly required for audio
+/// (each track is opened once per playback), but keeps both read-only URL
+/// builders on the same policy.
 String buildSubsonicStreamUrl({
   required String baseUrl,
   required String username,
@@ -136,7 +149,7 @@ String buildSubsonicStreamUrl({
   required String songId,
   String Function()? saltGenerator,
 }) {
-  final String salt = (saltGenerator ?? _randomHexSalt)();
+  final String salt = (saltGenerator ?? sessionStableSalt)();
   final String token =
       md5.convert(utf8.encode(password + salt)).toString();
   final Map<String, String> params = <String, String>{
