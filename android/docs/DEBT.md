@@ -30,6 +30,7 @@ Manual smokes called out as deferred in the CHANGELOG. No written log required �
 | V4 | Q (v2.0.0 background sync) | ✅ 2026-06-16 — mark album → background → worker fires → downloads complete; WiFi-off gate skips worker; charging-only toggle gates correctly. `v2.0.0` tagged. |
 | V5 | A1/A4/A5 credential + offline-prefs band (v3.1.1) | ✅ 2026-06-19 — on-device smoke passed. Upgrade from v3.0.0: silent re-login + offline prefs survived; no Servers tile/route; profile add/switch/remove; auth-error redirects to `/login`; fresh-install defaults. Tagged `v3.1.1`. |
 | V6 | A6 SettingsValue split + R8 media-notification fix (v3.1.2) | ✅ 2026-06-20 — on-device smoke passed. Release APK confirmed: lock-screen + pull-down media controls present; offline path re-keying on profile switch correct; offline prefs survive upgrade from v3.1.1. Tagged `v3.1.2`. |
+| V7 | DEBT §5 architectural-debt band — refactor-only (v3.2.0): A8/A10 service layer + LifecycleCoordinator, A3 stateless interceptors, A11 cover-art salt, A12–A14 offline-sync, A2/A15 reactive lifecycle, A17 file splits | ✅ 2026-06-20 — on-device smoke passed (SMOKE-TEST.md §14a). Release APK confirmed: all read/playback/offline/search/playlist/lyrics paths intact post-refactor; cover-art tiles no longer refetch on re-scroll; WiFi-off→on triggers off-schedule sync; profile-remove redirects to `/login` immediately; profile switch loads new creds + audio. Tagged `v3.2.0`. |
 
 ---
 

@@ -1930,3 +1930,11 @@ analyze` clean; `flutter test` green (567 tests).
   - `screens/library/playlist_detail_screen.dart` 606→556; extracted `playlist_detail_header.dart` (`_PlaylistHeader`, `_PlaylistAction`) — the rest is one large `State` class, not cleanly widget-extractable.
 - **P3 triage (no code):** A20 (`Settings.clear()` half-wipe) and A22 (`app/ios/` baggage) confirmed **stale** — `providers/settings.dart` was deleted in A6 and no `app/ios/` folder exists. A16 (screen re-foldering) and A19 (records→freezed) closed **won't-fix** with rationale (cosmetic/high-churn; records already have value equality). See DECISIONLOG.
 - `flutter analyze` clean; full suite 578 green. Resolves DEBT §5 A17; closes the P3 band and the whole §5 architectural backlog.
+
+## 2026-06-20 — v3.2.0: DEBT §5 architectural backlog (refactor-only release)
+
+- On-device release-APK smoke passed (SMOKE-TEST.md §14a): service-layer (A8/A10), lifecycle (A8/A2/A15), interceptor (A3), cover-art salt (A11), and offline-sync (A12–A14) refactors verified behaviour-preserving; A17 file splits covered by the read/playback passes.
+- `DEBT.md`: V7 marked ✅; the full §5 architectural backlog (A1–A22) is closed/triaged.
+- `pubspec.yaml`: 3.1.2 → 3.2.0.
+- SMOKE-TEST.md deleted (gitignored local working doc; the committed record is the V7 row above).
+- Promoted: `v3.2.0-rc3` → `v3.2.0`.
