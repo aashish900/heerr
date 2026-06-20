@@ -15,3 +15,17 @@
 -keep class * extends androidx.room.RoomDatabase { <init>(); }
 -keepclassmembers class * extends androidx.room.RoomDatabase { <init>(); }
 -keep class androidx.room.** { *; }
+
+# audio_service (J1 / media notification + lock-screen controls). The
+# AudioService + MediaButtonReceiver classes are auto-kept by AGP because
+# they are declared in AndroidManifest.xml, but the plugin's internal
+# MediaSession / notification-builder helper classes are not — R8 strips or
+# obfuscates them, so the foreground service still starts (playback works)
+# while the media notification and lock-screen controls silently stop
+# rendering. Keep the whole plugin package.
+-keep class com.ryanheise.audioservice.** { *; }
+
+# just_audio: the ExoPlayer-backed playback engine behind audio_service.
+# Its platform classes are referenced by the generated plugin registrant;
+# keep them so R8 doesn't break playback/loading in release builds.
+-keep class com.ryanheise.just_audio.** { *; }

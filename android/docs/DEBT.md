@@ -29,6 +29,7 @@ Manual smokes called out as deferred in the CHANGELOG. No written log required �
 | V3 | P (v1.5.0 polish) | ✅ 2026-06-15 — P1/P2/P3 all passed; bug fixes for nav reset + LRCLib fallback also verified. `v1.5.0` tagged. |
 | V4 | Q (v2.0.0 background sync) | ✅ 2026-06-16 — mark album → background → worker fires → downloads complete; WiFi-off gate skips worker; charging-only toggle gates correctly. `v2.0.0` tagged. |
 | V5 | A1/A4/A5 credential + offline-prefs band (v3.1.1) | ✅ 2026-06-19 — on-device smoke passed. Upgrade from v3.0.0: silent re-login + offline prefs survived; no Servers tile/route; profile add/switch/remove; auth-error redirects to `/login`; fresh-install defaults. Tagged `v3.1.1`. |
+| V6 | A6 SettingsValue split + R8 media-notification fix (v3.1.2) | ⏳ PENDING — `android/SMOKE-TEST.md` (`v3.1.2-rc2`). **Must run against a RELEASE APK** (R8 on). Regression gate: lock-screen + pull-down media notification (§6.8–6.10). |
 
 ---
 
@@ -165,3 +166,23 @@ Findings from a senior-Android-dev architectural pass over `android/app/lib/` (1
 5. **A8 → A10** — the bigger refactor; do it once the credential layer is settled.
 6. **P2 (perf)** — A11 is the highest-impact-per-LOC; A12/A13/A14 follow as the offline subsystem gets touched.
 7. **P3** — opportunistic; pick up alongside any feature work that lands in the same file.
+
+---
+
+## Resolved bugs
+
+### R8 strips audio_service → media notification + lock-screen player gone (release only)
+
+**Reported (2026-06-20):** Lock-screen controls gone; pull-down media notification not visible.
+
+**Root cause:** Commit `403c5ff` enabled R8 minification (`isMinifyEnabled = true` +
+`isShrinkResources = true`) to fix the WorkManager boot crash, but the keep rules in
+`proguard-rules.pro` covered only `androidx.work` / `androidx.room`. AGP auto-keeps the
+manifest-declared `AudioService` + `MediaButtonReceiver`, so the foreground service still
+started (playback worked), but R8 stripped/obfuscated `audio_service`'s internal
+MediaSession + notification-builder classes — so the notification + lock-screen controls
+silently stopped rendering. Release-only; invisible in `flutter run` (debug skips R8).
+
+**Fix (v3.1.2-rc2):** added `-keep class com.ryanheise.audioservice.**` and
+`-keep class com.ryanheise.just_audio.**` to `proguard-rules.pro`. Verified by V6 smoke
+(§6.8–6.10) against a release APK.
