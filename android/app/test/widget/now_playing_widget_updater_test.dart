@@ -6,9 +6,15 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockHomeWidgetClient extends Mock implements HomeWidgetClient {}
 
+class _MockArtCache extends Mock implements WidgetArtCache {}
+
 void main() {
   late _MockHomeWidgetClient client;
   late NowPlayingWidgetUpdater updater;
+
+  setUpAll(() {
+    registerFallbackValue(Uri.parse('https://fallback'));
+  });
 
   setUp(() {
     client = _MockHomeWidgetClient();
@@ -20,6 +26,9 @@ void main() {
 
   PlayerSnapshot snap(MediaItem? item, {bool playing = false}) =>
       PlayerSnapshot(item: item, state: PlaybackState(playing: playing));
+
+  MediaItem track(String id, {Uri? art}) =>
+      MediaItem(id: id, title: 'T', artist: 'A', artUri: art);
 
   group('NowPlayingWidgetUpdater (#20)', () {
     test('push with a playing track writes fields + triggers update', () async {
@@ -64,6 +73,61 @@ void main() {
         updater.push(snap(const MediaItem(id: 'a', title: 'T'))),
         completes,
       );
+    });
+  });
+
+  group('NowPlayingWidgetUpdater album art (#20)', () {
+    late _MockArtCache art;
+    late NowPlayingWidgetUpdater artUpdater;
+
+    setUp(() {
+      art = _MockArtCache();
+      artUpdater = NowPlayingWidgetUpdater(client: client, artCache: art);
+    });
+
+    test('caches the cover for an http artUri and saves its path', () async {
+      when(() => art.cache(any())).thenAnswer((_) async => '/data/art.png');
+
+      await artUpdater.push(
+        snap(track('s1', art: Uri.parse('https://h/cover?id=1'))),
+      );
+
+      verify(() => art.cache(Uri.parse('https://h/cover?id=1'))).called(1);
+      verify(() => client.saveString(kNpKeyArtPath, '/data/art.png')).called(1);
+    });
+
+    test('does not re-download art for the same track', () async {
+      when(() => art.cache(any())).thenAnswer((_) async => '/data/art.png');
+      final MediaItem same = track('s1', art: Uri.parse('https://h/c?id=1'));
+
+      await artUpdater.push(snap(same, playing: true));
+      await artUpdater.push(snap(same, playing: false));
+
+      verify(() => art.cache(any())).called(1);
+    });
+
+    test('re-downloads art when the track changes', () async {
+      when(() => art.cache(any())).thenAnswer((_) async => '/data/art.png');
+
+      await artUpdater.push(snap(track('s1', art: Uri.parse('https://h/c?id=1'))));
+      await artUpdater.push(snap(track('s2', art: Uri.parse('https://h/c?id=2'))));
+
+      verify(() => art.cache(any())).called(2);
+    });
+
+    test('non-http artUri saves empty path and skips the cache', () async {
+      await artUpdater.push(
+        snap(track('s1', art: Uri.parse('android.resource://x/y'))),
+      );
+
+      verifyNever(() => art.cache(any()));
+      verify(() => client.saveString(kNpKeyArtPath, '')).called(1);
+    });
+
+    test('null item clears the art path', () async {
+      await artUpdater.push(snap(null));
+
+      verify(() => client.saveString(kNpKeyArtPath, '')).called(1);
     });
   });
 }

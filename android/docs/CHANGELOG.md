@@ -1987,3 +1987,13 @@ analyze` clean; `flutter test` green (567 tests).
   - `proguard-rules.pro`: keep `es.antonborri.home_widget.**` (release R8 defence, mirrors the audio_service keep rule per DEBT.md).
 - **`test/widget/now_playing_widget_updater_test.dart`** (new): mocktail-mocked `HomeWidgetClient`; 5 cases (playing track writes all fields + update; paused → playing=false; null artist → empty string; null item → cleared; client error never throws). Red-first.
 - Verified: `flutter analyze` clean; full suite 603 green; `flutter build apk --debug` succeeds (Kotlin/manifest/resources compile). **Not yet smoke-tested on device** (G-milestone gate). Album art deferred — see DEBT.md.
+
+## 2026-06-21 — #20 follow-up: album art on the Now Playing widget
+
+- Feedback: the widget worked but the all-black background looked bland — show the streaming song's artwork.
+- **`lib/widget/now_playing_widget.dart`:** new `WidgetArtCache` seam (impl `WidgetArtCacheImpl`: Dio bytes GET → `getApplicationSupportDirectory()/np_widget_art.png`). `NowPlayingWidgetUpdater` gained an optional `artCache` + a new `np_art_path` data key. `push` resolves the cover path via `_resolveArtPath`, which fetches **once per track** (guards on `artUri` so play/pause/buffer emissions don't re-download) and only for http(s) URIs (the launcher-resource fallback → empty path). `clear()` and null item reset the path + guard.
+- **`lib/widget/now_playing_widget_provider.dart`:** wires `WidgetArtCacheImpl()` into the updater.
+- **`pubspec.yaml`:** already had `dio` + `path_provider` (no new deps).
+- **Native:** `now_playing_widget.xml` rebuilt as a `FrameLayout` — full-bleed `centerCrop` `@id/widget_art` ImageView + `#99000000` scrim + the existing text/controls on top. `NowPlayingWidgetProvider.kt` reads `np_art_path`, `BitmapFactory.decodeFile`s it (same-uid app-private file) and `setImageViewBitmap`s the background; falls back to the plain rounded `widget_background` drawable when absent/unreadable.
+- **`test/widget/now_playing_widget_updater_test.dart`:** new "album art" group (5 cases: http artUri caches + saves path; same track doesn't re-download; track change re-downloads; non-http skips cache → empty path; null item clears path). Red-first.
+- Verified: `flutter analyze` clean; full suite **608** green; `flutter build apk --debug` succeeds. Still pending on-device smoke (see DEBT.md).

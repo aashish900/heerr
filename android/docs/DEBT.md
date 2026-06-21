@@ -189,16 +189,16 @@ silently stopped rendering. Release-only; invisible in `flutter run` (debug skip
 (§6.8–6.10) against a release APK — lock-screen + pull-down notification restored. `v3.1.2` tagged.
 ---
 
-## #20 — Now Playing widget: no album art (deferred 2026-06-21)
+## #20 — Now Playing widget: no album art ✅ RESOLVED 2026-06-21
 
-The home-screen Now Playing widget (#20) shows title + artist + working
-play/pause/next/prev controls + tap-to-open, but **no album art**. RemoteViews
-cannot load a network image directly; real art requires `home_widget`'s
-`renderFlutterWidget` → PNG on disk → `ImageView`, which only works while the
-app process is alive (background/cold widget would show stale or no art).
-Deferred to keep the initial native build scoped. Follow-up: render the current
-cover to a bitmap in `NowPlayingWidgetUpdater.push` when the app is foregrounded
-and bind it to a new `ImageView` in `now_playing_widget.xml`.
+~~The home-screen Now Playing widget (#20) shows title + artist + working
+play/pause/next/prev controls + tap-to-open, but **no album art**.~~ Resolved:
+`NowPlayingWidgetUpdater` now downloads the current track's cover (Subsonic
+`artUri`, via a `WidgetArtCache` seam → Dio bytes → app-private PNG) once per
+track, and `NowPlayingWidgetProvider.kt` decodes it as a full-bleed
+`centerCrop` background behind a dark scrim. Fetched only while the app is
+alive (widget keeps the last cover when the process is dead). Non-network art
+(launcher fallback) → plain rounded background. (CHANGELOG 2026-06-21.)
 
 Also pending: **on-device smoke test** of the widget (add to home screen, verify
 controls hit the live MediaSession and title/artist/play-pause state track

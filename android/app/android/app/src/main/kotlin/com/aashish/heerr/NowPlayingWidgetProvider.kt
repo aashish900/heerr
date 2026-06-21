@@ -6,8 +6,11 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.BitmapFactory
 import android.view.KeyEvent
+import android.view.View
 import android.widget.RemoteViews
+import java.io.File
 import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetProvider
 
@@ -50,6 +53,22 @@ class NowPlayingWidgetProvider : HomeWidgetProvider() {
                 if (playing) android.R.drawable.ic_media_pause
                 else android.R.drawable.ic_media_play,
             )
+
+            // Cover art: decoded from the app-private file the Dart side
+            // cached (same uid, so the file is readable here). Falls back to
+            // the plain rounded background when absent/unreadable.
+            val artPath = widgetData.getString("np_art_path", null)
+            val bitmap = if (!artPath.isNullOrEmpty() && File(artPath).exists()) {
+                runCatching { BitmapFactory.decodeFile(artPath) }.getOrNull()
+            } else {
+                null
+            }
+            if (bitmap != null) {
+                views.setImageViewBitmap(R.id.widget_art, bitmap)
+                views.setViewVisibility(R.id.widget_art, View.VISIBLE)
+            } else {
+                views.setImageViewResource(R.id.widget_art, 0)
+            }
 
             // Transport controls -> live MediaSession via MediaButtonReceiver.
             views.setOnClickPendingIntent(

@@ -18,8 +18,10 @@ part 'now_playing_widget_provider.g.dart';
 /// last-pushed state until the user reopens the app.
 @Riverpod(keepAlive: true)
 NowPlayingWidgetUpdater nowPlayingWidget(NowPlayingWidgetRef ref) {
-  final NowPlayingWidgetUpdater updater =
-      NowPlayingWidgetUpdater(client: const HomeWidgetClientImpl());
+  final NowPlayingWidgetUpdater updater = NowPlayingWidgetUpdater(
+    client: const HomeWidgetClientImpl(),
+    artCache: WidgetArtCacheImpl(),
+  );
 
   ref.listen<AsyncValue<PlayerSnapshot>>(
     playerSnapshotProvider,
