@@ -11,6 +11,7 @@ import 'package:heerr/models/recommended_track.dart';
 import 'package:heerr/providers/download.dart';
 import 'package:heerr/providers/recommendations.dart';
 import 'package:heerr/screens/recommendations_screen.dart';
+import 'package:heerr/widgets/home_recommendation_card.dart';
 
 class _RecordingDispatcher extends DownloadDispatcher {
   final List<String> calls = <String>[];
@@ -115,7 +116,9 @@ void main() {
     expect(find.text('X1'), findsOneWidget);
     expect(find.text('B2'), findsOneWidget);
     expect(find.text('Y2'), findsOneWidget);
-    expect(find.text('Download'), findsNWidgets(2));
+    // #21: cards (like Home's "Picked for you") render an overlay download
+    // disc per remote track instead of a full-width "Download" button.
+    expect(find.byKey(const Key('rec-download')), findsNWidgets(2));
   });
 
   testWidgets('tapping Download dispatches to the dispatcher provider',
@@ -135,7 +138,7 @@ void main() {
     ]));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Download'));
+    await tester.tap(find.byKey(const Key('rec-download')));
     // Snackbar lingers (kSnackBarDuration) so pumpAndSettle would time out.
     // pump once for the dispatch microtask, then again for the SnackBar
     // entrance animation.
@@ -169,17 +172,19 @@ void main() {
     ]));
     await tester.pumpAndSettle();
 
-    expect(find.text('Play'), findsOneWidget);
-    expect(find.text('Download'), findsOneWidget);
+    // #21: in-library track shows the overlay Play disc, remote track the
+    // download disc — same affordances as Home's recommendation cards.
+    expect(find.byKey(const Key('rec-play')), findsOneWidget);
+    expect(find.byKey(const Key('rec-download')), findsOneWidget);
 
-    // Each label appears on the right row — quickest check: Play button is
-    // in the same ListTile as the library song's title.
-    final Finder playTile = find.ancestor(
-      of: find.text('Play'),
-      matching: find.byType(ListTile),
+    // Play disc belongs to the library song's card (shares the same
+    // HomeRecommendationCard ancestor as its title).
+    final Finder playCard = find.ancestor(
+      of: find.byKey(const Key('rec-play')),
+      matching: find.byType(HomeRecommendationCard),
     );
     expect(
-      find.descendant(of: playTile, matching: find.text('Library Song')),
+      find.descendant(of: playCard, matching: find.text('Library Song')),
       findsOneWidget,
     );
   });
@@ -200,7 +205,7 @@ void main() {
     ]));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Download'));
+    await tester.tap(find.byKey(const Key('rec-download')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 

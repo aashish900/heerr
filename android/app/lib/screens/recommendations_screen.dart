@@ -5,12 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_error.dart';
 import '../models/recommended_track.dart';
-import '../models/subsonic/song.dart';
-import '../player/playback_actions.dart';
-import '../providers/download.dart';
 import '../providers/recommendations.dart';
 import '../widgets/empty_state.dart';
-import '../widgets/error_snackbar.dart';
+import '../widgets/home_recommendation_card.dart';
 import '../widgets/skeleton.dart';
 
 /// "For You" — Phase N3. Reads [recommendationsProvider], renders
@@ -59,11 +56,30 @@ class _RecommendationsScreenState extends ConsumerState<RecommendationsScreen> {
             if (tracks.isEmpty) {
               return const _EmptyScroll();
             }
-            return ListView.builder(
+            // #21: render the same cover-art cards as Home's "Picked for you"
+            // section (HomeRecommendationCard) in a 2-column grid, instead of
+            // the old bare title/artist rows. Card width is derived from the
+            // viewport so the cover fills its cell and the aspect ratio keeps
+            // the title/artist text below the cover unclipped.
+            const double padding = 16;
+            const double spacing = 12;
+            final double cardWidth =
+                (MediaQuery.of(context).size.width - padding * 2 - spacing) / 2;
+            return GridView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(padding),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: spacing,
+                crossAxisSpacing: spacing,
+                // cover (cardWidth tall) + 8 gap + two text lines (~52).
+                childAspectRatio: cardWidth / (cardWidth + 56),
+              ),
               itemCount: tracks.length,
-              itemBuilder: (BuildContext c, int i) =>
-                  _RecommendationTile(track: tracks[i]),
+              itemBuilder: (BuildContext c, int i) => HomeRecommendationCard(
+                track: tracks[i],
+                width: cardWidth,
+              ),
             );
           },
         ),
@@ -121,85 +137,6 @@ class _ErrorScroll extends StatelessWidget {
           subtitle: message,
         ),
       ],
-    );
-  }
-}
-
-/// One row of the recommendations list.
-///
-/// When `track.inLibrary` is true and a `subsonicSongId` is attached
-/// (set by N4 cross-reference), the trailing slot renders a **Play**
-/// button that drives Subsonic playback via [playSongFromSubsonic]. The
-/// usual case — remote-only candidates — renders the Download button
-/// (reads only the in-flight set for *this* row's URL so other rows'
-/// dispatches don't repaint it).
-class _RecommendationTile extends ConsumerWidget {
-  const _RecommendationTile({required this.track});
-
-  final RecommendedTrack track;
-
-  Future<void> _onDownload(BuildContext context, WidgetRef ref) async {
-    try {
-      await ref
-          .read(downloadDispatcherProvider.notifier)
-          .dispatch(track.sourceUrl, sourceType: 'song', displayName: track.title);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: kSnackBarDuration,
-          content: Text('Queued "${track.title}"'),
-        ),
-      );
-    } on ApiError catch (e) {
-      if (!context.mounted) return;
-      showApiError(context, e, action: 'download');
-    }
-  }
-
-  Future<void> _onPlay(BuildContext context, WidgetRef ref) async {
-    final String? id = track.subsonicSongId;
-    if (id == null) return;
-    // Build a synthetic Song from what we have — `playSongFromSubsonic`
-    // only reads id/title/artist for the stream URL + queue label, and
-    // we don't want to round-trip through `getSong` for one play.
-    final Song song = Song(id: id, title: track.title, artist: track.artist);
-    await playSongFromSubsonic(ref, context, song);
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (track.inLibrary && track.subsonicSongId != null) {
-      return ListTile(
-        title: Text(track.title),
-        subtitle: Text(track.artist),
-        trailing: FilledButton.icon(
-          onPressed: () => unawaited(_onPlay(context, ref)),
-          icon: const Icon(Icons.play_arrow),
-          label: const Text('Play'),
-        ),
-      );
-    }
-
-    final bool inFlight = ref.watch(
-      downloadDispatcherProvider.select(
-        (Set<String> s) => s.contains(track.sourceUrl),
-      ),
-    );
-
-    return ListTile(
-      title: Text(track.title),
-      subtitle: Text(track.artist),
-      trailing: FilledButton.icon(
-        onPressed: inFlight ? null : () => unawaited(_onDownload(context, ref)),
-        icon: inFlight
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.download),
-        label: const Text('Download'),
-      ),
     );
   }
 }
