@@ -5,13 +5,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_error.dart';
+import '../../models/seed_track.dart';
 import '../../models/subsonic/lyrics.dart';
+import '../../models/subsonic/song.dart';
 import '../../player/heerr_audio_handler.dart';
 import '../../player/player_provider.dart';
 import '../../player/sleep_timer.dart';
+import '../../player/song_to_media_item.dart';
 import '../../providers/library/lyrics.dart';
 import '../../providers/queue.dart';
 import '../../utils/palette.dart';
+import '../../widgets/add_to_playlist_sheet.dart';
 
 // A17: per-section private widgets live in sibling part files to keep this
 // screen file readable. They share this library's imports + privacy.
@@ -110,6 +114,26 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     );
   }
 
+  /// Opens [AddToPlaylistSheet] for the track that is currently playing.
+  /// The Subsonic song id lives in the MediaItem's `subsonicId` extra (see
+  /// [songToMediaItem]); tracks without one (non-Subsonic playback) can't be
+  /// added to a server-side playlist, so we surface a snackbar instead.
+  void _openAddToPlaylist(BuildContext context) {
+    final MediaItem? item = ref.read(playerSnapshotProvider).valueOrNull?.item;
+    final Song? song = item == null ? null : songFromMediaItem(item);
+    if (song == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Can't add this track to a playlist")),
+      );
+      return;
+    }
+    AddToPlaylistSheet.show(
+      context: context,
+      songIds: <String>[song.id],
+      findSimilarSeed: seedForSong(song),
+    );
+  }
+
   void _maybeRefreshTint(Uri? artUri) {
     if (artUri == _tintArtUri) return;
     _tintArtUri = artUri;
@@ -153,12 +177,27 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             onSelected: (String v) {
               if (v == 'sleep') {
                 _openSleepTimerSheet(context);
+              } else if (v == 'add_to_playlist') {
+                _openAddToPlaylist(context);
               }
             },
             itemBuilder: (BuildContext _) => const <PopupMenuEntry<String>>[
               PopupMenuItem<String>(
+                key: Key('now-playing-add-to-playlist'),
+                value: 'add_to_playlist',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.playlist_add),
+                  title: Text('Add to playlist'),
+                ),
+              ),
+              PopupMenuItem<String>(
                 value: 'sleep',
-                child: Text('Sleep timer'),
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.bedtime_outlined),
+                  title: Text('Sleep timer'),
+                ),
               ),
             ],
           ),
