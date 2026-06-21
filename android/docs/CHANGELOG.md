@@ -1948,3 +1948,9 @@ analyze` clean; `flutter test` green (567 tests).
 - **Resource-shrinker keep rule (`res/raw/keep.xml`):** `ic_stat_heerr` is referenced only at runtime via audio_service's `Resources.getIdentifier()`, invisible to R8 `shrinkResources`. Without `tools:keep="@drawable/ic_stat_heerr"` the release build stripped it, producing a notification with no valid small icon → `IllegalArgumentException` crash on play. This was the root cause of the "playing any song crashes" regression.
 - **AOD app badge (`res/mipmap-anydpi-v26/ic_launcher.xml`):** added a `<monochrome>` layer (`res/drawable-*dpi/ic_launcher_monochrome.png`, all densities). Android 13+ uses the adaptive icon's monochrome layer for the themed app badge on AOD; its absence was the blank white circle on the always-on display.
 - **`pubspec.yaml`:** 3.2.0 → 3.2.1.
+
+## 2026-06-21 — #22: show playlist run time in detail header
+
+- **`lib/screens/library/playlist_detail_header.dart`:** the header meta line now combines song count and total run time, joined with " · " (e.g. `12 songs · 1 hr 6 min`). New `_metaLine` builds the parts (song count when `songCount != null`, run time when `duration != null && > 0`) and returns null when neither is known; new `_formatRuntime` renders the whole-playlist `Playlist.duration` (seconds, already supplied by Subsonic `getPlaylist`) as a coarse `H hr M min` / `M min` form (seconds dropped — playlist totals are minutes-scale). No-duration playlists still render just "N songs".
+- **`test/screens/library/playlist_detail_screen_test.dart`:** new "run time in header (#22)" group — under-an-hour (`2820s → 2 songs · 47 min`), over-an-hour (`3960s → 3 songs · 1 hr 6 min`), and no-duration (song count only, no separator). `flutter analyze` clean; full suite 581 green.
+- **`pubspec.yaml`:** 3.2.1 → 3.3.0. Tagged `v3.3.0-rc1`.

@@ -34,10 +34,10 @@ class _PlaylistHeader extends StatelessWidget {
                     style: tt.bodyMedium,
                   ),
                 ],
-                if (playlist.songCount != null) ...<Widget>[
+                if (_metaLine(playlist) case final String meta?) ...<Widget>[
                   const SizedBox(height: 4),
                   Text(
-                    '${playlist.songCount} songs',
+                    meta,
                     style: tt.bodySmall,
                   ),
                 ],
@@ -47,5 +47,29 @@ class _PlaylistHeader extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Header meta line: song count and/or total run time, joined with " · "
+  /// (e.g. "12 songs · 1 hr 6 min"). Returns null when neither is known.
+  static String? _metaLine(Playlist playlist) {
+    final List<String> parts = <String>[
+      if (playlist.songCount != null) '${playlist.songCount} songs',
+      if (playlist.duration != null && playlist.duration! > 0)
+        _formatRuntime(playlist.duration!),
+    ];
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
+  /// Formats a whole-playlist run time (in seconds) as a coarse,
+  /// human-readable duration: "47 min", "1 hr 6 min", "2 hr". Seconds are
+  /// dropped — playlist totals are minutes-scale, not track-scale.
+  static String _formatRuntime(int seconds) {
+    final int h = seconds ~/ 3600;
+    final int m = (seconds % 3600) ~/ 60;
+    if (h > 0) {
+      return m > 0 ? '$h hr $m min' : '$h hr';
+    }
+    if (m > 0) return '$m min';
+    return '< 1 min';
   }
 }

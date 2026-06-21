@@ -640,4 +640,73 @@ void main() {
       },
     );
   });
+
+  // ---------------------------------------------------------------------
+  // #22: playlist run time rendered in the header next to the song count.
+  // ---------------------------------------------------------------------
+  group('run time in header (#22)', () {
+    testWidgets(
+      'duration under an hour → "N songs · M min"',
+      (WidgetTester tester) async {
+        const Playlist p = Playlist(
+          id: 'pl-1',
+          name: 'Morning',
+          songCount: 2,
+          duration: 2820, // 47 min
+          entry: <Song>[
+            Song(id: 'so-1', title: 'a'),
+            Song(id: 'so-2', title: 'b'),
+          ],
+        );
+        await tester.pumpWidget(_wrap('pl-1', <Override>[
+          _playlistValue('pl-1', const AsyncData<Playlist>(p)),
+        ]));
+        await tester.pumpAndSettle();
+        expect(find.text('2 songs · 47 min'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'duration over an hour → "N songs · H hr M min"',
+      (WidgetTester tester) async {
+        const Playlist p = Playlist(
+          id: 'pl-1',
+          name: 'Long',
+          songCount: 3,
+          duration: 3960, // 1 hr 6 min
+          entry: <Song>[
+            Song(id: 'so-1', title: 'a'),
+            Song(id: 'so-2', title: 'b'),
+            Song(id: 'so-3', title: 'c'),
+          ],
+        );
+        await tester.pumpWidget(_wrap('pl-1', <Override>[
+          _playlistValue('pl-1', const AsyncData<Playlist>(p)),
+        ]));
+        await tester.pumpAndSettle();
+        expect(find.text('3 songs · 1 hr 6 min'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'no duration → song count only (no separator)',
+      (WidgetTester tester) async {
+        const Playlist p = Playlist(
+          id: 'pl-1',
+          name: 'NoDur',
+          songCount: 2,
+          entry: <Song>[
+            Song(id: 'so-1', title: 'a'),
+            Song(id: 'so-2', title: 'b'),
+          ],
+        );
+        await tester.pumpWidget(_wrap('pl-1', <Override>[
+          _playlistValue('pl-1', const AsyncData<Playlist>(p)),
+        ]));
+        await tester.pumpAndSettle();
+        expect(find.text('2 songs'), findsOneWidget);
+        expect(find.textContaining('·'), findsNothing);
+      },
+    );
+  });
 }
