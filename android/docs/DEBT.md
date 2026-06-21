@@ -204,3 +204,14 @@ Also pending: **on-device smoke test** of the widget (add to home screen, verify
 controls hit the live MediaSession and title/artist/play-pause state track
 playback). The APK builds clean but the widget has not been exercised on a
 device yet.
+
+**2026-06-21 — widget would not add / rendered blank on device.** First on-device
+attempt failed (couldn't add / blank). Suspected cause: the transport buttons in
+`now_playing_widget.xml` used `?android:attr/selectableItemBackgroundBorderless`
+as their background — a theme-attribute (`?attr/...`) reference, which RemoteViews
+(inflated in the launcher's process) commonly fails to resolve, manifesting as
+"Problem loading widget" / blank / can't-add. Replaced all three with
+`@android:color/transparent`. Builds clean. **Still unverified on device** — root
+cause not yet confirmed via logcat; if the blank/can't-add persists, capture
+`adb logcat` (AppWidget/AndroidRuntime/RemoteViews) to pin the actual exception
+(R8 stripping on release builds is a separate candidate).

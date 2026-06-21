@@ -62,7 +62,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:background="@android:color/transparent"
                 android:src="@android:drawable/ic_media_previous"
                 android:contentDescription="Previous"
                 android:tint="#FFFFFF" />
@@ -72,7 +72,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:background="@android:color/transparent"
                 android:src="@android:drawable/ic_media_play"
                 android:contentDescription="Play or pause"
                 android:tint="#1DB954" />
@@ -82,7 +82,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:background="@android:color/transparent"
                 android:src="@android:drawable/ic_media_next"
                 android:contentDescription="Next"
                 android:tint="#FFFFFF" />
