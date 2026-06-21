@@ -95,11 +95,52 @@ class HomeRecommendationCard extends ConsumerWidget {
         children: <Widget>[
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
-            child: _CoverArt(
-              track: track,
-              size: width,
-              fallbackColor: cs.surfaceContainerHighest,
-              fallbackIconColor: cs.onSurfaceVariant,
+            child: Stack(
+              children: <Widget>[
+                _CoverArt(
+                  track: track,
+                  size: width,
+                  fallbackColor: cs.surfaceContainerHighest,
+                  fallbackIconColor: cs.onSurfaceVariant,
+                ),
+                // Subtle overlay action: a centered play disc for in-library
+                // tracks, or a bottom-right download chip for remote ones.
+                if (isPlayable)
+                  Positioned.fill(
+                    child: Center(
+                      child: _OverlayAction(
+                        key: const Key('rec-play'),
+                        tooltip: 'Play',
+                        onPressed: () => unawaited(_onPlay(context, ref)),
+                        child: const Icon(Icons.play_arrow,
+                            size: 26, color: Colors.white),
+                      ),
+                    ),
+                  )
+                else
+                  Positioned(
+                    right: 6,
+                    bottom: 6,
+                    child: _OverlayAction(
+                      key: const Key('rec-download'),
+                      tooltip: 'Download',
+                      onPressed: inFlight
+                          ? null
+                          : () => unawaited(_onDownload(context, ref)),
+                      child: inFlight
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.download,
+                              size: 20, color: Colors.white),
+                    ),
+                  ),
+              ],
             ),
           ),
           const SizedBox(height: 8),
@@ -115,30 +156,44 @@ class HomeRecommendationCard extends ConsumerWidget {
             overflow: TextOverflow.ellipsis,
             style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: isPlayable
-                ? FilledButton.icon(
-                    onPressed: () => unawaited(_onPlay(context, ref)),
-                    icon: const Icon(Icons.play_arrow, size: 18),
-                    label: const Text('Play'),
-                  )
-                : FilledButton.icon(
-                    onPressed: inFlight
-                        ? null
-                        : () => unawaited(_onDownload(context, ref)),
-                    icon: inFlight
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.download, size: 18),
-                    label: const Text('Download'),
-                  ),
-          ),
         ],
+      ),
+    );
+  }
+}
+
+/// Subtle circular action overlaid on a recommendation card's cover art:
+/// a translucent dark disc with a white glyph. Replaces the old full-width
+/// filled buttons (#27) — keeps the action discoverable without dominating
+/// the card. A null [onPressed] renders the disc non-interactive (e.g. a
+/// download already in flight).
+class _OverlayAction extends StatelessWidget {
+  const _OverlayAction({
+    required this.child,
+    required this.tooltip,
+    required this.onPressed,
+    super.key,
+  });
+
+  final Widget child;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withValues(alpha: 0.55),
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onPressed,
+        child: Tooltip(
+          message: tooltip,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: child,
+          ),
+        ),
       ),
     );
   }

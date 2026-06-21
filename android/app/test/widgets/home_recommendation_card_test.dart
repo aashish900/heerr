@@ -49,7 +49,7 @@ Widget _wrap({required Widget child, List<Override> overrides = const []}) {
 
 void main() {
   testWidgets(
-    'inLibrary=true + subsonicSongId set → renders Play button',
+    'inLibrary=true + subsonicSongId set → renders play overlay, no download',
     (WidgetTester tester) async {
       const RecommendedTrack t = RecommendedTrack(
         title: 'Song A',
@@ -60,8 +60,8 @@ void main() {
       );
       await tester.pumpWidget(_wrap(child: const HomeRecommendationCard(track: t)));
 
-      expect(find.text('Play'), findsOneWidget);
-      expect(find.text('Download'), findsNothing);
+      expect(find.byKey(const Key('rec-play')), findsOneWidget);
+      expect(find.byKey(const Key('rec-download')), findsNothing);
       expect(find.text('Song A'), findsOneWidget);
       expect(find.text('Artist A'), findsOneWidget);
     },
@@ -111,7 +111,7 @@ void main() {
   });
 
   testWidgets(
-    'inLibrary=false → renders Download button and fires the dispatcher',
+    'inLibrary=false → renders download overlay and fires the dispatcher',
     (WidgetTester tester) async {
       final _RecordingDispatcher dispatcher = _RecordingDispatcher();
       const RecommendedTrack t = RecommendedTrack(
@@ -126,12 +126,42 @@ void main() {
         ],
       ));
 
-      expect(find.text('Download'), findsOneWidget);
-      expect(find.text('Play'), findsNothing);
+      expect(find.byKey(const Key('rec-download')), findsOneWidget);
+      expect(find.byKey(const Key('rec-play')), findsNothing);
 
-      await tester.tap(find.text('Download'));
+      await tester.tap(find.byKey(const Key('rec-download')));
       await tester.pump();
 
+      expect(dispatcher.calls, <String>[
+        'https://music.youtube.com/watch?v=abc',
+      ]);
+    },
+  );
+
+  testWidgets(
+    'download in-flight → spinner shown, dispatcher not re-fired on tap',
+    (WidgetTester tester) async {
+      final _RecordingDispatcher dispatcher = _RecordingDispatcher();
+      const RecommendedTrack t = RecommendedTrack(
+        title: 'Remote',
+        artist: 'X',
+        sourceUrl: 'https://music.youtube.com/watch?v=abc',
+      );
+      await tester.pumpWidget(_wrap(
+        child: const HomeRecommendationCard(track: t),
+        overrides: <Override>[
+          downloadDispatcherProvider.overrideWith(() => dispatcher),
+        ],
+      ));
+
+      // First tap dispatches and flips to in-flight (sourceUrl now in state).
+      await tester.tap(find.byKey(const Key('rec-download')));
+      await tester.pump();
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      // Tapping again while in-flight must not re-dispatch.
+      await tester.tap(find.byKey(const Key('rec-download')));
+      await tester.pump();
       expect(dispatcher.calls, <String>[
         'https://music.youtube.com/watch?v=abc',
       ]);
