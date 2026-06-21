@@ -115,7 +115,51 @@ Future<void> _useTallSurface(WidgetTester tester) async {
   });
 }
 
+/// #17: each settings section is now a collapsible [ExpansionTile] keyed
+/// `settings-section-<title>` and collapsed by default (except Profiles).
+/// Tap the section header to reveal its body, then let the expand animation
+/// + async child builds settle.
+Future<void> _expandSection(WidgetTester tester, String title) async {
+  await tester.tap(find.byKey(Key('settings-section-$title')));
+  await _pumpForBuild(tester);
+}
+
 void main() {
+  group('Collapsible sections (#17)', () {
+    testWidgets('all three section headers render', (WidgetTester tester) async {
+      await _useTallSurface(tester);
+      await tester.pumpWidget(_wrap(<Override>[..._storage(_InMemoryStorage())]));
+      await _pumpForBuild(tester);
+      expect(find.byKey(const Key('settings-section-Profiles')), findsOneWidget);
+      expect(find.byKey(const Key('settings-section-Offline downloads')),
+          findsOneWidget);
+      expect(find.byKey(const Key('settings-section-Recommendations')),
+          findsOneWidget);
+    });
+
+    testWidgets('Profiles expanded by default; others collapsed',
+        (WidgetTester tester) async {
+      await _useTallSurface(tester);
+      await tester.pumpWidget(_wrap(<Override>[..._storage(_InMemoryStorage())]));
+      await _pumpForBuild(tester);
+      // Profiles body is visible without tapping (empty registry → Add row).
+      expect(find.text('Add profile'), findsOneWidget);
+      // Other sections' bodies are hidden until expanded.
+      expect(find.text('WiFi only'), findsNothing);
+      expect(find.text('Engine health'), findsNothing);
+    });
+
+    testWidgets('collapsed Offline section expands on tap',
+        (WidgetTester tester) async {
+      await _useTallSurface(tester);
+      await tester.pumpWidget(_wrap(<Override>[..._storage(_InMemoryStorage())]));
+      await _pumpForBuild(tester);
+      expect(find.text('WiFi only'), findsNothing);
+      await _expandSection(tester, 'Offline downloads');
+      expect(find.text('WiFi only'), findsOneWidget);
+    });
+  });
+
   group('Offline downloads section', () {
     testWidgets('renders master switch + sub-controls', (
       WidgetTester tester,
@@ -125,6 +169,9 @@ void main() {
         ..._storage(_InMemoryStorage()),
       ]));
       await _pumpForBuild(tester);
+      // Collapsed by default (#17) — body hidden until the header is tapped.
+      expect(find.text('WiFi only'), findsNothing);
+      await _expandSection(tester, 'Offline downloads');
       expect(find.text('Offline downloads'), findsAtLeast(1));
       expect(find.text('WiFi only'), findsOneWidget);
       expect(find.text('Sync interval'), findsOneWidget);
@@ -140,6 +187,7 @@ void main() {
       final _InMemoryStorage store = _InMemoryStorage();
       await tester.pumpWidget(_wrap(_storage(store)));
       await _pumpForBuild(tester);
+      await _expandSection(tester, 'Offline downloads');
 
       // First SwitchListTile is the master.
       await tester.tap(find.byType(SwitchListTile).first);
@@ -158,6 +206,7 @@ void main() {
         estimateBytes: 2 * 1024 * 1024,
       ));
       await _pumpForBuild(tester);
+      await _expandSection(tester, 'Offline downloads');
 
       // Tap the "Sync entire library" switch — it's the SwitchListTile whose
       // title matches that exact string.
@@ -186,6 +235,7 @@ void main() {
         estimateBytes: 1024,
       ));
       await _pumpForBuild(tester);
+      await _expandSection(tester, 'Offline downloads');
 
       await tester.tap(find.widgetWithText(SwitchListTile, 'Sync entire library'));
       await _pumpForBuild(tester);
@@ -208,6 +258,7 @@ void main() {
         estimateBytes: 1024,
       ));
       await _pumpForBuild(tester);
+      await _expandSection(tester, 'Offline downloads');
 
       await tester.tap(find.widgetWithText(SwitchListTile, 'Sync entire library'));
       await _pumpForBuild(tester);
@@ -230,6 +281,7 @@ void main() {
         _storage(_InMemoryStorage(<String, String>{'offline_enabled': 'true'})),
       ));
       await _pumpForBuild(tester);
+      await _expandSection(tester, 'Offline downloads');
 
       await tester.tap(find.text('Clear all downloads'));
       await _pumpForBuild(tester);
@@ -288,6 +340,7 @@ void main() {
                 ))),
       ]));
       await _pumpForBuild(tester);
+      await _expandSection(tester, 'Recommendations');
 
       expect(find.text('Engine: ytmusic'), findsOneWidget);
       expect(find.byKey(const Key('engine-chip-ok')), findsOneWidget);
@@ -310,6 +363,7 @@ void main() {
                 ))),
       ]));
       await _pumpForBuild(tester);
+      await _expandSection(tester, 'Recommendations');
 
       expect(find.text('Engine: lastfm'), findsOneWidget);
       expect(find.byKey(const Key('engine-chip-degraded')), findsOneWidget);
@@ -331,6 +385,7 @@ void main() {
                 ))),
       ]));
       await _pumpForBuild(tester);
+      await _expandSection(tester, 'Recommendations');
 
       expect(find.byKey(const Key('engine-chip-fallback-active')),
           findsOneWidget);
@@ -350,6 +405,7 @@ void main() {
                 ))),
       ]));
       await _pumpForBuild(tester);
+      await _expandSection(tester, 'Recommendations');
 
       // Help text not yet visible.
       expect(find.textContaining('Primary engine probe failed'),

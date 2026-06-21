@@ -49,13 +49,62 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       // in ProfilesSection.
       body: ListView(
         children: const <Widget>[
-          ProfilesSection(),
-          Divider(),
-          _OfflineSection(),
-          Divider(),
-          _RecommendationsSection(),
+          // #17: each section is collapsible to keep the screen uncluttered.
+          // Profiles (the primary credential surface) stays open by default;
+          // the heavier Offline + Recommendations sections start collapsed.
+          _CollapsibleSection(
+            icon: Icons.people_outline,
+            title: 'Profiles',
+            initiallyExpanded: true,
+            child: ProfilesSection(),
+          ),
+          _CollapsibleSection(
+            icon: Icons.download_for_offline_outlined,
+            title: 'Offline downloads',
+            child: _OfflineSection(),
+          ),
+          _CollapsibleSection(
+            icon: Icons.recommend_outlined,
+            title: 'Recommendations',
+            child: _RecommendationsSection(),
+          ),
         ],
       ),
+    );
+  }
+}
+
+/// #17: a collapsible settings section. Wraps [child] in an [ExpansionTile]
+/// with a leading [icon] + bold [title]. Keyed `settings-section-<title>` so
+/// widget tests can target the header. Collapsed by default unless
+/// [initiallyExpanded].
+class _CollapsibleSection extends StatelessWidget {
+  const _CollapsibleSection({
+    required this.icon,
+    required this.title,
+    required this.child,
+    this.initiallyExpanded = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final Widget child;
+  final bool initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      key: Key('settings-section-$title'),
+      leading: Icon(icon),
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      initiallyExpanded: initiallyExpanded,
+      shape: const Border(),
+      collapsedShape: const Border(),
+      childrenPadding: EdgeInsets.zero,
+      children: <Widget>[child],
     );
   }
 }

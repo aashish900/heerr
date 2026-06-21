@@ -30,13 +30,6 @@ class ProfilesSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-          child: Text(
-            'Profiles',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-          ),
-        ),
         async.when(
           loading: () => const ListTile(
             leading: Icon(Icons.person_outline),

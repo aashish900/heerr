@@ -20,13 +20,6 @@ class _RecommendationsSectionState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-          child: Text(
-            'Recommendations',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-          ),
-        ),
         async.when(
           loading: () => const ListTile(
             leading: Icon(Icons.recommend_outlined),

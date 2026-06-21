@@ -25,13 +25,6 @@ class _OfflineSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-          child: Text(
-            'Offline downloads',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-          ),
-        ),
         SwitchListTile(
           secondary: const Icon(Icons.download_for_offline_outlined),
           title: const Text('Offline downloads'),
