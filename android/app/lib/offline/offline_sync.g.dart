@@ -23,11 +23,12 @@ final wifiCheckProvider = Provider<WifiCheck>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef WifiCheckRef = ProviderRef<WifiCheck>;
-String _$offlineSyncHash() => r'ded8ed3a8e06314895808850e088be67bd332883';
+String _$offlineSyncHash() => r'62903a3ae80a5639ec058ab85c698a46d7264796';
 
 /// Reconciles the on-disk song set against the markers (or — at L4 — the
 /// full library when sync-all is on). Owns its own Timer; pause()/resume()
-/// is driven from `_ShellScaffold` (L3).
+/// is driven from `LifecycleCoordinator` (A8). A14: also reacts to Wi-Fi
+/// reconnects via `WifiCheck.onWifiChanged`.
 ///
 /// Copied from [OfflineSync].
 @ProviderFor(OfflineSync)

@@ -29,3 +29,9 @@
 # Its platform classes are referenced by the generated plugin registrant;
 # keep them so R8 doesn't break playback/loading in release builds.
 -keep class com.ryanheise.just_audio.** { *; }
+
+# home_widget (#20 / Now Playing home-screen widget). NowPlayingWidgetProvider
+# is auto-kept by AGP (manifest-declared <receiver>), but it extends the
+# plugin's HomeWidgetProvider and calls HomeWidgetLaunchIntent — keep the
+# plugin package so R8 doesn't strip those superclass/helpers in release.
+-keep class es.antonborri.home_widget.** { *; }

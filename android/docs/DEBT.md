@@ -187,3 +187,20 @@ silently stopped rendering. Release-only; invisible in `flutter run` (debug skip
 **Fix (v3.1.2-rc2):** added `-keep class com.ryanheise.audioservice.**` and
 `-keep class com.ryanheise.just_audio.**` to `proguard-rules.pro`. Confirmed by V6 smoke
 (§6.8–6.10) against a release APK — lock-screen + pull-down notification restored. `v3.1.2` tagged.
+---
+
+## #20 — Now Playing widget: no album art (deferred 2026-06-21)
+
+The home-screen Now Playing widget (#20) shows title + artist + working
+play/pause/next/prev controls + tap-to-open, but **no album art**. RemoteViews
+cannot load a network image directly; real art requires `home_widget`'s
+`renderFlutterWidget` → PNG on disk → `ImageView`, which only works while the
+app process is alive (background/cold widget would show stale or no art).
+Deferred to keep the initial native build scoped. Follow-up: render the current
+cover to a bitmap in `NowPlayingWidgetUpdater.push` when the app is foregrounded
+and bind it to a new `ImageView` in `now_playing_widget.xml`.
+
+Also pending: **on-device smoke test** of the widget (add to home screen, verify
+controls hit the live MediaSession and title/artist/play-pause state track
+playback). The APK builds clean but the widget has not been exercised on a
+device yet.

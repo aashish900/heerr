@@ -13,6 +13,7 @@ import 'providers/prefs_storage.dart';
 import 'providers/profiles/legacy_migration.dart';
 import 'router.dart';
 import 'theme.dart';
+import 'widget/now_playing_widget_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -101,6 +102,10 @@ class _HeerrAppState extends ConsumerState<HeerrApp> {
     // are now safe because the router is held in state, not recreated.
     ref.watch(nowPlayingPersistenceProvider);
     ref.watch(nowPlayingRestoreProvider);
+
+    // #20: mirror live playback onto the home-screen widget. Keep-alive
+    // side-effect provider — watched only for the subscription.
+    ref.watch(nowPlayingWidgetProvider);
 
     return MaterialApp.router(
       title: 'heerr',

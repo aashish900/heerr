@@ -1973,3 +1973,17 @@ analyze` clean; `flutter test` green (567 tests).
 - **`lib/screens/settings_screen.dart`:** the three sections (Profiles / Offline downloads / Recommendations) are now wrapped in a new private `_CollapsibleSection` (an `ExpansionTile` with leading icon + bold title, keyed `settings-section-<title>`). Profiles stays `initiallyExpanded: true`; Offline + Recommendations start collapsed to de-clutter the screen. Removed the inter-section `Divider`s (ExpansionTile borders separate them).
 - **`lib/screens/settings/profiles_section.dart`, `lib/screens/settings_offline.dart`, `lib/screens/settings_recommendations.dart`:** dropped each section's inline bold title `Padding` — the ExpansionTile header now provides the title.
 - **`test/screens/settings_screen_test.dart`:** new `_expandSection(tester, title)` helper taps a section header by key; Offline + Recommendations test groups expand their section before asserting on now-collapsed content. New "Collapsible sections (#17)" group: all three headers render; Profiles expanded by default while others are collapsed; collapsed Offline expands on tap. `flutter analyze` clean; full suite 598 green.
+
+## 2026-06-21 — #20: Now Playing home-screen widget
+
+- **`pubspec.yaml`:** added `home_widget: ^0.9.3`.
+- **`lib/widget/now_playing_widget.dart`** (new): `HomeWidgetClient` seam over the static `HomeWidget` API (impl `HomeWidgetClientImpl`) + `NowPlayingWidgetUpdater.push(PlayerSnapshot)`, which maps the snapshot onto data keys (`np_has_track`/`np_title`/`np_artist`/`np_playing`) and calls `updateWidget`. Null item → `clear()`; all failures swallowed so a missing/unadded widget never breaks playback.
+- **`lib/widget/now_playing_widget_provider.dart`** (new): keep-alive `nowPlayingWidgetProvider` side-effect provider, mirrors `nowPlayingPersistence` pattern — `ref.listen(playerSnapshotProvider, fireImmediately: true)` pushes each emission through the updater.
+- **`lib/main.dart`:** `HeerrApp.build` watches `nowPlayingWidgetProvider` for the subscription side effect.
+- **Native (out of TDD scope — APK build + on-device smoke gate):**
+  - `android/app/src/main/kotlin/com/aashish/heerr/NowPlayingWidgetProvider.kt` (new): extends `HomeWidgetProvider`; renders title/artist/play-pause icon from the widget SharedPreferences. Transport buttons fire `ACTION_MEDIA_BUTTON` (`KEYCODE_MEDIA_PLAY_PAUSE`/`NEXT`/`PREVIOUS`) broadcasts to `com.ryanheise.audioservice.MediaButtonReceiver` → drives the live audio_service MediaSession (no background isolate, no second player). Body tap → `HomeWidgetLaunchIntent` opens MainActivity.
+  - `res/layout/now_playing_widget.xml`, `res/xml/now_playing_widget_info.xml`, `res/drawable/widget_background.xml` (new): RemoteViews layout + AppWidgetProviderInfo + rounded dark surface.
+  - `AndroidManifest.xml`: registered the `.NowPlayingWidgetProvider` `<receiver>` with `APPWIDGET_UPDATE` filter + provider meta-data.
+  - `proguard-rules.pro`: keep `es.antonborri.home_widget.**` (release R8 defence, mirrors the audio_service keep rule per DEBT.md).
+- **`test/widget/now_playing_widget_updater_test.dart`** (new): mocktail-mocked `HomeWidgetClient`; 5 cases (playing track writes all fields + update; paused → playing=false; null artist → empty string; null item → cleared; client error never throws). Red-first.
+- Verified: `flutter analyze` clean; full suite 603 green; `flutter build apk --debug` succeeds (Kotlin/manifest/resources compile). **Not yet smoke-tested on device** (G-milestone gate). Album art deferred — see DEBT.md.
