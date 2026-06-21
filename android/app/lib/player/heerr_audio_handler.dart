@@ -18,6 +18,9 @@ class HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   final AudioPlayer _player;
 
+  AudioServiceRepeatMode _repeatMode = AudioServiceRepeatMode.none;
+  AudioServiceShuffleMode _shuffleMode = AudioServiceShuffleMode.none;
+
   /// Expose the underlying player for tests / advanced callers (J2 uses it
   /// for the position stream). Most consumers should use the handler's
   /// `playbackState` and `mediaItem` streams instead.
@@ -58,6 +61,8 @@ class HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
         bufferedPosition: _player.bufferedPosition,
         speed: _player.speed,
         queueIndex: event.currentIndex,
+        repeatMode: _repeatMode,
+        shuffleMode: _shuffleMode,
       ),
     );
   }
@@ -192,6 +197,27 @@ class HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     if (index < 0 || index >= queue.value.length) return;
     await _player.seek(Duration.zero, index: index);
   }
+
+  @override
+  Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
+    _repeatMode = repeatMode;
+    await _player.setLoopMode(_toLoopMode(repeatMode));
+    playbackState.add(playbackState.value.copyWith(repeatMode: repeatMode));
+  }
+
+  @override
+  Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
+    _shuffleMode = shuffleMode;
+    await _player.setShuffleModeEnabled(
+        shuffleMode != AudioServiceShuffleMode.none);
+    playbackState.add(playbackState.value.copyWith(shuffleMode: shuffleMode));
+  }
+
+  LoopMode _toLoopMode(AudioServiceRepeatMode mode) => switch (mode) {
+        AudioServiceRepeatMode.none => LoopMode.off,
+        AudioServiceRepeatMode.one => LoopMode.one,
+        AudioServiceRepeatMode.group || AudioServiceRepeatMode.all => LoopMode.all,
+      };
 
   /// Combined snapshot stream for the mini-player + Now Playing (J2).
   /// Emits a [PlayerSnapshot] whenever the current item or transport state

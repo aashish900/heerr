@@ -289,7 +289,11 @@ class _Body extends ConsumerWidget {
           onSeekUpdate: onSeekUpdate,
           onSeekEnd: onSeekEnd,
         ),
-        _Transport(playing: snapshot.isPlaying),
+        _Transport(
+          playing: snapshot.isPlaying,
+          repeatMode: snapshot.state.repeatMode,
+          shuffleMode: snapshot.state.shuffleMode,
+        ),
         const SizedBox(height: 8),
         const Divider(height: 1),
         const Expanded(child: _QueueList()),

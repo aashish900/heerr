@@ -66,15 +66,40 @@ class _Scrubber extends StatelessWidget {
 }
 
 class _Transport extends ConsumerWidget {
-  const _Transport({required this.playing});
+  const _Transport({required this.playing, required this.repeatMode, required this.shuffleMode});
 
   final bool playing;
+  final AudioServiceRepeatMode repeatMode;
+  final AudioServiceShuffleMode shuffleMode;
+
+  AudioServiceRepeatMode _nextRepeat(AudioServiceRepeatMode current) =>
+      switch (current) {
+        AudioServiceRepeatMode.none => AudioServiceRepeatMode.all,
+        AudioServiceRepeatMode.all => AudioServiceRepeatMode.one,
+        _ => AudioServiceRepeatMode.none,
+      };
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final Color primary = Theme.of(context).colorScheme.primary;
+    final bool shuffleOn = shuffleMode != AudioServiceShuffleMode.none;
+    final bool repeatOn = repeatMode != AudioServiceRepeatMode.none;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: <Widget>[
+        IconButton(
+          iconSize: 28,
+          tooltip: shuffleOn ? 'Shuffle on' : 'Shuffle off',
+          color: shuffleOn ? primary : null,
+          icon: const Icon(Icons.shuffle),
+          onPressed: () {
+            final HeerrAudioHandler h = ref.read(audioHandlerProvider);
+            h.setShuffleMode(shuffleOn
+                ? AudioServiceShuffleMode.none
+                : AudioServiceShuffleMode.all);
+          },
+        ),
         IconButton(
           iconSize: 36,
           tooltip: 'Previous',
@@ -103,6 +128,20 @@ class _Transport extends ConsumerWidget {
           tooltip: 'Next',
           icon: const Icon(Icons.skip_next),
           onPressed: () => ref.read(audioHandlerProvider).skipToNext(),
+        ),
+        IconButton(
+          iconSize: 28,
+          tooltip: repeatMode == AudioServiceRepeatMode.one
+              ? 'Repeat one'
+              : repeatOn
+                  ? 'Repeat all'
+                  : 'Repeat off',
+          color: repeatOn ? primary : null,
+          icon: Icon(repeatMode == AudioServiceRepeatMode.one
+              ? Icons.repeat_one
+              : Icons.repeat),
+          onPressed: () =>
+              ref.read(audioHandlerProvider).setRepeatMode(_nextRepeat(repeatMode)),
         ),
       ],
     );
