@@ -16,8 +16,11 @@
         android:background="@drawable/widget_background"
         android:contentDescription="Album art" />
 
-    <!-- Dark scrim for legibility over bright artwork. -->
-    <View
+    <!-- Dark scrim for legibility over bright artwork. A bare <View> is NOT
+         in the RemoteViews whitelist and crashes widget inflation ("Class not
+         allowed to be inflated android.view.View"), so use an empty
+         FrameLayout, which is allowed. -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="#99000000" />

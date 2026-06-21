@@ -206,12 +206,22 @@ playback). The APK builds clean but the widget has not been exercised on a
 device yet.
 
 **2026-06-21 — widget would not add / rendered blank on device.** First on-device
-attempt failed (couldn't add / blank). Suspected cause: the transport buttons in
-`now_playing_widget.xml` used `?android:attr/selectableItemBackgroundBorderless`
-as their background — a theme-attribute (`?attr/...`) reference, which RemoteViews
-(inflated in the launcher's process) commonly fails to resolve, manifesting as
-"Problem loading widget" / blank / can't-add. Replaced all three with
-`@android:color/transparent`. Builds clean. **Still unverified on device** — root
-cause not yet confirmed via logcat; if the blank/can't-add persists, capture
-`adb logcat` (AppWidget/AndroidRuntime/RemoteViews) to pin the actual exception
-(R8 stripping on release builds is a separate candidate).
+attempt failed (couldn't add / blank).
+
+- *First guess (rc10, wrong):* suspected the transport buttons'
+  `?android:attr/selectableItemBackgroundBorderless` background. Replaced all
+  three with `@android:color/transparent`. Harmless, but **not** the cause.
+- *Actual root cause (rc11, confirmed via logcat):* the dark-scrim was a bare
+  `<View>`, and `android.view.View` is **not in the RemoteViews-allowed class
+  whitelist**. Launcher logcat:
+  `InflateException: Binary XML file line #23 ... Class not allowed to be
+  inflated android.view.View`. Fixed by changing the scrim `<View>` →
+  `<FrameLayout>` (allowed). Lesson: RemoteViews layouts may only use the
+  whitelisted classes (FrameLayout/LinearLayout/RelativeLayout/GridLayout +
+  TextView/ImageView/Button/ImageButton/ProgressBar/etc.) — never bare `View`.
+
+**Still unverified on device** — the debug APK can't install over the currently
+installed build (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`, signing-key mismatch);
+verifying needs an uninstall (wipes the on-device profile/login) or a
+matching-key build. Smoke (add to home screen; controls hit the live
+MediaSession; title/artist/play-pause + album art track playback) still pending.

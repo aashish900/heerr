@@ -2017,3 +2017,10 @@ analyze` clean; `flutter test` green (567 tests).
 - Symptom (first on-device test of #20): the home-screen widget could not be added / showed blank.
 - **`app/android/app/src/main/res/layout/now_playing_widget.xml`:** the three transport ImageButtons used `?android:attr/selectableItemBackgroundBorderless` as `android:background`. Theme-attribute (`?attr/...`) references are inflated against the launcher's process in a RemoteViews layout and are a known cause of inflation failure ("Problem loading widget" / blank / can't add). Replaced all three with `@android:color/transparent`.
 - Verified: `flutter build apk --debug` succeeds. **Not yet confirmed on device** — see DEBT.md #20 entry; if it persists, capture `adb logcat` to pin the exception (R8 on release is a separate candidate).
+
+## 2026-06-21 — Fix (real): Now Playing widget blank — bare <View> illegal in RemoteViews
+
+- rc10 guessed the cause was the `?attr` button background; on-device logcat proved otherwise.
+- Root cause (confirmed): the dark-scrim was a bare `<View>` at line 23 of `now_playing_widget.xml`, and `android.view.View` is not in the RemoteViews-allowed class whitelist. Launcher logged `InflateException: ... Class not allowed to be inflated android.view.View`, so the widget failed to inflate → blank / would not add.
+- **`app/android/app/src/main/res/layout/now_playing_widget.xml`:** changed the scrim `<View>` → empty `<FrameLayout>` (an allowed RemoteViews class) with the same `#99000000` background. (rc10's transparent-background change is retained — harmless.)
+- Verified: `flutter build apk --debug` succeeds. **Not yet smoke-tested on device** — debug APK can't install over the existing build (signing-key mismatch); needs an uninstall (wipes profile/login) or a matching-key build. See DEBT.md #20.
