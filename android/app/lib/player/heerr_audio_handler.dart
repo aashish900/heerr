@@ -96,11 +96,7 @@ class HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   Future<void> addQueueItem(MediaItem mediaItem) async {
     final List<MediaItem> next = <MediaItem>[...queue.value, mediaItem];
     queue.add(next);
-    await _player.setAudioSources(
-      next.map(_toAudioSource).toList(),
-      initialIndex: _player.currentIndex ?? 0,
-      initialPosition: _player.position,
-    );
+    await _player.addAudioSource(_toAudioSource(mediaItem));
   }
 
   AudioSource _toAudioSource(MediaItem item) {
