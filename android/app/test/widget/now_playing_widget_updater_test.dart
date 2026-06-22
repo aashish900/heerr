@@ -65,29 +65,12 @@ void main() {
       verify(() => client.saveString(kNpKeyArtist, '')).called(1);
     });
 
-    test('writes position and duration as millisecond strings', () async {
-      await updater.push(snap(
-        track('a', duration: const Duration(minutes: 3, seconds: 30)),
-        position: const Duration(seconds: 42),
-      ));
-
-      verify(() => client.saveString(kNpKeyPositionMs, '42000')).called(1);
-      verify(() => client.saveString(kNpKeyDurationMs, '210000')).called(1);
-    });
-
-    test('missing duration writes 0', () async {
-      await updater.push(snap(track('a')));
-
-      verify(() => client.saveString(kNpKeyDurationMs, '0')).called(1);
-    });
-
     test('push with null item clears the widget', () async {
       await updater.push(snap(null));
 
       verify(() => client.saveBool(kNpKeyHasTrack, false)).called(1);
       verify(() => client.saveString(kNpKeyTitle, '')).called(1);
-      verify(() => client.saveString(kNpKeyPositionMs, '0')).called(1);
-      verify(() => client.saveString(kNpKeyDurationMs, '0')).called(1);
+      verify(() => client.saveString(kNpKeyTintArgb, '')).called(1);
       verify(() => client.update()).called(1);
     });
 

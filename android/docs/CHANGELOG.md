@@ -2037,3 +2037,12 @@ analyze` clean; `flutter test` green (567 tests).
 - **`lib/screens/player/now_playing_screen.dart`:** strengthened the screen tint gradient (`0.85 → 0.35 → surface` over `0–45–90%`, was `0.45 → surface` over `0–65%`).
 - **`test/widget/now_playing_widget_updater_test.dart`:** rewritten — dropped the art-race tests, added position/duration string tests and a tint group (per-track extraction, non-http skip, null result). Red-first.
 - Verified: `flutter analyze` clean; full suite **611** green; debug APK builds and the widget loads on the Pixel 7. Cover-colour tint pending final on-device eyeball.
+
+## 2026-06-22 — Widget visual polish (icons, rounded tile, drop progress bar)
+
+- On-device design tweaks to the #20 widget after the redesign:
+- **Icons:** replaced the framework `@android:drawable/ic_media_*` (grey/bordered, small) with custom white Material **vector** drawables (`widget_ic_previous/play/pause/next.xml`) — rounded-corner glyph variants, no chrome. Sized ~15% larger (prev/next 55dp, play 60dp ImageButtons, fitCenter); transparent backgrounds (no button border/disc); play button white (was green).
+- **Tile:** corner radius 20dp → 28dp (`widget_background.xml`). Cover tint now recolors the rounded shape via `setColorStateList(..,"setBackgroundTintList",..)` (API 31+ guard) instead of `setInt(..,"setBackgroundColor",..)`, so the rounded corners survive when tinted.
+- **Progress bar removed** (`now_playing_widget.xml` `ProgressBar`, the native `setProgressBar` render, and the Dart `np_position_ms`/`np_duration_ms` push + their tests).
+- Net widget data keys: `np_has_track`, `np_title`, `np_artist`, `np_playing`, `np_tint_argb`.
+- Verified: `flutter analyze` clean; full suite **609** green; APK builds and installs on the Pixel 7.

@@ -40,45 +40,35 @@
             android:textColor="#B0B0B0"
             android:textSize="12sp"
             android:text="Nothing playing" />
-
-        <ProgressBar
-            android:id="@+id/widget_progress"
-            style="@android:style/Widget.ProgressBar.Horizontal"
-            android:layout_width="match_parent"
-            android:layout_height="3dp"
-            android:layout_marginTop="6dp"
-            android:max="0"
-            android:progress="0"
-            android:progressTint="#1DB954" />
     </LinearLayout>
 
     <ImageButton
         android:id="@+id/widget_prev"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:padding="6dp"
+        android:layout_width="55dp"
+        android:layout_height="55dp"
+        android:padding="9dp"
+        android:scaleType="fitCenter"
         android:background="@android:color/transparent"
-        android:src="@android:drawable/ic_media_previous"
-        android:contentDescription="Previous"
-        android:tint="#FFFFFF" />
+        android:src="@drawable/widget_ic_previous"
+        android:contentDescription="Previous" />
 
     <ImageButton
         android:id="@+id/widget_play_pause"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:padding="6dp"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:padding="7dp"
+        android:scaleType="fitCenter"
         android:background="@android:color/transparent"
-        android:src="@android:drawable/ic_media_play"
-        android:contentDescription="Play or pause"
-        android:tint="#1DB954" />
+        android:src="@drawable/widget_ic_play"
+        android:contentDescription="Play or pause" />
 
     <ImageButton
         android:id="@+id/widget_next"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:padding="6dp"
+        android:layout_width="55dp"
+        android:layout_height="55dp"
+        android:padding="9dp"
+        android:scaleType="fitCenter"
         android:background="@android:color/transparent"
-        android:src="@android:drawable/ic_media_next"
-        android:contentDescription="Next"
-        android:tint="#FFFFFF" />
+        android:src="@drawable/widget_ic_next"
+        android:contentDescription="Next" />
 </LinearLayout>

@@ -6,6 +6,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.res.ColorStateList
+import android.os.Build
 import android.view.KeyEvent
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetLaunchIntent
@@ -41,9 +43,6 @@ class NowPlayingWidgetProvider : HomeWidgetProvider() {
             val title = widgetData.getString("np_title", null)
             val artist = widgetData.getString("np_artist", null)
             val playing = widgetData.getBoolean("np_playing", false)
-            // Position/duration arrive as decimal-string millis (see Dart side).
-            val positionMs = widgetData.getString("np_position_ms", "0")?.toIntOrNull() ?: 0
-            val durationMs = widgetData.getString("np_duration_ms", "0")?.toIntOrNull() ?: 0
             // Cover-derived background tint (signed ARGB int as a string).
             val tintArgb = widgetData.getString("np_tint_argb", "")?.toIntOrNull()
 
@@ -57,28 +56,24 @@ class NowPlayingWidgetProvider : HomeWidgetProvider() {
             )
             views.setImageViewResource(
                 R.id.widget_play_pause,
-                if (playing) android.R.drawable.ic_media_pause
-                else android.R.drawable.ic_media_play,
+                if (playing) R.drawable.widget_ic_pause
+                else R.drawable.widget_ic_play,
             )
 
-            // Cover-derived background tint. setInt(..,"setBackgroundColor",..)
-            // paints a flat colour (replacing the rounded drawable) only when a
-            // tint is present; otherwise the default @drawable/widget_background
-            // stays. No bitmaps — just an int over the wire.
-            if (tintArgb != null && tintArgb != 0) {
-                views.setInt(R.id.widget_root, "setBackgroundColor", tintArgb)
-            }
-
-            // Position bar (display only). Clamp the progress into [0, max].
-            if (durationMs > 0) {
-                views.setProgressBar(
-                    R.id.widget_progress,
-                    durationMs,
-                    positionMs.coerceIn(0, durationMs),
-                    false,
+            // Cover-derived background tint. Tint the rounded background
+            // drawable (setBackgroundTintList) rather than replacing it with a
+            // flat colour, so the rounded corners survive. API 31+ only; older
+            // devices just keep the default dark tile. No bitmaps — just an int.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                views.setColorStateList(
+                    R.id.widget_root,
+                    "setBackgroundTintList",
+                    if (tintArgb != null && tintArgb != 0) {
+                        ColorStateList.valueOf(tintArgb)
+                    } else {
+                        null
+                    },
                 )
-            } else {
-                views.setProgressBar(R.id.widget_progress, 0, 0, false)
             }
 
             // Transport controls -> live MediaSession via MediaButtonReceiver.

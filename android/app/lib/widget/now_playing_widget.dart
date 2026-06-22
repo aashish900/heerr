@@ -33,13 +33,6 @@ const String kNpKeyTitle = 'np_title';
 const String kNpKeyArtist = 'np_artist';
 const String kNpKeyPlaying = 'np_playing';
 
-/// Playback position and track length, in **milliseconds**, stored as decimal
-/// strings. Strings (not ints) sidestep the int/Long ambiguity of the
-/// home_widget platform channel — the native side parses them back to Int for
-/// `setProgressBar`. Empty/"0" duration → indeterminate-free empty bar.
-const String kNpKeyPositionMs = 'np_position_ms';
-const String kNpKeyDurationMs = 'np_duration_ms';
-
 /// Cover-derived background tint as a **signed 32-bit ARGB int**, stored as a
 /// decimal string (empty when none). Signed so it fits Kotlin's `Int` —
 /// `0xFF......` as an unsigned value overflows `Int.toIntOrNull`. The native
@@ -126,14 +119,6 @@ class NowPlayingWidgetUpdater {
       await _client.saveString(kNpKeyTitle, item.title);
       await _client.saveString(kNpKeyArtist, item.artist ?? '');
       await _client.saveBool(kNpKeyPlaying, snapshot.isPlaying);
-      await _client.saveString(
-        kNpKeyPositionMs,
-        '${snapshot.position.inMilliseconds}',
-      );
-      await _client.saveString(
-        kNpKeyDurationMs,
-        '${item.duration?.inMilliseconds ?? 0}',
-      );
       await _client.saveString(kNpKeyTintArgb, await _resolveTint(item));
       await _client.update();
     } catch (e, st) {
@@ -172,8 +157,6 @@ class NowPlayingWidgetUpdater {
       await _client.saveString(kNpKeyTitle, '');
       await _client.saveString(kNpKeyArtist, '');
       await _client.saveBool(kNpKeyPlaying, false);
-      await _client.saveString(kNpKeyPositionMs, '0');
-      await _client.saveString(kNpKeyDurationMs, '0');
       await _client.saveString(kNpKeyTintArgb, '');
       await _client.update();
     } catch (e, st) {
