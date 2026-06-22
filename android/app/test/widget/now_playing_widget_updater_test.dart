@@ -6,7 +6,7 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockHomeWidgetClient extends Mock implements HomeWidgetClient {}
 
-class _MockArtCache extends Mock implements WidgetArtCache {}
+class _MockTintExtractor extends Mock implements WidgetTintExtractor {}
 
 void main() {
   late _MockHomeWidgetClient client;
@@ -24,11 +24,18 @@ void main() {
     updater = NowPlayingWidgetUpdater(client: client);
   });
 
-  PlayerSnapshot snap(MediaItem? item, {bool playing = false}) =>
-      PlayerSnapshot(item: item, state: PlaybackState(playing: playing));
+  PlayerSnapshot snap(
+    MediaItem? item, {
+    bool playing = false,
+    Duration position = Duration.zero,
+  }) =>
+      PlayerSnapshot(
+        item: item,
+        state: PlaybackState(playing: playing, updatePosition: position),
+      );
 
-  MediaItem track(String id, {Uri? art}) =>
-      MediaItem(id: id, title: 'T', artist: 'A', artUri: art);
+  MediaItem track(String id, {Duration? duration, Uri? art}) =>
+      MediaItem(id: id, title: 'T', artist: 'A', duration: duration, artUri: art);
 
   group('NowPlayingWidgetUpdater (#20)', () {
     test('push with a playing track writes fields + triggers update', () async {
@@ -58,11 +65,29 @@ void main() {
       verify(() => client.saveString(kNpKeyArtist, '')).called(1);
     });
 
+    test('writes position and duration as millisecond strings', () async {
+      await updater.push(snap(
+        track('a', duration: const Duration(minutes: 3, seconds: 30)),
+        position: const Duration(seconds: 42),
+      ));
+
+      verify(() => client.saveString(kNpKeyPositionMs, '42000')).called(1);
+      verify(() => client.saveString(kNpKeyDurationMs, '210000')).called(1);
+    });
+
+    test('missing duration writes 0', () async {
+      await updater.push(snap(track('a')));
+
+      verify(() => client.saveString(kNpKeyDurationMs, '0')).called(1);
+    });
+
     test('push with null item clears the widget', () async {
       await updater.push(snap(null));
 
       verify(() => client.saveBool(kNpKeyHasTrack, false)).called(1);
       verify(() => client.saveString(kNpKeyTitle, '')).called(1);
+      verify(() => client.saveString(kNpKeyPositionMs, '0')).called(1);
+      verify(() => client.saveString(kNpKeyDurationMs, '0')).called(1);
       verify(() => client.update()).called(1);
     });
 
@@ -76,58 +101,44 @@ void main() {
     });
   });
 
-  group('NowPlayingWidgetUpdater album art (#20)', () {
-    late _MockArtCache art;
-    late NowPlayingWidgetUpdater artUpdater;
+  group('NowPlayingWidgetUpdater tint (#20)', () {
+    late _MockTintExtractor tint;
+    late NowPlayingWidgetUpdater tintUpdater;
 
     setUp(() {
-      art = _MockArtCache();
-      artUpdater = NowPlayingWidgetUpdater(client: client, artCache: art);
+      tint = _MockTintExtractor();
+      tintUpdater =
+          NowPlayingWidgetUpdater(client: client, tintExtractor: tint);
     });
 
-    test('caches the cover for an http artUri and saves its path', () async {
-      when(() => art.cache(any())).thenAnswer((_) async => '/data/art.png');
+    test('writes the cover tint for an http artUri, once per track', () async {
+      when(() => tint.argbFor(any())).thenAnswer((_) async => -12345678);
+      final MediaItem t = track('s1', art: Uri.parse('https://h/c?id=1'));
 
-      await artUpdater.push(
-        snap(track('s1', art: Uri.parse('https://h/cover?id=1'))),
-      );
+      await tintUpdater.push(snap(t, playing: true));
+      await tintUpdater.push(snap(t, playing: false));
 
-      verify(() => art.cache(Uri.parse('https://h/cover?id=1'))).called(1);
-      verify(() => client.saveString(kNpKeyArtPath, '/data/art.png')).called(1);
+      verify(() => tint.argbFor(Uri.parse('https://h/c?id=1'))).called(1);
+      verify(() => client.saveString(kNpKeyTintArgb, '-12345678'))
+          .called(greaterThanOrEqualTo(1));
     });
 
-    test('does not re-download art for the same track', () async {
-      when(() => art.cache(any())).thenAnswer((_) async => '/data/art.png');
-      final MediaItem same = track('s1', art: Uri.parse('https://h/c?id=1'));
-
-      await artUpdater.push(snap(same, playing: true));
-      await artUpdater.push(snap(same, playing: false));
-
-      verify(() => art.cache(any())).called(1);
-    });
-
-    test('re-downloads art when the track changes', () async {
-      when(() => art.cache(any())).thenAnswer((_) async => '/data/art.png');
-
-      await artUpdater.push(snap(track('s1', art: Uri.parse('https://h/c?id=1'))));
-      await artUpdater.push(snap(track('s2', art: Uri.parse('https://h/c?id=2'))));
-
-      verify(() => art.cache(any())).called(2);
-    });
-
-    test('non-http artUri saves empty path and skips the cache', () async {
-      await artUpdater.push(
+    test('non-http artUri writes empty tint and skips extraction', () async {
+      await tintUpdater.push(
         snap(track('s1', art: Uri.parse('android.resource://x/y'))),
       );
 
-      verifyNever(() => art.cache(any()));
-      verify(() => client.saveString(kNpKeyArtPath, '')).called(1);
+      verifyNever(() => tint.argbFor(any()));
+      verify(() => client.saveString(kNpKeyTintArgb, '')).called(1);
     });
 
-    test('null item clears the art path', () async {
-      await artUpdater.push(snap(null));
+    test('null extraction result writes empty tint', () async {
+      when(() => tint.argbFor(any())).thenAnswer((_) async => null);
 
-      verify(() => client.saveString(kNpKeyArtPath, '')).called(1);
+      await tintUpdater
+          .push(snap(track('s1', art: Uri.parse('https://h/c?id=1'))));
+
+      verify(() => client.saveString(kNpKeyTintArgb, '')).called(1);
     });
   });
 }

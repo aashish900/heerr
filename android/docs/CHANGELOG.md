@@ -2024,3 +2024,16 @@ analyze` clean; `flutter test` green (567 tests).
 - Root cause (confirmed): the dark-scrim was a bare `<View>` at line 23 of `now_playing_widget.xml`, and `android.view.View` is not in the RemoteViews-allowed class whitelist. Launcher logged `InflateException: ... Class not allowed to be inflated android.view.View`, so the widget failed to inflate → blank / would not add.
 - **`app/android/app/src/main/res/layout/now_playing_widget.xml`:** changed the scrim `<View>` → empty `<FrameLayout>` (an allowed RemoteViews class) with the same `#99000000` background. (rc10's transparent-background change is retained — harmless.)
 - Verified: `flutter build apk --debug` succeeds. **Not yet smoke-tested on device** — debug APK can't install over the existing build (signing-key mismatch); needs an uninstall (wipes profile/login) or a matching-key build. See DEBT.md #20.
+
+## 2026-06-22 — Widget redesign (4x1, no bitmaps) + cover-colour tint; Now Playing screen tint boost
+
+- The cover-art widget kept failing on device (blank / unreliable on skip; the temp-file rename regressed to ENOENT). Scrapped cover art and rebuilt the widget as a simple, robust tile.
+- **`lib/widget/now_playing_widget.dart`:** removed `WidgetArtCache`/`WidgetArtCacheImpl`, `np_art_path`, and all the staleness/in-flight/temp-file machinery. Widget now pushes title/artist/playing + position/duration (millisecond strings) + a cover-derived tint. New `WidgetTintExtractor` seam (`WidgetTintExtractorImpl` reuses `dominantColorFor`, darkens ~50% for legibility, returns a signed-32-bit ARGB int); tint resolved once per track, pushed as `np_tint_argb`.
+- **`lib/widget/now_playing_widget_provider.dart`:** wires `WidgetTintExtractorImpl`.
+- **Native `NowPlayingWidgetProvider.kt`:** removed `BitmapFactory`/`decodeScaledBitmap`/art. Reads title/artist/playing, parses position/duration strings → `setProgressBar`, parses `np_tint_argb` → `setInt(widget_root,"setBackgroundColor",..)`. Media-button controls unchanged.
+- **Native layout `now_playing_widget.xml`:** rebuilt as a horizontal 1-row tile (title/artist + `ProgressBar` + prev/play-pause/next `ImageButton`s). Only RemoteViews-whitelisted views — no `ImageView`/`View`.
+- **`now_playing_widget_info.xml`:** resized 3x2 → 4x1 (minWidth 250dp, minHeight 40dp, targetCell 4x1, resize horizontal).
+- **`lib/utils/palette.dart`:** richer swatch fallback (vibrant → light/dark-vibrant → muted → dominant) so dark covers still yield a hue.
+- **`lib/screens/player/now_playing_screen.dart`:** strengthened the screen tint gradient (`0.85 → 0.35 → surface` over `0–45–90%`, was `0.45 → surface` over `0–65%`).
+- **`test/widget/now_playing_widget_updater_test.dart`:** rewritten — dropped the art-race tests, added position/duration string tests and a tint group (per-track extraction, non-http skip, null result). Red-first.
+- Verified: `flutter analyze` clean; full suite **611** green; debug APK builds and the widget loads on the Pixel 7. Cover-colour tint pending final on-device eyeball.

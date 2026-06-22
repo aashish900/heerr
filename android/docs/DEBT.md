@@ -220,8 +220,21 @@ attempt failed (couldn't add / blank).
   whitelisted classes (FrameLayout/LinearLayout/RelativeLayout/GridLayout +
   TextView/ImageView/Button/ImageButton/ProgressBar/etc.) — never bare `View`.
 
-**Still unverified on device** — the debug APK can't install over the currently
-installed build (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`, signing-key mismatch);
-verifying needs an uninstall (wipes the on-device profile/login) or a
-matching-key build. Smoke (add to home screen; controls hit the live
-MediaSession; title/artist/play-pause + album art track playback) still pending.
+**2026-06-22 — redesigned the widget; dropped cover art entirely.** After the
+art approach kept failing on device (blank background / unreliable on skip; the
+in-flight temp-file rename even regressed to ENOENT), the widget was rebuilt as
+a compact **4x1** tile: title + artist, prev / play-pause / next, and a
+display-only position `ProgressBar`. Layout uses only RemoteViews-whitelisted
+classes (LinearLayout / TextView / ProgressBar / ImageButton) — no `ImageView`,
+no `BitmapFactory`, no files. Position/duration cross the channel as
+millisecond *strings* (sidesteps the home_widget int/Long ambiguity). Confirmed
+loading on the Pixel 7.
+
+Cover **colour** tint added back as the cheap version of the original "bonus":
+`WidgetTintExtractor` computes the cover's dominant colour in Dart (reusing
+`dominantColorFor`), darkens it ~50% for white-text legibility, and pushes a
+**signed** ARGB int (string) — native paints the tile background via
+`setInt(..,"setBackgroundColor",..)`. No bitmaps cross Binder. Computed once
+per track while the app is alive; the tile keeps the last colour when the
+process is dead. A draggable seek bar is intentionally not attempted (not
+reliably supported in home-screen widgets); tapping the tile opens the app.

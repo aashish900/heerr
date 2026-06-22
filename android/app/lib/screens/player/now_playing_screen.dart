@@ -252,10 +252,11 @@ class _TintedBackground extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: <Color>[
-            c.withValues(alpha: 0.45),
+            c.withValues(alpha: 0.85),
+            c.withValues(alpha: 0.35),
             cs.surface,
           ],
-          stops: const <double>[0.0, 0.65],
+          stops: const <double>[0.0, 0.45, 0.9],
         ),
       ),
       child: child,

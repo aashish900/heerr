@@ -6,23 +6,25 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.graphics.BitmapFactory
 import android.view.KeyEvent
-import android.view.View
 import android.widget.RemoteViews
-import java.io.File
 import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetProvider
 
 /**
- * #20: home-screen "Now Playing" widget.
+ * #20: home-screen "Now Playing" widget — a compact single-row tile.
  *
  * Display state is written from Dart via the `home_widget` package
  * (NowPlayingWidgetUpdater) into the [widgetData] SharedPreferences; this
- * provider renders it. Transport controls are dispatched as
- * `ACTION_MEDIA_BUTTON` broadcasts to audio_service's already-registered
- * MediaButtonReceiver, so they drive the LIVE MediaSession — no second
- * player, no Flutter background isolate.
+ * provider renders title/artist, a play-pause icon and a position progress
+ * bar. Transport controls are dispatched as `ACTION_MEDIA_BUTTON` broadcasts
+ * to audio_service's already-registered MediaButtonReceiver, so they drive
+ * the LIVE MediaSession — no second player, no Flutter background isolate.
+ *
+ * No cover art by design: decoding bitmaps from disk on every track change
+ * was the source of repeated blank-widget / race bugs (see DEBT.md #20). The
+ * layout uses only RemoteViews-whitelisted views (LinearLayout / TextView /
+ * ProgressBar / ImageButton).
  */
 class NowPlayingWidgetProvider : HomeWidgetProvider() {
 
@@ -39,6 +41,11 @@ class NowPlayingWidgetProvider : HomeWidgetProvider() {
             val title = widgetData.getString("np_title", null)
             val artist = widgetData.getString("np_artist", null)
             val playing = widgetData.getBoolean("np_playing", false)
+            // Position/duration arrive as decimal-string millis (see Dart side).
+            val positionMs = widgetData.getString("np_position_ms", "0")?.toIntOrNull() ?: 0
+            val durationMs = widgetData.getString("np_duration_ms", "0")?.toIntOrNull() ?: 0
+            // Cover-derived background tint (signed ARGB int as a string).
+            val tintArgb = widgetData.getString("np_tint_argb", "")?.toIntOrNull()
 
             views.setTextViewText(
                 R.id.widget_title,
@@ -54,20 +61,24 @@ class NowPlayingWidgetProvider : HomeWidgetProvider() {
                 else android.R.drawable.ic_media_play,
             )
 
-            // Cover art: decoded from the app-private file the Dart side
-            // cached (same uid, so the file is readable here). Falls back to
-            // the plain rounded background when absent/unreadable.
-            val artPath = widgetData.getString("np_art_path", null)
-            val bitmap = if (!artPath.isNullOrEmpty() && File(artPath).exists()) {
-                runCatching { BitmapFactory.decodeFile(artPath) }.getOrNull()
-            } else {
-                null
+            // Cover-derived background tint. setInt(..,"setBackgroundColor",..)
+            // paints a flat colour (replacing the rounded drawable) only when a
+            // tint is present; otherwise the default @drawable/widget_background
+            // stays. No bitmaps — just an int over the wire.
+            if (tintArgb != null && tintArgb != 0) {
+                views.setInt(R.id.widget_root, "setBackgroundColor", tintArgb)
             }
-            if (bitmap != null) {
-                views.setImageViewBitmap(R.id.widget_art, bitmap)
-                views.setViewVisibility(R.id.widget_art, View.VISIBLE)
+
+            // Position bar (display only). Clamp the progress into [0, max].
+            if (durationMs > 0) {
+                views.setProgressBar(
+                    R.id.widget_progress,
+                    durationMs,
+                    positionMs.coerceIn(0, durationMs),
+                    false,
+                )
             } else {
-                views.setImageViewResource(R.id.widget_art, 0)
+                views.setProgressBar(R.id.widget_progress, 0, 0, false)
             }
 
             // Transport controls -> live MediaSession via MediaButtonReceiver.
@@ -84,7 +95,7 @@ class NowPlayingWidgetProvider : HomeWidgetProvider() {
                 mediaButtonIntent(context, KeyEvent.KEYCODE_MEDIA_PREVIOUS),
             )
 
-            // Tapping the body opens the app.
+            // Tapping the body opens the app (for full seek / browsing).
             views.setOnClickPendingIntent(
                 R.id.widget_root,
                 HomeWidgetLaunchIntent.getActivity(context, MainActivity::class.java),

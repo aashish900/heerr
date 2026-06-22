@@ -20,7 +20,7 @@ part 'now_playing_widget_provider.g.dart';
 NowPlayingWidgetUpdater nowPlayingWidget(NowPlayingWidgetRef ref) {
   final NowPlayingWidgetUpdater updater = NowPlayingWidgetUpdater(
     client: const HomeWidgetClientImpl(),
-    artCache: WidgetArtCacheImpl(),
+    tintExtractor: const WidgetTintExtractorImpl(),
   );
 
   ref.listen<AsyncValue<PlayerSnapshot>>(
