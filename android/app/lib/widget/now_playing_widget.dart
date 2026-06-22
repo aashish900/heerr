@@ -2,27 +2,33 @@
 // cleanly; same trade-off as now_playing_persistence.dart.
 // ignore_for_file: prefer_initializing_formals
 
+import 'dart:io';
+
 import 'package:audio_service/audio_service.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:home_widget/home_widget.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../player/heerr_audio_handler.dart';
 import '../utils/palette.dart';
 
 /// #20: home-screen "Now Playing" widget.
 ///
-/// A compact single-row tile: track title + artist, a play/pause / next /
-/// previous control row, and a (display-only) progress bar. Controls are
+/// A compact single-row tile: a left cover-art thumbnail, track title +
+/// artist, and a play/pause / next / previous control row. Controls are
 /// wired natively in [NowPlayingWidgetProvider.kt] as `ACTION_MEDIA_BUTTON`
 /// broadcasts to `com.ryanheise.audioservice.MediaButtonReceiver`, so they
 /// drive the **live** audio_service MediaSession — no background isolate, no
 /// second player instance.
 ///
-/// Deliberately renders no cover art: a RemoteViews layout that decodes
-/// bitmaps from disk on every track change was the source of repeated
-/// blank-widget / race bugs (see DEBT.md #20). This Dart side only pushes
-/// lightweight display state; the native provider name + these data keys are
-/// the contract the RemoteViews reads.
+/// Cover art is rendered as a **small left thumbnail** only (the native side
+/// decodes it heavily downsampled). The earlier full-bleed-background bitmap
+/// approach caused repeated blank-widget / race bugs (see DEBT.md #20); the
+/// caching here is race-safe (per-URL file, unique temp + atomic rename,
+/// in-flight coalescing, staleness guard). This Dart side pushes display
+/// state + the cached art path; the native provider name + these data keys
+/// are the contract the RemoteViews reads.
 
 /// Must match the Kotlin `AppWidgetProvider` class (and its manifest
 /// `<receiver android:name>`).
@@ -38,6 +44,51 @@ const String kNpKeyPlaying = 'np_playing';
 /// `0xFF......` as an unsigned value overflows `Int.toIntOrNull`. The native
 /// side paints the tile background this colour; no bitmaps involved.
 const String kNpKeyTintArgb = 'np_tint_argb';
+
+/// Absolute path to the cached cover-art file (empty when none). The widget
+/// runs in the same app uid, so it reads this app-private file directly.
+const String kNpKeyArtPath = 'np_art_path';
+
+/// Downloads cover art to a stable on-disk file the native widget can decode.
+/// Seam so [NowPlayingWidgetUpdater] is testable without network / filesystem.
+abstract class WidgetArtCache {
+  /// Fetch [artUri] and write it to a per-URL cache file. Returns the absolute
+  /// path, or null on failure.
+  Future<String?> cache(Uri artUri);
+}
+
+class WidgetArtCacheImpl implements WidgetArtCache {
+  WidgetArtCacheImpl({Dio? dio}) : _dio = dio ?? Dio();
+
+  final Dio _dio;
+
+  @override
+  Future<String?> cache(Uri artUri) async {
+    try {
+      final Response<List<int>> resp = await _dio.getUri<List<int>>(
+        artUri,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      final List<int>? bytes = resp.data;
+      if (bytes == null || bytes.isEmpty) return null;
+      final Directory dir = await getApplicationSupportDirectory();
+      // Per-URL filename so a superseded download can't clobber the file the
+      // current track points at; unique temp + atomic rename so the native
+      // side never decodes a half-written file.
+      final String base = 'np_art_${artUri.toString().hashCode & 0x7fffffff}';
+      final File file = File('${dir.path}/$base.png');
+      final File tmp =
+          File('${dir.path}/$base.${DateTime.now().microsecondsSinceEpoch}.tmp');
+      await tmp.writeAsBytes(bytes, flush: true);
+      await tmp.rename(file.path);
+      return file.path;
+    } catch (e, st) {
+      debugPrint('now_playing_widget: art fetch failed: $e');
+      debugPrintStack(stackTrace: st);
+      return null;
+    }
+  }
+}
 
 /// Seam over the cover-art → tint-colour computation so [NowPlayingWidgetUpdater]
 /// is testable without the network / `palette_generator`.
@@ -97,16 +148,25 @@ class NowPlayingWidgetUpdater {
   NowPlayingWidgetUpdater({
     required HomeWidgetClient client,
     WidgetTintExtractor? tintExtractor,
+    WidgetArtCache? artCache,
   })  : _client = client,
-        _tint = tintExtractor;
+        _tint = tintExtractor,
+        _art = artCache;
 
   final HomeWidgetClient _client;
   final WidgetTintExtractor? _tint;
+  final WidgetArtCache? _art;
 
   // Per-track guard: the cover (and thus tint) only changes on track change,
   // so we don't recompute the palette on every play/pause/position emission.
   String? _lastTintUri;
   String _lastTint = '';
+
+  // Same per-track guard + in-flight coalescing for the cover thumbnail.
+  String? _lastArtUri;
+  String _lastArtPath = '';
+  String? _inFlightArtUri;
+  Future<String?>? _inFlightArt;
 
   Future<void> push(PlayerSnapshot snapshot) async {
     final MediaItem? item = snapshot.item;
@@ -120,6 +180,7 @@ class NowPlayingWidgetUpdater {
       await _client.saveString(kNpKeyArtist, item.artist ?? '');
       await _client.saveBool(kNpKeyPlaying, snapshot.isPlaying);
       await _client.saveString(kNpKeyTintArgb, await _resolveTint(item));
+      await _client.saveString(kNpKeyArtPath, await _resolveArtPath(item));
       await _client.update();
     } catch (e, st) {
       debugPrint('now_playing_widget: push failed: $e');
@@ -148,16 +209,57 @@ class NowPlayingWidgetUpdater {
     return _lastTint;
   }
 
+  /// On-disk cover path, fetched once per track. Empty when there is no cache
+  /// or no network cover. Coalesces concurrent fetches and ignores a stale
+  /// download whose track was already skipped past.
+  Future<String> _resolveArtPath(MediaItem item) async {
+    final WidgetArtCache? cache = _art;
+    final Uri? art = item.artUri;
+    final bool isNetwork =
+        art != null && (art.isScheme('http') || art.isScheme('https'));
+    if (cache == null || !isNetwork) {
+      _lastArtUri = null;
+      _lastArtPath = '';
+      return '';
+    }
+    final String url = art.toString();
+    if (url == _lastArtUri) return _lastArtPath;
+
+    final Future<String?> fetch;
+    if (_inFlightArtUri == url && _inFlightArt != null) {
+      fetch = _inFlightArt!;
+    } else {
+      fetch = cache.cache(art);
+      _inFlightArt = fetch;
+      _inFlightArtUri = url;
+    }
+    final String? path = await fetch;
+    if (identical(_inFlightArt, fetch)) {
+      _inFlightArt = null;
+      _inFlightArtUri = null;
+    }
+    if (_inFlightArtUri != null && _inFlightArtUri != url) {
+      // A newer track is already being fetched; don't clobber its art.
+      return _lastArtPath;
+    }
+    _lastArtUri = url;
+    _lastArtPath = path ?? '';
+    return _lastArtPath;
+  }
+
   /// Reset the widget to its empty "nothing playing" state.
   Future<void> clear() async {
     _lastTintUri = null;
     _lastTint = '';
+    _lastArtUri = null;
+    _lastArtPath = '';
     try {
       await _client.saveBool(kNpKeyHasTrack, false);
       await _client.saveString(kNpKeyTitle, '');
       await _client.saveString(kNpKeyArtist, '');
       await _client.saveBool(kNpKeyPlaying, false);
       await _client.saveString(kNpKeyTintArgb, '');
+      await _client.saveString(kNpKeyArtPath, '');
       await _client.update();
     } catch (e, st) {
       debugPrint('now_playing_widget: clear failed: $e');

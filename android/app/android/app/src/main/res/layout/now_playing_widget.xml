@@ -1,23 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- #20: compact single-row "Now Playing" widget. Only RemoteViews-allowed
-     classes (LinearLayout / TextView / ProgressBar / ImageButton) — no bare
-     View, no ImageView/bitmap (those caused the blank-widget bugs; see
-     DEBT.md #20). Field ids must match the keys NowPlayingWidgetProvider.kt
-     reads from the home_widget data. -->
+<!-- #20: compact single-row "Now Playing" widget. A left cover thumbnail,
+     then title/artist + the transport row. Uses only RemoteViews-allowed
+     classes (LinearLayout / TextView / ImageView / ImageButton) — no bare
+     View. Field ids must match the keys NowPlayingWidgetProvider.kt reads
+     from the home_widget data. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:background="@drawable/widget_background"
-    android:padding="10dp">
+    android:background="@drawable/widget_background">
+
+    <!-- Full-bleed left cover: fills the tile height and reaches the left /
+         top / bottom edges. The launcher clips the widget to rounded corners
+         (API 31+), so the left corners follow the tile's rounding. -->
+    <ImageView
+        android:id="@+id/widget_art"
+        android:layout_width="80dp"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:contentDescription="Album art" />
 
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:orientation="vertical"
+        android:paddingStart="12dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
         android:paddingEnd="8dp">
 
         <TextView
@@ -66,6 +78,7 @@
         android:id="@+id/widget_next"
         android:layout_width="55dp"
         android:layout_height="55dp"
+        android:layout_marginEnd="6dp"
         android:padding="9dp"
         android:scaleType="fitCenter"
         android:background="@android:color/transparent"

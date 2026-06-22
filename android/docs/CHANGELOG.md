@@ -2046,3 +2046,13 @@ analyze` clean; `flutter test` green (567 tests).
 - **Progress bar removed** (`now_playing_widget.xml` `ProgressBar`, the native `setProgressBar` render, and the Dart `np_position_ms`/`np_duration_ms` push + their tests).
 - Net widget data keys: `np_has_track`, `np_title`, `np_artist`, `np_playing`, `np_tint_argb`.
 - Verified: `flutter analyze` clean; full suite **609** green; APK builds and installs on the Pixel 7.
+
+## 2026-06-22 — Widget: re-add cover art as a full-bleed left thumbnail
+
+- Per request, the cover is back — but as a small **left thumbnail** (not the old full-bleed background that caused the blank/crash bugs).
+- **`lib/widget/now_playing_widget.dart`:** re-added `WidgetArtCache`/`WidgetArtCacheImpl` (Dio bytes → per-URL file, unique temp + atomic rename) and `np_art_path`. `NowPlayingWidgetUpdater` gained an optional `artCache`; `_resolveArtPath` fetches once per track with in-flight coalescing + a staleness guard (no skip races, no ENOENT).
+- **`lib/widget/now_playing_widget_provider.dart`:** wires `WidgetArtCacheImpl`.
+- **Native `NowPlayingWidgetProvider.kt`:** reads `np_art_path`, decodes downsampled (`decodeScaledBitmap`, cap 192px → tiny bitmap, no TransactionTooLarge), `setImageViewBitmap` on the left `widget_art` ImageView; `GONE` when absent.
+- **Layout:** added a left `ImageView` (80dp, `match_parent` height, `centerCrop`); dropped the root padding so the cover bleeds to the left/top/bottom edges (launcher rounds the corners on API 31+); re-inset the text column; right margin on the next button.
+- **`test/widget/now_playing_widget_updater_test.dart`:** added a cover-thumbnail group (caches once per track, concurrent-fetch coalescing, non-http skip, null-item clear).
+- Verified: `flutter analyze` clean; full suite **614** green; builds + installs on the Pixel 7.

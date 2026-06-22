@@ -21,6 +21,7 @@ NowPlayingWidgetUpdater nowPlayingWidget(NowPlayingWidgetRef ref) {
   final NowPlayingWidgetUpdater updater = NowPlayingWidgetUpdater(
     client: const HomeWidgetClientImpl(),
     tintExtractor: const WidgetTintExtractorImpl(),
+    artCache: WidgetArtCacheImpl(),
   );
 
   ref.listen<AsyncValue<PlayerSnapshot>>(

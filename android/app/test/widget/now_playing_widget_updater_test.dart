@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heerr/player/heerr_audio_handler.dart';
@@ -7,6 +9,8 @@ import 'package:mocktail/mocktail.dart';
 class _MockHomeWidgetClient extends Mock implements HomeWidgetClient {}
 
 class _MockTintExtractor extends Mock implements WidgetTintExtractor {}
+
+class _MockArtCache extends Mock implements WidgetArtCache {}
 
 void main() {
   late _MockHomeWidgetClient client;
@@ -122,6 +126,65 @@ void main() {
           .push(snap(track('s1', art: Uri.parse('https://h/c?id=1'))));
 
       verify(() => client.saveString(kNpKeyTintArgb, '')).called(1);
+    });
+  });
+
+  group('NowPlayingWidgetUpdater cover thumbnail (#20)', () {
+    late _MockArtCache art;
+    late NowPlayingWidgetUpdater artUpdater;
+
+    setUp(() {
+      art = _MockArtCache();
+      artUpdater = NowPlayingWidgetUpdater(client: client, artCache: art);
+    });
+
+    test('caches the cover for an http artUri and saves its path', () async {
+      when(() => art.cache(any())).thenAnswer((_) async => '/data/art.png');
+
+      await artUpdater
+          .push(snap(track('s1', art: Uri.parse('https://h/c?id=1'))));
+
+      verify(() => art.cache(Uri.parse('https://h/c?id=1'))).called(1);
+      verify(() => client.saveString(kNpKeyArtPath, '/data/art.png')).called(1);
+    });
+
+    test('does not re-download for the same track', () async {
+      when(() => art.cache(any())).thenAnswer((_) async => '/data/art.png');
+      final MediaItem same = track('s1', art: Uri.parse('https://h/c?id=1'));
+
+      await artUpdater.push(snap(same, playing: true));
+      await artUpdater.push(snap(same, playing: false));
+
+      verify(() => art.cache(any())).called(1);
+    });
+
+    test('coalesces concurrent fetches for the same track', () async {
+      final Completer<String?> pending = Completer<String?>();
+      when(() => art.cache(any())).thenAnswer((_) => pending.future);
+
+      final Future<void> a =
+          artUpdater.push(snap(track('s1', art: Uri.parse('https://h/c?id=1'))));
+      final Future<void> b =
+          artUpdater.push(snap(track('s1', art: Uri.parse('https://h/c?id=1'))));
+      pending.complete('/data/art.png');
+      await Future.wait(<Future<void>>[a, b]);
+
+      verify(() => art.cache(any())).called(1);
+    });
+
+    test('non-http artUri saves empty path and skips the cache', () async {
+      await artUpdater.push(
+        snap(track('s1', art: Uri.parse('android.resource://x/y'))),
+      );
+
+      verifyNever(() => art.cache(any()));
+      verify(() => client.saveString(kNpKeyArtPath, '')).called(1);
+    });
+
+    test('null item clears the art path', () async {
+      await artUpdater.push(snap(null));
+
+      verify(() => client.saveString(kNpKeyArtPath, '')).called(1);
     });
   });
 }

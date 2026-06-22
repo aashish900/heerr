@@ -7,9 +7,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.view.KeyEvent
+import android.view.View
 import android.widget.RemoteViews
+import java.io.File
 import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetProvider
 
@@ -45,6 +49,7 @@ class NowPlayingWidgetProvider : HomeWidgetProvider() {
             val playing = widgetData.getBoolean("np_playing", false)
             // Cover-derived background tint (signed ARGB int as a string).
             val tintArgb = widgetData.getString("np_tint_argb", "")?.toIntOrNull()
+            val artPath = widgetData.getString("np_art_path", null)
 
             views.setTextViewText(
                 R.id.widget_title,
@@ -76,6 +81,21 @@ class NowPlayingWidgetProvider : HomeWidgetProvider() {
                 )
             }
 
+            // Left cover-art thumbnail. Decoded heavily downsampled so the
+            // bitmap stays tiny (well under the Binder transaction limit).
+            // Hidden when there's no cover, so the text/controls reflow left.
+            val bitmap = if (!artPath.isNullOrEmpty() && File(artPath).exists()) {
+                runCatching { decodeScaledBitmap(artPath, MAX_ART_PX) }.getOrNull()
+            } else {
+                null
+            }
+            if (bitmap != null) {
+                views.setImageViewBitmap(R.id.widget_art, bitmap)
+                views.setViewVisibility(R.id.widget_art, View.VISIBLE)
+            } else {
+                views.setViewVisibility(R.id.widget_art, View.GONE)
+            }
+
             // Transport controls -> live MediaSession via MediaButtonReceiver.
             views.setOnClickPendingIntent(
                 R.id.widget_play_pause,
@@ -100,6 +120,25 @@ class NowPlayingWidgetProvider : HomeWidgetProvider() {
         }
     }
 
+    /**
+     * Decodes [path] downsampled so neither side exceeds [maxPx]. The widget
+     * shows a small thumbnail, so a tiny bitmap keeps the RemoteViews payload
+     * well under the Binder transaction limit (avoids TransactionTooLarge).
+     */
+    private fun decodeScaledBitmap(path: String, maxPx: Int): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, bounds)
+        val w = bounds.outWidth
+        val h = bounds.outHeight
+        if (w <= 0 || h <= 0) return null
+        var sample = 1
+        while (w / sample > maxPx || h / sample > maxPx) {
+            sample *= 2
+        }
+        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+        return BitmapFactory.decodeFile(path, opts)
+    }
+
     private fun mediaButtonIntent(context: Context, keyCode: Int): PendingIntent {
         val intent = Intent(Intent.ACTION_MEDIA_BUTTON).apply {
             component = ComponentName(
@@ -114,5 +153,11 @@ class NowPlayingWidgetProvider : HomeWidgetProvider() {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+    }
+
+    private companion object {
+        // Max thumbnail edge (px). The tile thumbnail is small, so a tight cap
+        // keeps the RemoteViews bitmap payload well under the Binder limit.
+        const val MAX_ART_PX = 192
     }
 }
