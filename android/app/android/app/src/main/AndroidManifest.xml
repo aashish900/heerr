@@ -80,6 +80,33 @@
                 android:resource="@xml/now_playing_widget_info" />
         </receiver>
 
+        <!-- Thin "bar" Now Playing widget (3x1/4x1): animated waveform +
+             inline title/artist + display-only progress bar. Shares the
+             home_widget data contract with the classic tile above. -->
+        <receiver
+            android:name=".BarWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/bar_widget_info" />
+        </receiver>
+
+        <!-- Chubby "pill" Now Playing widget (2x1): circular cover art +
+             title/artist + animated waveform. Shares the same data contract. -->
+        <receiver
+            android:name=".PillWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/pill_widget_info" />
+        </receiver>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

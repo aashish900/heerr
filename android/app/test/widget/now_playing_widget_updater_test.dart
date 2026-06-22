@@ -55,6 +55,36 @@ void main() {
       verify(() => client.update()).called(1);
     });
 
+    test('writes position + duration in ms for the bar widget', () async {
+      await updater.push(snap(
+        const MediaItem(
+          id: 'song://1',
+          title: 'Hello',
+          artist: 'Adele',
+          duration: Duration(minutes: 3),
+        ),
+        playing: true,
+        position: const Duration(seconds: 30),
+      ));
+
+      verify(() => client.saveString(kNpKeyPositionMs, '30000')).called(1);
+      verify(() => client.saveString(kNpKeyDurationMs, '180000')).called(1);
+    });
+
+    test('unknown duration writes 0', () async {
+      await updater
+          .push(snap(const MediaItem(id: 'a', title: 'T', artist: 'A')));
+
+      verify(() => client.saveString(kNpKeyDurationMs, '0')).called(1);
+    });
+
+    test('null item clears position + duration', () async {
+      await updater.push(snap(null));
+
+      verify(() => client.saveString(kNpKeyPositionMs, '')).called(1);
+      verify(() => client.saveString(kNpKeyDurationMs, '')).called(1);
+    });
+
     test('push paused writes playing=false', () async {
       await updater.push(
         snap(const MediaItem(id: 'a', title: 'T', artist: 'A'), playing: false),

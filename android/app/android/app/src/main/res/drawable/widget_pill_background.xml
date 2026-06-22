@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fully-rounded "pill" surface for the chubby Now Playing pill widget. A
+     very large corner radius makes the short ends perfect semicircles
+     regardless of the tile's measured height. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#1E1E1E" />
+    <corners android:radius="200dp" />
+</shape>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Music-waveform frame 1/8. Five heerr-green bars centred on y=12 (both top
+     and bottom move). The eight frames are a sine wave sampled at advancing
+     phase, so cycling them in a ViewFlipper reads as a smooth travelling wave.
+     RemoteViews can't host a custom view, so animation = flipping vectors. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp"
+    android:height="24dp"
+    android:viewportWidth="26"
+    android:viewportHeight="24">
+    <path android:strokeColor="#1DB954" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M3,6 L3,18" />
+    <path android:strokeColor="#1DB954" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M8,2 L8,22" />
+    <path android:strokeColor="#1DB954" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M13,3.5 L13,20.5" />
+    <path android:strokeColor="#1DB954" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M18,8.5 L18,15.5" />
+    <path android:strokeColor="#1DB954" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M23,10 L23,14" />
+</vector>

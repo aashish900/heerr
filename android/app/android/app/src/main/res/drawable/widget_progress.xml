@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Display-only playback progress track for the bar widget. Dark rounded
+     track with a heerr-green rounded fill. Position is pushed from Dart; the
+     bar is not seekable (no touch on a ProgressBar in RemoteViews). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@android:id/background">
+        <shape android:shape="rectangle">
+            <solid android:color="#3A3A3A" />
+            <corners android:radius="100dp" />
+        </shape>
+    </item>
+    <item android:id="@android:id/progress">
+        <clip>
+            <shape android:shape="rectangle">
+                <solid android:color="#1DB954" />
+                <corners android:radius="100dp" />
+            </shape>
+        </clip>
+    </item>
+</layer-list>

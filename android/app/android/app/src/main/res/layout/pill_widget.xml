@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Chubby "pill" Now Playing widget (2x1). The visible tile is centred at
+     ~90% of the cell height via weighted empty spacers, and uses a fully-
+     rounded background so the ends are perfect semicircles. Layout: circular
+     cover art (left, rounded natively in PillWidgetProvider.kt) + stacked
+     title/artist (centre) + animated waveform (right). Uses only RemoteViews-
+     whitelisted classes. Field ids must match PillWidgetProvider.kt. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <!-- Top spacer: ~5% of the cell height. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- The visible tile: ~90% of the cell height. -->
+    <LinearLayout
+        android:id="@+id/widget_root"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="18"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="0dp"
+        android:paddingEnd="20dp"
+        android:background="@drawable/widget_pill_background">
+
+        <!-- Circular cover (rounded natively in PillWidgetProvider.kt). A
+             *uniform* margin (start = top = bottom) insets the art so a dark
+             ring of the pill shows around it and its left rounded end stays
+             visible. The uniform margin keeps the art's centre at H/2 (same as
+             the pill's left-end centre) so the two circles stay concentric.
+             height match_parent + width wrap_content + adjustViewBounds make
+             the box square (the margined height drives the width) at any pill
+             size, so no hard-coded dp. fitCenter so it never crops/squashes. -->
+        <ImageView
+            android:id="@+id/widget_art"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_marginStart="5dp"
+            android:layout_marginTop="5dp"
+            android:layout_marginBottom="5dp"
+            android:adjustViewBounds="true"
+            android:scaleType="fitCenter"
+            android:contentDescription="Album art" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp">
+
+            <TextView
+                android:id="@+id/widget_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:text="heerr" />
+
+            <TextView
+                android:id="@+id/widget_artist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="#B0B0B0"
+                android:textSize="12sp"
+                android:text="Nothing playing" />
+        </LinearLayout>
+
+        <!-- Animated waveform (while playing) overlaid on a static frame
+             (while paused); the provider toggles visibility off np_playing. -->
+        <FrameLayout
+            android:layout_width="30dp"
+            android:layout_height="24dp">
+
+            <ViewFlipper
+                android:id="@+id/widget_wave"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:autoStart="true"
+                android:flipInterval="120"
+                android:measureAllChildren="true">
+                <ImageView android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/widget_wave_1"
+                    android:contentDescription="Playing" />
+                <ImageView android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitCenter" android:src="@drawable/widget_wave_2" />
+                <ImageView android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitCenter" android:src="@drawable/widget_wave_3" />
+                <ImageView android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitCenter" android:src="@drawable/widget_wave_4" />
+                <ImageView android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitCenter" android:src="@drawable/widget_wave_5" />
+                <ImageView android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitCenter" android:src="@drawable/widget_wave_6" />
+                <ImageView android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitCenter" android:src="@drawable/widget_wave_7" />
+                <ImageView android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitCenter" android:src="@drawable/widget_wave_8" />
+            </ViewFlipper>
+
+            <ImageView
+                android:id="@+id/widget_wave_static"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:visibility="gone"
+                android:src="@drawable/widget_wave_3"
+                android:contentDescription="Paused" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <!-- Bottom spacer: ~5% of the cell height. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+</LinearLayout>

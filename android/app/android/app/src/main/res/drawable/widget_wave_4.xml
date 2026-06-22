@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Music-waveform frame 4/8. See widget_wave_1.xml. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp"
+    android:height="24dp"
+    android:viewportWidth="26"
+    android:viewportHeight="24">
+    <path android:strokeColor="#1DB954" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M3,3 L3,21" />
+    <path android:strokeColor="#1DB954" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M8,8 L8,16" />
+    <path android:strokeColor="#1DB954" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M13,10 L13,14" />
+    <path android:strokeColor="#1DB954" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M18,6.5 L18,17.5" />
+    <path android:strokeColor="#1DB954" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M23,2.5 L23,21.5" />
+</vector>

@@ -30,14 +30,30 @@ import '../utils/palette.dart';
 /// state + the cached art path; the native provider name + these data keys
 /// are the contract the RemoteViews reads.
 
-/// Must match the Kotlin `AppWidgetProvider` class (and its manifest
-/// `<receiver android:name>`).
+/// Must match the Kotlin `AppWidgetProvider` classes (and their manifest
+/// `<receiver android:name>` entries). All three home-screen widgets share the
+/// same `np_*` data keys; they differ only in how the native RemoteViews
+/// renders them.
 const String kNowPlayingWidgetName = 'NowPlayingWidgetProvider';
+
+/// Thin 3x1/4x1 "bar" widget (animated waveform + inline title/artist +
+/// display-only progress).
+const String kBarWidgetName = 'BarWidgetProvider';
+
+/// Chubby 2x1 "pill" widget (circular cover art + title/artist + waveform).
+const String kPillWidgetName = 'PillWidgetProvider';
 
 const String kNpKeyHasTrack = 'np_has_track';
 const String kNpKeyTitle = 'np_title';
 const String kNpKeyArtist = 'np_artist';
 const String kNpKeyPlaying = 'np_playing';
+
+/// Playback position / track duration in milliseconds, stored as decimal
+/// strings (empty when unknown). Consumed only by the bar widget's display-only
+/// progress bar. Strings (not ints) so the native side parses with
+/// `toLongOrNull`, matching the tint-key convention.
+const String kNpKeyPositionMs = 'np_position_ms';
+const String kNpKeyDurationMs = 'np_duration_ms';
 
 /// Cover-derived background tint as a **signed 32-bit ARGB int**, stored as a
 /// decimal string (empty when none). Signed so it fits Kotlin's `Int` —
@@ -135,10 +151,18 @@ class HomeWidgetClientImpl implements HomeWidgetClient {
       HomeWidget.saveWidgetData<bool>(key, value);
 
   @override
-  Future<void> update() => HomeWidget.updateWidget(
-        name: kNowPlayingWidgetName,
-        androidName: kNowPlayingWidgetName,
-      );
+  Future<void> update() async {
+    // Redraw all three home-screen widgets; any not added by the user is a
+    // harmless no-op. They share the same `np_*` data, so a single push feeds
+    // whichever tiles are on the home screen.
+    for (final String name in const <String>[
+      kNowPlayingWidgetName,
+      kBarWidgetName,
+      kPillWidgetName,
+    ]) {
+      await HomeWidget.updateWidget(name: name, androidName: name);
+    }
+  }
 }
 
 /// Maps a [PlayerSnapshot] onto the widget's data keys and asks the OS to
@@ -181,6 +205,17 @@ class NowPlayingWidgetUpdater {
       await _client.saveBool(kNpKeyPlaying, snapshot.isPlaying);
       await _client.saveString(kNpKeyTintArgb, await _resolveTint(item));
       await _client.saveString(kNpKeyArtPath, await _resolveArtPath(item));
+      // Bar-widget progress. Snapshots only emit on transport changes, so the
+      // bar snaps to the new position on play/pause/seek/track-change rather
+      // than ticking continuously — the battery-safe trade-off for a widget.
+      await _client.saveString(
+        kNpKeyPositionMs,
+        snapshot.position.inMilliseconds.toString(),
+      );
+      await _client.saveString(
+        kNpKeyDurationMs,
+        (item.duration?.inMilliseconds ?? 0).toString(),
+      );
       await _client.update();
     } catch (e, st) {
       debugPrint('now_playing_widget: push failed: $e');
@@ -260,6 +295,8 @@ class NowPlayingWidgetUpdater {
       await _client.saveBool(kNpKeyPlaying, false);
       await _client.saveString(kNpKeyTintArgb, '');
       await _client.saveString(kNpKeyArtPath, '');
+      await _client.saveString(kNpKeyPositionMs, '');
+      await _client.saveString(kNpKeyDurationMs, '');
       await _client.update();
     } catch (e, st) {
       debugPrint('now_playing_widget: clear failed: $e');
