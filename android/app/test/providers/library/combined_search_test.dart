@@ -356,8 +356,15 @@ void main() {
         ),
       );
 
-      // Wait past the reindex grace + library re-fetch.
-      await Future<void>.delayed(const Duration(milliseconds: 250));
+      // Poll for the re-fetch; 50 ms grace + Riverpod rebuild + two async
+      // hops inside librarySearch can exceed a fixed 250 ms ceiling on slow
+      // CI runners.
+      const Duration kStep = Duration(milliseconds: 20);
+      const int kMaxPolls = 100; // 2 s total
+      for (int i = 0; i < kMaxPolls; i++) {
+        await Future<void>.delayed(kStep);
+        if (subsonicFetches > baseline) break;
+      }
 
       expect(
         subsonicFetches,
