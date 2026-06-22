@@ -108,14 +108,11 @@ CombinedSearchResult combinedSearch(CombinedSearchRef ref, String query) {
     }
   }
 
-  final List<Timer> pendingTimers = <Timer>[];
-  ref.onDispose(() {
-    for (final Timer t in pendingTimers) {
-      t.cancel();
-    }
-    pendingTimers.clear();
-  });
-
+  // Timers are intentionally NOT stored for cancellation. ref.onDispose fires
+  // on every reactive rebuild (e.g. when ytmSearchProvider resolves), so
+  // cancelling in onDispose would silently abort a pending promotion timer.
+  // On true disposal the timer fires a harmless invalidate against an
+  // already-dead auto-dispose provider; the try-catch guards that path.
   ref.listen<AsyncValue<QueueResponse>>(queueProvider, (
     AsyncValue<QueueResponse>? prev,
     AsyncValue<QueueResponse> next,
@@ -126,6 +123,15 @@ CombinedSearchResult combinedSearch(CombinedSearchRef ref, String query) {
       ...r.active,
       ...r.recent,
     ].where((JobView j) => j.state == JobState.done);
+    // AsyncLoading → AsyncData is the initial queue resolution, not a new
+    // transition. Seed seenDoneJobIds so we don't schedule a spurious
+    // promotion timer for jobs that were already done when the search opened.
+    if (prev?.hasValue != true) {
+      for (final JobView j in allDone) {
+        seenDoneJobIds.add(j.jobId);
+      }
+      return;
+    }
     final Set<String> newlyDone = <String>{};
     for (final JobView j in allDone) {
       if (seenDoneJobIds.add(j.jobId)) {
@@ -134,10 +140,13 @@ CombinedSearchResult combinedSearch(CombinedSearchRef ref, String query) {
     }
     if (newlyDone.isEmpty) return;
     final Duration grace = ref.read(reindexGraceProvider);
-    final Timer t = Timer(grace, () {
-      ref.invalidate(librarySearchProvider(query));
+    Timer(grace, () {
+      try {
+        ref.invalidate(librarySearchProvider(query));
+      } catch (_) {
+        // combinedSearch was disposed before the grace period elapsed.
+      }
     });
-    pendingTimers.add(t);
   });
 
   // -----------------------------------------------------------------
