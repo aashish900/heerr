@@ -2056,3 +2056,10 @@ analyze` clean; `flutter test` green (567 tests).
 - **Layout:** added a left `ImageView` (80dp, `match_parent` height, `centerCrop`); dropped the root padding so the cover bleeds to the left/top/bottom edges (launcher rounds the corners on API 31+); re-inset the text column; right margin on the next button.
 - **`test/widget/now_playing_widget_updater_test.dart`:** added a cover-thumbnail group (caches once per track, concurrent-fetch coalescing, non-http skip, null-item clear).
 - Verified: `flutter analyze` clean; full suite **614** green; builds + installs on the Pixel 7.
+
+## 2026-06-22 — Widget sizing (v3.3.0)
+
+- **`now_playing_widget_info.xml`:** default span 4x1 → 3x1, minWidth 250→200dp (narrower default).
+- **`now_playing_widget.xml`:** tile no longer fills the whole cell — wrapped in an outer full-height vertical LinearLayout with weighted empty-LinearLayout spacers so the visible tile is centred at **90% of the cell height** (weights 1/18/1; RemoteViews has no percentage height, and a bare `<View>` spacer isn't inflatable). Cover thumbnail widened to 80dp and fills the tile height.
+- Note: a home-screen widget still occupies whole grid cells (launcher constraint); only the visible tile height/width within the allotted cells is controlled here.
+- Verified: `flutter analyze` clean; full suite **614** green; builds + installs on the Pixel 7. Tagged **v3.3.0**.

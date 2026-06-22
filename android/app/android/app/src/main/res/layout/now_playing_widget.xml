@@ -1,87 +1,108 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- #20: compact single-row "Now Playing" widget. A left cover thumbnail,
-     then title/artist + the transport row. Uses only RemoteViews-allowed
-     classes (LinearLayout / TextView / ImageView / ImageButton) — no bare
-     View. Field ids must match the keys NowPlayingWidgetProvider.kt reads
-     from the home_widget data. -->
+<!-- #20: "Now Playing" widget. The tile (widget_root) is centred at 80% of
+     the cell height using weighted empty-LinearLayout spacers (10% / 80% /
+     10%) — RemoteViews has no percent height, and a bare <View> spacer is
+     not inflatable here. Uses only RemoteViews-allowed classes (LinearLayout
+     / TextView / ImageView / ImageButton). Field ids must match the keys
+     NowPlayingWidgetProvider.kt reads from the home_widget data. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
-    android:gravity="center_vertical"
-    android:background="@drawable/widget_background">
+    android:orientation="vertical">
 
-    <!-- Full-bleed left cover: fills the tile height and reaches the left /
-         top / bottom edges. The launcher clips the widget to rounded corners
-         (API 31+), so the left corners follow the tile's rounding. -->
-    <ImageView
-        android:id="@+id/widget_art"
-        android:layout_width="80dp"
-        android:layout_height="match_parent"
-        android:scaleType="centerCrop"
-        android:contentDescription="Album art" />
-
+    <!-- Top spacer: 10% of the cell height. -->
     <LinearLayout
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:paddingStart="12dp"
-        android:paddingTop="10dp"
-        android:paddingBottom="10dp"
-        android:paddingEnd="8dp">
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 
-        <TextView
-            android:id="@+id/widget_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:textColor="#FFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:text="heerr" />
+    <!-- The visible tile: 90% of the cell height (5% spacer each side). -->
+    <LinearLayout
+        android:id="@+id/widget_root"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="18"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/widget_background">
 
-        <TextView
-            android:id="@+id/widget_artist"
-            android:layout_width="match_parent"
+        <!-- Full-bleed left cover: fills the tile height and reaches the
+             left / top / bottom edges. The launcher clips the widget to
+             rounded corners (API 31+), so the left corners follow the tile. -->
+        <ImageView
+            android:id="@+id/widget_art"
+            android:layout_width="80dp"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:contentDescription="Album art" />
+
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:textColor="#B0B0B0"
-            android:textSize="12sp"
-            android:text="Nothing playing" />
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingStart="12dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:paddingEnd="8dp">
+
+            <TextView
+                android:id="@+id/widget_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:text="heerr" />
+
+            <TextView
+                android:id="@+id/widget_artist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="#B0B0B0"
+                android:textSize="12sp"
+                android:text="Nothing playing" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/widget_prev"
+            android:layout_width="55dp"
+            android:layout_height="55dp"
+            android:padding="9dp"
+            android:scaleType="fitCenter"
+            android:background="@android:color/transparent"
+            android:src="@drawable/widget_ic_previous"
+            android:contentDescription="Previous" />
+
+        <ImageButton
+            android:id="@+id/widget_play_pause"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:padding="7dp"
+            android:scaleType="fitCenter"
+            android:background="@android:color/transparent"
+            android:src="@drawable/widget_ic_play"
+            android:contentDescription="Play or pause" />
+
+        <ImageButton
+            android:id="@+id/widget_next"
+            android:layout_width="55dp"
+            android:layout_height="55dp"
+            android:layout_marginEnd="6dp"
+            android:padding="9dp"
+            android:scaleType="fitCenter"
+            android:background="@android:color/transparent"
+            android:src="@drawable/widget_ic_next"
+            android:contentDescription="Next" />
     </LinearLayout>
 
-    <ImageButton
-        android:id="@+id/widget_prev"
-        android:layout_width="55dp"
-        android:layout_height="55dp"
-        android:padding="9dp"
-        android:scaleType="fitCenter"
-        android:background="@android:color/transparent"
-        android:src="@drawable/widget_ic_previous"
-        android:contentDescription="Previous" />
-
-    <ImageButton
-        android:id="@+id/widget_play_pause"
-        android:layout_width="60dp"
-        android:layout_height="60dp"
-        android:padding="7dp"
-        android:scaleType="fitCenter"
-        android:background="@android:color/transparent"
-        android:src="@drawable/widget_ic_play"
-        android:contentDescription="Play or pause" />
-
-    <ImageButton
-        android:id="@+id/widget_next"
-        android:layout_width="55dp"
-        android:layout_height="55dp"
-        android:layout_marginEnd="6dp"
-        android:padding="9dp"
-        android:scaleType="fitCenter"
-        android:background="@android:color/transparent"
-        android:src="@drawable/widget_ic_next"
-        android:contentDescription="Next" />
+    <!-- Bottom spacer: 10% of the cell height. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 </LinearLayout>
