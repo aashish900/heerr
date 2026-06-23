@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import require_scope_query_or_header
+from app.config import Settings, get_settings
 from app.models import Token
 from app.services.preview_resolver import (
     PreviewResolveError,
@@ -40,9 +41,21 @@ _PASSTHROUGH_HEADERS = ("content-length", "content-range", "accept-ranges")
 PreviewResolver = Callable[[str], Awaitable[ResolvedPreview]]
 
 
-def get_preview_resolver() -> PreviewResolver:
-    """DI seam: the resolver callable (tests override with a fake)."""
-    return resolve_preview
+def get_preview_resolver(settings: Settings = Depends(get_settings)) -> PreviewResolver:
+    """DI seam: the resolver callable (tests override with a fake).
+
+    Binds the cache TTL from config so a deploy can tune re-resolution cadence.
+    """
+
+    async def _resolve(source_url: str) -> ResolvedPreview:
+        return await resolve_preview(source_url, ttl_seconds=settings.preview_cache_ttl_s)
+
+    return _resolve
+
+
+def preview_enabled_flag(settings: Settings = Depends(get_settings)) -> bool:
+    """DI seam for the kill switch (tests override to force-disable)."""
+    return settings.preview_enabled
 
 
 async def get_preview_http_client() -> AsyncIterator[httpx.AsyncClient]:
@@ -60,9 +73,12 @@ async def preview_stream(
     request: Request,
     source_url: str = Query(..., description="A music.youtube.com/watch?v=<id> URL"),
     _tok: Token = Depends(require_scope_query_or_header("read")),
+    enabled: bool = Depends(preview_enabled_flag),
     resolver: PreviewResolver = Depends(get_preview_resolver),
     client: httpx.AsyncClient = Depends(get_preview_http_client),
 ) -> StreamingResponse:
+    if not enabled:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="preview is disabled")
     try:
         resolved = await resolver(source_url)
     except PreviewUnsupported as exc:

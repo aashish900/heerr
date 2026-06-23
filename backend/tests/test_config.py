@@ -26,6 +26,26 @@ def test_loads_from_env(monkeypatch):
     assert s.navidrome_url == REQUIRED_ENV["NAVIDROME_URL"]
 
 
+def test_preview_defaults_when_unset(monkeypatch):
+    for k, v in REQUIRED_ENV.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.delenv("PREVIEW_ENABLED", raising=False)
+    monkeypatch.delenv("PREVIEW_CACHE_TTL_S", raising=False)
+    s = Settings()
+    assert s.preview_enabled is True
+    assert s.preview_cache_ttl_s == 300.0
+
+
+def test_preview_env_override(monkeypatch):
+    for k, v in REQUIRED_ENV.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.setenv("PREVIEW_ENABLED", "false")
+    monkeypatch.setenv("PREVIEW_CACHE_TTL_S", "60")
+    s = Settings()
+    assert s.preview_enabled is False
+    assert s.preview_cache_ttl_s == 60.0
+
+
 @pytest.mark.parametrize("missing", list(REQUIRED_ENV))
 def test_missing_required_raises(monkeypatch, missing):
     for k, v in REQUIRED_ENV.items():

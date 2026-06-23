@@ -12,6 +12,12 @@ class Settings(BaseSettings):
     music_output_dir: str
     navidrome_url: str
 
+    # Preview stream proxy (Phase K). Disabled → GET /preview/stream returns 404
+    # (operator kill switch for the one feature that pulls from googlevideo).
+    preview_enabled: bool = True
+    # How long a resolved googlevideo URL is reused before re-resolving (seconds).
+    preview_cache_ttl_s: float = 300.0
+
     @field_validator("navidrome_url")
     @classmethod
     def _validate_navidrome_url(cls, v: str) -> str:

@@ -352,12 +352,15 @@ Resolving server-side is the whole point: `googlevideo` URLs are signed to the *
 **Done when:** all branches green; `mypy app/` clean.
 **Commit:** `feat(preview): K2 — GET /preview/stream proxy + query-param auth`
 
-### [ ] K3. Dockerfile dep + token log redaction + kill switch
-**Files:** `backend/Dockerfile` (yt-dlp into the app venv), `backend/app/config.py` (`PREVIEW_ENABLED=true`, `PREVIEW_CACHE_TTL_S=300`), request-logging middleware (redaction), `backend/.env.example`, `backend/tests/` (redaction + disabled-flag).
-**Deliverable:** yt-dlp installed in the runtime image's **app** venv (not spotDL's isolated venv). The `?token=` query param is redacted to `token=***` in access logs (CLAUDE.md "never log raw tokens"). `PREVIEW_ENABLED=false` makes `/preview/stream` return 404 (operator kill switch).
-**Test gate:** log-redaction unit test; disabled-flag → 404. (Dockerfile / `.env.example` out of TDD scope.)
-**Done when:** `docker build -t music-search-backend backend/` succeeds; tests green.
-**Commit:** `feat(preview): K3 — dockerfile yt-dlp + token log redaction + kill switch`
+### [x] K3. Config + kill switch (Dockerfile dep & token redaction already covered)
+**Files:** `backend/app/config.py` (`preview_enabled` + `preview_cache_ttl_s`), `backend/app/api/v1/preview.py` (kill-switch dep + TTL wiring), `.env.example` (root — Preview section), `backend/tests/test_config.py` + `backend/tests/test_preview.py`.
+**Deliverable:** `PREVIEW_ENABLED=false` makes `/preview/stream` return 404 (operator kill switch); `PREVIEW_CACHE_TTL_S` tunes the K1 resolver cache via `get_preview_resolver`.
+**Findings that reduced scope (CLAUDE.md staleness rule — corrected from the original plan):**
+- **No Dockerfile change needed.** yt-dlp was added to `[tool.poetry.dependencies]` (main group) in K1, so the existing `poetry install --no-root --only main` already pulls it into `/app/.venv`. ffmpeg is already present.
+- **No log-redaction code needed.** `?token=` is already unloggable: `logging_config.setup_logging` disables `uvicorn.access` (so uvicorn never logs the request line), `RequestLoggingMiddleware` logs only `scope["path"]` (no query string), and `JsonFormatter` strips `token`/`authorization`/`credentials` from any payload. Locked by the existing `test_logging.py::test_json_formatter_strips_forbidden_keys`.
+**Test gate:** config defaults + env override; disabled-flag → 404 without resolving. Full suite 423 passed.
+**Done when:** `poetry run pytest` green; `ruff`/`mypy` clean.
+**Commit:** `feat(preview): K3 — preview kill switch + config (yt-dlp dep & token redaction already covered)`
 
 ### [ ] K4. DECISIONLOG ADR + CONTEXT.md + CHANGELOG + version bump
 **Files modified:** `backend/docs/DECISIONLOG.md` (new ADR "YouTube Music preview via server-side proxy — heerr backend v3.2.0"), `backend/docs/CONTEXT.md` (document the new preview surface), `backend/docs/CHANGELOG.md` (K1–K3), `backend/pyproject.toml` → `3.2.0`.

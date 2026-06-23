@@ -10,7 +10,11 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from app.api.v1.preview import get_preview_http_client, get_preview_resolver
+from app.api.v1.preview import (
+    get_preview_http_client,
+    get_preview_resolver,
+    preview_enabled_flag,
+)
 from app.api.v1.router import api_v1
 from app.db import get_session
 from app.services.preview_resolver import (
@@ -211,6 +215,24 @@ async def test_upstream_error_status_maps_to_502(app_sm, make_token):
             params={"source_url": _WATCH, "token": raw},
         )
     assert r.status_code == 502
+
+
+# ----- kill switch ---------------------------------------------------------
+
+
+async def test_disabled_returns_404_without_resolving(app_sm, make_token):
+    raw = await make_token(scopes=("read",))
+    seen: list[httpx.Request] = []
+    resolver = _resolver_returning(_ok_resolved())
+    app = _build_app(app_sm, resolver, _make_handler(seen))
+    app.dependency_overrides[preview_enabled_flag] = lambda: False
+    async with await _client(app) as c:
+        r = await c.get(
+            "/api/v1/preview/stream",
+            params={"source_url": _WATCH, "token": raw},
+        )
+    assert r.status_code == 404
+    assert seen == []  # never reached the resolver/proxy
 
 
 # ----- resolver error mapping ----------------------------------------------
