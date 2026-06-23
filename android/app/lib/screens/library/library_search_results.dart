@@ -223,6 +223,7 @@ class _YtmSection extends ConsumerWidget {
             for (final SearchResultItem item in r.results)
               ResultTile(
                 item: item,
+                onPreview: () => playPreview(ref, context, item),
                 onTap: () async {
                   try {
                     await ref

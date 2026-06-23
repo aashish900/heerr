@@ -646,7 +646,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** `flutter analyze` clean; `flutter test` green.
 **Commit:** `feat(flutter): T2 — preview playback action for YouTube results`
 
-### [ ] T3. Preview affordance on the search result tile + Now Playing badge
+### [x] T3. Preview affordance on the search result tile + Now Playing badge
 **Files (modify):** `android/app/lib/widgets/result_tile.dart` (a play/preview `IconButton` beside the existing download control; tap → `playPreview`), `android/app/lib/screens/library/library_search_results.dart` (wire it where YT results render), `android/app/lib/widgets/mini_player.dart` + `android/app/lib/screens/player/now_playing_screen.dart` (small "Preview" chip when `extras['preview'] == true`), corresponding widget tests.
 **Deliverable:** every not-in-library YT result shows **both** a preview (play) control and the existing download control; preview starts immediately on tap; the download flow is unchanged. A "Preview" badge shows in Now Playing / mini-player while a preview is the current item. Backend errors (404/502 from `/preview/stream`) route through the existing `reactToApiError` snackbars.
 **Test gate:** tile renders both controls; tapping preview fires `playPreview` (not the download dispatcher); badge renders for preview items and is absent for library/offline items.

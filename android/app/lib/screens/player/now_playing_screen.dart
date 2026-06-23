@@ -16,6 +16,7 @@ import '../../providers/library/lyrics.dart';
 import '../../providers/queue.dart';
 import '../../utils/palette.dart';
 import '../../widgets/add_to_playlist_sheet.dart';
+import '../../widgets/preview_badge.dart';
 
 // A17: per-section private widgets live in sibling part files to keep this
 // screen file readable. They share this library's imports + privacy.
@@ -306,6 +307,10 @@ class _Body extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
+              if (isPreviewMediaItem(item)) ...<Widget>[
+                const PreviewBadge(),
+                const SizedBox(height: 8),
+              ],
               Text(
                 item.title,
                 style: Theme.of(context).textTheme.titleLarge,

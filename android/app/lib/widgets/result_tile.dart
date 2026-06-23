@@ -7,19 +7,28 @@ import '../providers/download.dart';
 /// One row in the Search screen's results list. Dims when the backend hint
 /// says the track is already downloaded.
 ///
-/// The trailing slot has three states:
+/// The trailing slot is a row: an optional Preview (play) button followed by a
+/// download-status icon with three states:
 ///   * `inFlight` (a POST /download for this URI is mid-flight) → spinner.
 ///   * `item.alreadyDownloaded` → check-mark badge.
 ///   * otherwise → outline download icon to signal tap-to-queue.
 ///
-/// `onTap` is invoked when the row is tapped. It's disabled (null) when the
-/// row is mid-flight or already downloaded — the parent screen owns the
-/// dispatch + snackbar; the tile is presentational.
+/// `onTap` is invoked when the row is tapped (download). It's disabled (null)
+/// when the row is mid-flight or already downloaded. `onPreview`, when set,
+/// renders a play button that streams the track through the backend preview
+/// proxy before download (Phase T) — independent of download state. The parent
+/// screen owns the dispatch + snackbar; the tile is presentational.
 class ResultTile extends ConsumerWidget {
-  const ResultTile({required this.item, this.onTap, super.key});
+  const ResultTile({
+    required this.item,
+    this.onTap,
+    this.onPreview,
+    super.key,
+  });
 
   final SearchResultItem item;
   final VoidCallback? onTap;
+  final VoidCallback? onPreview;
 
   String _subtitle() {
     final String? album = item.album;
@@ -53,9 +62,20 @@ class ResultTile extends ConsumerWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: _Trailing(
-          alreadyDownloaded: item.alreadyDownloaded,
-          inFlight: inFlight,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (onPreview != null)
+              IconButton(
+                icon: const Icon(Icons.play_circle_outline),
+                tooltip: 'Preview',
+                onPressed: onPreview,
+              ),
+            _Trailing(
+              alreadyDownloaded: item.alreadyDownloaded,
+              inFlight: inFlight,
+            ),
+          ],
         ),
         onTap: tappable ? onTap : null,
       ),

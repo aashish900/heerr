@@ -7,6 +7,7 @@ import '../player/heerr_audio_handler.dart';
 import '../player/player_provider.dart';
 import '../theme.dart';
 import '../utils/palette.dart';
+import 'preview_badge.dart';
 
 /// Test seam — swap with a deterministic fake (e.g. `(_) async => null`) so
 /// widget tests don't hit the network and don't depend on `palette_generator`.
@@ -98,16 +99,33 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        if (item.artist != null)
-                          Text(
-                            item.artist!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: Colors.white70),
+                        if (isPreviewMediaItem(item) ||
+                            item.artist != null) ...<Widget>[
+                          const SizedBox(height: 2),
+                          Row(
+                            children: <Widget>[
+                              if (isPreviewMediaItem(item)) ...<Widget>[
+                                const PreviewBadge(
+                                  background: Colors.white24,
+                                  foreground: Colors.white,
+                                ),
+                                const SizedBox(width: 6),
+                              ],
+                              if (item.artist != null)
+                                Flexible(
+                                  child: Text(
+                                    item.artist!,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(color: Colors.white70),
+                                  ),
+                                ),
+                            ],
                           ),
+                        ],
                       ],
                     ),
                   ),

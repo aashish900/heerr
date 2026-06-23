@@ -100,6 +100,30 @@ void main() {
     expect(find.text('NOW_PLAYING_SCREEN'), findsOneWidget);
   });
 
+  testWidgets('shows the Preview badge for a preview MediaItem',
+      (WidgetTester tester) async {
+    final MediaItem preview = MediaItem(
+      id: 'http://heerr/api/v1/preview/stream?source_url=x&token=y',
+      title: 'Demo Track',
+      artist: 'Someone',
+      extras: const <String, dynamic>{'preview': true},
+    );
+    await tester.pumpWidget(_wrap(
+      snapshot: AsyncData<PlayerSnapshot>(_snapshot(item: preview)),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Preview'), findsOneWidget);
+  });
+
+  testWidgets('no Preview badge for a normal (library) MediaItem',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(
+      snapshot: AsyncData<PlayerSnapshot>(_snapshot(item: _item())),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Preview'), findsNothing);
+  });
+
   testWidgets('hidden when snapshot stream is still loading',
       (WidgetTester tester) async {
     await tester.pumpWidget(
