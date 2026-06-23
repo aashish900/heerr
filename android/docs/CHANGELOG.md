@@ -2077,3 +2077,19 @@ analyze` clean; `flutter test` green (567 tests).
 - **Manifest:** two new `<receiver>` entries (`.BarWidgetProvider`, `.PillWidgetProvider`).
 - **`test/widget/now_playing_widget_updater_test.dart`:** added position+duration write, unknown-duration→0, and null-item clear assertions.
 - Verified: `flutter analyze` clean; widget-updater suite green (19 tests); `flutter build apk --debug` succeeds (Kotlin + resources compile). On-device add-to-home-screen verification pending. Tagged **v3.4.0** after smoke.
+
+## 2026-06-23 — Phase T (T1–T4): stream-first preview of YouTube Music results — v3.5.0
+
+Preview (stream) a YouTube-Music search result before downloading it into Navidrome. Consumes the backend Phase K `/preview/stream` proxy. Pure-client slice. ADR: `DECISIONLOG.md` 2026-06-23. Roadmap T1–T5; T5 is the on-device smoke (pending). Recommendation/home preview deferred to DEBT F3.
+
+- **`lib/api/endpoints.dart`** (T1) — `previewStream = '/preview/stream'` (bare path; base URL already includes `/api/v1`).
+- **`lib/player/preview_url.dart`** (new, T1) — pure `buildPreviewStreamUrl({heerrBaseUrl, sourceUrl, token})` → absolute proxy URL, both params percent-encoded via `Uri`. Bearer rides in `?token=` (just_audio can't set headers). Tests: encoding, round-trip, trailing-slash.
+- **`lib/player/search_result_to_media_item.dart`** (new, T2) — pure `searchResultToMediaItem({item, heerrBaseUrl, token})` → `MediaItem` with `id` = the preview URL (third id kind beside Subsonic-stream and `file://`), `extras: {preview: true, sourceUrl}`, YouTube-thumbnail art with the launcher fallback. Bypasses `songToMediaItem`. 6 tests.
+- **`lib/player/playback_actions.dart`** (T2) — `playPreview(ref, context, SearchResultItem)` reads `heerrBaseUrl`/`heerrBearerToken` from `activeProfileProvider`, builds the preview `MediaItem`, routes through `audioHandlerProvider.playSong`. "Preview: <title>" snackbar; not-signed-in guard.
+- **`lib/widgets/preview_badge.dart`** (new, T3) — shared `PreviewBadge` pill + `isPreviewMediaItem(item)`.
+- **`lib/widgets/result_tile.dart`** (T3) — `onPreview` → `play_circle_outline` button in the trailing row beside the download affordance; independent of download state.
+- **`lib/screens/library/library_search_results.dart`** (T3) — YT results pass `onPreview: () => playPreview(ref, context, item)`.
+- **`lib/widgets/mini_player.dart`** + **`lib/screens/player/now_playing_screen.dart`** (T3) — "Preview" badge while a preview stream is current. Mini-player renders it inline on the artist line (stacking overflowed the 56px bar). Tests: `result_tile_test.dart` (4) + 2 in `mini_player_test.dart`.
+- **`android/app/pubspec.yaml`** (T4) — `3.4.0` → `3.5.0`.
+- **`android/docs/{DECISIONLOG,ROADMAP,DEBT}.md`** (T4) — Phase T ADR; ROADMAP `MediaItem.id` cross-cutting reminder amended for the preview-URL kind (the reminder lives in ROADMAP, not CLAUDE.md — corrected from the T4 plan text); DEBT F3 records the recommendations/home preview follow-up.
+- Verified: `flutter analyze` clean; full suite **632** passed.

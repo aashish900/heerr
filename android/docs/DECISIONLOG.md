@@ -690,3 +690,30 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **Do A16/A19 anyway for completeness.** Rejected per the project's blunt-engineering preference: closing low-value/high-churn items as documented won't-fix is sounder than churning ~3000 LOC for cosmetics. (Confirmed with the user.)
 
 **Reference:** new `part` files under `android/app/lib/screens/**`; DEBT §5 A16–A22 entries. This closes the DEBT §5 architectural backlog (P0/P1/P2 done earlier; P3 done/triaged here).
+
+## 2026-06-23 — Phase T: stream-first preview via the backend proxy — heerr v3.5.0
+
+**Context:** Before this, hearing a YouTube-Music search result required committing to a full download: tap → `/download` (spotDL) → Navidrome re-index (~1 min) → stream via Subsonic. There was no way to *audition* a result first. Phase T adds a preview affordance that streams the track immediately by consuming the backend's new `GET /api/v1/preview/stream` proxy (backend Phase K — see `backend/docs/DECISIONLOG.md` 2026-06-23). Pure-client slice; the only backend dependency is K2, already shipped.
+
+**Decision:**
+1. **Play preview through the backend proxy, not on-device extraction.** The preview `MediaItem.id` is the heerr `/preview/stream?source_url=…&token=…` URL (built by `buildPreviewStreamUrl`, T1); `just_audio` opens it and the backend proxies the googlevideo bytes over Tailscale.
+2. **A third `MediaItem.id` kind.** Alongside `file://` (offline) and the Subsonic stream URL, preview items use the proxy URL and are stamped `extras['preview'] == true` (vs `extras['subsonicId']` for library tracks). `isPreviewMediaItem` is the discriminator; `searchResultToMediaItem` (T2) is the builder, deliberately **bypassing** `songToMediaItem`.
+3. **Token in the query string.** `just_audio`'s `AudioSource.uri` can't attach an `Authorization` header, so the bearer rides in `?token=` — the same shape Subsonic playback URLs already use. Creds are read from `activeProfileProvider` at the call site (`playPreview`), never baked into the pure builders.
+4. **Ephemeral; reuse existing reactive promotion.** A preview writes nothing and creates no queue/download row. The find → *hear* → download loop is preserved: tapping Download on the same row still dispatches `/download`, and the existing combined-search promotion (`combined_search.dart`) upgrades the row from "On YouTube Music" → library once Navidrome re-indexes.
+5. **Search-results-only in v1.** The preview button is wired on the Library search YouTube-Music section (`ResultTile.onPreview`). Previewing **recommendations** / **Home cards** is deferred (DEBT F3) — those surfaces model `RecommendedTrack`/`HomeRecommendationCard`, not `SearchResultItem`, so they need a small `sourceUrl → playPreview` adapter.
+
+**Why:**
+- **Backend proxy over on-device extraction** inherits the Phase K rationale: googlevideo URLs are egress-IP-bound (a device-side `youtube_explode_dart` URL or a bare `-g` redirect 403s), and on-device extraction breaks on YouTube player changes that would need an **app release** to fix — whereas the proxy is fixed by a backend `yt-dlp` bump. Keeping the device on the tailnet also matches the connectivity rule.
+- **Third id kind, not a parallel player path.** Reusing the existing `HeerrAudioHandler` queue + mini-player + Now Playing means preview gets lock-screen controls, the scrubber, and persistence for free; only the `MediaItem` construction differs. The `extras['preview']` flag drives the one visible difference (the "Preview" badge) without branching the player.
+- **Pure builders + call-site creds** keep `buildPreviewStreamUrl` / `searchResultToMediaItem` unit-testable without a container (matching `songToMediaItem`), and avoid a second credential read path (CLAUDE.md hard rule — creds come from `activeProfileProvider` only).
+- **Search-results-only** ships the highest-value surface (the "is this the right track?" moment is during search) at the smallest blast radius; the recommendation/home surfaces are a clean fast-follow once asked for.
+
+**Alternatives considered:**
+- **On-device extraction (`youtube_explode_dart`).** Rejected (Phase K planning) — fragile, app-release-bound fixes, silent throttling.
+- **Reuse `songToMediaItem` with a synthetic `Song`.** Rejected: it would force a fake Subsonic id and route through the offline-local-uri chokepoint that has no meaning for a non-library track; a dedicated builder is clearer and keeps the preview path off the library invariants.
+- **A separate "preview player" instance.** Rejected: doubles the audio-session/notification wiring; the single handler with a flagged item is simpler and gives preview the full transport UI.
+- **Wire preview everywhere (recommendations + home) now.** Deferred to DEBT F3 — different models, marginal incremental value over the search surface for v1.
+
+**Trade-off:** A preview that the user lets run produces backend bandwidth (the K double-hop) with nothing persisted; if they want to keep it they must still tap Download. Accepted — auditioning is cheap at home scale and the explicit Download keeps "what's in my library" intentional. The reactive-promotion handoff means a previewed-then-downloaded track briefly exists as both a YT row (preview) and, post-reindex, a library row — the promotion collapses this on the next render.
+
+**Reference:** `android/app/lib/player/{preview_url,search_result_to_media_item,playback_actions}.dart`, `android/app/lib/widgets/{result_tile,preview_badge,mini_player}.dart`, `android/app/lib/screens/{library/library_search_results,player/now_playing_screen}.dart`, `android/app/lib/api/endpoints.dart`. Backend side: `backend/app/api/v1/preview.py` + ADR `backend/docs/DECISIONLOG.md` 2026-06-23. Roadmap milestones T1–T5; CHANGELOG `2026-06-23 — Phase T`. Recommendation/home follow-up: DEBT F3.

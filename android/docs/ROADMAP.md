@@ -653,7 +653,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** `flutter analyze` clean; `flutter test` green.
 **Commit:** `feat(flutter): T3 — preview play button on search results + Now Playing badge`
 
-### [ ] T4. DECISIONLOG ADR + CLAUDE.md note + DEBT + CHANGELOG + version bump
+### [x] T4. DECISIONLOG ADR + CLAUDE.md note + DEBT + CHANGELOG + version bump
 **Files modified:** `android/docs/DECISIONLOG.md` (new ADR "Stream-first preview via backend proxy — heerr v3.5.0"), `android/CLAUDE.md` (amend the "`MediaItem.id` is the playback URI" reminder to cover the preview-URL kind), `android/docs/DEBT.md` (backlog item: extend preview to the Recommendations screen + Home cards where `inLibrary == false`), `android/docs/CHANGELOG.md` (T1–T3), `android/app/pubspec.yaml` → `3.5.0`.
 **Deliverable:** ADR explains: why the backend proxy (cite backend Phase K ADR — googlevideo IP-binding), preview URL as the third `MediaItem.id` kind, token-in-query for just_audio, ephemerality + reliance on existing reactive promotion, and why v1 is search-results-only (recommendations/home previews deferred to the DEBT backlog item).
 **Test gate:** none (documentation).
@@ -677,7 +677,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 - **No backend change from Android phases** — each Android phase is a pure-client slice; any required backend endpoints ship in the corresponding backend roadmap first.
 - **DECISIONLOG drift:** any contract / stack change → update `DECISIONLOG.md` + `PLAN.md` in the same commit (CLAUDE.md staleness rule).
 - **Owner-only edits** — any new playlist mutation affordance added later must honour the `canEdit(Playlist, SettingsValue)` gate.
-- **`MediaItem.id` is the playback URI** — keep it the `file://` URI when local, Subsonic stream URL when remote. Any deviation breaks offline playback.
+- **`MediaItem.id` is the playback URI** — one of three kinds: `file://` when local (offline), the Subsonic stream URL when streaming a library track, or the heerr `/preview/stream?...&token=` proxy URL for a YouTube-Music preview (Phase T, built by `searchResultToMediaItem`). Any deviation breaks offline playback. Preview items also carry `extras['preview'] == true` (vs `extras['subsonicId']` for library tracks) — use `isPreviewMediaItem` to tell them apart.
 
 ---
 
