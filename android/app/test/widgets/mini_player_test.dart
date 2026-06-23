@@ -102,11 +102,11 @@ void main() {
 
   testWidgets('shows the Preview badge for a preview MediaItem',
       (WidgetTester tester) async {
-    final MediaItem preview = MediaItem(
+    const MediaItem preview = MediaItem(
       id: 'http://heerr/api/v1/preview/stream?source_url=x&token=y',
       title: 'Demo Track',
       artist: 'Someone',
-      extras: const <String, dynamic>{'preview': true},
+      extras: <String, dynamic>{'preview': true},
     );
     await tester.pumpWidget(_wrap(
       snapshot: AsyncData<PlayerSnapshot>(_snapshot(item: preview)),
