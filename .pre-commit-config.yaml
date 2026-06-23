@@ -1,5 +1,6 @@
 # Pre-commit hooks. Mirrors the gates in `.github/workflows/backend-ci.yml`
-# so the same checks run locally before a commit ever leaves your machine.
+# (ruff) and `.github/workflows/android-ci.yml` (flutter analyze) so the same
+# checks run locally before a commit ever leaves your machine.
 #
 # One-time setup per clone:
 #   pipx install pre-commit && pre-commit install
@@ -10,6 +11,10 @@
 # Ruff is pinned to match `backend/poetry.lock` exactly. Bumping ruff in
 # `backend/pyproject.toml` MUST bump `rev:` here in the same commit — a
 # drift here is what makes "passes locally, fails on CI" come back.
+#
+# The flutter-analyze hook needs `flutter` on PATH in the shell you commit from
+# (it runs project-wide `flutter analyze`, exactly as CI does, because info-level
+# lints are fatal there). It fires only when an `android/app` Dart file changes.
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -22,3 +27,12 @@ repos:
       - id: ruff-format
         name: ruff-format
         files: ^backend/.*\.py$
+
+  - repo: local
+    hooks:
+      - id: flutter-analyze
+        name: flutter analyze (android)
+        entry: bash -c 'cd android/app && flutter analyze'
+        language: system
+        files: ^android/app/.*\.dart$
+        pass_filenames: false
