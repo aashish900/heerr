@@ -19,6 +19,7 @@ typer = "^0.15"
 uvicorn = {version = "^0.32", extras = ["standard"]}
 httpx = "^0.28"
 ytmusicapi = ">=0.25"
+yt-dlp = ">=2025.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3"
@@ -74,7 +75,7 @@ exclude = ["alembic/versions", "tests/"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["testcontainers.*", "spotdl.*", "ytmusicapi.*"]
+module = ["testcontainers.*", "spotdl.*", "ytmusicapi.*", "yt_dlp.*"]
 ignore_missing_imports = true
 
 [build-system]

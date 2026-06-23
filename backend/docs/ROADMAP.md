@@ -4,7 +4,7 @@ Track progress through the backend build. Each milestone = one git commit with a
 
 See `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file is the *how* / *when*.
 
-**Status (2026-06-19):** Phases A–J complete. v3.1.0 smoke passed on home server 2026-06-19 (all sections green including e2e download, per-user isolation, recommendations, and admin listings). SMOKE-TEST.md deleted — procedure served its purpose; not retained as a living doc.
+**Status (2026-06-23):** Phases A–J complete (v3.1.0 smoke passed on home server 2026-06-19 — all sections green including e2e download, per-user isolation, recommendations, and admin listings; SMOKE-TEST.md deleted). **Phase K (YouTube Music preview stream proxy) planned — milestones K1–K5 below are unchecked.**
 
 **Conventions:**
 - TDD per CLAUDE.md §2 — tests written first, land in same commit as code.
@@ -330,6 +330,50 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 
 ---
 
+## Phase K — YouTube Music preview stream proxy
+
+**Architecture note:** Adds a server-side audio proxy so the Android client can **preview** (stream) a YouTube Music search result *before* committing to a full spotDL download into the Navidrome library. The backend resolves the `music.youtube.com/watch?v=<id>` URL to a direct `googlevideo` audio URL via **yt-dlp** (added to the app venv — distinct from spotDL's isolated venv), then **proxies the bytes** to the device over Tailscale with Range-request passthrough for seeking. The device plays the backend URL via just_audio.
+
+Resolving server-side is the whole point: `googlevideo` URLs are signed to the **resolver's egress IP**, so a bare `yt-dlp -g` redirect handed to the phone would 403 from a different IP — proxying means the device IP never touches `googlevideo`, and **all device traffic stays on the tailnet** (CLAUDE.md connectivity rule). **No persistence** — previews are ephemeral; nothing is written to `/data/media/music`. Scope: `read` (non-destructive, mirrors `/search`). Because just_audio cannot attach auth headers to an `AudioSource`, the bearer token is accepted as a `?token=` query param (same shape Subsonic stream URLs already use); the request logger redacts it. Full rationale incl. the IP-binding tradeoff in the K4 ADR.
+
+**Depends on:** nothing in Phase J; the home Navidrome is needed only for the K5 smoke. **Android Phase T consumes `/preview/stream` and must not land before K2.**
+
+### [x] K1. yt-dlp dependency + preview resolver service
+**Files:** `backend/pyproject.toml` (add `yt-dlp`), `backend/app/services/preview_resolver.py`, `backend/tests/test_preview_resolver.py`.
+**Deliverable:** `async resolve_preview(source_url) -> ResolvedPreview(stream_url, headers, content_type, expires_at)`. Validates the URL is a `music.youtube.com/watch?v=<id>` (reject `browse/`/album/playlist URLs → typed `PreviewUnsupported`). Uses `YoutubeDL({'format': 'bestaudio', 'quiet': True}).extract_info(url, download=False)` under `asyncio.to_thread` — selects the best audio-only format URL + the `http_headers` yt-dlp returns (User-Agent etc.). In-memory TTL cache keyed by `videoId` (default 300 s) so repeated previews / retries don't re-resolve. Typed errors: `PreviewUnsupported`, `PreviewUnavailable` (gone / region / age-gated), `PreviewResolveError`.
+**Test gate:** yt-dlp faked (monkeypatch the extract call); assert bestaudio selection, header passthrough, cache-hit avoids a second extract, each error class maps correctly. No network.
+**Done when:** all branches green; `mypy app/` clean on new files.
+**Commit:** `feat(preview): K1 — yt-dlp preview resolver service`
+
+### [ ] K2. Query/header bearer auth dep + `GET /preview/stream` proxy
+**Files:** `backend/app/api/deps.py` (new `bearer_token_query_or_header()`), `backend/app/api/v1/preview.py`, `backend/app/api/v1/router.py` (wire), `backend/tests/test_preview.py`, `backend/tests/test_auth.py` (query-or-header dep).
+**Deliverable:** `bearer_token_query_or_header()` accepts the raw token via `Authorization: Bearer …` **or** `?token=…`, then runs the same hash-lookup + `current_user` resolution + `read`-scope check as the header dep. `GET /api/v1/preview/stream?source_url=<url>&token=<raw>` calls the K1 resolver, opens `httpx.AsyncClient.stream("GET", stream_url, headers=resolver_headers + forwarded Range)`, and returns a `StreamingResponse` propagating upstream status (200/206) + `Content-Type`, `Content-Length`, `Content-Range`, `Accept-Ranges: bytes`. The client `Range` header is forwarded so ExoPlayer can seek. `PreviewUnsupported` → 422, `PreviewUnavailable` → 404, resolve/upstream failure → 502.
+**Test gate:** auth via header AND via query param both 200; missing / non-`read` → 401/403; a `Range` request forwards the header and returns 206 + `Content-Range`; 422/404/502 branches; httpx faked via `MockTransport`, no network.
+**Done when:** all branches green; `mypy app/` clean.
+**Commit:** `feat(preview): K2 — GET /preview/stream proxy + query-param auth`
+
+### [ ] K3. Dockerfile dep + token log redaction + kill switch
+**Files:** `backend/Dockerfile` (yt-dlp into the app venv), `backend/app/config.py` (`PREVIEW_ENABLED=true`, `PREVIEW_CACHE_TTL_S=300`), request-logging middleware (redaction), `backend/.env.example`, `backend/tests/` (redaction + disabled-flag).
+**Deliverable:** yt-dlp installed in the runtime image's **app** venv (not spotDL's isolated venv). The `?token=` query param is redacted to `token=***` in access logs (CLAUDE.md "never log raw tokens"). `PREVIEW_ENABLED=false` makes `/preview/stream` return 404 (operator kill switch).
+**Test gate:** log-redaction unit test; disabled-flag → 404. (Dockerfile / `.env.example` out of TDD scope.)
+**Done when:** `docker build -t music-search-backend backend/` succeeds; tests green.
+**Commit:** `feat(preview): K3 — dockerfile yt-dlp + token log redaction + kill switch`
+
+### [ ] K4. DECISIONLOG ADR + CONTEXT.md + CHANGELOG + version bump
+**Files modified:** `backend/docs/DECISIONLOG.md` (new ADR "YouTube Music preview via server-side proxy — heerr backend v3.2.0"), `backend/docs/CONTEXT.md` (document the new preview surface), `backend/docs/CHANGELOG.md` (K1–K3), `backend/pyproject.toml` → `3.2.0`.
+**Deliverable:** ADR explains: why proxy over a bare `-g` redirect (googlevideo egress-IP binding), why yt-dlp in the app venv vs spotDL's isolated venv, why query-param token (just_audio header limitation) + log redaction, the ephemerality guarantee (no Navidrome write), the kill switch, and the raw-token-in-URL tradeoff (consistent with Subsonic; HMAC-signed ephemeral URL noted as a future hardening).
+**Test gate:** none (documentation).
+**Done when:** docs reflect implementation; version bumped.
+**Commit:** `chore(backend): K4 — preview ADR + CONTEXT/CHANGELOG + v3.2.0`
+
+### [ ] K5. End-to-end preview smoke on the home server
+**Deliverable:** From a tailnet device against the deployed backend: `GET /preview/stream?source_url=<real ytm watch url>&token=<read token>` streams audio; a `Range: bytes=…` request returns 206; an album/`browse` URL → 422; `PREVIEW_ENABLED=false` → 404.
+**Test gate:** manual; record the commands + outcomes in `backend/docs/CHANGELOG.md`.
+**Done when:** all four checks pass.
+**Commit:** `chore(backend): K5 — preview e2e smoke verified`
+
+---
+
 ## Cross-cutting reminders
 
 - **`.env` never committed.** Only `.env.example`.
@@ -350,9 +394,9 @@ practice — Last.fm and ListenBrainz need listening history to personalise.
 
 ## Roadmap complete when
 
-1. All milestone boxes checked (A1–H1, I1–I5, J1–J12).
+1. All milestone boxes checked (A1–H1, I1–I5, J1–J12, K1–K5).
 2. Every test gate green at its milestone.
 3. H1 smoke succeeds against the real home stack.
 4. J12 multi-user smoke succeeds against the real home stack.
 5. CHANGELOG entries exist for each milestone group.
-6. `git log --oneline backend/` reads as a clean A→H→I→J progression.
+6. `git log --oneline backend/` reads as a clean A→H→I→J→K progression.

@@ -4,7 +4,7 @@ Track progress through the Android client build. Each milestone = one git commit
 
 See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
-**Status (2026-06-17):** Phases A–S complete. Phase S shipped at `v3.0.0` (multi-user via Navidrome IdP); Phase R shipped at `v2.1.0` (gapless); Phase Q at `v2.0.0` (background sync). All milestone boxes checked; outstanding doc debt tracked in `docs/DEBT.md`.
+**Status (2026-06-23):** Phases A–S complete. Phase S shipped at `v3.0.0` (multi-user via Navidrome IdP); Phase R shipped at `v2.1.0` (gapless); Phase Q at `v2.0.0` (background sync). Outstanding doc debt tracked in `docs/DEBT.md`. **Phase T (stream-first preview of YouTube Music results, v3.5.0) planned — milestones T1–T5 below are unchecked; depends on backend Phase K.**
 
 **Conventions:**
 - TDD by default (CLAUDE.md §2) — widget tests / unit tests written first, land in the same commit as code.
@@ -626,6 +626,47 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 ---
 
+## Phase T — Stream-first preview of YouTube Music results (v3.5.0)
+
+**Architecture note:** Lets the user **preview** (stream) a YouTube-Music search result *before* downloading it into the library — closing the find → *hear* → download loop. Consumes backend `GET /api/v1/preview/stream` (backend **Phase K**): the device plays a heerr-backend URL via just_audio while the backend proxies the audio from googlevideo over Tailscale. **Pure-client slice on top of K — no other backend change.** The preview `MediaItem.id` is the backend proxy URL with the bearer token as a `?token=` query param (just_audio cannot set auth headers — the same constraint Subsonic playback already works around). Previews are **ephemeral** and added to no library; the existing reactive-promotion path (`combined_search.dart`) still upgrades a row from preview → real Subsonic playback once the user downloads it and Navidrome re-indexes. The `MediaItem.id`-is-the-URI invariant is preserved — this is simply a **third URI kind** alongside `file://` and the Subsonic stream URL. **Depends on backend K2.**
+
+### [ ] T1. Preview stream URL builder + endpoint constant
+**Files (new):** `android/app/lib/player/preview_url.dart`, `android/app/test/player/preview_url_test.dart`.
+**Files (modify):** `android/app/lib/api/endpoints.dart` (add `previewStream`).
+**Deliverable:** pure `buildPreviewStreamUrl({required heerrBaseUrl, required sourceUrl, required token})` → `<heerrBaseUrl>/api/v1/preview/stream?source_url=<enc>&token=<enc>`, URL-encoding both params. Creds are read from `activeProfileProvider` at the call site, not inside the pure builder.
+**Test gate:** encoding round-trip; correct path + params for representative URLs.
+**Done when:** `flutter analyze` clean; `flutter test` green.
+**Commit:** `feat(flutter): T1 — preview stream URL builder`
+
+### [ ] T2. Preview playback entry point
+**Files (new):** `android/app/lib/player/search_result_to_media_item.dart`, `android/app/test/player/search_result_to_media_item_test.dart`.
+**Files (modify):** `android/app/lib/player/playback_actions.dart` (add `playPreview(SearchResultItem)`), `android/app/test/player/playback_actions_test.dart`.
+**Deliverable:** build a `MediaItem` with `id` = the T1 preview URL, `title`/`artist`/`album`/`artUri` from the `SearchResultItem` (`coverUrl`), `extras: {'preview': true, 'sourceUrl': item.sourceUrl}`. `playPreview` reads the active profile for base URL + token, then routes the single item through the existing `HeerrAudioHandler` queue — **bypassing `songToMediaItem`** (no Subsonic / file path). Reuses the existing handler / mini-player wiring untouched.
+**Test gate:** `MediaItem` shape (id = preview URL, `preview: true`, art set); handler receives the item; assert neither the Subsonic-stream nor `file://` builder is invoked.
+**Done when:** `flutter analyze` clean; `flutter test` green.
+**Commit:** `feat(flutter): T2 — preview playback action for YouTube results`
+
+### [ ] T3. Preview affordance on the search result tile + Now Playing badge
+**Files (modify):** `android/app/lib/widgets/result_tile.dart` (a play/preview `IconButton` beside the existing download control; tap → `playPreview`), `android/app/lib/screens/library/library_search_results.dart` (wire it where YT results render), `android/app/lib/widgets/mini_player.dart` + `android/app/lib/screens/player/now_playing_screen.dart` (small "Preview" chip when `extras['preview'] == true`), corresponding widget tests.
+**Deliverable:** every not-in-library YT result shows **both** a preview (play) control and the existing download control; preview starts immediately on tap; the download flow is unchanged. A "Preview" badge shows in Now Playing / mini-player while a preview is the current item. Backend errors (404/502 from `/preview/stream`) route through the existing `reactToApiError` snackbars.
+**Test gate:** tile renders both controls; tapping preview fires `playPreview` (not the download dispatcher); badge renders for preview items and is absent for library/offline items.
+**Done when:** `flutter analyze` clean; `flutter test` green.
+**Commit:** `feat(flutter): T3 — preview play button on search results + Now Playing badge`
+
+### [ ] T4. DECISIONLOG ADR + CLAUDE.md note + DEBT + CHANGELOG + version bump
+**Files modified:** `android/docs/DECISIONLOG.md` (new ADR "Stream-first preview via backend proxy — heerr v3.5.0"), `android/CLAUDE.md` (amend the "`MediaItem.id` is the playback URI" reminder to cover the preview-URL kind), `android/docs/DEBT.md` (backlog item: extend preview to the Recommendations screen + Home cards where `inLibrary == false`), `android/docs/CHANGELOG.md` (T1–T3), `android/app/pubspec.yaml` → `3.5.0`.
+**Deliverable:** ADR explains: why the backend proxy (cite backend Phase K ADR — googlevideo IP-binding), preview URL as the third `MediaItem.id` kind, token-in-query for just_audio, ephemerality + reliance on existing reactive promotion, and why v1 is search-results-only (recommendations/home previews deferred to the DEBT backlog item).
+**Test gate:** none (documentation).
+**Done when:** docs reflect the implementation; version bumped.
+**Commit:** `chore(flutter): T4 — preview ADR + CLAUDE.md/DEBT/CHANGELOG + v3.5.0`
+
+### [ ] T5. On-device preview smoke + version tag
+**Test gate:** manual on the Pixel against the home server (backend Phase K deployed): (1) search a track **not** in the library → tap **Preview** → audio plays through the backend within ~1–2 s; (2) scrubber advances and **seek works** (Range passthrough); (3) lock-screen / notification shows the track with the "Preview" badge in-app; (4) tap **Download** on the same row → after Navidrome re-indexes it promotes into the library section and plays from Subsonic; (5) preview a region-locked / unavailable track → readable error snackbar, no crash.
+**Done when:** all five steps pass. Tagged `v3.5.0`.
+**Commit:** `chore(flutter): v3.5.0 stream-first preview smoke verified`
+
+---
+
 ## Cross-cutting reminders
 
 - **`flutter analyze` green before declaring any milestone done.**
@@ -662,8 +703,8 @@ Items scheduled into v1.5.0 (Phase P) or v2.0.0 (Phase Q) are no longer here —
 
 ## Roadmap complete when
 
-1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5, P1–P4, Q1–Q4, R1, S1–S11).
+1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5, P1–P4, Q1–Q4, R1, S1–S11, T1–T5).
 2. Every test gate green at its milestone.
-3. G1, K2, L6, M5, N5, O5, P4, Q4, R1, and S11 manual smokes verified on-device.
+3. G1, K2, L6, M5, N5, O5, P4, Q4, R1, S11, and T5 manual smokes verified on-device.
 4. CHANGELOG entries exist for each milestone group.
-5. `git log --oneline android/` reads as a clean A→S progression under the `feat(flutter):` / `chore(flutter):` Conventional-Commits cadence.
+5. `git log --oneline android/` reads as a clean A→T progression under the `feat(flutter):` / `chore(flutter):` Conventional-Commits cadence.
