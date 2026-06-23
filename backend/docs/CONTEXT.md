@@ -13,9 +13,10 @@ A native mobile app where I search for songs (via YouTube Music) and, if found, 
 
 ## Architecture (decided)
 - **Frontend:** native Flutter app (Android-first). Thin client — it only talks to my backend's REST API. No download logic on the device.
-- **Backend:** FastAPI service that wraps spotDL. Runs as a Docker container in my existing arr-stack. Exposes `search`, `download`, and `status/queue`.
+- **Backend:** FastAPI service that wraps spotDL. Runs as a Docker container in my existing arr-stack. Exposes `search`, `download`, `status`/`queue`, and `preview`.
 - **Search:** YouTube Music via `ytmusicapi` (no API key — unofficial API). Returns `music.youtube.com` URLs for songs, browse URLs for albums/playlists.
 - **Download:** backend shells out to spotDL, passing the YouTube Music URL directly. Files named `{title}-{artist}.mp3`. spotDL is isolated in its own venv due to FastAPI version conflicts.
+- **Preview (Phase K, v3.2.0):** `GET /preview/stream` resolves a YouTube Music URL to its audio via **yt-dlp** and **proxies the bytes** to the device over Tailscale, so a search result can be streamed (heard) before it is downloaded. Read-only and ephemeral — no file is written, no job/download row is created. yt-dlp lives in the app venv (separate from spotDL's). just_audio can't set auth headers, so the bearer rides in `?token=` (already unloggable). `PREVIEW_ENABLED=false` disables it. Android consumer is Phase T (`android/docs/ROADMAP.md`).
 - **Connectivity:** app reaches the backend over Tailscale (MagicDNS), no public exposure.
 
 ## Build order
@@ -38,7 +39,7 @@ A native mobile app where I search for songs (via YouTube Music) and, if found, 
 - Shared filesystem root at `/data`.
 
 ## heerr deployment shape
-- `/.env.example` — env template; populate as `.env` next to the arr-stack compose file (Postgres creds, `DATABASE_URL`, `MUSIC_OUTPUT_DIR`, `NAVIDROME_URL` — required for the Phase J multi-user login flow). No Spotify credentials needed.
+- `/.env.example` — env template; populate as `.env` next to the arr-stack compose file (Postgres creds, `DATABASE_URL`, `MUSIC_OUTPUT_DIR`, `NAVIDROME_URL` — required for the Phase J multi-user login flow; optional `PREVIEW_ENABLED` / `PREVIEW_CACHE_TTL_S` for the Phase K preview proxy). No Spotify credentials needed.
 - `/docker-compose.snippet.yml` — four services merged into arr-stack:
   - `heerr-postgres-init` (one-shot: chowns `/data/postgres` to UID 999).
   - `heerr-postgres` (`pgvector/pgvector:pg17`, bind-mounted `/data/postgres`, fixed IP `172.39.0.50`).

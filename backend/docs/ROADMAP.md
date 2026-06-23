@@ -362,7 +362,7 @@ Resolving server-side is the whole point: `googlevideo` URLs are signed to the *
 **Done when:** `poetry run pytest` green; `ruff`/`mypy` clean.
 **Commit:** `feat(preview): K3 — preview kill switch + config (yt-dlp dep & token redaction already covered)`
 
-### [ ] K4. DECISIONLOG ADR + CONTEXT.md + CHANGELOG + version bump
+### [x] K4. DECISIONLOG ADR + CONTEXT.md + CHANGELOG + version bump
 **Files modified:** `backend/docs/DECISIONLOG.md` (new ADR "YouTube Music preview via server-side proxy — heerr backend v3.2.0"), `backend/docs/CONTEXT.md` (document the new preview surface), `backend/docs/CHANGELOG.md` (K1–K3), `backend/pyproject.toml` → `3.2.0`.
 **Deliverable:** ADR explains: why proxy over a bare `-g` redirect (googlevideo egress-IP binding), why yt-dlp in the app venv vs spotDL's isolated venv, why query-param token (just_audio header limitation) + log redaction, the ephemerality guarantee (no Navidrome write), the kill switch, and the raw-token-in-URL tradeoff (consistent with Subsonic; HMAC-signed ephemeral URL noted as a future hardening).
 **Test gate:** none (documentation).

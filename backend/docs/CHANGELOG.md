@@ -838,3 +838,17 @@ All 21 checks in SMOKE-TEST.md passed. Two bugs surfaced during smoke and fixed:
 - **`backend/tests/test_worker.py`** — `test_run_job_track_with_no_produced_files_marks_done` renamed to `test_run_job_track_with_no_produced_files_marks_failed`; asserts `state=failed` and `"no audio file" in error_msg`.
 - **`backend/docs/SMOKE-TEST.md`** — deleted. v3.1.0 smoke passed on home server 2026-06-19 (all sections green: image pull, migrate, health, admin-docs gate, Navidrome login, search, e2e download, per-user isolation, recommendations, admin listings, revoke). Not retained as a living doc.
 - **`backend/docs/ROADMAP.md`** — status line updated: Phases A–J complete, v3.1.0 smoke green.
+
+## 2026-06-23 — Phase K (K1–K4): YouTube Music preview stream proxy — v3.2.0
+
+Stream-first preview — hear a YouTube Music search result before downloading it into Navidrome. Backend Phase K; the Android consumer is Phase T (`android/docs/ROADMAP.md`). ADR: `DECISIONLOG.md` 2026-06-23.
+
+- **`backend/app/services/preview_resolver.py`** (new, K1) — `resolve_preview(source_url)` resolves a `music.youtube.com/watch?v=<id>` URL to a direct googlevideo audio URL + yt-dlp's request headers via an injected extractor (default lazy-imports yt-dlp). Per-`videoId` TTL cache; typed `PreviewUnsupported` / `PreviewUnavailable` / `PreviewResolveError`; selects the best audio-only direct-https format, rejects manifest protocols.
+- **`backend/pyproject.toml` + `backend/poetry.lock`** (K1) — `yt-dlp = ">=2025.1"` added to the **app** deps (lock pinned `2026.6.9`); mypy override for `yt_dlp.*`. No Dockerfile change — the existing `poetry install --no-root --only main` pulls it into `/app/.venv`.
+- **`backend/app/api/deps.py`** (K2) — extracted shared `_resolve_token`; added `bearer_token_query_or_header` (token via `Authorization` header OR `?token=`) + `require_scope_query_or_header`. Header-only `bearer_token` now delegates to the same helper (behaviour identical).
+- **`backend/app/api/v1/preview.py`** + **`router.py`** (K2) — `GET /api/v1/preview/stream` (`read` scope): resolves via K1, proxies googlevideo bytes with `follow_redirects=True`, forwards the client `Range` both ways (206 pass-through), forwards yt-dlp headers upstream, propagates `Content-Length`/`Content-Range`/`Accept-Ranges`. Resolver errors → 422/404/502; upstream non-200/206 → 502. Resolver + httpx client are DI seams. Ephemeral — nothing persisted.
+- **`backend/app/config.py`** + **`/.env.example`** (K3) — `preview_enabled` (default true; false → 404 operator kill switch) + `preview_cache_ttl_s` (default 300, wired into the resolver via `get_preview_resolver`).
+- **No log-redaction code needed (K3)** — `?token=` is already unloggable: `uvicorn.access` disabled, the access middleware logs only `scope["path"]`, and `JsonFormatter` strips `token`/`authorization`/`credentials` (locked by `test_logging.py`).
+- **`backend/pyproject.toml` + `backend/app/main.py`** (K4) — version `3.1.0-rc1` → `3.2.0`.
+- **`backend/docs/{DECISIONLOG,CONTEXT}.md`** (K4) — new ADR "Phase K: YouTube Music preview via server-side proxy — v3.2.0"; CONTEXT preview surface + env vars documented.
+- **Tests:** `tests/test_preview_resolver.py` (13), `tests/test_preview.py` (11 — header+query auth, 401/403, Range→206, redirect-follow, upstream→502, kill-switch→404, resolver 422/404/502), `tests/test_config.py` (+2 preview settings). Full suite 423 passed; ruff check + format + mypy clean.
