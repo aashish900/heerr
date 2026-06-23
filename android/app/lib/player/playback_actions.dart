@@ -8,6 +8,8 @@ import '../api/api_error.dart';
 import '../api/subsonic_client.dart';
 import '../api/subsonic_endpoints.dart';
 import '../models/job_view.dart';
+import '../models/profile.dart';
+import '../models/search_result_item.dart';
 import '../models/subsonic/album.dart';
 import '../models/subsonic/artist.dart';
 import '../models/subsonic/playlist.dart';
@@ -17,9 +19,11 @@ import '../offline/local_uri.dart';
 import '../providers/library/library_album.dart';
 import '../providers/library/library_artist.dart';
 import '../providers/library/library_playlist.dart';
+import '../providers/profiles/active_profile.dart';
 import '../providers/server_creds.dart';
 import '../widgets/error_snackbar.dart';
 import 'player_provider.dart';
+import 'search_result_to_media_item.dart';
 import 'song_to_media_item.dart';
 
 /// Resolved Navidrome credentials. `null` means at least one of the three
@@ -105,6 +109,47 @@ Future<void> playSongFromSubsonic(
     messenger.showSnackBar(SnackBar(
       duration: kSnackBarDuration,
       content: Text('Playing: ${song.title}'),
+    ));
+  } catch (e) {
+    if (context.mounted) _errSnack(context, e);
+  }
+}
+
+/// Stream a not-in-library YouTube-Music search result through the backend
+/// preview proxy (Phase K / Phase T), without downloading it first. Replaces
+/// the queue with just this preview.
+///
+/// Deliberately bypasses [songToMediaItem] / [_toMediaItem] — there is no
+/// Subsonic song id and no local file, so the MediaItem is built straight from
+/// the search result with `id` = the `/preview/stream` URL (see
+/// [searchResultToMediaItem]). Reads the heerr base URL + bearer token from the
+/// active profile at the call site.
+Future<void> playPreview(
+  WidgetRef ref,
+  BuildContext context,
+  SearchResultItem item,
+) async {
+  final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+  try {
+    final Profile? profile = ref.read(activeProfileProvider);
+    if (profile == null ||
+        profile.heerrBaseUrl.isEmpty ||
+        profile.heerrBearerToken.isEmpty) {
+      messenger.showSnackBar(const SnackBar(
+        duration: kSnackBarDuration,
+        content: Text('Not signed in — sign in under Settings.'),
+      ));
+      return;
+    }
+    final MediaItem mediaItem = searchResultToMediaItem(
+      item: item,
+      heerrBaseUrl: profile.heerrBaseUrl,
+      token: profile.heerrBearerToken,
+    );
+    await ref.read(audioHandlerProvider).playSong(mediaItem);
+    messenger.showSnackBar(SnackBar(
+      duration: kSnackBarDuration,
+      content: Text('Preview: ${item.title}'),
     ));
   } catch (e) {
     if (context.mounted) _errSnack(context, e);

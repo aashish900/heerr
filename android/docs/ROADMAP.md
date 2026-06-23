@@ -638,7 +638,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** `flutter analyze` clean; `flutter test` green.
 **Commit:** `feat(flutter): T1 — preview stream URL builder`
 
-### [ ] T2. Preview playback entry point
+### [x] T2. Preview playback entry point
 **Files (new):** `android/app/lib/player/search_result_to_media_item.dart`, `android/app/test/player/search_result_to_media_item_test.dart`.
 **Files (modify):** `android/app/lib/player/playback_actions.dart` (add `playPreview(SearchResultItem)`), `android/app/test/player/playback_actions_test.dart`.
 **Deliverable:** build a `MediaItem` with `id` = the T1 preview URL, `title`/`artist`/`album`/`artUri` from the `SearchResultItem` (`coverUrl`), `extras: {'preview': true, 'sourceUrl': item.sourceUrl}`. `playPreview` reads the active profile for base URL + token, then routes the single item through the existing `HeerrAudioHandler` queue — **bypassing `songToMediaItem`** (no Subsonic / file path). Reuses the existing handler / mini-player wiring untouched.
