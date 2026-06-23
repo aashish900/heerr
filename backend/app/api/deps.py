@@ -2,7 +2,7 @@ import hashlib
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,17 +17,14 @@ _security = HTTPBearer(auto_error=False)
 _UNAUTH_HEADERS = {"WWW-Authenticate": "Bearer"}
 
 
-async def bearer_token(
-    creds: HTTPAuthorizationCredentials | None = Depends(_security),
-    session: AsyncSession = Depends(get_session),
-) -> Token:
-    if creds is None or creds.scheme.lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="missing or invalid bearer token",
-            headers=_UNAUTH_HEADERS,
-        )
-    token_hash = hashlib.sha256(creds.credentials.encode()).hexdigest()
+async def _resolve_token(raw: str, session: AsyncSession) -> Token:
+    """Resolve a raw bearer token string to its `Token` (user eager-loaded).
+
+    Shared by the header-only `bearer_token` dep and the `bearer_token_query_or_header`
+    dep used by `/preview/stream` (where the token rides in the query string because
+    the audio player cannot attach auth headers to a media URL).
+    """
+    token_hash = hashlib.sha256(raw.encode()).hexdigest()
     result = await session.execute(
         select(Token).options(selectinload(Token.user)).where(Token.token_hash == token_hash)
     )
@@ -52,6 +49,45 @@ async def bearer_token(
     return tok
 
 
+async def bearer_token(
+    creds: HTTPAuthorizationCredentials | None = Depends(_security),
+    session: AsyncSession = Depends(get_session),
+) -> Token:
+    if creds is None or creds.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="missing or invalid bearer token",
+            headers=_UNAUTH_HEADERS,
+        )
+    return await _resolve_token(creds.credentials, session)
+
+
+async def bearer_token_query_or_header(
+    creds: HTTPAuthorizationCredentials | None = Depends(_security),
+    token: str | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> Token:
+    """Like `bearer_token`, but also accepts the raw token via `?token=`.
+
+    The Android audio player (just_audio) cannot attach an `Authorization` header
+    to an `AudioSource` URL, so `/preview/stream` carries the bearer in the query
+    string — the same shape Subsonic stream URLs already use. The `?token=` value
+    is redacted from access logs (see middleware, K3). Header wins if both present.
+    """
+    raw: str | None = None
+    if creds is not None and creds.scheme.lower() == "bearer":
+        raw = creds.credentials
+    elif token:
+        raw = token
+    if not raw:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="missing or invalid bearer token",
+            headers=_UNAUTH_HEADERS,
+        )
+    return await _resolve_token(raw, session)
+
+
 async def current_user(tok: Token = Depends(bearer_token)) -> User:
     """Extracts the bearer token's User. Eager-loaded by `bearer_token`."""
     return tok.user
@@ -59,6 +95,20 @@ async def current_user(tok: Token = Depends(bearer_token)) -> User:
 
 def require_scope(*required: str) -> Callable[[Token], Awaitable[Token]]:
     async def _dep(tok: Token = Depends(bearer_token)) -> Token:
+        if not set(required).issubset(set(tok.scopes)):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"insufficient scope; requires {sorted(required)}",
+            )
+        return tok
+
+    return _dep
+
+
+def require_scope_query_or_header(*required: str) -> Callable[[Token], Awaitable[Token]]:
+    """Scope check over `bearer_token_query_or_header` (for `/preview/stream`)."""
+
+    async def _dep(tok: Token = Depends(bearer_token_query_or_header)) -> Token:
         if not set(required).issubset(set(tok.scopes)):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

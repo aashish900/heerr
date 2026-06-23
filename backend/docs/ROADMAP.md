@@ -345,7 +345,7 @@ Resolving server-side is the whole point: `googlevideo` URLs are signed to the *
 **Done when:** all branches green; `mypy app/` clean on new files.
 **Commit:** `feat(preview): K1 — yt-dlp preview resolver service`
 
-### [ ] K2. Query/header bearer auth dep + `GET /preview/stream` proxy
+### [x] K2. Query/header bearer auth dep + `GET /preview/stream` proxy
 **Files:** `backend/app/api/deps.py` (new `bearer_token_query_or_header()`), `backend/app/api/v1/preview.py`, `backend/app/api/v1/router.py` (wire), `backend/tests/test_preview.py`, `backend/tests/test_auth.py` (query-or-header dep).
 **Deliverable:** `bearer_token_query_or_header()` accepts the raw token via `Authorization: Bearer …` **or** `?token=…`, then runs the same hash-lookup + `current_user` resolution + `read`-scope check as the header dep. `GET /api/v1/preview/stream?source_url=<url>&token=<raw>` calls the K1 resolver, opens `httpx.AsyncClient.stream("GET", stream_url, headers=resolver_headers + forwarded Range)`, and returns a `StreamingResponse` propagating upstream status (200/206) + `Content-Type`, `Content-Length`, `Content-Range`, `Accept-Ranges: bytes`. The client `Range` header is forwarded so ExoPlayer can seek. `PreviewUnsupported` → 422, `PreviewUnavailable` → 404, resolve/upstream failure → 502.
 **Test gate:** auth via header AND via query param both 200; missing / non-`read` → 401/403; a `Range` request forwards the header and returns 206 + `Content-Range`; 422/404/502 branches; httpx faked via `MockTransport`, no network.

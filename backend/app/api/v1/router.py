@@ -5,6 +5,7 @@ from app.api.v1 import (
     auth,
     download,
     health,
+    preview,
     queue,
     recommend,
     search,
@@ -19,6 +20,7 @@ api_v1.include_router(search.router)
 api_v1.include_router(download.router)
 api_v1.include_router(status.router)
 api_v1.include_router(queue.router)
+api_v1.include_router(preview.router)
 api_v1.include_router(recommend.router)
 api_v1.include_router(settings.router)
 api_v1.include_router(admin.router)
