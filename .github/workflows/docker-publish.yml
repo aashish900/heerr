@@ -90,7 +90,7 @@ jobs:
           # service-specific literals that trip the secrets scanner with
           # false positives. See DECISIONLOG 2026-06-09 "Trivy: skip spotdl
           # venv".
-          skip-dirs: /opt/spotdl-venv
+          skip-dirs: /opt/spotdl-venv,/app/.venv
 
       - name: Log in to Docker Hub
         # Only log in when we're actually going to push, so secrets are not
