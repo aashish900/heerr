@@ -79,8 +79,16 @@ jobs:
       # is what every local pre-commit hook also runs, in lockstep. Catches
       # `--no-verify` commits and contributors who never ran
       # `pre-commit install`. Read-only — never modifies the repo.
+      #
+      # SKIP the `flutter-analyze` hook: this runner has no Flutter, and that
+      # hook is a local-only gate (Flutter analyze runs in CI via
+      # `android-ci.yml`). A bare `pre-commit run --all-files` would invoke it
+      # here and fail with exit 127. SKIP runs every other hook (the ruff
+      # lint + format gates this step exists for).
       - name: Pre-commit hooks (ruff lint + format)
         working-directory: ${{ github.workspace }}
+        env:
+          SKIP: flutter-analyze
         run: |
           pipx install pre-commit
           pre-commit run --all-files --show-diff-on-failure
