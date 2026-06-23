@@ -630,7 +630,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 **Architecture note:** Lets the user **preview** (stream) a YouTube-Music search result *before* downloading it into the library — closing the find → *hear* → download loop. Consumes backend `GET /api/v1/preview/stream` (backend **Phase K**): the device plays a heerr-backend URL via just_audio while the backend proxies the audio from googlevideo over Tailscale. **Pure-client slice on top of K — no other backend change.** The preview `MediaItem.id` is the backend proxy URL with the bearer token as a `?token=` query param (just_audio cannot set auth headers — the same constraint Subsonic playback already works around). Previews are **ephemeral** and added to no library; the existing reactive-promotion path (`combined_search.dart`) still upgrades a row from preview → real Subsonic playback once the user downloads it and Navidrome re-indexes. The `MediaItem.id`-is-the-URI invariant is preserved — this is simply a **third URI kind** alongside `file://` and the Subsonic stream URL. **Depends on backend K2.**
 
-### [ ] T1. Preview stream URL builder + endpoint constant
+### [x] T1. Preview stream URL builder + endpoint constant
 **Files (new):** `android/app/lib/player/preview_url.dart`, `android/app/test/player/preview_url_test.dart`.
 **Files (modify):** `android/app/lib/api/endpoints.dart` (add `previewStream`).
 **Deliverable:** pure `buildPreviewStreamUrl({required heerrBaseUrl, required sourceUrl, required token})` → `<heerrBaseUrl>/api/v1/preview/stream?source_url=<enc>&token=<enc>`, URL-encoding both params. Creds are read from `activeProfileProvider` at the call site, not inside the pure builder.
