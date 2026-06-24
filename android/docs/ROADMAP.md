@@ -660,7 +660,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 **Done when:** docs reflect the implementation; version bumped.
 **Commit:** `chore(flutter): T4 — preview ADR + CLAUDE.md/DEBT/CHANGELOG + v3.5.0`
 
-### [ ] T5. On-device preview smoke + version tag
+### [x] T5. On-device preview smoke + version tag
 **Test gate:** manual on the Pixel against the home server (backend Phase K deployed): (1) search a track **not** in the library → tap **Preview** → audio plays through the backend within ~1–2 s; (2) scrubber advances and **seek works** (Range passthrough); (3) lock-screen / notification shows the track with the "Preview" badge in-app; (4) tap **Download** on the same row → after Navidrome re-indexes it promotes into the library section and plays from Subsonic; (5) preview a region-locked / unavailable track → readable error snackbar, no crash.
 **Done when:** all five steps pass. Tagged `v3.5.0`.
 **Commit:** `chore(flutter): v3.5.0 stream-first preview smoke verified`
@@ -673,7 +673,7 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 **Depends on:** backend Phase K (for `BackendService.jobStatus`) and existing `SubsonicLibraryService.findLibraryMatch` + `PlaylistMutations.addSongs`.
 
-### [ ] U1. Download-to-playlist sheet + async flow
+### [x] U1. Download-to-playlist sheet + async flow
 
 **New file: `android/app/lib/widgets/download_options_sheet.dart`**
 

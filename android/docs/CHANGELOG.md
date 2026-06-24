@@ -2093,3 +2093,14 @@ Preview (stream) a YouTube-Music search result before downloading it into Navidr
 - **`android/app/pubspec.yaml`** (T4) — `3.4.0` → `3.5.0`.
 - **`android/docs/{DECISIONLOG,ROADMAP,DEBT}.md`** (T4) — Phase T ADR; ROADMAP `MediaItem.id` cross-cutting reminder amended for the preview-URL kind (the reminder lives in ROADMAP, not CLAUDE.md — corrected from the T4 plan text); DEBT F3 records the recommendations/home preview follow-up.
 - Verified: `flutter analyze` clean; full suite **632** passed.
+
+## 2026-06-24 — Phase U (U1): download-to-playlist — optional playlist assignment on YTM download
+
+Tapping the download icon on a YouTube-Music search result now opens a bottom sheet offering either a plain download (existing behaviour) or download-and-add-to-playlist: once the backend job completes and Navidrome indexes the new file, the song is added to a chosen Navidrome playlist. Pure-client slice — no backend change. Async orchestration is a top-level function (no persistent Riverpod state), mirroring `playPreview` / `playSongFromSubsonic`.
+
+- **`lib/widgets/download_options_sheet.dart`** (new) — `DownloadOptionsSheet` `ConsumerWidget` + static `show()`. Presentational only. Layout: song title → "Download" `ListTile` (key `download-options-download-only`) → divider → "Add to playlist after download" → owned playlists from `libraryPlaylistsProvider` filtered by `serverCredsProvider.navidromeUsername` (one `ListTile` per playlist, key `download-to-playlist-<id>`; loading/error/empty states). Each tap pops the sheet first, then invokes the `onDownloadOnly` / `onDownloadToPlaylist(id, name)` callback.
+- **`lib/providers/download_to_playlist.dart`** (new) — `downloadAndAddToPlaylist({ref, context, item, playlistId, playlistName, ...})`. Steps (each `await` guarded by `context.mounted`): dispatch via `downloadDispatcherProvider` + "Downloading…" snackbar (ApiError → `showApiError`); poll `BackendService.jobStatus` to terminal when non-terminal (`failed` → error snackbar; timeout → snackbar); poll `SubsonicLibraryService.findLibraryMatch` (transient ApiError keeps polling; null at ceiling → "not indexed yet" warning); `PlaylistMutations.addSongs` + success snackbar. `@visibleForTesting` poll-interval / ceiling knobs.
+- **`lib/screens/library/library_search_results.dart`** — `_YtmSection` ResultTile `onDownload` now opens `DownloadOptionsSheet`; existing dispatch+"Queued" logic extracted to `_downloadOnly`; playlist choice routes to `downloadAndAddToPlaylist`.
+- **`lib/screens/library/library_screen.dart`** — added imports for `download_options_sheet.dart` + `download_to_playlist.dart`.
+- **Tests:** `test/widgets/download_options_sheet_test.dart` (6 widget tests), `test/providers/download_to_playlist_test.dart` (3: happy path, job-failed, Navidrome timeout). All 9 green.
+- Verified: `flutter analyze` clean; full suite **643** passed.

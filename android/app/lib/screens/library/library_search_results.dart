@@ -224,32 +224,51 @@ class _YtmSection extends ConsumerWidget {
               ResultTile(
                 item: item,
                 onPreview: () => playPreview(ref, context, item),
-                onDownload: () async {
-                  try {
-                    await ref
-                        .read(downloadDispatcherProvider.notifier)
-                        .dispatch(
-                          item.sourceUrl,
-                          sourceType: item.sourceType,
-                          displayName: item.title,
-                        );
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        duration: kSnackBarDuration,
-                        content: Text('Queued: ${item.title}'),
-                      ),
-                    );
-                  } on ApiError catch (e) {
-                    if (!context.mounted) return;
-                    showApiError(context, e, action: 'download');
-                  }
-                },
+                onDownload: () => DownloadOptionsSheet.show(
+                  context: context,
+                  item: item,
+                  onDownloadOnly: () => _downloadOnly(ref, context, item),
+                  onDownloadToPlaylist:
+                      (String playlistId, String playlistName) =>
+                          downloadAndAddToPlaylist(
+                    ref: ref,
+                    context: context,
+                    item: item,
+                    playlistId: playlistId,
+                    playlistName: playlistName,
+                  ),
+                ),
               ),
           ],
         );
       },
     );
+  }
+
+  /// Existing download-only behaviour: dispatch the job and show a "Queued"
+  /// snackbar (or an [ApiError] snackbar on failure).
+  Future<void> _downloadOnly(
+    WidgetRef ref,
+    BuildContext context,
+    SearchResultItem item,
+  ) async {
+    try {
+      await ref.read(downloadDispatcherProvider.notifier).dispatch(
+            item.sourceUrl,
+            sourceType: item.sourceType,
+            displayName: item.title,
+          );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: kSnackBarDuration,
+          content: Text('Queued: ${item.title}'),
+        ),
+      );
+    } on ApiError catch (e) {
+      if (!context.mounted) return;
+      showApiError(context, e, action: 'download');
+    }
   }
 }
 
