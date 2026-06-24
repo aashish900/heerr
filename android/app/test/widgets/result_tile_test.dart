@@ -20,6 +20,7 @@ Future<void> _pump(
   WidgetTester tester, {
   VoidCallback? onDownload,
   VoidCallback? onPreview,
+  VoidCallback? onLongPress,
   bool alreadyDownloaded = false,
 }) async {
   await tester.pumpWidget(
@@ -30,6 +31,7 @@ Future<void> _pump(
             item: _item(alreadyDownloaded: alreadyDownloaded),
             onDownload: onDownload,
             onPreview: onPreview,
+            onLongPress: onLongPress,
           ),
         ),
       ),
@@ -100,6 +102,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(previews, 1);
+    expect(downloads, 0);
+  });
+
+  testWidgets('long-pressing the row fires onLongPress',
+      (WidgetTester tester) async {
+    int longPresses = 0;
+    int downloads = 0;
+    await _pump(
+      tester,
+      onDownload: () => downloads++,
+      onPreview: () {},
+      onLongPress: () => longPresses++,
+    );
+
+    await tester.longPress(find.text('Let It Happen'));
+    await tester.pumpAndSettle();
+
+    expect(longPresses, 1);
     expect(downloads, 0);
   });
 

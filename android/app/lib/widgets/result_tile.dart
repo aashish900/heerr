@@ -16,19 +16,22 @@ import '../providers/download.dart';
 ///
 /// [onDownload] is disabled when the row is mid-flight or already downloaded.
 /// [onPreview], when set, renders a play button AND makes the whole row
-/// tappable — independent of download state. The parent screen owns the
-/// dispatch + snackbar; the tile is presentational.
+/// tappable — independent of download state. [onLongPress], when set, fires on
+/// a long-press of the row (used to offer "download to a playlist"). The parent
+/// screen owns the dispatch + snackbar; the tile is presentational.
 class ResultTile extends ConsumerWidget {
   const ResultTile({
     required this.item,
     this.onDownload,
     this.onPreview,
+    this.onLongPress,
     super.key,
   });
 
   final SearchResultItem item;
   final VoidCallback? onDownload;
   final VoidCallback? onPreview;
+  final VoidCallback? onLongPress;
 
   String _subtitle() {
     final String? album = item.album;
@@ -79,6 +82,7 @@ class ResultTile extends ConsumerWidget {
           ],
         ),
         onTap: onPreview,
+        onLongPress: onLongPress,
       ),
     );
   }

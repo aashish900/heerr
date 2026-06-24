@@ -7,51 +7,36 @@ import '../models/subsonic/playlist.dart';
 import '../providers/library/library_playlists.dart';
 import '../providers/server_creds.dart';
 
-/// Modal bottom sheet shown when the user taps the download icon on a
-/// YouTube-Music search result (U1). Lets the user either download the song
-/// directly (current behaviour) or download AND queue it to be added to one of
-/// their Navidrome playlists once the job finishes and Navidrome indexes the
-/// file.
+/// Modal bottom sheet shown when the user long-presses a YouTube-Music search
+/// result (U1). It lets them pick one of their Navidrome playlists; the caller
+/// then downloads the song and adds it to that playlist once the job finishes
+/// and Navidrome indexes the file. A plain tap on the row's download icon still
+/// downloads directly — this sheet is the opt-in "to a playlist" path only.
 ///
-/// Purely presentational — it owns no async logic. The two outcomes are
-/// surfaced as callbacks the caller wires to [downloadDispatcherProvider]
-/// (download-only) and `downloadAndAddToPlaylist` (download-to-playlist):
-///   - [onDownloadOnly] — fired by the "Download" row.
-///   - [onDownloadToPlaylist] — fired by a playlist row, with that playlist's
-///     id + name.
-///
-/// Each row pops the sheet *first* (so the sheet's context is gone before the
-/// caller starts showing snackbars on the host scaffold), then invokes the
-/// callback.
-class DownloadOptionsSheet extends ConsumerWidget {
-  const DownloadOptionsSheet({
+/// Purely presentational — it owns no async logic. Tapping a playlist row pops
+/// the sheet *first* (so the sheet's context is gone before the caller starts
+/// showing snackbars on the host scaffold), then invokes [onSelect] with that
+/// playlist's id + name.
+class DownloadToPlaylistSheet extends ConsumerWidget {
+  const DownloadToPlaylistSheet({
     required this.item,
-    required this.onDownloadOnly,
-    required this.onDownloadToPlaylist,
+    required this.onSelect,
     super.key,
   });
 
   final SearchResultItem item;
-  final VoidCallback onDownloadOnly;
-  final void Function(String playlistId, String playlistName)
-      onDownloadToPlaylist;
+  final void Function(String playlistId, String playlistName) onSelect;
 
   static void show({
     required BuildContext context,
     required SearchResultItem item,
-    required VoidCallback onDownloadOnly,
-    required void Function(String playlistId, String playlistName)
-        onDownloadToPlaylist,
+    required void Function(String playlistId, String playlistName) onSelect,
   }) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => DownloadOptionsSheet(
-        item: item,
-        onDownloadOnly: onDownloadOnly,
-        onDownloadToPlaylist: onDownloadToPlaylist,
-      ),
+      builder: (_) => DownloadToPlaylistSheet(item: item, onSelect: onSelect),
     );
   }
 
@@ -72,28 +57,22 @@ class DownloadOptionsSheet extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+              child: Text(
+                'Download to playlist',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Text(
                 item.title,
-                style: Theme.of(context).textTheme.titleMedium,
+                style: Theme.of(context).textTheme.bodyMedium,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            ListTile(
-              key: const Key('download-options-download-only'),
-              leading: const Icon(Icons.download_outlined),
-              title: const Text('Download'),
-              onTap: () {
-                Navigator.of(context).pop();
-                onDownloadOnly();
-              },
-            ),
             const Divider(height: 1),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Text('Add to playlist after download'),
-            ),
             Flexible(
               child: playlistsAsync.when(
                 loading: () => const Padding(
@@ -116,7 +95,7 @@ class DownloadOptionsSheet extends ConsumerWidget {
                   ];
                   if (editable.isEmpty) {
                     return const Padding(
-                      padding: EdgeInsets.fromLTRB(16, 4, 16, 24),
+                      padding: EdgeInsets.fromLTRB(16, 16, 16, 24),
                       child: Text('No playlists yet.'),
                     );
                   }
@@ -134,7 +113,7 @@ class DownloadOptionsSheet extends ConsumerWidget {
                             : Text('${p.songCount} songs'),
                         onTap: () {
                           Navigator.of(context).pop();
-                          onDownloadToPlaylist(p.id, p.name);
+                          onSelect(p.id, p.name);
                         },
                       );
                     },

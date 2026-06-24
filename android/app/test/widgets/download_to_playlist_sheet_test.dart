@@ -8,7 +8,7 @@ import 'package:heerr/models/search_result_item.dart';
 import 'package:heerr/models/subsonic/playlist.dart';
 import 'package:heerr/providers/library/library_playlists.dart';
 import 'package:heerr/providers/secure_storage.dart';
-import 'package:heerr/widgets/download_options_sheet.dart';
+import 'package:heerr/widgets/download_to_playlist_sheet.dart';
 
 import '../support/cred_test_support.dart';
 
@@ -44,15 +44,12 @@ Override _playlistsValue(AsyncValue<List<Playlist>> value) {
   );
 }
 
-/// Mount a host button that opens the sheet via `DownloadOptionsSheet.show`.
-/// [onDownloadOnly] / [onDownloadToPlaylist] are forwarded so tests can assert
-/// the callbacks fire. When [settle] is false the caller drives the pump (for
-/// the never-resolving loading state).
+/// Mount a host button that opens the sheet via `DownloadToPlaylistSheet.show`.
+/// When [settle] is false the caller drives the pump (never-resolving loading).
 Future<void> _openSheet(
   WidgetTester tester, {
   required List<Override> overrides,
-  VoidCallback? onDownloadOnly,
-  void Function(String, String)? onDownloadToPlaylist,
+  void Function(String, String)? onSelect,
   String? username = 'phone',
   bool settle = true,
 }) async {
@@ -68,12 +65,10 @@ Future<void> _openSheet(
           builder: (BuildContext context) => Scaffold(
             body: Center(
               child: ElevatedButton(
-                onPressed: () => DownloadOptionsSheet.show(
+                onPressed: () => DownloadToPlaylistSheet.show(
                   context: context,
                   item: _item,
-                  onDownloadOnly: onDownloadOnly ?? () {},
-                  onDownloadToPlaylist:
-                      onDownloadToPlaylist ?? (String _, String _) {},
+                  onSelect: onSelect ?? (String _, String _) {},
                 ),
                 child: const Text('open'),
               ),
@@ -114,13 +109,14 @@ void main() {
     songCount: 30,
   );
 
-  testWidgets('renders the song title', (WidgetTester tester) async {
+  testWidgets('renders the header + song title', (WidgetTester tester) async {
     await _openSheet(
       tester,
       overrides: <Override>[
         _playlistsValue(const AsyncData<List<Playlist>>(<Playlist>[owned1])),
       ],
     );
+    expect(find.text('Download to playlist'), findsOneWidget);
     expect(find.text('Test Song'), findsOneWidget);
   });
 
@@ -152,34 +148,9 @@ void main() {
       ],
     );
     expect(find.text('No playlists yet.'), findsOneWidget);
-    // "Download" row is still present regardless of playlist availability.
-    expect(
-      find.byKey(const Key('download-options-download-only')),
-      findsOneWidget,
-    );
   });
 
-  testWidgets('tap "Download" fires onDownloadOnly and closes the sheet',
-      (WidgetTester tester) async {
-    int calls = 0;
-    await _openSheet(
-      tester,
-      overrides: <Override>[
-        _playlistsValue(const AsyncData<List<Playlist>>(<Playlist>[owned1])),
-      ],
-      onDownloadOnly: () => calls++,
-    );
-
-    await tester.tap(find.byKey(const Key('download-options-download-only')));
-    await tester.pumpAndSettle();
-
-    expect(calls, 1);
-    // Sheet gone.
-    expect(find.text('Add to playlist after download'), findsNothing);
-  });
-
-  testWidgets(
-      'tap a playlist row fires onDownloadToPlaylist with id+name and closes',
+  testWidgets('tap a playlist row fires onSelect with id+name and closes',
       (WidgetTester tester) async {
     String? gotId;
     String? gotName;
@@ -188,7 +159,7 @@ void main() {
       overrides: <Override>[
         _playlistsValue(const AsyncData<List<Playlist>>(<Playlist>[owned1])),
       ],
-      onDownloadToPlaylist: (String id, String name) {
+      onSelect: (String id, String name) {
         gotId = id;
         gotName = name;
       },
@@ -199,7 +170,8 @@ void main() {
 
     expect(gotId, 'pl-owned-1');
     expect(gotName, 'Morning');
-    expect(find.text('Add to playlist after download'), findsNothing);
+    // Sheet gone.
+    expect(find.text('Download to playlist'), findsNothing);
   });
 
   testWidgets('loading playlists → spinner', (WidgetTester tester) async {

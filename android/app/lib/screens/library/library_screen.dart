@@ -27,7 +27,7 @@ import '../../providers/library/library_search_query.dart';
 import '../../providers/library/playlist_mutations.dart';
 import '../../router.dart';
 import '../../widgets/add_to_playlist_sheet.dart';
-import '../../widgets/download_options_sheet.dart';
+import '../../widgets/download_to_playlist_sheet.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_snackbar.dart';
 import '../../widgets/library_result_tile.dart';

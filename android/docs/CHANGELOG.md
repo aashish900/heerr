@@ -2104,3 +2104,15 @@ Tapping the download icon on a YouTube-Music search result now opens a bottom sh
 - **`lib/screens/library/library_screen.dart`** — added imports for `download_options_sheet.dart` + `download_to_playlist.dart`.
 - **Tests:** `test/widgets/download_options_sheet_test.dart` (6 widget tests), `test/providers/download_to_playlist_test.dart` (3: happy path, job-failed, Navidrome timeout). All 9 green.
 - Verified: `flutter analyze` clean; full suite **643** passed.
+
+## 2026-06-24 — U1 follow-up: download-to-playlist moved to long-press (sheet drops the download-only row)
+
+UX revision of the U1 commit above, per user request. A plain tap of the download icon now downloads directly again (the original "Queued" behaviour — no intermediate sheet). The download-to-playlist path is now opt-in via a **long-press** on the search-result row, which opens a playlist picker.
+
+- **`lib/widgets/download_to_playlist_sheet.dart`** (new, replaces `download_options_sheet.dart`) — `DownloadToPlaylistSheet`. Presentational playlist picker: "Download to playlist" header → song title → owned playlists from `libraryPlaylistsProvider` filtered by `serverCredsProvider.navidromeUsername` (key `download-to-playlist-<id>`; loading/error/empty states). Tapping a row pops first, then `onSelect(id, name)`. The "Download" row + `onDownloadOnly` callback are gone (a plain tap covers that path).
+- **`lib/widgets/result_tile.dart`** — new optional `onLongPress` wired to `ListTile.onLongPress`.
+- **`lib/screens/library/library_search_results.dart`** — `_YtmSection`: `onDownload` → `_downloadOnly` (plain dispatch + "Queued"); new `onLongPress` → `DownloadToPlaylistSheet`, selection routes to `downloadAndAddToPlaylist` (unchanged).
+- **`lib/screens/library/library_screen.dart`** — import swapped to `download_to_playlist_sheet.dart`.
+- **Removed:** `lib/widgets/download_options_sheet.dart`, `test/widgets/download_options_sheet_test.dart`.
+- **Tests:** `test/widgets/download_to_playlist_sheet_test.dart` (5: header+title, ownership filter, empty, row-tap fires onSelect, loading); long-press case added to `test/widgets/result_tile_test.dart`; `download_to_playlist_test.dart` provider tests unchanged.
+- Verified: `flutter analyze` clean; full suite **643** passed.

@@ -224,13 +224,12 @@ class _YtmSection extends ConsumerWidget {
               ResultTile(
                 item: item,
                 onPreview: () => playPreview(ref, context, item),
-                onDownload: () => DownloadOptionsSheet.show(
+                onDownload: () => _downloadOnly(ref, context, item),
+                onLongPress: () => DownloadToPlaylistSheet.show(
                   context: context,
                   item: item,
-                  onDownloadOnly: () => _downloadOnly(ref, context, item),
-                  onDownloadToPlaylist:
-                      (String playlistId, String playlistName) =>
-                          downloadAndAddToPlaylist(
+                  onSelect: (String playlistId, String playlistName) =>
+                      downloadAndAddToPlaylist(
                     ref: ref,
                     context: context,
                     item: item,
