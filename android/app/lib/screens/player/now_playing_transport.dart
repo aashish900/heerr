@@ -92,7 +92,7 @@ class _Transport extends ConsumerWidget {
           iconSize: 28,
           tooltip: shuffleOn ? 'Shuffle on' : 'Shuffle off',
           color: shuffleOn ? primary : null,
-          icon: const Icon(Icons.shuffle),
+          icon: const Icon(Icons.shuffle_rounded),
           onPressed: () {
             final HeerrAudioHandler h = ref.read(audioHandlerProvider);
             h.setShuffleMode(shuffleOn
@@ -138,8 +138,8 @@ class _Transport extends ConsumerWidget {
                   : 'Repeat off',
           color: repeatOn ? primary : null,
           icon: Icon(repeatMode == AudioServiceRepeatMode.one
-              ? Icons.repeat_one
-              : Icons.repeat),
+              ? Icons.repeat_one_rounded
+              : Icons.repeat_rounded),
           onPressed: () =>
               ref.read(audioHandlerProvider).setRepeatMode(_nextRepeat(repeatMode)),
         ),

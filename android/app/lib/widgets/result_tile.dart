@@ -7,27 +7,27 @@ import '../providers/download.dart';
 /// One row in the Search screen's results list. Dims when the backend hint
 /// says the track is already downloaded.
 ///
+/// Tapping anywhere on the row invokes [onPreview] (stream-first listen).
 /// The trailing slot is a row: an optional Preview (play) button followed by a
 /// download-status icon with three states:
 ///   * `inFlight` (a POST /download for this URI is mid-flight) → spinner.
 ///   * `item.alreadyDownloaded` → check-mark badge.
-///   * otherwise → outline download icon to signal tap-to-queue.
+///   * otherwise → tappable download icon that invokes [onDownload].
 ///
-/// `onTap` is invoked when the row is tapped (download). It's disabled (null)
-/// when the row is mid-flight or already downloaded. `onPreview`, when set,
-/// renders a play button that streams the track through the backend preview
-/// proxy before download (Phase T) — independent of download state. The parent
-/// screen owns the dispatch + snackbar; the tile is presentational.
+/// [onDownload] is disabled when the row is mid-flight or already downloaded.
+/// [onPreview], when set, renders a play button AND makes the whole row
+/// tappable — independent of download state. The parent screen owns the
+/// dispatch + snackbar; the tile is presentational.
 class ResultTile extends ConsumerWidget {
   const ResultTile({
     required this.item,
-    this.onTap,
+    this.onDownload,
     this.onPreview,
     super.key,
   });
 
   final SearchResultItem item;
-  final VoidCallback? onTap;
+  final VoidCallback? onDownload;
   final VoidCallback? onPreview;
 
   String _subtitle() {
@@ -45,8 +45,8 @@ class ResultTile extends ConsumerWidget {
         (Set<String> s) => s.contains(item.sourceUrl),
       ),
     );
-    final bool tappable =
-        onTap != null && !inFlight && !item.alreadyDownloaded;
+    final bool downloadable =
+        onDownload != null && !inFlight && !item.alreadyDownloaded;
 
     return Opacity(
       opacity: item.alreadyDownloaded ? 0.5 : 1.0,
@@ -74,20 +74,26 @@ class ResultTile extends ConsumerWidget {
             _Trailing(
               alreadyDownloaded: item.alreadyDownloaded,
               inFlight: inFlight,
+              onDownload: downloadable ? onDownload : null,
             ),
           ],
         ),
-        onTap: tappable ? onTap : null,
+        onTap: onPreview,
       ),
     );
   }
 }
 
 class _Trailing extends StatelessWidget {
-  const _Trailing({required this.alreadyDownloaded, required this.inFlight});
+  const _Trailing({
+    required this.alreadyDownloaded,
+    required this.inFlight,
+    this.onDownload,
+  });
 
   final bool alreadyDownloaded;
   final bool inFlight;
+  final VoidCallback? onDownload;
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +107,11 @@ class _Trailing extends StatelessWidget {
     if (alreadyDownloaded) {
       return const Icon(Icons.download_done);
     }
-    return const Icon(Icons.download_outlined);
+    return IconButton(
+      icon: const Icon(Icons.download_outlined),
+      tooltip: 'Download',
+      onPressed: onDownload,
+    );
   }
 }
 

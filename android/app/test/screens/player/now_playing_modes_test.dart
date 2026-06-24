@@ -86,8 +86,8 @@ void main() {
   testWidgets('shuffle + repeat buttons render', (WidgetTester tester) async {
     await tester.pumpWidget(_wrap(_snap(), handler));
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.shuffle), findsOneWidget);
-    expect(find.byIcon(Icons.repeat), findsOneWidget);
+    expect(find.byIcon(Icons.shuffle_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.repeat_rounded), findsOneWidget);
   });
 
   testWidgets('repeat-one state shows repeat_one icon',
@@ -96,15 +96,15 @@ void main() {
       _wrap(_snap(repeat: AudioServiceRepeatMode.one), handler),
     );
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.repeat_one), findsOneWidget);
-    expect(find.byIcon(Icons.repeat), findsNothing);
+    expect(find.byIcon(Icons.repeat_one_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.repeat_rounded), findsNothing);
   });
 
   testWidgets('tap repeat from none → setRepeatMode(all)',
       (WidgetTester tester) async {
     await tester.pumpWidget(_wrap(_snap(), handler));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.repeat));
+    await tester.tap(find.byIcon(Icons.repeat_rounded));
     await tester.pumpAndSettle();
     verify(() => handler.setRepeatMode(AudioServiceRepeatMode.all)).called(1);
   });
@@ -115,7 +115,7 @@ void main() {
       _wrap(_snap(repeat: AudioServiceRepeatMode.all), handler),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.repeat));
+    await tester.tap(find.byIcon(Icons.repeat_rounded));
     await tester.pumpAndSettle();
     verify(() => handler.setRepeatMode(AudioServiceRepeatMode.one)).called(1);
   });
@@ -126,7 +126,7 @@ void main() {
       _wrap(_snap(repeat: AudioServiceRepeatMode.one), handler),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.repeat_one));
+    await tester.tap(find.byIcon(Icons.repeat_one_rounded));
     await tester.pumpAndSettle();
     verify(() => handler.setRepeatMode(AudioServiceRepeatMode.none)).called(1);
   });
@@ -135,7 +135,7 @@ void main() {
       (WidgetTester tester) async {
     await tester.pumpWidget(_wrap(_snap(), handler));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.shuffle));
+    await tester.tap(find.byIcon(Icons.shuffle_rounded));
     await tester.pumpAndSettle();
     verify(() => handler.setShuffleMode(AudioServiceShuffleMode.all)).called(1);
   });
@@ -146,7 +146,7 @@ void main() {
       _wrap(_snap(shuffle: AudioServiceShuffleMode.all), handler),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.shuffle));
+    await tester.tap(find.byIcon(Icons.shuffle_rounded));
     await tester.pumpAndSettle();
     verify(() => handler.setShuffleMode(AudioServiceShuffleMode.none)).called(1);
   });

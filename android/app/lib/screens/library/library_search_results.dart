@@ -224,7 +224,7 @@ class _YtmSection extends ConsumerWidget {
               ResultTile(
                 item: item,
                 onPreview: () => playPreview(ref, context, item),
-                onTap: () async {
+                onDownload: () async {
                   try {
                     await ref
                         .read(downloadDispatcherProvider.notifier)

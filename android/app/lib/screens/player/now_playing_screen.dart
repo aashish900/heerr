@@ -12,10 +12,13 @@ import '../../player/heerr_audio_handler.dart';
 import '../../player/player_provider.dart';
 import '../../player/sleep_timer.dart';
 import '../../player/song_to_media_item.dart';
+import '../../providers/library/favourites.dart';
 import '../../providers/library/lyrics.dart';
+import '../../providers/library/playlist_mutations.dart';
 import '../../providers/queue.dart';
 import '../../utils/palette.dart';
 import '../../widgets/add_to_playlist_sheet.dart';
+import '../../widgets/error_snackbar.dart';
 import '../../widgets/preview_badge.dart';
 
 // A17: per-section private widgets live in sibling part files to keep this
@@ -156,6 +159,12 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
     final Duration? sleepRemaining = ref.watch(sleepTimerNotifierProvider);
 
+    final MediaItem? currentItem = snap.valueOrNull?.item;
+    final Song? currentSong =
+        currentItem != null && !isPreviewMediaItem(currentItem)
+            ? songFromMediaItem(currentItem)
+            : null;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Now playing'),
@@ -163,6 +172,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
         actions: <Widget>[
           if (sleepRemaining != null)
             _SleepCountdownChip(remaining: sleepRemaining),
+          if (currentSong != null) _FavouriteButton(song: currentSong),
           IconButton(
             key: const Key('now-playing-lyrics-toggle'),
             tooltip: _showLyrics ? 'Show cover art' : 'Show lyrics',
@@ -230,6 +240,39 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+/// Heart icon in the Now Playing AppBar. Watches [favouriteSongIdsProvider]
+/// so the filled/outlined state updates immediately after a toggle.
+/// Only rendered for Subsonic tracks (preview MediaItems have no song id).
+class _FavouriteButton extends ConsumerWidget {
+  const _FavouriteButton({required this.song});
+
+  final Song song;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final Set<String> favIds =
+        ref.watch(favouriteSongIdsProvider).valueOrNull ?? const <String>{};
+    final bool isFav = favIds.contains(song.id);
+    return IconButton(
+      tooltip: isFav ? 'Remove from Favourites' : 'Add to Favourites',
+      icon: Icon(
+        isFav ? Icons.favorite : Icons.favorite_border,
+        color: isFav ? Colors.redAccent : null,
+      ),
+      onPressed: () async {
+        try {
+          await ref
+              .read(playlistMutationsProvider.notifier)
+              .toggleFavourite(song);
+        } on ApiError catch (e) {
+          if (!context.mounted) return;
+          showApiError(context, e);
+        }
+      },
     );
   }
 }

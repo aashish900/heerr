@@ -18,7 +18,7 @@ SearchResultItem _item({bool alreadyDownloaded = false}) {
 
 Future<void> _pump(
   WidgetTester tester, {
-  VoidCallback? onTap,
+  VoidCallback? onDownload,
   VoidCallback? onPreview,
   bool alreadyDownloaded = false,
 }) async {
@@ -28,7 +28,7 @@ Future<void> _pump(
         home: Scaffold(
           body: ResultTile(
             item: _item(alreadyDownloaded: alreadyDownloaded),
-            onTap: onTap,
+            onDownload: onDownload,
             onPreview: onPreview,
           ),
         ),
@@ -53,17 +53,54 @@ void main() {
     expect(find.byIcon(Icons.play_circle_outline), findsNothing);
   });
 
-  testWidgets('tapping preview fires onPreview, not onTap (download)',
+  testWidgets('tapping the row fires onPreview', (WidgetTester tester) async {
+    int previews = 0;
+    int downloads = 0;
+    await _pump(
+      tester,
+      onDownload: () => downloads++,
+      onPreview: () => previews++,
+    );
+
+    await tester.tap(find.text('Let It Happen'));
+    await tester.pumpAndSettle();
+
+    expect(previews, 1);
+    expect(downloads, 0);
+  });
+
+  testWidgets('tapping the download icon fires onDownload',
       (WidgetTester tester) async {
     int previews = 0;
-    int taps = 0;
-    await _pump(tester, onTap: () => taps++, onPreview: () => previews++);
+    int downloads = 0;
+    await _pump(
+      tester,
+      onDownload: () => downloads++,
+      onPreview: () => previews++,
+    );
+
+    await tester.tap(find.byIcon(Icons.download_outlined));
+    await tester.pumpAndSettle();
+
+    expect(downloads, 1);
+    expect(previews, 0);
+  });
+
+  testWidgets('tapping play button fires onPreview not onDownload',
+      (WidgetTester tester) async {
+    int previews = 0;
+    int downloads = 0;
+    await _pump(
+      tester,
+      onDownload: () => downloads++,
+      onPreview: () => previews++,
+    );
 
     await tester.tap(find.byIcon(Icons.play_circle_outline));
     await tester.pumpAndSettle();
 
     expect(previews, 1);
-    expect(taps, 0);
+    expect(downloads, 0);
   });
 
   testWidgets('preview button works even when already downloaded',
