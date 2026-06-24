@@ -232,10 +232,25 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
     super.dispose();
   }
 
+  // The exact locations where we own back handling. Any path not in this set
+  // (e.g. /library/playlist/:id) is a pushed detail screen — never intercept.
+  static const Set<String> _tabRoots = <String>{
+    Routes.home,
+    Routes.library,
+    Routes.downloads,
+    Routes.queue,
+    Routes.settings,
+  };
+
   @override
   Future<bool> didPopRoute() async {
     if (!mounted) return false;
-    // Yield to go_router when a screen is stacked above the shell.
+    // Safety guard: only intercept at exact tab roots. If widget.location is a
+    // detail path (e.g. /library/playlist/:id — can happen when go_router
+    // updates the shell location before the detail route fully settles),
+    // yield to go_router unconditionally so detail screens always pop normally.
+    if (!_tabRoots.contains(widget.location)) return false;
+    // Also yield to go_router when there is something stacked above the shell.
     if (GoRouter.of(context).canPop()) return false;
     // Library search mode: clear field and exit search.
     if (widget.location == Routes.library &&

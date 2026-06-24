@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:heerr/offline/offline_sync.dart';
+import 'package:go_router/go_router.dart';
 import 'package:heerr/models/subsonic/search_result3.dart';
 import 'package:heerr/providers/library/combined_search.dart';
 import 'package:heerr/providers/profiles/profile_registry.dart';
@@ -218,6 +221,53 @@ void main() {
   });
 
   group('V1 — predictable back stack', () {
+    testWidgets('system back from a detail screen is not intercepted by shell', (
+      WidgetTester tester,
+    ) async {
+      // The shell's didPopRoute must NOT intercept back when widget.location
+      // is a detail path (e.g. /library/album/:id). It must yield to go_router
+      // so go_router pops the detail and returns to the tab.
+      await tester.pumpWidget(_bootApp());
+      await tester.pumpAndSettle();
+
+      // Navigate to Library tab, then push album detail.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text('Library'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // GoRouter.canPop() must be true once a detail is pushed. The shell's
+      // _tabRoots guard and canPop guard both ensure we return false from
+      // didPopRoute and let go_router handle the pop. We verify via canPop.
+      final GoRouter router = GoRouter.of(
+        tester.element(find.byType(NavigationBar)),
+      );
+      expect(router.canPop(), isFalse,
+          reason: 'sanity: no detail pushed yet');
+
+      // Directly push a fake album path to simulate context.push usage.
+      unawaited(router.push(Routes.libraryAlbum('test-album-id')));
+      await tester.pumpAndSettle();
+
+      expect(router.canPop(), isTrue,
+          reason: 'detail is stacked — canPop must be true');
+
+      // System back: shell must yield so go_router pops the detail.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      // After pop, canPop is false again (back on Library root).
+      expect(router.canPop(), isFalse);
+      // The Library tab bar is visible (we're back on the Library root).
+      expect(
+        find.descendant(of: find.byType(TabBar), matching: find.text('Artists')),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('system back from a non-Home tab returns to Home, not exit', (
       WidgetTester tester,
     ) async {
