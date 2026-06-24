@@ -667,6 +667,79 @@ See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
 ---
 
+## Phase U — Download-to-playlist (optional post-download playlist assignment)
+
+**Architecture note:** When a user taps the download icon on a YouTube Music search result, show a bottom sheet letting them either download directly (current behaviour) or download and automatically add the song to one of their Navidrome playlists once the download job completes and Navidrome indexes the file. **Pure-client slice — no backend changes required.** The async orchestration lives as a top-level function (no persistent Riverpod state), mirroring the pattern of `playPreview` / `playSongFromSubsonic`.
+
+**Depends on:** backend Phase K (for `BackendService.jobStatus`) and existing `SubsonicLibraryService.findLibraryMatch` + `PlaylistMutations.addSongs`.
+
+### [ ] U1. Download-to-playlist sheet + async flow
+
+**New file: `android/app/lib/widgets/download_options_sheet.dart`**
+
+`DownloadOptionsSheet` — a `ConsumerWidget` shown via `showModalBottomSheet`. Purely presentational; no async logic. Static `show()` factory:
+
+```dart
+static void show({
+  required BuildContext context,
+  required SearchResultItem item,
+  required VoidCallback onDownloadOnly,
+  required void Function(String playlistId, String playlistName) onDownloadToPlaylist,
+})
+```
+
+Sheet layout (top→bottom): song title → "Download" `ListTile` (key `'download-options-download-only'`) → `Divider` → "Add to playlist after download" label → `libraryPlaylistsProvider` filtered by `serverCredsProvider.navidromeUsername` (loading / error / empty-state / one `ListTile` per owned playlist, key `'download-to-playlist-${p.id}'`). Each tap: `Navigator.of(context).pop()` first, then invoke the callback.
+
+**New file: `android/app/lib/providers/download_to_playlist.dart`**
+
+```dart
+Future<void> downloadAndAddToPlaylist({
+  required WidgetRef ref,
+  required BuildContext context,
+  required SearchResultItem item,
+  required String playlistId,
+  required String playlistName,
+  @visibleForTesting Duration jobPollInterval = const Duration(seconds: 2),
+  @visibleForTesting Duration naviPollInterval = const Duration(seconds: 5),
+  @visibleForTesting int maxJobPolls = 150,   // ~5 min ceiling
+  @visibleForTesting int maxNaviPolls = 18,   // ~90 s ceiling
+}) async
+```
+
+Steps (each `await` is guarded by `context.mounted`):
+1. `downloadDispatcherProvider.notifier.dispatch(...)` → show "Downloading … will add to [playlist] when ready" snackbar. `ApiError` → `showApiError`, return.
+2. If `!response.state.isTerminal`: poll `BackendService.jobStatus` every `jobPollInterval` up to `maxJobPolls`. `failed` → error snackbar, return. Timeout → timeout snackbar, return.
+3. Poll `SubsonicLibraryService.findLibraryMatch("$title $artist")` every `naviPollInterval` up to `maxNaviPolls`. Transient `ApiError` → continue polling. Timeout (match still null) → warning snackbar, return.
+4. `PlaylistMutations.addSongs(playlistId, [match.id])` → success snackbar "Added [title] to [playlist]".
+
+**Modified: `android/app/lib/screens/library/library_search_results.dart`**
+
+In `_YtmSection`, replace the `onDownload` inline closure on each `ResultTile` with `DownloadOptionsSheet.show(...)`. `onDownloadOnly` keeps the existing dispatch + "Queued" snackbar logic. `onDownloadToPlaylist` calls `downloadAndAddToPlaylist(...)`.
+
+**Modified: `android/app/lib/screens/library/library_screen.dart`**
+
+Add two imports: `download_options_sheet.dart` and `download_to_playlist.dart`.
+
+**Tests:**
+
+`test/widgets/download_options_sheet_test.dart` — 6 widget tests (title visible, owned-playlist filter, empty-state, "Download" fires `onDownloadOnly` + closes, playlist row fires `onDownloadToPlaylist` + closes, loading spinner). Use a `Completer` (never resolved) for the loading-state test and skip `pumpAndSettle`.
+
+`test/providers/download_to_playlist_test.dart` — 3 tests using stubs for all four providers. Override syntax: `downloadDispatcherProvider.overrideWith(() => stub)` (no-arg factory); `backendServiceProvider.overrideWith((_) => Future.value(stub))` (FutureProvider). Tests: (1) happy path — `done` state skips job poll, match found → `addSongs` called, success snackbar visible; (2) job failed → error snackbar, `addSongs` not called; (3) Navidrome timeout — `maxNaviPolls=1`, match always null → warning snackbar, `addSongs` not called.
+
+**Snackbar-queue timing (test 3):** the initial "Downloading…" snackbar renders first. After `pumpAndSettle()` (which settles on the first snackbar), advance fake time past its 4 s display duration before asserting the second snackbar:
+```dart
+await tester.pumpAndSettle();
+await tester.pump(const Duration(seconds: 5));
+await tester.pumpAndSettle();
+expect(find.textContaining('not indexed yet'), findsOneWidget);
+```
+
+**Test gate:** all 9 tests green; `flutter test` full suite green; `flutter analyze` zero issues.
+
+**Commit:** `feat(flutter): U1 — download-to-playlist — optional playlist assignment on YTM download`
+
+---
+
 ## Cross-cutting reminders
 
 - **`flutter analyze` green before declaring any milestone done.**
@@ -703,8 +776,8 @@ Items scheduled into v1.5.0 (Phase P) or v2.0.0 (Phase Q) are no longer here —
 
 ## Roadmap complete when
 
-1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5, P1–P4, Q1–Q4, R1, S1–S11, T1–T5).
+1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5, P1–P4, Q1–Q4, R1, S1–S11, T1–T5, U1).
 2. Every test gate green at its milestone.
 3. G1, K2, L6, M5, N5, O5, P4, Q4, R1, S11, and T5 manual smokes verified on-device.
 4. CHANGELOG entries exist for each milestone group.
-5. `git log --oneline android/` reads as a clean A→T progression under the `feat(flutter):` / `chore(flutter):` Conventional-Commits cadence.
+5. `git log --oneline android/` reads as a clean A→U progression under the `feat(flutter):` / `chore(flutter):` Conventional-Commits cadence.

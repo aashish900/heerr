@@ -377,6 +377,28 @@ Resolving server-side is the whole point: `googlevideo` URLs are signed to the *
 
 ---
 
+## Phase L — Lyrics embedding via spotDL
+
+### [ ] L1. `SPOTDL_EMBED_LYRICS` env toggle
+Passes `--lyrics` to spotDL when enabled so downloaded MP3s carry embedded lyrics from spotDL's default providers (Genius, AZLyrics, etc.).
+
+**Files:**
+- `backend/app/config.py` — add `spotdl_embed_lyrics: bool = False` field to `Settings` after the `preview_*` fields. pydantic-settings maps this to `SPOTDL_EMBED_LYRICS`.
+- `backend/app/services/spotdl_runner.py` — add `embed_lyrics: bool = False` keyword-only arg to `run_spotdl`. Append `"--lyrics"` to `cmd` when `embed_lyrics=True`. No other changes to the function.
+- `backend/app/services/workers.py` — in `get_enqueuer()`, wrap `run_spotdl` in `functools.partial(run_spotdl, embed_lyrics=settings.spotdl_embed_lyrics)` before passing to `JobEnqueuer`. This preserves the `SpotdlRunner = Callable[[str, str], Awaitable[...]]` positional contract.
+- `.env.example` (repo root) — add commented `SPOTDL_EMBED_LYRICS=false` block after the `PREVIEW_CACHE_TTL_S` section.
+- `backend/tests/test_spotdl_runner.py` — add two async tests reusing the existing `monkeypatch + FakeProc` pattern:
+  - `test_embed_lyrics_flag_added_when_true`: `run_spotdl(..., embed_lyrics=True)` → `"--lyrics"` in captured `cmd`.
+  - `test_embed_lyrics_flag_absent_by_default`: `run_spotdl(...)` (no kwarg) → `"--lyrics"` absent.
+
+**Test gate:** both new tests green; `poetry run pytest` full suite green; `ruff check app/ && mypy app/` clean.
+
+**Smoke (optional):** set `SPOTDL_EMBED_LYRICS=true` in `.env`, restart container, download a track, confirm `eyeD3 <track>.mp3 | grep -i lyric` shows a lyrics tag.
+
+**Commit:** `feat(backend): L1 — SPOTDL_EMBED_LYRICS toggle — embed lyrics in downloaded MP3s`
+
+---
+
 ## Cross-cutting reminders
 
 - **`.env` never committed.** Only `.env.example`.
@@ -397,7 +419,7 @@ Resolving server-side is the whole point: `googlevideo` URLs are signed to the *
 
 ## Roadmap complete when
 
-1. All milestone boxes checked (A1–H1, I1–I5, J1–J12, K1–K5).
+1. All milestone boxes checked (A1–H1, I1–I5, J1–J12, K1–K5, L1).
 2. Every test gate green at its milestone.
 3. H1 smoke succeeds against the real home stack.
 4. J12 multi-user smoke succeeds against the real home stack.
