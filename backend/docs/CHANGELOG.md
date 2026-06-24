@@ -852,3 +852,13 @@ Stream-first preview — hear a YouTube Music search result before downloading i
 - **`backend/pyproject.toml` + `backend/app/main.py`** (K4) — version `3.1.0-rc1` → `3.2.0`.
 - **`backend/docs/{DECISIONLOG,CONTEXT}.md`** (K4) — new ADR "Phase K: YouTube Music preview via server-side proxy — v3.2.0"; CONTEXT preview surface + env vars documented.
 - **Tests:** `tests/test_preview_resolver.py` (13), `tests/test_preview.py` (11 — header+query auth, 401/403, Range→206, redirect-follow, upstream→502, kill-switch→404, resolver 422/404/502), `tests/test_config.py` (+2 preview settings). Full suite 423 passed; ruff check + format + mypy clean.
+
+## 2026-06-24 — K5: preview e2e smoke verified — v3.2.0
+
+Manual smoke on home server against the deployed v3.2.0 image. All four checks passed:
+
+- `GET /preview/stream?source_url=<real ytm watch url>&token=<read token>` → audio streamed successfully.
+- `Range: bytes=…` request → 206 + `Content-Range` returned (seek works).
+- Album `browse/` URL passed as `source_url` → 422 (unsupported type).
+- `PREVIEW_ENABLED=false` (restart with kill switch) → 404.
+- **`backend/docs/ROADMAP.md`** — K5 checked; status line updated to reflect Phase K complete.

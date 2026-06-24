@@ -4,7 +4,7 @@ Track progress through the backend build. Each milestone = one git commit with a
 
 See `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file is the *how* / *when*.
 
-**Status (2026-06-23):** Phases A–J complete (v3.1.0 smoke passed on home server 2026-06-19 — all sections green including e2e download, per-user isolation, recommendations, and admin listings; SMOKE-TEST.md deleted). **Phase K (YouTube Music preview stream proxy) planned — milestones K1–K5 below are unchecked.**
+**Status (2026-06-24):** Phases A–K complete. v3.2.0 smoke passed on home server 2026-06-24 — preview stream, Range/206, album URL → 422, and kill-switch all verified.
 
 **Conventions:**
 - TDD per CLAUDE.md §2 — tests written first, land in same commit as code.
@@ -369,7 +369,7 @@ Resolving server-side is the whole point: `googlevideo` URLs are signed to the *
 **Done when:** docs reflect implementation; version bumped.
 **Commit:** `chore(backend): K4 — preview ADR + CONTEXT/CHANGELOG + v3.2.0`
 
-### [ ] K5. End-to-end preview smoke on the home server
+### [x] K5. End-to-end preview smoke on the home server
 **Deliverable:** From a tailnet device against the deployed backend: `GET /preview/stream?source_url=<real ytm watch url>&token=<read token>` streams audio; a `Range: bytes=…` request returns 206; an album/`browse` URL → 422; `PREVIEW_ENABLED=false` → 404.
 **Test gate:** manual; record the commands + outcomes in `backend/docs/CHANGELOG.md`.
 **Done when:** all four checks pass.
