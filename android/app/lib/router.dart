@@ -201,7 +201,55 @@ class _ShellScaffold extends ConsumerStatefulWidget {
   ConsumerState<_ShellScaffold> createState() => _ShellScaffoldState();
 }
 
-class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
+class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
+    with WidgetsBindingObserver {
+  // V1: predictable back stack.
+  //
+  // `PopScope` is unreliable with go_router's ShellRoute because go_router 14
+  // calls `_findCurrentNavigators()` (innermost-first) and processes
+  // `maybePop()` before the shell page's PopScope can fire. Instead we
+  // register as a WidgetsBindingObserver. _ShellScaffoldState is constructed
+  // after the root Router (which registers RootBackButtonDispatcher), so in
+  // the reversed observer list we are called FIRST — before go_router touches
+  // anything.
+  //
+  // Logic:
+  //   • If go_router can pop (a detail screen is above the shell on the root
+  //     or shell navigator), yield to go_router — return false.
+  //   • If Library is in search mode, exit search (flip provider) — return true.
+  //   • If already on Home, yield to the OS — return false (app exits).
+  //   • Otherwise (any other tab/queue root) — go Home — return true.
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Future<bool> didPopRoute() async {
+    if (!mounted) return false;
+    // Yield to go_router when a screen is stacked above the shell.
+    if (GoRouter.of(context).canPop()) return false;
+    // Library search mode: clear field and exit search.
+    if (widget.location == Routes.library &&
+        ref.read(librarySearchActiveProvider)) {
+      ref.read(librarySearchActiveProvider.notifier).set(false);
+      return true;
+    }
+    // On Home: let the OS handle (exit the app).
+    if (widget.location == Routes.home) return false;
+    // Any other tab root or /queue: navigate to Home.
+    context.go(Routes.home);
+    return true;
+  }
+
   static const List<_NavTab> _tabs = <_NavTab>[
     _NavTab(
       path: Routes.home,
@@ -274,51 +322,25 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
   @override
   Widget build(BuildContext context) {
     final int currentIndex = _indexFor(widget.location);
-    // V1: predictable back stack. Tab switches use `context.go()`, which
-    // replaces the stack — so once a tab is selected Home is no longer
-    // beneath it and a system back would exit the app. Intercept back at the
-    // shell: from any non-Home tab/queue, route to Home; only when already on
-    // Home do we let the pop through (→ app exit). Pushed detail screens sit
-    // above the shell on the root navigator and pop themselves first, so this
-    // only fires at a tab root.
-    final bool atHome = widget.location == Routes.home;
-    // When Library is in search mode, system back should clear the field and
-    // exit search (not route to Home). The shell is the single back handler for
-    // this route; it exits search by flipping the same provider LibraryScreen
-    // watches, which clears the field via its listener.
-    final bool librarySearching =
-        widget.location == Routes.library &&
-        ref.watch(librarySearchActiveProvider);
-    return PopScope<Object?>(
-      canPop: atHome,
-      onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (didPop) return;
-        if (librarySearching) {
-          ref.read(librarySearchActiveProvider.notifier).set(false);
-          return;
-        }
-        context.go(Routes.home);
-      },
-      child: Scaffold(
-        body: widget.child,
-        bottomNavigationBar: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            const MiniPlayer(),
-            NavigationBar(
-              selectedIndex: currentIndex,
-              onDestinationSelected: (int i) => context.go(_tabs[i].path),
-              destinations: <NavigationDestination>[
-                for (final _NavTab t in _tabs)
-                  NavigationDestination(
-                    icon: _iconFor(context, t, selected: false),
-                    selectedIcon: _iconFor(context, t, selected: true),
-                    label: t.label,
-                  ),
-              ],
-            ),
-          ],
-        ),
+    return Scaffold(
+      body: widget.child,
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const MiniPlayer(),
+          NavigationBar(
+            selectedIndex: currentIndex,
+            onDestinationSelected: (int i) => context.go(_tabs[i].path),
+            destinations: <NavigationDestination>[
+              for (final _NavTab t in _tabs)
+                NavigationDestination(
+                  icon: _iconFor(context, t, selected: false),
+                  selectedIcon: _iconFor(context, t, selected: true),
+                  label: t.label,
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
