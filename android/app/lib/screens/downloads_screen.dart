@@ -62,11 +62,7 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen>
       ),
       body: TabBarView(
         controller: _tabs,
-        children: const <Widget>[
-          _AlbumsTab(),
-          _PlaylistsTab(),
-          _SongsTab(),
-        ],
+        children: const <Widget>[_AlbumsTab(), _PlaylistsTab(), _SongsTab()],
       ),
     );
   }
@@ -82,8 +78,9 @@ class _AlbumsTab extends ConsumerWidget {
     // artist would download the songs but the Albums / Songs tabs
     // would stay empty until the user also individually marked each
     // album under the artist.
-    final AsyncValue<List<String>> idsAsync =
-        ref.watch(downloadedAlbumIdsProvider);
+    final AsyncValue<List<String>> idsAsync = ref.watch(
+      downloadedAlbumIdsProvider,
+    );
     return idsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (Object e, _) => _ErrorView(message: 'Downloads error: $e'),
@@ -91,15 +88,15 @@ class _AlbumsTab extends ConsumerWidget {
         if (ids.isEmpty) {
           return const _EmptyView(
             icon: Icons.album_outlined,
-            message: 'No albums marked for offline.\n'
+            message:
+                'No albums marked for offline.\n'
                 'Mark an album or artist from Library, or enable\n'
                 '"Sync entire library" in Settings.',
           );
         }
         return ListView.builder(
           itemCount: ids.length,
-          itemBuilder: (BuildContext c, int i) =>
-              _AlbumRow(albumId: ids[i]),
+          itemBuilder: (BuildContext c, int i) => _AlbumRow(albumId: ids[i]),
         );
       },
     );
@@ -112,8 +109,9 @@ class _AlbumRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<Album> albumAsync =
-        ref.watch(libraryAlbumProvider(albumId));
+    final AsyncValue<Album> albumAsync = ref.watch(
+      libraryAlbumProvider(albumId),
+    );
     return albumAsync.when(
       loading: () => const ListTile(
         leading: SizedBox(
@@ -132,7 +130,7 @@ class _AlbumRow extends ConsumerWidget {
         title: album.name,
         subtitle: album.artist,
         coverArtId: album.coverArt,
-        onTap: () => context.go(Routes.libraryAlbum(album.id)),
+        onTap: () => context.push(Routes.libraryAlbum(album.id)),
         trailingPlay: true,
         onPlay: () => playAlbumFromSubsonic(ref, context, album.id),
       ),
@@ -145,8 +143,9 @@ class _PlaylistsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<OfflineManifest> manifestAsync =
-        ref.watch(offlineManifestProvider);
+    final AsyncValue<OfflineManifest> manifestAsync = ref.watch(
+      offlineManifestProvider,
+    );
     return manifestAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (Object e, _) => _ErrorView(message: 'Manifest error: $e'),
@@ -155,7 +154,8 @@ class _PlaylistsTab extends ConsumerWidget {
         if (ids.isEmpty) {
           return const _EmptyView(
             icon: Icons.queue_music_outlined,
-            message: 'No playlists marked for offline.\n'
+            message:
+                'No playlists marked for offline.\n'
                 'Mark a playlist from Library to download it.',
           );
         }
@@ -175,8 +175,9 @@ class _PlaylistRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<Playlist> async =
-        ref.watch(libraryPlaylistProvider(playlistId));
+    final AsyncValue<Playlist> async = ref.watch(
+      libraryPlaylistProvider(playlistId),
+    );
     return async.when(
       loading: () => const ListTile(
         leading: SizedBox(
@@ -195,7 +196,7 @@ class _PlaylistRow extends ConsumerWidget {
         title: p.name,
         subtitle: p.owner,
         coverArtId: p.coverArt,
-        onTap: () => context.go(Routes.libraryPlaylist(p.id)),
+        onTap: () => context.push(Routes.libraryPlaylist(p.id)),
         trailingPlay: true,
         onPlay: () => playPlaylistFromSubsonic(ref, context, p.id),
       ),
@@ -208,8 +209,7 @@ class _SongsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<List<Song>> async =
-        ref.watch(downloadedSongsProvider);
+    final AsyncValue<List<Song>> async = ref.watch(downloadedSongsProvider);
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (Object e, _) => _ErrorView(message: 'Songs error: $e'),
@@ -217,7 +217,8 @@ class _SongsTab extends ConsumerWidget {
         if (songs.isEmpty) {
           return const _EmptyView(
             icon: Icons.music_off_outlined,
-            message: 'No downloaded songs yet.\n'
+            message:
+                'No downloaded songs yet.\n'
                 'Mark an album or playlist for offline,\n'
                 'then wait for sync to complete.',
           );
@@ -226,9 +227,10 @@ class _SongsTab extends ConsumerWidget {
           itemCount: songs.length,
           itemBuilder: (BuildContext c, int i) {
             final Song s = songs[i];
-            final String subtitle = <String?>[s.artist, s.album]
-                .where((String? v) => v != null && v.isNotEmpty)
-                .join(' • ');
+            final String subtitle = <String?>[
+              s.artist,
+              s.album,
+            ].where((String? v) => v != null && v.isNotEmpty).join(' • ');
             return ListTile(
               leading: LibraryCoverArt(coverArtId: s.coverArt),
               title: Text(s.title),

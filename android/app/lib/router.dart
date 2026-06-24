@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import 'app/lifecycle_coordinator.dart';
+import 'providers/library/library_search_query.dart';
 import 'providers/profiles/profile_registry.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/downloads_screen.dart';
@@ -53,16 +54,18 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
   // against a torn-down profile until the user taps a tab. Bridging the
   // registry provider to a Listenable makes GoRouter re-evaluate the redirect
   // (→ /login) the instant the active profile becomes null.
-  final _RouterRefresh? refresh =
-      container == null ? null : _RouterRefresh(container);
+  final _RouterRefresh? refresh = container == null
+      ? null
+      : _RouterRefresh(container);
   return GoRouter(
     initialLocation: Routes.home,
     refreshListenable: refresh,
     redirect: container == null
         ? null
         : (BuildContext context, GoRouterState state) {
-            final AsyncValue<ProfileRegistryState> async =
-                container.read(profileRegistryProvider);
+            final AsyncValue<ProfileRegistryState> async = container.read(
+              profileRegistryProvider,
+            );
             final ProfileRegistryState? value = async.valueOrNull;
             // While the registry is still loading, don't redirect — let
             // the destination screen render a loading state.
@@ -89,7 +92,10 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
           // pure layout widget; all AppLifecycleState side-effects live in
           // LifecycleCoordinator.
           return LifecycleCoordinator(
-            child: _ShellScaffold(location: state.matchedLocation, child: child),
+            child: _ShellScaffold(
+              location: state.matchedLocation,
+              child: child,
+            ),
           );
         },
         routes: <RouteBase>[
@@ -117,7 +123,8 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
                 path: 'playlist/:id',
                 builder: (BuildContext context, GoRouterState state) =>
                     PlaylistDetailScreen(
-                        playlistId: state.pathParameters['id']!),
+                      playlistId: state.pathParameters['id']!,
+                    ),
               ),
               GoRoute(
                 path: 'recommendations',
@@ -230,10 +237,10 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
   /// selected / unselected states without hard-coding a palette.
   Widget _buildLibraryIcon(BuildContext context, {required bool selected}) {
     final IconThemeData theme = selected
-        ? NavigationBarTheme.of(context).iconTheme?.resolve(<WidgetState>{
-              WidgetState.selected,
-            }) ??
-            IconTheme.of(context)
+        ? NavigationBarTheme.of(
+                context,
+              ).iconTheme?.resolve(<WidgetState>{WidgetState.selected}) ??
+              IconTheme.of(context)
         : IconTheme.of(context);
     final Color tint = theme.color ?? Theme.of(context).colorScheme.onSurface;
     return SvgPicture.asset(
@@ -267,25 +274,51 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
   @override
   Widget build(BuildContext context) {
     final int currentIndex = _indexFor(widget.location);
-    return Scaffold(
-      body: widget.child,
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          const MiniPlayer(),
-          NavigationBar(
-            selectedIndex: currentIndex,
-            onDestinationSelected: (int i) => context.go(_tabs[i].path),
-            destinations: <NavigationDestination>[
-              for (final _NavTab t in _tabs)
-                NavigationDestination(
-                  icon: _iconFor(context, t, selected: false),
-                  selectedIcon: _iconFor(context, t, selected: true),
-                  label: t.label,
-                ),
-            ],
-          ),
-        ],
+    // V1: predictable back stack. Tab switches use `context.go()`, which
+    // replaces the stack — so once a tab is selected Home is no longer
+    // beneath it and a system back would exit the app. Intercept back at the
+    // shell: from any non-Home tab/queue, route to Home; only when already on
+    // Home do we let the pop through (→ app exit). Pushed detail screens sit
+    // above the shell on the root navigator and pop themselves first, so this
+    // only fires at a tab root.
+    final bool atHome = widget.location == Routes.home;
+    // When Library is in search mode, system back should clear the field and
+    // exit search (not route to Home). The shell is the single back handler for
+    // this route; it exits search by flipping the same provider LibraryScreen
+    // watches, which clears the field via its listener.
+    final bool librarySearching =
+        widget.location == Routes.library &&
+        ref.watch(librarySearchActiveProvider);
+    return PopScope<Object?>(
+      canPop: atHome,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (didPop) return;
+        if (librarySearching) {
+          ref.read(librarySearchActiveProvider.notifier).set(false);
+          return;
+        }
+        context.go(Routes.home);
+      },
+      child: Scaffold(
+        body: widget.child,
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const MiniPlayer(),
+            NavigationBar(
+              selectedIndex: currentIndex,
+              onDestinationSelected: (int i) => context.go(_tabs[i].path),
+              destinations: <NavigationDestination>[
+                for (final _NavTab t in _tabs)
+                  NavigationDestination(
+                    icon: _iconFor(context, t, selected: false),
+                    selectedIcon: _iconFor(context, t, selected: true),
+                    label: t.label,
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

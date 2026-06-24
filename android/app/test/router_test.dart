@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:heerr/offline/offline_sync.dart';
+import 'package:heerr/models/subsonic/search_result3.dart';
+import 'package:heerr/providers/library/combined_search.dart';
 import 'package:heerr/providers/profiles/profile_registry.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/router.dart';
@@ -25,10 +27,11 @@ class _NoopStorage implements SecureStorage {
   Future<void> delete(String key) async {}
 }
 
-Widget _bootApp() {
+Widget _bootApp({List<Override> extraOverrides = const <Override>[]}) {
   return ProviderScope(
     overrides: <Override>[
       secureStorageProvider.overrideWith((Ref<SecureStorage> _) => _NoopStorage()),
+      ...extraOverrides,
     ],
     child: MaterialApp.router(
       theme: heerrDarkTheme(),
@@ -211,6 +214,104 @@ void main() {
       for (final int h in <int>[0, 2, 4]) {
         expect(greetingForHour(h), 'Good evening', reason: 'hour=$h');
       }
+    });
+  });
+
+  group('V1 — predictable back stack', () {
+    testWidgets('system back from a non-Home tab returns to Home, not exit', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(_bootApp());
+      await tester.pumpAndSettle();
+
+      // Switch to Settings (a tab switch uses context.go → stack replace).
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text('Settings'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(_activeTitle(tester), 'Settings');
+
+      // System back must be intercepted by the shell PopScope → route Home.
+      final bool handled = await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(handled, isTrue, reason: 'shell should consume back off-Home');
+      expect(
+        <String>['Good morning', 'Good afternoon', 'Good evening'],
+        contains(_activeTitle(tester)),
+        reason: 'back from Settings should land on Home',
+      );
+    });
+
+    testWidgets('system back on Home is not consumed (app would exit)', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(_bootApp());
+      await tester.pumpAndSettle();
+
+      // On Home canPop is true and Home is the only shell page, so the pop
+      // is not handled — the OS takes it (app exit), the desired behaviour.
+      final bool handled = await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(handled, isFalse);
+    });
+  });
+
+  group('V1 — search-mode back clears the field instead of exiting', () {
+    testWidgets('system back in search mode clears text + returns to browse', (
+      WidgetTester tester,
+    ) async {
+      // Stub the combined-search result for our query so the screen renders a
+      // search body without spawning the real debounce / queue-poll timers
+      // (which would leak past the test as pending timers).
+      await tester.pumpWidget(
+        _bootApp(
+          extraOverrides: <Override>[
+            combinedSearchProvider('daft punk').overrideWithValue(
+              const CombinedSearchResult(
+                query: 'daft punk',
+                library: AsyncValue<SearchResult3>.loading(),
+              ),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Library tab → enter search mode → type a query.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text('Library'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Search'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'daft punk');
+      await tester.pump();
+      expect(find.text('daft punk'), findsOneWidget);
+
+      // System back: PopScope(canPop:false) → onExit clears text + drops back
+      // to the browse TabBar, rather than falling through to Home/exit.
+      final bool handled = await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(handled, isTrue);
+      expect(find.text('daft punk'), findsNothing);
+      expect(find.byType(TextField), findsNothing);
+      // Back on the Library browse view (Artists/Albums/Playlists tabs).
+      expect(
+        find.descendant(of: find.byType(TabBar), matching: find.text('Artists')),
+        findsOneWidget,
+      );
+
+      // Re-entering search shows an empty field (the query state was cleared).
+      await tester.tap(find.byTooltip('Search'));
+      await tester.pumpAndSettle();
+      final TextField field = tester.widget<TextField>(find.byType(TextField));
+      expect(field.controller!.text, isEmpty);
     });
   });
 

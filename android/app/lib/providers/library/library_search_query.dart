@@ -23,6 +23,23 @@ class LibrarySearchQuery extends _$LibrarySearchQuery {
   }
 }
 
+/// Whether the Library tab is currently showing its search overlay (V1).
+/// `LibraryScreen` keeps this in sync with its local `_searching` state so
+/// the shell's back-button handler (`_ShellScaffold`) can tell "Library is
+/// searching" apart from "Library browse" — both live in the same go_router
+/// route, so both their `PopScope`s fire on a system back. When searching,
+/// the shell defers to `LibraryScreen`'s own back handler (clear + exit
+/// search) instead of routing to Home.
+@Riverpod(keepAlive: true)
+class LibrarySearchActive extends _$LibrarySearchActive {
+  @override
+  bool build() => false;
+
+  void set(bool active) {
+    state = active;
+  }
+}
+
 /// One-shot flag flipped by surfaces outside the Library tab (Home's
 /// search shortcut) to request that Library auto-enter search mode on
 /// next mount. The LibraryScreen reads it in `initState`, applies it,

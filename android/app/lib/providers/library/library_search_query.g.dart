@@ -31,6 +31,31 @@ final librarySearchQueryProvider =
     );
 
 typedef _$LibrarySearchQuery = Notifier<String>;
+String _$librarySearchActiveHash() =>
+    r'd83d68008ab3f6e82ffc8379108bac5c351a2494';
+
+/// Whether the Library tab is currently showing its search overlay (V1).
+/// `LibraryScreen` keeps this in sync with its local `_searching` state so
+/// the shell's back-button handler (`_ShellScaffold`) can tell "Library is
+/// searching" apart from "Library browse" — both live in the same go_router
+/// route, so both their `PopScope`s fire on a system back. When searching,
+/// the shell defers to `LibraryScreen`'s own back handler (clear + exit
+/// search) instead of routing to Home.
+///
+/// Copied from [LibrarySearchActive].
+@ProviderFor(LibrarySearchActive)
+final librarySearchActiveProvider =
+    NotifierProvider<LibrarySearchActive, bool>.internal(
+      LibrarySearchActive.new,
+      name: r'librarySearchActiveProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$librarySearchActiveHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$LibrarySearchActive = Notifier<bool>;
 String _$librarySearchAutoFocusHash() =>
     r'c55b892985420976e3ad57c16227eaf7e110342a';
 

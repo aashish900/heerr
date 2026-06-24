@@ -54,7 +54,6 @@ class LibraryScreen extends ConsumerStatefulWidget {
 
 class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   late final TextEditingController _searchController;
-  bool _searching = false;
 
   @override
   void initState() {
@@ -63,7 +62,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     _searchController = TextEditingController(text: initial);
     final bool autoFocusRequested =
         ref.read(librarySearchAutoFocusProvider);
-    _searching = initial.isNotEmpty || autoFocusRequested;
+    // V1: search mode is owned by `librarySearchActiveProvider` (the single
+    // source of truth, also read by the shell's back-button handler). Seed it
+    // from the persisted query / auto-focus request post-frame so we don't
+    // mutate a provider during initState/build.
+    final bool initialSearching = initial.isNotEmpty || autoFocusRequested;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(librarySearchActiveProvider.notifier).set(initialSearching);
+    });
     if (autoFocusRequested) {
       // Consume after the first build so subsequent navigations into the
       // Library tab don't accidentally re-enter search mode.
@@ -81,13 +88,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   void _enterSearch() {
-    setState(() => _searching = true);
+    ref.read(librarySearchActiveProvider.notifier).set(true);
   }
 
   void _exitSearch() {
-    _searchController.clear();
-    ref.read(librarySearchQueryProvider.notifier).clear();
-    setState(() => _searching = false);
+    // Flipping the provider drives the rebuild back to browse; the listener in
+    // `build` clears the controller + query on the true→false transition (so
+    // the shell's PopScope can exit search by flipping the same flag).
+    ref.read(librarySearchActiveProvider.notifier).set(false);
   }
 
   void _onQueryChanged(String value) {
@@ -96,7 +104,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_searching) {
+    // Clear the field + query whenever search mode turns off — whether exited
+    // via the in-app back arrow (_exitSearch) or the system back button
+    // (shell PopScope flips the same provider).
+    ref.listen<bool>(librarySearchActiveProvider, (bool? prev, bool next) {
+      if (prev == true && !next) {
+        _searchController.clear();
+        ref.read(librarySearchQueryProvider.notifier).clear();
+      }
+    });
+    final bool searching = ref.watch(librarySearchActiveProvider);
+    if (searching) {
       return _SearchModeScaffold(
         controller: _searchController,
         onQueryChanged: _onQueryChanged,

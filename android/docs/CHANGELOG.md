@@ -2116,3 +2116,13 @@ UX revision of the U1 commit above, per user request. A plain tap of the downloa
 - **Removed:** `lib/widgets/download_options_sheet.dart`, `test/widgets/download_options_sheet_test.dart`.
 - **Tests:** `test/widgets/download_to_playlist_sheet_test.dart` (5: header+title, ownership filter, empty, row-tap fires onSelect, loading); long-press case added to `test/widgets/result_tile_test.dart`; `download_to_playlist_test.dart` provider tests unchanged.
 - Verified: `flutter analyze` clean; full suite **643** passed.
+
+## 2026-06-24 — V1: predictable back-button navigation
+
+- **`lib/router.dart`** — `_ShellScaffold` now wraps its `Scaffold` in a `PopScope`. `canPop` is true only on Home; off-Home a system back is intercepted and routes to Home (so back walks toward Home, then exits on Home instead of quitting from any tab). When Library is in search mode it instead flips `librarySearchActiveProvider` to false (single back handler per route). Added import of `providers/library/library_search_query.dart`.
+- **`lib/providers/library/library_search_query.dart`** — new `LibrarySearchActive` keepAlive notifier (bool) — single source of truth for whether the Library tab is showing its search overlay; read by the shell's back handler.
+- **`lib/screens/library/library_screen.dart`** — search mode is now driven by `librarySearchActiveProvider` instead of a local `_searching` bool. `initState` seeds it post-frame from the persisted query / auto-focus; `build` registers a `ref.listen` that clears the controller + query on the true→false transition (covers both the in-app back arrow and the system back button). `_enterSearch`/`_exitSearch` just flip the provider.
+- **`lib/screens/library/library_search_results.dart`** — removed the (briefly added) search-mode `PopScope`; back handling consolidated in the shell.
+- **`lib/screens/downloads_screen.dart`** — album (`_AlbumRow`) and playlist (`_PlaylistRow`) drill-downs changed `context.go(...)` → `context.push(...)` so back returns to Downloads instead of replacing the stack.
+- **Tests:** `test/router_test.dart` — added `V1 — predictable back stack` (off-Home back → Home and is handled; Home back not handled → app exit) and `V1 — search-mode back clears the field` (type query, system back clears text + returns to browse tabs, query state cleared). Stubs `combinedSearchProvider('daft punk')` to keep the test timer-free.
+- Verified: `flutter analyze` clean; full suite **646** passed.

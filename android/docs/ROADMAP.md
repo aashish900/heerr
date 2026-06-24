@@ -740,6 +740,44 @@ expect(find.textContaining('not indexed yet'), findsOneWidget);
 
 ---
 
+## Phase V — Back-button navigation fixes (predictable back stack)
+
+**Problem:** Two user-reported back-button bugs.
+1. From any non-Home screen the system back button exits the app instead of walking back toward Home. Root cause: bottom-nav tab switches use `context.go()` (`router.dart:278`), which *replaces* the go_router stack rather than pushing — so once a tab is selected, Home is gone from the stack and the next back exits the app. Two detail drill-downs in `downloads_screen.dart` (`:135` album, `:198` playlist) also use `context.go()` where they should `context.push()`, so back from those exits immediately.
+2. With text in the Library search field, the **system** back button exits the app instead of clearing the field. Root cause: search is an internal `_searching` bool in `LibraryScreen` (not a route); the in-app AppBar back arrow calls `onExit`, but the hardware back button has no `PopScope` to intercept it (`library_search_results.dart`).
+
+**Decision (locked):** Any tab → Home → exit. Use a shell-level `PopScope` (not a `StatefulShellRoute` refactor) — smaller, lower-risk for v1. Detail screens already push onto the root navigator above the `ShellRoute`, so they pop correctly; only the flat tab roots need handling.
+
+**Pure-client slice — no backend changes.**
+
+### [x] V1. Predictable back stack + search-mode back interception
+
+**Single back handler per route (as built):** a go_router route hosts both the shell *and* the Library search overlay, and a system back fires only the outer (shell) `PopScope` — so a second `PopScope` inside the search overlay never runs. Back handling is therefore consolidated in the shell, keyed off a new search-active provider.
+
+**`android/app/lib/providers/library/library_search_query.dart`** — new `LibrarySearchActive` keepAlive notifier (bool): single source of truth for whether Library is showing its search overlay.
+
+**`android/app/lib/router.dart`** — wrap `_ShellScaffold`'s `Scaffold` in a `PopScope`:
+- `canPop:` true only when `widget.location == Routes.home`.
+- `onPopInvokedWithResult:` if `!didPop` → when Library is searching (`location == library && librarySearchActiveProvider`), flip `librarySearchActiveProvider` to false (exit search); otherwise `context.go(Routes.home)`.
+
+Fires only when the shell route is the top route (pushed detail screens pop themselves first), so it handles exactly the tab-root case: from any tab/queue → back goes Home; from Home → back exits.
+
+**`android/app/lib/screens/library/library_screen.dart`** — search mode driven by `librarySearchActiveProvider` (not a local `_searching` bool). `initState` seeds it post-frame from the persisted query / auto-focus; `build` registers a `ref.listen` that clears the controller + `librarySearchQueryProvider` on the true→false transition (covers both the in-app back arrow and the system back button). `_enterSearch`/`_exitSearch` just flip the provider.
+
+**`android/app/lib/screens/library/library_search_results.dart`** — `_SearchModeScaffold` stays a plain `Scaffold` (no `PopScope`); back is handled by the shell.
+
+**`android/app/lib/screens/downloads_screen.dart`** — change `context.go(...)` → `context.push(...)` at the album (`:135`) and playlist (`:198`) drill-downs so back returns to Downloads.
+
+**Tests:**
+- `test/router_test.dart` — from a tab/detail location, simulate system back → asserts navigation to Home (not app exit); from Home, pop is allowed.
+- Library-screen widget test — enter search, type text, trigger system back → asserts text cleared, `_searching == false`, still on Library (not popped).
+
+**Test gate:** new tests green; `flutter test` full suite green; `flutter analyze` zero issues.
+
+**Commit:** `fix(flutter): V1 — predictable back stack — tab-root back to Home, search back clears field`
+
+---
+
 ## Cross-cutting reminders
 
 - **`flutter analyze` green before declaring any milestone done.**
@@ -776,7 +814,7 @@ Items scheduled into v1.5.0 (Phase P) or v2.0.0 (Phase Q) are no longer here —
 
 ## Roadmap complete when
 
-1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5, P1–P4, Q1–Q4, R1, S1–S11, T1–T5, U1).
+1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5, P1–P4, Q1–Q4, R1, S1–S11, T1–T5, U1, V1).
 2. Every test gate green at its milestone.
 3. G1, K2, L6, M5, N5, O5, P4, Q4, R1, S11, and T5 manual smokes verified on-device.
 4. CHANGELOG entries exist for each milestone group.

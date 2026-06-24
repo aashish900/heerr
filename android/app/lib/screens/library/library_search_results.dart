@@ -14,43 +14,46 @@ class _SearchModeScaffold extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final String query = ref.watch(librarySearchQueryProvider);
+    // System-back handling for search mode lives in the shell's PopScope
+    // (_ShellScaffold), keyed off `librarySearchActiveProvider` — a single
+    // back handler per route avoids two PopScopes fighting over the same pop.
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          tooltip: 'Close search',
-          onPressed: onExit,
-        ),
-        title: TextField(
-          controller: controller,
-          autofocus: true,
-          textInputAction: TextInputAction.search,
-          decoration: const InputDecoration(
-            hintText: 'Search library + YouTube Music',
-            border: InputBorder.none,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            tooltip: 'Close search',
+            onPressed: onExit,
           ),
-          onChanged: onQueryChanged,
-        ),
-        actions: <Widget>[
-          if (controller.text.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.close),
-              tooltip: 'Clear',
-              onPressed: () {
-                controller.clear();
-                onQueryChanged('');
-              },
+          title: TextField(
+            controller: controller,
+            autofocus: true,
+            textInputAction: TextInputAction.search,
+            decoration: const InputDecoration(
+              hintText: 'Search library + YouTube Music',
+              border: InputBorder.none,
             ),
-        ],
-      ),
-      body: query.trim().isEmpty
-          ? const EmptyState(
-              icon: Icons.search,
-              title: 'Search your library',
-              subtitle:
-                  'We check Navidrome first. YouTube Music kicks in if nothing matches.',
-            )
-          : _CombinedResultsBody(query: query),
+            onChanged: onQueryChanged,
+          ),
+          actions: <Widget>[
+            if (controller.text.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.close),
+                tooltip: 'Clear',
+                onPressed: () {
+                  controller.clear();
+                  onQueryChanged('');
+                },
+              ),
+          ],
+        ),
+        body: query.trim().isEmpty
+            ? const EmptyState(
+                icon: Icons.search,
+                title: 'Search your library',
+                subtitle:
+                    'We check Navidrome first. YouTube Music kicks in if nothing matches.',
+              )
+            : _CombinedResultsBody(query: query),
     );
   }
 }
@@ -62,22 +65,21 @@ class _CombinedResultsBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final CombinedSearchResult result =
-        ref.watch(combinedSearchProvider(query));
+    final CombinedSearchResult result = ref.watch(
+      combinedSearchProvider(query),
+    );
 
     final AsyncValue<SearchResult3> library = result.library;
     final AsyncValue<SearchResponse>? ytm = result.ytm;
     final bool manuallyTriggered = ref.watch(
-      ytmManualTriggerProvider
-          .select((Set<String> s) => s.contains(query)),
+      ytmManualTriggerProvider.select((Set<String> s) => s.contains(query)),
     );
 
     // K-polish: heerrGreen indicator for the song row whose subsonicId
     // matches the active MediaItem. Null when nothing is playing.
-    final String? currentSubsonicId = ref
-        .watch(currentMediaItemProvider)
-        .valueOrNull
-        ?.extras?['subsonicId'] as String?;
+    final String? currentSubsonicId =
+        ref.watch(currentMediaItemProvider).valueOrNull?.extras?['subsonicId']
+            as String?;
 
     return library.when(
       loading: () => const SkeletonList(count: 6),
@@ -85,7 +87,8 @@ class _CombinedResultsBody extends ConsumerWidget {
       data: (SearchResult3 lib) {
         final bool libEmpty =
             lib.artist.isEmpty && lib.album.isEmpty && lib.song.isEmpty;
-        final bool bothEmpty = libEmpty &&
+        final bool bothEmpty =
+            libEmpty &&
             (ytm?.maybeWhen(
                   data: (SearchResponse r) => r.results.isEmpty,
                   orElse: () => false,
@@ -135,14 +138,14 @@ class _CombinedResultsBody extends ConsumerWidget {
                     subtitle: a.artist,
                     coverArtId: a.coverArt,
                     trailingPlay: true,
-                    isMarkedForOffline: ref
+                    isMarkedForOffline:
+                        ref
                             .watch(offlineManifestProvider)
                             .valueOrNull
                             ?.markedAlbums
                             .contains(a.id) ??
                         false,
-                    onPlay: () =>
-                        playAlbumFromSubsonic(ref, context, a.id),
+                    onPlay: () => playAlbumFromSubsonic(ref, context, a.id),
                     onTap: () => context.push(Routes.libraryAlbum(a.id)),
                   ),
               ],
@@ -230,12 +233,12 @@ class _YtmSection extends ConsumerWidget {
                   item: item,
                   onSelect: (String playlistId, String playlistName) =>
                       downloadAndAddToPlaylist(
-                    ref: ref,
-                    context: context,
-                    item: item,
-                    playlistId: playlistId,
-                    playlistName: playlistName,
-                  ),
+                        ref: ref,
+                        context: context,
+                        item: item,
+                        playlistId: playlistId,
+                        playlistName: playlistName,
+                      ),
                 ),
               ),
           ],
@@ -252,7 +255,9 @@ class _YtmSection extends ConsumerWidget {
     SearchResultItem item,
   ) async {
     try {
-      await ref.read(downloadDispatcherProvider.notifier).dispatch(
+      await ref
+          .read(downloadDispatcherProvider.notifier)
+          .dispatch(
             item.sourceUrl,
             sourceType: item.sourceType,
             displayName: item.title,
@@ -278,7 +283,9 @@ class _ErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Text(error is ApiError ? (error as ApiError).message : 'Error: $error'),
+      child: Text(
+        error is ApiError ? (error as ApiError).message : 'Error: $error',
+      ),
     );
   }
 }

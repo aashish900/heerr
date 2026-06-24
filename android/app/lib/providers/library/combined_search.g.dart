@@ -23,7 +23,7 @@ final reindexGraceProvider = Provider<Duration>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ReindexGraceRef = ProviderRef<Duration>;
-String _$combinedSearchHash() => r'082ecd054e2a46527ff0ffb5b419fb5d206b4890';
+String _$combinedSearchHash() => r'c2369561ebe499455e636d21b63c07d285deb70b';
 
 /// Copied from Dart SDK
 class _SystemHash {

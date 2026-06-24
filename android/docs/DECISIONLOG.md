@@ -717,3 +717,15 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Trade-off:** A preview that the user lets run produces backend bandwidth (the K double-hop) with nothing persisted; if they want to keep it they must still tap Download. Accepted — auditioning is cheap at home scale and the explicit Download keeps "what's in my library" intentional. The reactive-promotion handoff means a previewed-then-downloaded track briefly exists as both a YT row (preview) and, post-reindex, a library row — the promotion collapses this on the next render.
 
 **Reference:** `android/app/lib/player/{preview_url,search_result_to_media_item,playback_actions}.dart`, `android/app/lib/widgets/{result_tile,preview_badge,mini_player}.dart`, `android/app/lib/screens/{library/library_search_results,player/now_playing_screen}.dart`, `android/app/lib/api/endpoints.dart`. Backend side: `backend/app/api/v1/preview.py` + ADR `backend/docs/DECISIONLOG.md` 2026-06-23. Roadmap milestones T1–T5; CHANGELOG `2026-06-23 — Phase T`. Recommendation/home follow-up: DEBT F3.
+
+---
+
+## 2026-06-24 — Back-button: shell PopScope to Home, single handler per route
+
+**Context:** Two reported back-button bugs. (1) From any non-Home screen the system back exited the app instead of walking back to Home — because bottom-nav tab switches use `context.go()`, which replaces the go_router stack, leaving no Home beneath the active tab. (2) With text in the Library search field, system back exited the app because search is an internal mode (not a route) with no back interception.
+
+**Decision:** Handle tab-root back with a single `PopScope` in the shell (`_ShellScaffold`): off-Home → route to Home; on Home → allow the OS pop (exit). Search mode is exited by the *same* shell handler via a new `librarySearchActiveProvider` flag — not a second `PopScope` — so there is exactly one back handler per go_router route. Two detail drill-downs in Downloads were also corrected from `context.go()` to `context.push()`.
+
+**Why:** Pushed detail screens already sit above the `ShellRoute` on the root navigator and pop correctly; only the flat tab roots needed handling, so a shell-level `PopScope` is the minimal fix. A first attempt used a separate `PopScope` inside the search overlay, but a single go_router route hosts both the shell and the overlay — and a system back fires only the outer handler, so the inner search handler never cleared the field. Consolidating to one provider-driven handler removed the conflict.
+
+**Alternatives considered:** `StatefulShellRoute.indexedStack` (per-tab back history + preserved state) — more idiomatic but a larger router refactor; deferred (recorded in ROADMAP Phase V as the alternative). Keeping search as an internal bool with its own `PopScope` — rejected: two `PopScope`s in one route fight over the same pop.
