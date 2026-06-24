@@ -85,122 +85,68 @@ class _Transport extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final Color primary = Theme.of(context).colorScheme.primary;
     final bool shuffleOn = shuffleMode != AudioServiceShuffleMode.none;
     final bool repeatOn = repeatMode != AudioServiceRepeatMode.none;
 
-    return Column(
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: <Widget>[
-        // ── Skip / play / skip ──────────────────────────────────────────
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: <Widget>[
-            IconButton(
-              iconSize: 36,
-              tooltip: 'Previous',
-              icon: const Icon(Icons.skip_previous),
-              onPressed: () => ref.read(audioHandlerProvider).skipToPrevious(),
-            ),
-            IconButton(
-              iconSize: 56,
-              tooltip: playing ? 'Pause' : 'Play',
-              icon: Icon(
-                playing ? Icons.pause_circle_filled : Icons.play_circle_fill,
-              ),
-              onPressed: () {
-                final HeerrAudioHandler h = ref.read(audioHandlerProvider);
-                if (playing) {
-                  h.pause();
-                } else {
-                  h.play();
-                }
-              },
-            ),
-            IconButton(
-              iconSize: 36,
-              tooltip: 'Next',
-              icon: const Icon(Icons.skip_next),
-              onPressed: () => ref.read(audioHandlerProvider).skipToNext(),
-            ),
-          ],
+        IconButton(
+          iconSize: 28,
+          tooltip: shuffleOn ? 'Shuffle on' : 'Shuffle off',
+          color: shuffleOn ? primary : null,
+          icon: const Icon(Icons.shuffle_rounded),
+          onPressed: () {
+            final HeerrAudioHandler h = ref.read(audioHandlerProvider);
+            h.setShuffleMode(shuffleOn
+                ? AudioServiceShuffleMode.none
+                : AudioServiceShuffleMode.all);
+          },
         ),
-        // ── Shuffle / Repeat mode chips ──────────────────────────────────
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: <Widget>[
-            _ModeButton(
-              icon: Icons.shuffle_rounded,
-              label: 'Shuffle',
-              active: shuffleOn,
-              onPressed: () => ref.read(audioHandlerProvider).setShuffleMode(
-                    shuffleOn
-                        ? AudioServiceShuffleMode.none
-                        : AudioServiceShuffleMode.all,
-                  ),
-            ),
-            _ModeButton(
-              icon: repeatMode == AudioServiceRepeatMode.one
-                  ? Icons.repeat_one_rounded
-                  : Icons.repeat_rounded,
-              label: repeatMode == AudioServiceRepeatMode.one
-                  ? 'Repeat one'
-                  : 'Repeat',
-              active: repeatOn,
-              onPressed: () => ref
-                  .read(audioHandlerProvider)
-                  .setRepeatMode(_nextRepeat(repeatMode)),
-            ),
-          ],
+        IconButton(
+          iconSize: 36,
+          tooltip: 'Previous',
+          icon: const Icon(Icons.skip_previous_rounded),
+          onPressed: () => ref.read(audioHandlerProvider).skipToPrevious(),
+        ),
+        IconButton(
+          iconSize: 56,
+          tooltip: playing ? 'Pause' : 'Play',
+          icon: Icon(
+            playing ? Icons.pause_circle_filled : Icons.play_circle_fill,
+          ),
+          onPressed: () {
+            final HeerrAudioHandler h = ref.read(audioHandlerProvider);
+            if (playing) {
+              h.pause();
+            } else {
+              h.play();
+            }
+          },
+        ),
+        IconButton(
+          iconSize: 36,
+          tooltip: 'Next',
+          icon: const Icon(Icons.skip_next_rounded),
+          onPressed: () => ref.read(audioHandlerProvider).skipToNext(),
+        ),
+        IconButton(
+          iconSize: 28,
+          tooltip: repeatMode == AudioServiceRepeatMode.one
+              ? 'Repeat one'
+              : repeatOn
+                  ? 'Repeat all'
+                  : 'Repeat off',
+          color: repeatOn ? primary : null,
+          icon: Icon(repeatMode == AudioServiceRepeatMode.one
+              ? Icons.repeat_one_rounded
+              : Icons.repeat_rounded),
+          onPressed: () => ref
+              .read(audioHandlerProvider)
+              .setRepeatMode(_nextRepeat(repeatMode)),
         ),
       ],
-    );
-  }
-}
-
-/// Rounded chip with an icon above a text label. Used for the Shuffle and
-/// Repeat mode toggles in [_Transport].
-class _ModeButton extends StatelessWidget {
-  const _ModeButton({
-    required this.icon,
-    required this.label,
-    required this.active,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final ColorScheme cs = Theme.of(context).colorScheme;
-    final Color color = active ? cs.primary : cs.onSurfaceVariant;
-    return Material(
-      color: cs.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(icon, color: color, size: 22),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 12,
-                  fontWeight:
-                      active ? FontWeight.w600 : FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
