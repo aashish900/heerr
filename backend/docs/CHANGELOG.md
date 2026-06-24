@@ -872,3 +872,13 @@ Optional `--lyrics` pass-through to spotdl so downloaded files carry embedded ly
 - **`backend/app/services/workers.py`** — `get_enqueuer()` wraps `run_spotdl` in `functools.partial(run_spotdl, embed_lyrics=settings.spotdl_embed_lyrics)`, preserving the `SpotdlRunner = Callable[[str, str], …]` positional contract.
 - **`/.env.example`** — new commented "Lyrics embedding (Phase L)" block (`SPOTDL_EMBED_LYRICS=false`) after the Preview section.
 - **Tests:** `tests/test_spotdl_runner.py` (+2) — `test_embed_lyrics_flag_added_when_true`, `test_embed_lyrics_flag_absent_by_default`. Full suite 425 passed; ruff check + format + mypy clean.
+
+## 2026-06-24 — L1: lyrics-embedding e2e smoke verified
+
+Manual smoke on the home server against the deployed image (`v4.1.0-rc1`). Both
+lyrics paths verified plus a regression sweep of the wider backend surface:
+
+- **Default OFF** — `SPOTDL_EMBED_LYRICS` unset/false → downloaded track had **no** `USLT` ID3 frame (inspected via `mutagen` from the spotDL venv).
+- **Enabled** — `SPOTDL_EMBED_LYRICS=true` + `docker compose up -d --force-recreate heerr-backend` → re-downloaded track carried an embedded `USLT` lyrics frame.
+- **Regression sweep** — `/health`, `POST /auth/login`, `POST /search`, `POST /download` → `done`, per-user dedupe (`deduped:true`), `GET /preview/stream` Range → 206, `GET /recommend/health` all green.
+- A temporary `backend/docs/SMOKE-TEST.md` checklist drove the run and was removed afterward (kept ephemeral by design).

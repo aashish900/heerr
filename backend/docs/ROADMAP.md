@@ -393,7 +393,7 @@ Passes `--lyrics` to spotDL when enabled so downloaded MP3s carry embedded lyric
 
 **Test gate:** both new tests green; `poetry run pytest` full suite green; `ruff check app/ && mypy app/` clean.
 
-**Smoke (optional):** set `SPOTDL_EMBED_LYRICS=true` in `.env`, restart container, download a track, confirm `eyeD3 <track>.mp3 | grep -i lyric` shows a lyrics tag.
+**Smoke:** ✅ Passed on the home server 2026-06-24. Default-off path confirmed no `USLT` ID3 frame; with `SPOTDL_EMBED_LYRICS=true` (container recreated) a re-downloaded track carried an embedded `USLT` lyrics frame. Also re-verified the wider backend surface (health, login, search, download→done, dedupe, preview Range/206, recommend health) green.
 
 **Commit:** `feat(backend): L1 — SPOTDL_EMBED_LYRICS toggle — embed lyrics in downloaded MP3s`
 
