@@ -1,3 +1,4 @@
+import functools
 import logging
 from collections.abc import Awaitable, Callable
 from uuid import UUID
@@ -131,6 +132,6 @@ def get_enqueuer() -> JobEnqueuer:
     settings = get_settings()
     return JobEnqueuer(
         sm=_sessionmaker(),
-        runner=run_spotdl,
+        runner=functools.partial(run_spotdl, embed_lyrics=settings.spotdl_embed_lyrics),
         output_dir=settings.music_output_dir,
     )

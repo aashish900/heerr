@@ -862,3 +862,13 @@ Manual smoke on home server against the deployed v3.2.0 image. All four checks p
 - Album `browse/` URL passed as `source_url` → 422 (unsupported type).
 - `PREVIEW_ENABLED=false` (restart with kill switch) → 404.
 - **`backend/docs/ROADMAP.md`** — K5 checked; status line updated to reflect Phase K complete.
+
+## 2026-06-24 — L1: SPOTDL_EMBED_LYRICS toggle — embed lyrics in downloaded MP3s
+
+Optional `--lyrics` pass-through to spotdl so downloaded files carry embedded lyrics from spotdl's default providers (Genius, AZLyrics, etc.). Off by default; opt-in via env var. Closes the backend roadmap (A1–L1).
+
+- **`backend/app/services/spotdl_runner.py`** — `run_spotdl` gains keyword-only `embed_lyrics: bool = False`; appends `"--lyrics"` to the spotdl command when true. No other change to the invocation.
+- **`backend/app/config.py`** — new `spotdl_embed_lyrics: bool = False` field on `Settings` (pydantic-settings maps `SPOTDL_EMBED_LYRICS`), after the `preview_*` fields.
+- **`backend/app/services/workers.py`** — `get_enqueuer()` wraps `run_spotdl` in `functools.partial(run_spotdl, embed_lyrics=settings.spotdl_embed_lyrics)`, preserving the `SpotdlRunner = Callable[[str, str], …]` positional contract.
+- **`/.env.example`** — new commented "Lyrics embedding (Phase L)" block (`SPOTDL_EMBED_LYRICS=false`) after the Preview section.
+- **Tests:** `tests/test_spotdl_runner.py` (+2) — `test_embed_lyrics_flag_added_when_true`, `test_embed_lyrics_flag_absent_by_default`. Full suite 425 passed; ruff check + format + mypy clean.

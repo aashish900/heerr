@@ -4,7 +4,7 @@ Track progress through the backend build. Each milestone = one git commit with a
 
 See `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file is the *how* / *when*.
 
-**Status (2026-06-24):** Phases A–K complete. v3.2.0 smoke passed on home server 2026-06-24 — preview stream, Range/206, album URL → 422, and kill-switch all verified.
+**Status (2026-06-24):** Phases A–L complete. v3.2.0 smoke passed on home server 2026-06-24 — preview stream, Range/206, album URL → 422, and kill-switch all verified. L1 (`SPOTDL_EMBED_LYRICS` toggle) landed 2026-06-24 — backend roadmap closed.
 
 **Conventions:**
 - TDD per CLAUDE.md §2 — tests written first, land in same commit as code.
@@ -379,7 +379,7 @@ Resolving server-side is the whole point: `googlevideo` URLs are signed to the *
 
 ## Phase L — Lyrics embedding via spotDL
 
-### [ ] L1. `SPOTDL_EMBED_LYRICS` env toggle
+### [x] L1. `SPOTDL_EMBED_LYRICS` env toggle
 Passes `--lyrics` to spotDL when enabled so downloaded MP3s carry embedded lyrics from spotDL's default providers (Genius, AZLyrics, etc.).
 
 **Files:**

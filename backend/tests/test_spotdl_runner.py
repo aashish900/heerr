@@ -71,6 +71,32 @@ async def test_command_invokes_spotdl_executable(tmp_path, monkeypatch):
     assert output_val.endswith("{title}-{artist}.{output-ext}")
 
 
+async def test_embed_lyrics_flag_added_when_true(tmp_path, monkeypatch):
+    captured: dict[str, list[str]] = {}
+
+    async def fake_spawn(cmd):
+        captured["cmd"] = list(cmd)
+        return FakeProc(returncode=0)
+
+    monkeypatch.setattr("app.services.spotdl_runner._spawn", fake_spawn)
+
+    await run_spotdl("spotify:track:abc", tmp_path, embed_lyrics=True)
+    assert "--lyrics" in captured["cmd"]
+
+
+async def test_embed_lyrics_flag_absent_by_default(tmp_path, monkeypatch):
+    captured: dict[str, list[str]] = {}
+
+    async def fake_spawn(cmd):
+        captured["cmd"] = list(cmd)
+        return FakeProc(returncode=0)
+
+    monkeypatch.setattr("app.services.spotdl_runner._spawn", fake_spawn)
+
+    await run_spotdl("spotify:track:abc", tmp_path)
+    assert "--lyrics" not in captured["cmd"]
+
+
 async def test_spotdl_executable_env_override(tmp_path, monkeypatch):
     captured: dict[str, list[str]] = {}
 

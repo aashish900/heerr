@@ -212,13 +212,16 @@ def _scan_audio_files(output_dir: Path) -> set[Path]:
     return out
 
 
-async def run_spotdl(source_url: str, output_dir: str | Path) -> list[DownloadedFile]:
+async def run_spotdl(
+    source_url: str, output_dir: str | Path, *, embed_lyrics: bool = False
+) -> list[DownloadedFile]:
     """Invoke `spotdl download <url> --output <template>` as a subprocess.
 
     Returns the list of new audio files produced (dir-diff before vs after).
     Raises `SpotdlError(exit_code, combined_output_tail)` on non-zero exit.
     Executable is resolved via `_spotdl_executable()` (env `SPOTDL_EXECUTABLE`
-    or PATH).
+    or PATH). When `embed_lyrics` is True, passes `--lyrics` so spotdl embeds
+    lyrics from its default providers into the downloaded file.
     """
     out_path = Path(output_dir).resolve()
     out_path.mkdir(parents=True, exist_ok=True)
@@ -232,6 +235,8 @@ async def run_spotdl(source_url: str, output_dir: str | Path) -> list[Downloaded
         "--output",
         str(out_path / "{title}-{artist}.{output-ext}"),
     ]
+    if embed_lyrics:
+        cmd.append("--lyrics")
     proc = await _spawn(cmd)
     stdout_b, _ = await proc.communicate()
     output_text = (stdout_b or b"").decode("utf-8", errors="replace")[-_OUTPUT_TAIL_BYTES:]

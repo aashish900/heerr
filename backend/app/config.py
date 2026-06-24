@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     # How long a resolved googlevideo URL is reused before re-resolving (seconds).
     preview_cache_ttl_s: float = 300.0
 
+    # Pass `--lyrics` to spotdl (Phase L) so downloaded files carry embedded
+    # lyrics from spotdl's default providers (Genius, AZLyrics, etc.).
+    spotdl_embed_lyrics: bool = False
+
     @field_validator("navidrome_url")
     @classmethod
     def _validate_navidrome_url(cls, v: str) -> str:
