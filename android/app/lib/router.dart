@@ -245,22 +245,25 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold>
   @override
   Future<bool> didPopRoute() async {
     if (!mounted) return false;
-    // Safety guard: only intercept at exact tab roots. If widget.location is a
-    // detail path (e.g. /library/playlist/:id — can happen when go_router
-    // updates the shell location before the detail route fully settles),
-    // yield to go_router unconditionally so detail screens always pop normally.
-    if (!_tabRoots.contains(widget.location)) return false;
-    // Also yield to go_router when there is something stacked above the shell.
-    if (GoRouter.of(context).canPop()) return false;
+
+    // Detail screens should pop normally.
+    if (!_tabRoots.contains(widget.location)) {
+      return false;
+    }
+
     // Library search mode: clear field and exit search.
     if (widget.location == Routes.library &&
         ref.read(librarySearchActiveProvider)) {
       ref.read(librarySearchActiveProvider.notifier).set(false);
       return true;
     }
-    // On Home: let the OS handle (exit the app).
-    if (widget.location == Routes.home) return false;
-    // Any other tab root or /queue: navigate to Home.
+
+    // Home is the only place allowed to exit the app.
+    if (widget.location == Routes.home) {
+      return false;
+    }
+
+    // Any other root tab goes back to Home.
     context.go(Routes.home);
     return true;
   }
