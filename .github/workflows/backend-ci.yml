@@ -60,7 +60,7 @@ jobs:
         run: pipx install poetry==2.4.1
 
       - name: Cache Poetry virtualenv
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # Poetry creates the venv inside backend/.venv when virtualenvs.in-project is true.
           path: backend/.venv
