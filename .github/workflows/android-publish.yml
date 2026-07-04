@@ -112,8 +112,15 @@ jobs:
           storeFile=keystore.jks
           EOF
 
+      # #36: bake the release tag into the APK's versionName (and a
+      # monotonic versionCode from the run number) so the in-app "App
+      # version" line in Settings shows the tag the build shipped as,
+      # not whatever pubspec `version:` happened to say.
       - name: Build release APK
-        run: flutter build apk --release
+        run: |
+          flutter build apk --release \
+            --build-name="${GITHUB_REF_NAME#v}" \
+            --build-number="${{ github.run_number }}"
 
       - name: Rename APK (embed version in filename)
         run: |

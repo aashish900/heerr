@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/recommend_health.dart';
+import '../providers/app_version.dart';
 import '../offline/offline_manifest.dart';
 import '../offline/offline_paths.dart';
 import '../offline/offline_settings.dart';
@@ -68,8 +69,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: 'Recommendations',
             child: _RecommendationsSection(),
           ),
+          _AppVersionTile(),
         ],
       ),
+    );
+  }
+}
+
+/// #36: app-version footer at the bottom of Settings. Reads the installed
+/// APK's versionName/versionCode via [appVersionProvider]; renders nothing
+/// while loading and on error (a version line is nice-to-have, never worth
+/// an error surface).
+class _AppVersionTile extends ConsumerWidget {
+  const _AppVersionTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final String? version = ref.watch(appVersionProvider).valueOrNull;
+    if (version == null) return const SizedBox.shrink();
+    return ListTile(
+      key: const Key('settings-app-version'),
+      leading: const Icon(Icons.info_outline),
+      title: const Text(
+        'App version',
+        style: TextStyle(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(version),
     );
   }
 }

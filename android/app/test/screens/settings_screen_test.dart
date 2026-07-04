@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'package:heerr/models/recommend_health.dart';
 import 'package:heerr/offline/offline_paths.dart';
@@ -157,6 +158,24 @@ void main() {
       expect(find.text('WiFi only'), findsNothing);
       await _expandSection(tester, 'Offline downloads');
       expect(find.text('WiFi only'), findsOneWidget);
+    });
+  });
+
+  group('App version footer (#36)', () {
+    testWidgets('renders the APK version below the sections',
+        (WidgetTester tester) async {
+      PackageInfo.setMockInitialValues(
+        appName: 'heerr',
+        packageName: 'com.aashish.heerr',
+        version: '4.1.0',
+        buildNumber: '9',
+        buildSignature: '',
+      );
+      await _useTallSurface(tester);
+      await tester.pumpWidget(_wrap(<Override>[..._storage(_InMemoryStorage())]));
+      await _pumpForBuild(tester);
+      expect(find.byKey(const Key('settings-app-version')), findsOneWidget);
+      expect(find.text('v4.1.0+9'), findsOneWidget);
     });
   });
 
