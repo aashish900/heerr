@@ -104,6 +104,64 @@ class HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     await _player.addAudioSource(_toAudioSource(mediaItem));
   }
 
+  /// #35: append [mediaItems] to the end of the current queue without
+  /// interrupting playback. Batch counterpart of [addQueueItem] — one
+  /// player call so ExoPlayer's gapless pre-preparation (R1) sees the
+  /// whole batch at once.
+  @override
+  Future<void> addQueueItems(List<MediaItem> mediaItems) async {
+    if (mediaItems.isEmpty) return;
+    final List<MediaItem> next = <MediaItem>[...queue.value, ...mediaItems];
+    queue.add(next);
+    await _player.addAudioSources(mediaItems.map(_toAudioSource).toList());
+  }
+
+  /// #35: remove the queue entry at [index]. Out-of-range is a no-op.
+  /// just_audio shifts its internal currentIndex when removing above the
+  /// playing item, and skips to the next source when the playing item
+  /// itself is removed — we re-derive [mediaItem] from the player's
+  /// post-mutation index rather than second-guessing either case.
+  @override
+  Future<void> removeQueueItemAt(int index) async {
+    final List<MediaItem> current = queue.value;
+    if (index < 0 || index >= current.length) return;
+    final List<MediaItem> next = <MediaItem>[...current]..removeAt(index);
+    queue.add(next);
+    await _player.removeAudioSourceAt(index);
+    _rebroadcastCurrentItem(next);
+  }
+
+  /// #35: move the queue entry at [from] to position [to] (remove-then-
+  /// insert semantics — matches both `ReorderableListView.onReorder` after
+  /// the standard newIndex adjustment and just_audio's `moveAudioSource`).
+  /// Out-of-range or no-op moves return without touching the player.
+  Future<void> moveQueueItem(int from, int to) async {
+    final List<MediaItem> current = queue.value;
+    if (from == to) return;
+    if (from < 0 || from >= current.length) return;
+    if (to < 0 || to >= current.length) return;
+    final List<MediaItem> next = <MediaItem>[...current];
+    final MediaItem item = next.removeAt(from);
+    next.insert(to, item);
+    queue.add(next);
+    await _player.moveAudioSource(from, to);
+    _rebroadcastCurrentItem(next);
+  }
+
+  /// After a structural queue mutation the player's currentIndex can point
+  /// at a different item while keeping the same numeric value (e.g. the
+  /// playing item was removed), so `currentIndexStream` won't necessarily
+  /// re-emit. Push the item at the player's index explicitly; null when
+  /// the queue emptied.
+  void _rebroadcastCurrentItem(List<MediaItem> next) {
+    final int? cur = _player.currentIndex;
+    if (cur != null && cur >= 0 && cur < next.length) {
+      mediaItem.add(next[cur]);
+    } else if (next.isEmpty) {
+      mediaItem.add(null);
+    }
+  }
+
   AudioSource _toAudioSource(MediaItem item) {
     return AudioSource.uri(Uri.parse(item.id), tag: item);
   }

@@ -2131,3 +2131,30 @@ UX revision of the U1 commit above, per user request. A plain tap of the downloa
 
 - **`lib/router.dart`** — Replaced `PopScope` in `_ShellScaffoldState` with `WidgetsBindingObserver.didPopRoute()`. Root cause: go_router 14 `popRoute()` calls `_findCurrentNavigators()` (innermost-first) and drives `maybePop()` on each; the shell sub-navigator (1-page, no `PopScope`) returned false, and the root navigator's `PopScope` fired `onPopInvokedWithResult` but then `maybePop()` also returned false — causing go_router to return false from `popRoute()` and the `Router` widget to call `SystemNavigator.pop()` (app exit) after our `context.go(home)`. `WidgetsBindingObserver` sidesteps this entirely: `_ShellScaffoldState` registers after `RootBackButtonDispatcher` (LIFO), so `didPopRoute()` is called first; we check `GoRouter.canPop()` before intercepting so pushed detail screens still pop normally. `PopScope` and all related `atHome`/`librarySearching` build-time variables removed from `build()`.
 - Everything else unchanged: `librarySearchActiveProvider`, `LibraryScreen` listener, `downloads_screen.dart` `.push()` fixes.
+
+## 2026-07-04 — V1 back-stack fix, final: opt out of Android predictive back (manifest)
+
+- **`android/app/src/main/AndroidManifest.xml`** — added `android:enableOnBackInvokedCallback="false"` on `<application>`. Root cause of "works in tests, exits on device": at targetSdk 36 (Android 16) predictive back is on by default, and back is only delivered to Flutter when the framework has reported `setFrameworkHandlesBack(true)`. That report is driven by `NavigationNotification`s (`navigator.dart:3753`); go_router's nested ShellRoute navigator (one page per tab, no PopScope in its own routes) dispatches `canHandlePop: false` after every tab switch — clobbering the shell PopScope's `doNotPop` notification (parent builds before child, so the child's dispatch lands last). The OS then finished the Activity itself; `popRoute` / `PopScope` never ran. The opt-out restores the legacy `KEYCODE_BACK → onBackPressed → popRoute` channel path, which is exactly what `router_test.dart`'s `handlePopRoute()` tests exercise. Trade-off: no predictive-back animation — irrelevant, since the shell intercepts back for custom navigation anyway.
+- **`lib/router.dart`** — the shell back handler is the (fix5) `PopScope` form: `canPop` only on Home; off-Home → `context.go(home)`; Library-searching → flip `librarySearchActiveProvider`. Removed a leftover `debugPrint`. (Note: the 2026-06-24 "PopScope → WidgetsBindingObserver" entry above was itself reverted back to PopScope during the fix1–fix5 iterations; this entry records the final mechanism.)
+- Verified: `flutter analyze` clean; 647 tests green. On-device back-nav smoke on the Pixel 7 (rc9).
+
+## 2026-07-04 — #36: app-version footer in Settings + tag-injected versionName in CI
+
+- **`lib/providers/app_version.dart`** (new) — `appVersionProvider` (keepAlive) reads the installed APK's versionName/versionCode via `package_info_plus` (^9.0.1, new dep) and formats `v<version>+<build>` (build suffix omitted when empty).
+- **`lib/screens/settings_screen.dart`** — `_AppVersionTile` (key `settings-app-version`) below the three collapsible sections; renders nothing while loading / on error.
+- **`.github/workflows/android-publish.yml`** — release build now passes `--build-name="${GITHUB_REF_NAME#v}"` + `--build-number=${{ github.run_number }}`, so release installs display the tag they shipped as instead of the stale pubspec `version:`.
+- **Tests:** `test/providers/app_version_test.dart` (2) + a footer widget test in `settings_screen_test.dart`. Full suite 650 green; analyze clean.
+
+## 2026-07-04 — #35: add-to-queue from song rows + remove/reorder in the Now Playing queue
+
+- **`lib/player/heerr_audio_handler.dart`** — three queue-mutation methods: `addQueueItems` (batch append, one `addAudioSources` call so R1's gapless pre-preparation sees the whole batch), `removeQueueItemAt` (interface override; delegates to `removeAudioSourceAt`), `moveQueueItem(from, to)` (custom, remove-then-insert semantics via `moveAudioSource`). Removal/move end with `_rebroadcastCurrentItem` — after a structural mutation the player's `currentIndex` can point at a different item with the same numeric value, so `currentIndexStream` won't re-emit; the handler pushes the post-mutation item (or null on empty) explicitly.
+- **`lib/player/playback_actions.dart`** — `addSongsToQueue(...)`: creds → existing `_toMediaItem` chokepoint (offline `file://` still wins) → append; empty queue behaves like Play (`playAll`). Snackbars for single/multi and play/append variants.
+- **`lib/widgets/add_to_playlist_sheet.dart`** — optional `queueSongs` param; when non-empty renders an "Add to queue" tile (key `add-to-playlist-add-to-queue`) above "Find similar". Awaits the action while the sheet is mounted, then pops.
+- **Call sites** — song-row long-presses (album detail, playlist detail, library search), the visible song-row "…" action, and the album overflow (whole tracklist). Now Playing's sheet deliberately omits it.
+- **`lib/screens/player/now_playing_transport.dart`** — `_QueueList` is now a `ReorderableListView`: per-row trailing drag handle (`ReorderableDragStartListener`), swipe-left `Dismissible` remove, tap-to-jump unchanged. Uses the non-deprecated `onReorderItem` (Flutter 3.42+ pre-adjusts `newIndex`).
+- **Tests:** 9 handler unit tests (batch append/order/no-op; remove in/out-of-range/rebroadcast/clear-on-empty; move semantics/no-ops), 3 sheet widget tests, 3 Now Playing queue-edit widget tests (handles render, swipe → `removeQueueItemAt(1)`, timed drag → `moveQueueItem(0, 1)`). Full suite 665 green; analyze clean.
+
+## 2026-07-04 — v4.1.0 release
+
+- **`pubspec.yaml`** — `3.5.0` → `4.1.0` (pubspec had drifted behind the `v4.*` tags; CI now injects the tag as versionName regardless, but local builds should agree with the release line).
+- Bundles: V1 back-stack fix (manifest opt-out), #36 app-version footer, #35 add-to-queue + Now Playing queue remove/reorder. Tagged `v4.1.0`.

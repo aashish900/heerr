@@ -127,6 +127,7 @@ class _CombinedResultsBody extends ConsumerWidget {
                       context: context,
                       songIds: <String>[s.id],
                       findSimilarSeed: seedForSong(s),
+                      queueSongs: <Song>[s],
                     ),
                   ),
               ],

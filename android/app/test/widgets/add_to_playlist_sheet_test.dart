@@ -1,10 +1,16 @@
 import 'dart:async';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:rxdart/rxdart.dart';
 
 import 'package:heerr/models/subsonic/playlist.dart';
+import 'package:heerr/models/subsonic/song.dart';
+import 'package:heerr/player/heerr_audio_handler.dart';
+import 'package:heerr/player/player_provider.dart';
 import 'package:heerr/providers/library/library_playlists.dart';
 import 'package:heerr/providers/library/playlist_mutations.dart';
 import 'package:heerr/providers/secure_storage.dart';
@@ -93,6 +99,7 @@ Future<void> _openSheet(
   required List<String> songIds,
   required List<Override> overrides,
   String? username,
+  List<Song> queueSongs = const <Song>[],
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -109,6 +116,7 @@ Future<void> _openSheet(
                 onPressed: () => AddToPlaylistSheet.show(
                   context: context,
                   songIds: songIds,
+                  queueSongs: queueSongs,
                 ),
                 child: const Text('open'),
               ),
@@ -121,6 +129,11 @@ Future<void> _openSheet(
   await tester.tap(find.text('open'));
   await tester.pumpAndSettle();
 }
+
+/// #35: stubbed audio handler for the "Add to queue" tile tests. `queue`
+/// is a real BehaviorSubject so the action's `queue.value.isEmpty` branch
+/// works; the transport methods record calls via mocktail.
+class _StubHandler extends Mock implements HeerrAudioHandler {}
 
 void main() {
   initPrefsMock();
@@ -397,5 +410,97 @@ void main() {
         );
       },
     );
+  });
+
+  group('AddToPlaylistSheet — add to queue (#35)', () {
+    const Song songA = Song(id: 's-a', title: 'Alpha');
+    const Song songB = Song(id: 's-b', title: 'Beta');
+    const Key tileKey = Key('add-to-playlist-add-to-queue');
+
+    late _StubHandler handler;
+
+    setUpAll(() {
+      registerFallbackValue(const <MediaItem>[]);
+    });
+
+    setUp(() {
+      handler = _StubHandler();
+      when(() => handler.addQueueItems(any())).thenAnswer((_) async {});
+      when(() => handler.playAll(any(),
+          startIndex: any(named: 'startIndex'))).thenAnswer((_) async {});
+    });
+
+    List<Override> queueOverrides(List<MediaItem> currentQueue) {
+      final BehaviorSubject<List<MediaItem>> subject =
+          BehaviorSubject<List<MediaItem>>.seeded(currentQueue);
+      addTearDown(subject.close);
+      when(() => handler.queue).thenAnswer((_) => subject);
+      return <Override>[
+        _playlistsValue(const AsyncValue<List<Playlist>>.data(<Playlist>[])),
+        audioHandlerProvider.overrideWithValue(handler),
+      ];
+    }
+
+    testWidgets('tile hidden when queueSongs is empty', (
+      WidgetTester tester,
+    ) async {
+      await _openSheet(
+        tester,
+        songIds: <String>['s-a'],
+        username: 'me',
+        overrides: <Override>[
+          _playlistsValue(const AsyncValue<List<Playlist>>.data(<Playlist>[])),
+        ],
+      );
+      expect(find.byKey(tileKey), findsNothing);
+    });
+
+    testWidgets('appends behind a non-empty queue, pops, snackbars', (
+      WidgetTester tester,
+    ) async {
+      await _openSheet(
+        tester,
+        songIds: <String>['s-a'],
+        username: 'me',
+        queueSongs: const <Song>[songA],
+        overrides: queueOverrides(const <MediaItem>[
+          MediaItem(id: 'https://x/playing', title: 'Playing now'),
+        ]),
+      );
+      await tester.tap(find.byKey(tileKey));
+      await tester.pumpAndSettle();
+
+      final List<MediaItem> added = verify(
+        () => handler.addQueueItems(captureAny()),
+      ).captured.single as List<MediaItem>;
+      expect(added, hasLength(1));
+      expect(added.single.title, 'Alpha');
+      verifyNever(() => handler.playAll(any(),
+          startIndex: any(named: 'startIndex')));
+      expect(find.byKey(tileKey), findsNothing); // sheet popped
+      expect(find.text('Added to queue: Alpha'), findsOneWidget);
+    });
+
+    testWidgets('empty queue → starts playback instead of appending', (
+      WidgetTester tester,
+    ) async {
+      await _openSheet(
+        tester,
+        songIds: <String>['s-a', 's-b'],
+        username: 'me',
+        queueSongs: const <Song>[songA, songB],
+        overrides: queueOverrides(const <MediaItem>[]),
+      );
+      await tester.tap(find.byKey(tileKey));
+      await tester.pumpAndSettle();
+
+      final List<MediaItem> played = verify(
+        () => handler.playAll(captureAny(),
+            startIndex: any(named: 'startIndex')),
+      ).captured.single as List<MediaItem>;
+      expect(played, hasLength(2));
+      verifyNever(() => handler.addQueueItems(any()));
+      expect(find.text('Playing 2 songs'), findsOneWidget);
+    });
   });
 }

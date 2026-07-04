@@ -729,3 +729,25 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Why:** Pushed detail screens already sit above the `ShellRoute` on the root navigator and pop correctly; only the flat tab roots needed handling, so a shell-level `PopScope` is the minimal fix. A first attempt used a separate `PopScope` inside the search overlay, but a single go_router route hosts both the shell and the overlay — and a system back fires only the outer handler, so the inner search handler never cleared the field. Consolidating to one provider-driven handler removed the conflict.
 
 **Alternatives considered:** `StatefulShellRoute.indexedStack` (per-tab back history + preserved state) — more idiomatic but a larger router refactor; deferred (recorded in ROADMAP Phase V as the alternative). Keeping search as an internal bool with its own `PopScope` — rejected: two `PopScope`s in one route fight over the same pop.
+
+---
+
+## 2026-07-04 — Opt out of Android predictive back (`enableOnBackInvokedCallback="false"`)
+
+**Context:** The V1 back-stack milestone put a `PopScope` on the shell (`router.dart _ShellScaffold`) so system back walks tab roots to Home before exiting. Five fix iterations passed `router_test.dart`'s `handlePopRoute()` tests but kept exiting the app on the Pixel 7. Root cause: the app targets SDK 36 (Flutter default, `FlutterExtension.kt:34`), where Android 16 enables predictive back by default — the OS only delivers back to Flutter when the framework has reported `setFrameworkHandlesBack(true)`. That report is driven by `NavigationNotification`s (`navigator.dart:3753`: `canHandlePop = navigatorCanPop || topRouteBlocksPop`). go_router's nested ShellRoute navigator holds one page per tab with no PopScope in its own routes, so it dispatches `canHandlePop: false` after every tab switch; parent builds before child, so this deterministically clobbers the shell PopScope's `doNotPop` notification dispatched moments earlier. The OS concluded the framework doesn't handle back and finished the Activity itself — `popRoute` never ran on device, while tests (which inject the event framework-side) stayed green.
+
+**Decision:** Set `android:enableOnBackInvokedCallback="false"` on `<application>` in the manifest. This opts the app out of predictive back; Android delivers legacy `KEYCODE_BACK → onBackPressed → "popRoute" channel`, which always reaches the framework — the exact code path the shell PopScope logic and the existing tests already handle.
+
+**Why:**
+- One line, zero Dart changes; the tested back-handling logic starts working as-is.
+- The framework-side alternative (keeping predictive back delivered) requires a second `PopScope` inside every tab route of the nested navigator purely to fix the notification value, while the *actual* pop still has to be handled by the root-route PopScope — two coupled mechanisms where the notification shim does nothing functional. Fragile against go_router/Flutter changes.
+- The predictive-back animation we give up is worthless here: the shell intercepts back to run `context.go(home)`, which the predictive animation cannot preview anyway.
+
+**Alternatives considered:**
+- **Per-tab PopScope notification shim** (above) — rejected as fragile/duplicated.
+- **`StatefulShellRoute` refactor** — doesn't fix the delivery problem by itself; the nested branch navigators still report `canHandlePop: false` at tab roots.
+- **Wait for upstream fix** (flutter/go_router nested-navigator NavigationNotification handling) — unbounded timeline; the manifest opt-out is reversible in one line when upstream lands.
+
+**Trade-off:** No predictive-back system animation on Android 14+. The opt-out flag is deprecated-path (Android intends to remove it in a future release), so this must be revisited when targetSdk moves past the flag's removal — at which point the per-route-PopScope shim or an upstream fix becomes mandatory. Tracked implicitly by this ADR.
+
+**Reference:** `android/app/android/app/src/main/AndroidManifest.xml` (`<application>` comment cites the mechanism), `android/app/lib/router.dart` (shell PopScope), CHANGELOG 2026-07-04.

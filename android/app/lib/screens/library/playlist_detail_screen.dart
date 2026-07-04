@@ -426,6 +426,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
             context: context,
             songIds: <String>[s.id],
             findSimilarSeed: seedForSong(s),
+            queueSongs: <Song>[s],
           ),
         );
       },

@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../api/api_error.dart';
 import '../models/seed_track.dart';
 import '../models/subsonic/playlist.dart';
+import '../models/subsonic/song.dart';
+import '../player/playback_actions.dart';
 import '../providers/library/library_playlists.dart';
 import '../providers/library/playlist_mutations.dart';
 import '../providers/recommendations.dart';
@@ -39,10 +41,19 @@ class AddToPlaylistSheet extends ConsumerWidget {
   const AddToPlaylistSheet({
     required this.songIds,
     this.findSimilarSeed,
+    this.queueSongs = const <Song>[],
     super.key,
   });
 
   final List<String> songIds;
+
+  /// #35: when non-empty, renders an "Add to queue" entry that appends
+  /// these songs to the Now Playing queue via [addSongsToQueue]. Callers
+  /// that have full [Song] objects pass them here (song-row long-presses
+  /// pass one, the album-level entry passes the album's tracklist); the
+  /// Now Playing screen leaves it empty — queueing the track that is
+  /// already playing is a no-op the user doesn't need.
+  final List<Song> queueSongs;
 
   /// When non-null, renders a "Find similar →" entry at the top of the
   /// sheet. Tapping it sets [manualSeedProvider] to this seed and
@@ -55,6 +66,7 @@ class AddToPlaylistSheet extends ConsumerWidget {
     required BuildContext context,
     required List<String> songIds,
     SeedTrack? findSimilarSeed,
+    List<Song> queueSongs = const <Song>[],
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -63,8 +75,17 @@ class AddToPlaylistSheet extends ConsumerWidget {
       builder: (_) => AddToPlaylistSheet(
         songIds: songIds,
         findSimilarSeed: findSimilarSeed,
+        queueSongs: queueSongs,
       ),
     );
+  }
+
+  /// #35: queue while the sheet is still mounted (the sheet's `ref` is
+  /// only valid until pop), then close. [addSongsToQueue] resolves the
+  /// root ScaffoldMessenger up front, so its snackbar outlives the pop.
+  Future<void> _onAddToQueue(BuildContext sheetContext, WidgetRef ref) async {
+    await addSongsToQueue(ref, sheetContext, queueSongs);
+    if (sheetContext.mounted) Navigator.of(sheetContext).pop();
   }
 
   void _onFindSimilar(BuildContext sheetContext, WidgetRef ref) {
@@ -165,6 +186,16 @@ class AddToPlaylistSheet extends ConsumerWidget {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
+            if (queueSongs.isNotEmpty) ...<Widget>[
+              ListTile(
+                key: const Key('add-to-playlist-add-to-queue'),
+                leading: const Icon(Icons.playlist_play),
+                title: const Text('Add to queue'),
+                subtitle: const Text('Play after the current queue'),
+                onTap: () => _onAddToQueue(context, ref),
+              ),
+              const Divider(height: 1),
+            ],
             if (findSimilarSeed != null) ...<Widget>[
               ListTile(
                 key: const Key('add-to-playlist-find-similar'),

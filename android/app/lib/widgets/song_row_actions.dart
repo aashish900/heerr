@@ -74,6 +74,7 @@ class SongRowActions extends ConsumerWidget {
           onPressed: () => AddToPlaylistSheet.show(
             context: context,
             songIds: <String>[song.id],
+            queueSongs: <Song>[song],
           ),
         ),
         if (trailingStatus != null) ...<Widget>[

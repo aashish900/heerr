@@ -172,32 +172,63 @@ class _QueueList extends ConsumerWidget {
             ),
           );
         }
-        return ListView.builder(
+        // #35: reorder via the trailing drag handle, remove via
+        // swipe-to-dismiss. Keys are index+id on purpose: MediaItem ids
+        // can repeat in a queue (same song queued twice) and Reorderable/
+        // Dismissible require unique keys; the provider re-emits and
+        // rebuilds after every mutation, so index-based keys stay valid
+        // for the lifetime of one build, which is all the gesture needs.
+        return ReorderableListView.builder(
+          buildDefaultDragHandles: false,
           itemCount: items.length,
+          // onReorderItem (3.42+) already adjusts newIndex to
+          // remove-then-insert semantics — no manual `-1` needed.
+          onReorderItem: (int oldIndex, int newIndex) {
+            ref.read(audioHandlerProvider).moveQueueItem(oldIndex, newIndex);
+          },
           itemBuilder: (BuildContext c, int i) {
             final MediaItem m = items[i];
             final bool isCurrent = m.id == currentId;
-            return ListTile(
-              leading: Icon(
-                isCurrent ? Icons.equalizer : Icons.music_note,
-                color: isCurrent
-                    ? Theme.of(c).colorScheme.primary
-                    : null,
-              ),
-              title: Text(
-                m.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: isCurrent ? FontWeight.w600 : null,
+            return Dismissible(
+              key: ValueKey<String>('queue-row-$i-${m.id}'),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                color: Theme.of(c).colorScheme.errorContainer,
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 16),
+                child: Icon(
+                  Icons.delete_outline,
+                  color: Theme.of(c).colorScheme.onErrorContainer,
                 ),
               ),
-              subtitle: m.artist == null
-                  ? null
-                  : Text(m.artist!,
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
-              onTap: () =>
-                  ref.read(audioHandlerProvider).skipToQueueItem(i),
+              onDismissed: (_) =>
+                  ref.read(audioHandlerProvider).removeQueueItemAt(i),
+              child: ListTile(
+                leading: Icon(
+                  isCurrent ? Icons.equalizer : Icons.music_note,
+                  color: isCurrent
+                      ? Theme.of(c).colorScheme.primary
+                      : null,
+                ),
+                title: Text(
+                  m.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: isCurrent ? FontWeight.w600 : null,
+                  ),
+                ),
+                subtitle: m.artist == null
+                    ? null
+                    : Text(m.artist!,
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                trailing: ReorderableDragStartListener(
+                  index: i,
+                  child: const Icon(Icons.drag_handle),
+                ),
+                onTap: () =>
+                    ref.read(audioHandlerProvider).skipToQueueItem(i),
+              ),
             );
           },
         );

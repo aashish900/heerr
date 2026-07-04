@@ -4,6 +4,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 
 import 'package:heerr/models/job_view.dart';
 import 'package:heerr/models/queue_response.dart';
@@ -56,12 +57,18 @@ MediaItem _item({
   );
 }
 
+/// #35: queue-mutation tests need a real handler behind the rows' swipe /
+/// drag / tap gestures. Everything is stubbed via mocktail.
+class _StubHandler extends Mock implements HeerrAudioHandler {}
+
 Widget _wrap({
   required PlayerSnapshot snapshot,
   List<MediaItem> queue = const <MediaItem>[],
+  HeerrAudioHandler? handler,
 }) {
   return ProviderScope(
     overrides: <Override>[
+      if (handler != null) audioHandlerProvider.overrideWithValue(handler),
       playerSnapshotProvider.overrideWith(
         (Ref<AsyncValue<PlayerSnapshot>> ref) =>
             Stream<PlayerSnapshot>.value(snapshot),
@@ -146,6 +153,65 @@ void main() {
     expect(find.text('Track B'), findsOneWidget);
     // The current track gets the equalizer icon.
     expect(find.byIcon(Icons.equalizer), findsOneWidget);
+  });
+
+  group('queue edit (#35)', () {
+    late _StubHandler handler;
+
+    setUp(() {
+      handler = _StubHandler();
+      when(() => handler.removeQueueItemAt(any())).thenAnswer((_) async {});
+      when(() => handler.moveQueueItem(any(), any()))
+          .thenAnswer((_) async {});
+    });
+
+    Future<void> pumpQueue(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      final MediaItem a = _item(id: 'http://s/1', title: 'Track A');
+      final MediaItem b = _item(id: 'http://s/2', title: 'Track B');
+      final MediaItem c = _item(id: 'http://s/3', title: 'Track C');
+      await tester.pumpWidget(_wrap(
+        snapshot: _snap(item: a, playing: true),
+        queue: <MediaItem>[a, b, c],
+        handler: handler,
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('rows render drag handles', (WidgetTester tester) async {
+      await pumpQueue(tester);
+      expect(find.byIcon(Icons.drag_handle), findsNWidgets(3));
+    });
+
+    testWidgets('swipe-to-dismiss removes the row at its index',
+        (WidgetTester tester) async {
+      await pumpQueue(tester);
+      await tester.drag(find.text('Track B'), const Offset(-600, 0));
+      await tester.pumpAndSettle();
+      verify(() => handler.removeQueueItemAt(1)).called(1);
+    });
+
+    testWidgets('dragging a handle reorders via moveQueueItem',
+        (WidgetTester tester) async {
+      await pumpQueue(tester);
+      // Row height ~56px; drag Track A's handle down past Track B.
+      await tester.timedDrag(
+        find.byIcon(Icons.drag_handle).first,
+        const Offset(0, 70),
+        const Duration(milliseconds: 300),
+      );
+      await tester.pumpAndSettle();
+      final List<dynamic> args = verify(
+        () => handler.moveQueueItem(captureAny(), captureAny()),
+      ).captured;
+      expect(args[0], 0);
+      expect(args[1], 1);
+    });
   });
 
   testWidgets('empty queue → "Queue is empty"',

@@ -92,6 +92,7 @@ class AlbumDetailScreen extends ConsumerWidget {
                       songIds: <String>[
                         for (final Song s in album.song) s.id,
                       ],
+                      queueSongs: album.song,
                     );
                 }
               },
@@ -191,6 +192,7 @@ class _Body extends ConsumerWidget {
             context: context,
             songIds: <String>[s.id],
             findSimilarSeed: seedForSong(s),
+            queueSongs: <Song>[s],
           ),
         );
       },

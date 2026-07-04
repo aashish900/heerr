@@ -22,6 +22,7 @@ import '../providers/library/library_playlist.dart';
 import '../providers/profiles/active_profile.dart';
 import '../providers/server_creds.dart';
 import '../widgets/error_snackbar.dart';
+import 'heerr_audio_handler.dart';
 import 'player_provider.dart';
 import 'search_result_to_media_item.dart';
 import 'song_to_media_item.dart';
@@ -150,6 +151,51 @@ Future<void> playPreview(
     messenger.showSnackBar(SnackBar(
       duration: kSnackBarDuration,
       content: Text('Preview: ${item.title}'),
+    ));
+  } catch (e) {
+    if (context.mounted) _errSnack(context, e);
+  }
+}
+
+/// #35: append [songs] to the end of the Now Playing queue without
+/// interrupting the current track. When nothing is queued yet there is
+/// nothing to append behind, so it behaves like "Play" (loads the songs
+/// and starts playback) — matching what every mainstream player does for
+/// add-to-queue-from-cold.
+Future<void> addSongsToQueue(
+  WidgetRef ref,
+  BuildContext context,
+  List<Song> songs,
+) async {
+  if (songs.isEmpty) return;
+  final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+  try {
+    final _Creds? creds = await _resolveCreds(ref);
+    if (creds == null) {
+      if (context.mounted) _credsMissingSnack(context);
+      return;
+    }
+    final List<MediaItem> items = await Future.wait<MediaItem>(
+      songs.map((Song s) => _toMediaItem(ref, s, creds)),
+    );
+    final HeerrAudioHandler handler = ref.read(audioHandlerProvider);
+    final bool wasEmpty = handler.queue.value.isEmpty;
+    if (wasEmpty) {
+      await handler.playAll(items);
+    } else {
+      await handler.addQueueItems(items);
+    }
+    messenger.showSnackBar(SnackBar(
+      duration: kSnackBarDuration,
+      content: Text(
+        songs.length == 1
+            ? (wasEmpty
+                ? 'Playing: ${songs.first.title}'
+                : 'Added to queue: ${songs.first.title}')
+            : (wasEmpty
+                ? 'Playing ${songs.length} songs'
+                : 'Added ${songs.length} songs to queue'),
+      ),
     ));
   } catch (e) {
     if (context.mounted) _errSnack(context, e);
