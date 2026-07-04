@@ -281,8 +281,6 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
       onPopInvokedWithResult: (bool didPop, Object? result) {
         if (didPop) return;
 
-        debugPrint('PopScope: ${widget.location}');
-
         if (widget.location == Routes.library &&
             ref.read(librarySearchActiveProvider)) {
           ref.read(librarySearchActiveProvider.notifier).set(false);

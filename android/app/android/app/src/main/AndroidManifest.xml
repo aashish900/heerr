@@ -16,10 +16,22 @@
          here. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
+    <!-- V1 (back-stack fix): opt out of Android predictive back. At
+         targetSdk 36 predictive back is on by default, and the shell's
+         PopScope lives on the ROOT navigator's route while go_router's
+         nested ShellRoute navigator (one page per tab, no PopScope of its
+         own) dispatches NavigationNotification(canHandlePop: false) after
+         every tab switch — clobbering the PopScope's doNotPop notification.
+         Flutter then reports setFrameworkHandlesBack(false), so the OS
+         finishes the Activity itself and the PopScope callback never runs.
+         Opting out restores the legacy KEYCODE_BACK → onBackPressed →
+         "popRoute" channel path, where the PopScope works (and is what
+         router_test.dart's handlePopRoute() tests exercise). -->
     <application
         android:label="heerr"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+        android:enableOnBackInvokedCallback="false"
         android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
