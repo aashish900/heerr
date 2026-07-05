@@ -45,6 +45,7 @@
             android:layout_marginBottom="5dp"
             android:adjustViewBounds="true"
             android:scaleType="fitCenter"
+            android:visibility="gone"
             android:contentDescription="Album art" />
 
         <LinearLayout

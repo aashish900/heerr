@@ -79,10 +79,10 @@ class PillWidgetProvider : HomeWidgetProvider() {
             }
             if (bitmap != null) {
                 views.setImageViewBitmap(R.id.widget_art, bitmap)
-                views.setViewVisibility(R.id.widget_art, View.VISIBLE)
             } else {
-                views.setViewVisibility(R.id.widget_art, View.GONE)
+                views.setImageViewResource(R.id.widget_art, R.drawable.widget_ic_album)
             }
+            views.setViewVisibility(R.id.widget_art, View.VISIBLE)
 
             // Waveform "sync": animate only while playing, freeze otherwise.
             // A widget has no live-amplitude API; play/pause is the only state
