@@ -98,6 +98,20 @@ class BackendService {
     );
   }
 
+  /// `DELETE /library/song` → remove a track file from the server's music
+  /// library by its Navidrome-relative path (Subsonic `song.path`). The
+  /// backend also clears its already-downloaded dedupe state for the file;
+  /// Navidrome drops the track from the library on its next scan (~1 min).
+  Future<void> deleteLibrarySong(String path) {
+    return apiCall<void>(
+      () => _dio.delete<dynamic>(
+        Endpoints.libraryDeleteSong,
+        data: <String, String>{'path': path},
+      ),
+      (dynamic data) {},
+    );
+  }
+
   /// `GET /status/{jobId}` → one job's current view.
   Future<JobView> jobStatus(String jobId) {
     return apiCall<JobView>(

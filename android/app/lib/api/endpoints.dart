@@ -28,5 +28,10 @@ class Endpoints {
   /// navidromeUsername}` on success.
   static const String authLogin = '/auth/login';
 
+  /// Phase W (#41): backend N1 — `DELETE /library/song`. Body
+  /// `{path: <subsonic-relative-path>}` deletes the file from the music
+  /// library on the server; Navidrome drops the track on its next scan.
+  static const String libraryDeleteSong = '/library/song';
+
   static String status(String jobId) => '/status/$jobId';
 }

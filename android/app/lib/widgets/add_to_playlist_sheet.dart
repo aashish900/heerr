@@ -7,6 +7,7 @@ import '../models/seed_track.dart';
 import '../models/subsonic/playlist.dart';
 import '../models/subsonic/song.dart';
 import '../player/playback_actions.dart';
+import '../providers/library/library_delete.dart';
 import '../providers/library/library_playlists.dart';
 import '../providers/library/playlist_mutations.dart';
 import '../providers/recommendations.dart';
@@ -44,6 +45,7 @@ class AddToPlaylistSheet extends ConsumerWidget {
     this.queueSongs = const <Song>[],
     this.onRemoveFromPlaylist,
     this.removeFromPlaylistName,
+    this.deleteFromServerSong,
     super.key,
   });
 
@@ -72,6 +74,12 @@ class AddToPlaylistSheet extends ConsumerWidget {
   /// callers leave it null so the affordance doesn't appear.
   final SeedTrack? findSimilarSeed;
 
+  /// W1 (#41): when non-null and the song carries a Subsonic `path`, renders
+  /// a destructive "Delete from server…" tile at the bottom of the sheet.
+  /// Single-song long-press callers pass their [Song]; album-level /
+  /// multi-song callers leave it null.
+  final Song? deleteFromServerSong;
+
   static Future<void> show({
     required BuildContext context,
     required List<String> songIds,
@@ -79,6 +87,7 @@ class AddToPlaylistSheet extends ConsumerWidget {
     List<Song> queueSongs = const <Song>[],
     Future<void> Function()? onRemoveFromPlaylist,
     String? removeFromPlaylistName,
+    Song? deleteFromServerSong,
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -90,6 +99,7 @@ class AddToPlaylistSheet extends ConsumerWidget {
         queueSongs: queueSongs,
         onRemoveFromPlaylist: onRemoveFromPlaylist,
         removeFromPlaylistName: removeFromPlaylistName,
+        deleteFromServerSong: deleteFromServerSong,
       ),
     );
   }
@@ -169,6 +179,56 @@ class AddToPlaylistSheet extends ConsumerWidget {
         SnackBar(
           duration: kSnackBarDuration,
           content: Text(msg),
+        ),
+      );
+    } on ApiError catch (e) {
+      if (!sheetContext.mounted) return;
+      showApiError(sheetContext, e);
+    }
+  }
+
+  /// W1 (#41): confirm over the still-open sheet (the sheet's `ref` is only
+  /// valid until pop), delete via [LibraryDelete], then pop + snackbar via
+  /// the pre-captured messenger. On [ApiError] the sheet stays open.
+  Future<void> _onDeleteFromServer(
+    BuildContext sheetContext,
+    WidgetRef ref,
+    Song song,
+  ) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: sheetContext,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: const Text('Delete from server?'),
+        content: Text(
+          '"${song.title}" will be permanently deleted from the Navidrome '
+          'library for every user. This cannot be undone.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !sheetContext.mounted) return;
+    try {
+      await ref.read(libraryDeleteProvider.notifier).deleteFromServer(song);
+      if (!sheetContext.mounted) return;
+      final ScaffoldMessengerState messenger =
+          ScaffoldMessenger.of(sheetContext);
+      Navigator.of(sheetContext).pop();
+      messenger.showSnackBar(
+        SnackBar(
+          duration: kSnackBarDuration,
+          content: Text(
+            'Deleted "${song.title}" from server — library updates after '
+            'the next Navidrome scan',
+          ),
         ),
       );
     } on ApiError catch (e) {
@@ -291,6 +351,23 @@ class AddToPlaylistSheet extends ConsumerWidget {
                 },
               ),
             ),
+            if (deleteFromServerSong != null &&
+                deleteFromServerSong!.path != null &&
+                deleteFromServerSong!.path!.isNotEmpty) ...<Widget>[
+              const Divider(height: 1),
+              ListTile(
+                key: const Key('add-to-playlist-delete-from-server'),
+                leading: Icon(Icons.cloud_off_outlined, color: cs.error),
+                title: Text(
+                  'Delete from server…',
+                  style: TextStyle(color: cs.error),
+                ),
+                subtitle:
+                    const Text('Removes the file from the Navidrome library'),
+                onTap: () =>
+                    _onDeleteFromServer(context, ref, deleteFromServerSong!),
+              ),
+            ],
           ],
         ),
       ),

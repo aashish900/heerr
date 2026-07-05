@@ -2169,3 +2169,15 @@ UX revision of the U1 commit above, per user request. A plain tap of the downloa
 - **`lib/screens/player/now_playing_lyrics.dart`** — `_LyricsPane` takes the live `position`; timed lyrics render a synced view (`now-playing-lyrics-synced`): active line highlighted primary/bold, kept near-centre via `Scrollable.ensureVisible`; non-lazy list so seek jumps still scroll. Plain lyrics render as before.
 - **Known gaps:** songs downloaded before this build have no cached lyrics until their lyrics are opened once online (no backfill pass); the LRCLib fallback needs internet at download time (Navidrome-sourced lyrics are tailnet-only).
 - **Tests:** `test/models/lyrics_parse_test.dart` (5), synced + cache groups in `lyrics_test.dart` (6, harness gains temp-docs/creds/LRCLib-adapter knobs), sync-hook tests in `offline_sync_test.dart` (2, env now always stubs `lyricsServiceProvider` so no test touches real network), synced-pane widget test in `now_playing_lyrics_toggle_test.dart`. Full suite 679 green; analyze clean.
+
+## 2026-07-05 — W1: delete song from server / device / both (#41, v4.2.0)
+
+Completes issue #41 (device-only delete shipped in `64c8e47`). Consumes backend Phase N (`DELETE /api/v1/library/song`), identifying the file by the Subsonic `Song.path`.
+
+- **`lib/api/endpoints.dart`** — new `libraryDeleteSong = '/library/song'`.
+- **`lib/services/backend_service.dart`** — `deleteLibrarySong(path)`: `DELETE` with `{path}` body through `apiCall`/`ApiError`.
+- **`lib/providers/library/library_delete.dart`** (new) — `LibraryDelete` keepAlive notifier: guards `song.path` (StateError when absent), calls the service, invalidates `librarySearch`/`libraryAlbums`/`libraryArtists`/`libraryAlbum(albumId)`/`downloadedSongs`/home providers on success. Navidrome drops the track on its next scan, so snackbars note the delay.
+- **`lib/screens/downloads_screen.dart`** — Songs long-press now opens a Device / Server / Both bottom sheet (Server/Both disabled when the song has no `path`); destructive confirm dialogs; server errors via `showApiError`.
+- **`lib/widgets/add_to_playlist_sheet.dart`** — optional `deleteFromServerSong` renders a destructive "Delete from server…" tile (confirm-gated; sheet stays open on `ApiError`). Passed by song-row long-presses in album detail, playlist detail, and library search.
+- **`pubspec.yaml`** — `4.2.0`.
+- **Tests (+19):** `test/services/backend_service_test.dart`, `test/providers/library/library_delete_test.dart`, `test/screens/downloads_screen_delete_test.dart`, `test/widgets/add_to_playlist_delete_from_server_test.dart`. Full suite 698 passed; `flutter analyze` clean; `build_runner` clean.

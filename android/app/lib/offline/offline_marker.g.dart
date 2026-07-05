@@ -6,7 +6,7 @@ part of 'offline_marker.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$offlineMarkerHash() => r'a00de25ac89c92d3b56beb94d2ed8d05c0aaaf8d';
+String _$offlineMarkerHash() => r'a598d956e4bbf8d455518fe75443c5d53520cd52';
 
 /// Mark / unmark albums + playlists for offline sync.
 ///

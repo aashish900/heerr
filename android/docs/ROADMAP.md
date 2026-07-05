@@ -4,7 +4,7 @@ Track progress through the Android client build. Each milestone = one git commit
 
 See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
-**Status (2026-06-23):** Phases A–S complete. Phase S shipped at `v3.0.0` (multi-user via Navidrome IdP); Phase R shipped at `v2.1.0` (gapless); Phase Q at `v2.0.0` (background sync). Outstanding doc debt tracked in `docs/DEBT.md`. **Phase T (stream-first preview of YouTube Music results, v3.5.0) planned — milestones T1–T5 below are unchecked; depends on backend Phase K.**
+**Status (2026-07-05):** Phases A–V complete. Phase W (delete from server / device / both, issue #41, v4.2.0) landed 2026-07-05 — depends on backend Phase N (`DELETE /library/song`); on-device smoke pending.
 
 **Conventions:**
 - TDD by default (CLAUDE.md §2) — widget tests / unit tests written first, land in the same commit as code.
@@ -778,6 +778,20 @@ Fires only when the shell route is the top route (pushed detail screens pop them
 
 ---
 
+## Phase W — Delete song from server / device / both (#41, v4.2.0)
+
+**Architecture note:** Completes issue #41 (the device half shipped in `64c8e47`). Server delete calls the backend's new `DELETE /api/v1/library/song` (backend Phase N), identifying the file by the Subsonic-relative `Song.path` the client already holds. Navidrome drops the track on its next scan (~1 min), so invalidated library providers may transiently re-serve the song — snackbars say so. **Depends on backend N1.**
+
+### [x] W1. Delete from server — service + notifier + Downloads sheet + library long-press
+**Files (new):** `android/app/lib/providers/library/library_delete.dart` (`LibraryDelete` keepAlive notifier — guards `song.path`, calls `BackendService.deleteLibrarySong`, invalidates library/downloads/home read providers), `android/app/test/services/backend_service_test.dart`, `android/app/test/providers/library/library_delete_test.dart`, `android/app/test/screens/downloads_screen_delete_test.dart`, `android/app/test/widgets/add_to_playlist_delete_from_server_test.dart`.
+**Files (modify):** `android/app/lib/api/endpoints.dart` (`libraryDeleteSong`), `android/app/lib/services/backend_service.dart` (`deleteLibrarySong(path)`), `android/app/lib/screens/downloads_screen.dart` (long-press → Device / Server / Both sheet; Server/Both disabled when `path == null`; destructive confirm dialogs), `android/app/lib/widgets/add_to_playlist_sheet.dart` (optional `deleteFromServerSong` → destructive "Delete from server…" tile), album/playlist-detail + library-search song rows (pass `deleteFromServerSong`), `android/app/pubspec.yaml` → `4.2.0`.
+**Known edge (accepted):** "Both" with the parent album still offline-marked can re-download before Navidrome rescans; after the rescan the song leaves the album listing and sync no longer sees it.
+**Test gate:** service transport tests (DELETE shape, 404/403/network → typed `ApiError`); notifier tests (path guard, invalidation-on-success, no-invalidation-on-failure); Downloads sheet widget tests (three options, disabled-without-path, confirm-gated calls, cancel); sheet tile tests (render/hide rules, confirm fires + pops, cancel keeps sheet). Full suite green; `flutter analyze` clean.
+**Smoke:** on the Pixel against the home server — pending (with backend N1 smoke).
+**Commit:** `feat(flutter): W1 — delete song from server / device / both (#41)`
+
+---
+
 ## Cross-cutting reminders
 
 - **`flutter analyze` green before declaring any milestone done.**
@@ -814,7 +828,7 @@ Items scheduled into v1.5.0 (Phase P) or v2.0.0 (Phase Q) are no longer here —
 
 ## Roadmap complete when
 
-1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5, P1–P4, Q1–Q4, R1, S1–S11, T1–T5, U1, V1).
+1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5, P1–P4, Q1–Q4, R1, S1–S11, T1–T5, U1, V1, W1).
 2. Every test gate green at its milestone.
 3. G1, K2, L6, M5, N5, O5, P4, Q4, R1, S11, and T5 manual smokes verified on-device.
 4. CHANGELOG entries exist for each milestone group.
