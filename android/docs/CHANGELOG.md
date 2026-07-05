@@ -2181,3 +2181,7 @@ Completes issue #41 (device-only delete shipped in `64c8e47`). Consumes backend 
 - **`lib/widgets/add_to_playlist_sheet.dart`** — optional `deleteFromServerSong` renders a destructive "Delete from server…" tile (confirm-gated; sheet stays open on `ApiError`). Passed by song-row long-presses in album detail, playlist detail, and library search.
 - **`pubspec.yaml`** — `4.2.0`.
 - **Tests (+19):** `test/services/backend_service_test.dart`, `test/providers/library/library_delete_test.dart`, `test/screens/downloads_screen_delete_test.dart`, `test/widgets/add_to_playlist_delete_from_server_test.dart`. Full suite 698 passed; `flutter analyze` clean; `build_runner` clean.
+
+## 2026-07-05 — W1 smoke verified on-device (v4.2.0)
+
+Delete from device / server / both verified on the Pixel against the home server (backend N1+N2 deployed). Smoke surfaced two operator prerequisites, now documented in ROADMAP Phase W + backend N2: Navidrome must report real paths (`ND_SUBSONIC_DEFAULTREPORTREALPATH=true` + per-player "Report Real Path" on `heerr [Dart]`), and the app needs one re-search so the L5 cache drops pre-flag virtual paths. Tagged `v4.2.0`.

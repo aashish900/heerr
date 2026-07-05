@@ -900,3 +900,7 @@ Smoke against the home server exposed that Navidrome reports virtual (tag-derive
 - **`backend/app/api/v1/library.py`** — strip the configured prefix from the request path before resolving under `music_output_dir`; all other absolute paths still 422; traversal through the prefix caught by the containment check.
 - **`/.env.example`** — `NAVIDROME_MUSIC_FOLDER` block incl. the `ND_SUBSONIC_DEFAULTREPORTREALPATH` + per-player "Report Real Path" operator requirement.
 - **Tests:** `tests/test_library_delete.py` +7 (prefixed-absolute happy path, relative still works, non-prefix absolute 422, prefix traversal 422s, bare-prefix 422s). Full suite 444 passed; ruff + mypy clean.
+
+## 2026-07-05 — Phase N smoke verified on the home server
+
+Delete-from-server verified end-to-end with N2 deployed: curl with the Navidrome-reported `/music/<file>` path → `{"deleted": true}` + file gone on disk; in-app delete works after the operator steps (ND_SUBSONIC_DEFAULTREPORTREALPATH=true + "Report Real Path" on the app's `heerr [Dart]` player records + one app re-search to refresh cached paths). ROADMAP N1/N2 smoke notes flipped to verified.

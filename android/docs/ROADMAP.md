@@ -4,7 +4,7 @@ Track progress through the Android client build. Each milestone = one git commit
 
 See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
-**Status (2026-07-05):** Phases A–V complete. Phase W (delete from server / device / both, issue #41, v4.2.0) landed 2026-07-05 — depends on backend Phase N (`DELETE /library/song`); on-device smoke pending.
+**Status (2026-07-05):** Phases A–W complete. Phase W (delete from server / device / both, issue #41) shipped and smoke-verified on-device 2026-07-05 at `v4.2.0` — depends on backend Phase N (`DELETE /library/song` + Navidrome real-path config, see backend ROADMAP N2).
 
 **Conventions:**
 - TDD by default (CLAUDE.md §2) — widget tests / unit tests written first, land in the same commit as code.
@@ -787,7 +787,7 @@ Fires only when the shell route is the top route (pushed detail screens pop them
 **Files (modify):** `android/app/lib/api/endpoints.dart` (`libraryDeleteSong`), `android/app/lib/services/backend_service.dart` (`deleteLibrarySong(path)`), `android/app/lib/screens/downloads_screen.dart` (long-press → Device / Server / Both sheet; Server/Both disabled when `path == null`; destructive confirm dialogs), `android/app/lib/widgets/add_to_playlist_sheet.dart` (optional `deleteFromServerSong` → destructive "Delete from server…" tile), album/playlist-detail + library-search song rows (pass `deleteFromServerSong`), `android/app/pubspec.yaml` → `4.2.0`.
 **Known edge (accepted):** "Both" with the parent album still offline-marked can re-download before Navidrome rescans; after the rescan the song leaves the album listing and sync no longer sees it.
 **Test gate:** service transport tests (DELETE shape, 404/403/network → typed `ApiError`); notifier tests (path guard, invalidation-on-success, no-invalidation-on-failure); Downloads sheet widget tests (three options, disabled-without-path, confirm-gated calls, cancel); sheet tile tests (render/hide rules, confirm fires + pops, cancel keeps sheet). Full suite green; `flutter analyze` clean.
-**Smoke:** on the Pixel against the home server — pending (with backend N1 smoke).
+**Smoke:** ✅ Passed on the Pixel against the home server 2026-07-05. Operator prerequisites discovered during the smoke (Navidrome reports virtual paths by default): `ND_SUBSONIC_DEFAULTREPORTREALPATH=true` on the navidrome container **and** "Report Real Path" enabled on the app's `heerr [Dart]` player record per user (the flag only defaults new player records); app-side re-search needed once so the L5 cache drops old virtual paths. Backend N2 strips the `/music/` prefix Navidrome reports.
 **Commit:** `feat(flutter): W1 — delete song from server / device / both (#41)`
 
 ---

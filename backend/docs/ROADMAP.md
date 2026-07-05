@@ -4,7 +4,7 @@ Track progress through the backend build. Each milestone = one git commit with a
 
 See `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file is the *how* / *when*.
 
-**Status (2026-07-05):** Phases A–L complete (roadmap closed 2026-06-24), reopened for Phase N — library delete (issue #41 remainder). N1 landed 2026-07-05; smoke pending.
+**Status (2026-07-05):** Phases A–N complete. Phase N (library delete, issue #41 remainder) shipped 2026-07-05: N1 endpoint + N2 Navidrome real-path fix; smoke passed on the home server the same day (v4.2.0).
 
 **Conventions:**
 - TDD per CLAUDE.md §2 — tests written first, land in same commit as code.
@@ -414,7 +414,7 @@ Passes `--lyrics` to spotDL when enabled so downloaded MP3s carry embedded lyric
 
 **Test gate:** `backend/tests/test_library_delete.py` — auth (401/403), traversal/absolute/empty path 422s, non-audio 422, missing-file 404, happy path (file gone + both `downloads` rows for the same `output_path` gone), empty-dir pruning + non-empty-dir preservation. Full suite green.
 
-**Smoke:** on the home server — delete a library track from the app, confirm the file is gone on disk, Navidrome drops it after rescan, search shows the track un-dimmed, and a re-download works (no dedupe ghost). Pending (runs with the Android W1 smoke).
+**Smoke:** ✅ Passed on the home server 2026-07-05 (with N2 deployed): curl with a Navidrome-reported `/music/<file>` path → `{"deleted": true}`, file gone on disk; app delete works after enabling "Report Real Path" on the app's `heerr [Dart]` player records (see N2).
 
 **Commit:** `feat(backend): N1 — DELETE /library/song — remove file from music library (#41)`
 
