@@ -891,3 +891,12 @@ Server half of issue #41 (device half shipped in `64c8e47`). Lets the app delete
 - **`backend/app/schemas/library.py`** (new) — `DeleteSongRequest` / `DeleteSongResponse`.
 - **`backend/app/api/v1/router.py`** — register `library.router`.
 - **Tests:** `backend/tests/test_library_delete.py` (new, 12 tests) — auth/scope, traversal + absolute + empty-path 422s, non-audio 422, missing-file 404, happy path incl. multi-row `downloads` cleanup, dir pruning (empty pruned / non-empty kept). Full suite 437 passed; ruff clean.
+
+## 2026-07-05 — N2: strip Navidrome music-folder prefix in DELETE /library/song (#41)
+
+Smoke against the home server exposed that Navidrome reports virtual (tag-derived) Subsonic paths by default; with `Subsonic.DefaultReportRealPath=true` it reports real paths, but absolute inside its container (`/music/<file>`).
+
+- **`backend/app/config.py`** — new `navidrome_music_folder: str = "/music"` setting.
+- **`backend/app/api/v1/library.py`** — strip the configured prefix from the request path before resolving under `music_output_dir`; all other absolute paths still 422; traversal through the prefix caught by the containment check.
+- **`/.env.example`** — `NAVIDROME_MUSIC_FOLDER` block incl. the `ND_SUBSONIC_DEFAULTREPORTREALPATH` + per-player "Report Real Path" operator requirement.
+- **Tests:** `tests/test_library_delete.py` +7 (prefixed-absolute happy path, relative still works, non-prefix absolute 422, prefix traversal 422s, bare-prefix 422s). Full suite 444 passed; ruff + mypy clean.

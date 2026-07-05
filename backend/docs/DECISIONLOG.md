@@ -423,3 +423,22 @@ Sub-decisions locked across J1–J10:
 **Trade-off:** Any authenticated user can delete any track in the shared library (deletes are inherently cross-user because the file is). Accepted at household scale on a Tailscale-only network. Assumption to verify at smoke: Navidrome's music folder and the backend's `music_output_dir` mount the same directory (`/data/media/music`), so Subsonic-relative paths resolve 1:1.
 
 **Reference:** `backend/app/api/v1/library.py`, `backend/app/schemas/library.py`, `backend/tests/test_library_delete.py`. Roadmap Phase N. Android consumer: `android/docs/ROADMAP.md` Phase W.
+
+## 2026-07-05 — N2 addendum: Navidrome virtual paths — real-path requirement + prefix stripping
+
+**Context:** The N1 ADR assumed Subsonic `song.path` is the real library-relative file path. The v4.2.0-rc3 smoke disproved this: Navidrome (post-Big-File-Refactor) reports a **virtual path** derived from tags (`AlbumArtist/Album/NN - Title.ext`). With spotDL's flat output (`Artist - Title.mp3`) the virtual path never exists on disk → every delete 404'd. (Observed live: Subsonic returned `Taylor Swift/Lover/01-08 - Paper Rings.mp3` while the file on disk is `Taylor Swift - Paper Rings.mp3`; `ls` of the virtual folder → "No such file or directory".)
+
+**Decision:** Keep delete-by-Subsonic-path, but (1) require Navidrome to run with `Subsonic.DefaultReportRealPath=true` (cited: https://www.navidrome.org/docs/usage/configuration/options/), and (2) strip the Navidrome-container mount prefix (new `NAVIDROME_MUSIC_FOLDER` setting, default `/music`) from reported paths before resolving under `music_output_dir`, since real paths are reported absolute inside Navidrome's container (observed: `/music/Taylor Swift - Paper Rings.mp3`).
+
+**Operational caveats (observed on the home server):**
+- `DefaultReportRealPath` seeds the default for **new player records only**. Clients that connected before the flag keep `reportRealPath=false` — toggle "Report Real Path" per player in the Navidrome web UI (Settings → Players) or delete the player row.
+- The Android L5 library cache holds pre-flag virtual paths until refreshed.
+
+**Alternatives considered:**
+- **Resolve the real path server-side via Navidrome's native API** — rejected: needs a native-API session per user (heerr stores no passwords; the IdP shim only pings Subsonic).
+- **Fuzzy-match `title + artist` against files on disk** — rejected: guessy deletes are worse than a 404.
+- **Match against `downloads.output_path`** — rejected in N1 already (album/playlist files have no rows).
+
+**Trade-off:** The feature now depends on a non-default Navidrome config knob plus a per-player toggle. Accepted: it's a one-time operator step on a single home server, documented in `.env.example` and ROADMAP N2. Prefix stripping is narrowly scoped — only the exact configured prefix is stripped; every other absolute path still 422s, and traversal through the prefix is caught by the existing containment check.
+
+**Reference:** `backend/app/config.py` (`navidrome_music_folder`), `backend/app/api/v1/library.py`, `backend/tests/test_library_delete.py` (N2 group). CHANGELOG `2026-07-05 — N2`.

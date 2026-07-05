@@ -12,6 +12,12 @@ class Settings(BaseSettings):
     music_output_dir: str
     navidrome_url: str
 
+    # Where the music library is mounted inside NAVIDROME's container. With
+    # `Subsonic.DefaultReportRealPath=true` Navidrome reports song paths as
+    # absolute under this prefix (e.g. `/music/<file>`); DELETE /library/song
+    # strips it before resolving under music_output_dir (Phase N2).
+    navidrome_music_folder: str = "/music"
+
     # Preview stream proxy (Phase K). Disabled → GET /preview/stream returns 404
     # (operator kill switch for the one feature that pulls from googlevideo).
     preview_enabled: bool = True

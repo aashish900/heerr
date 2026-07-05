@@ -58,8 +58,17 @@ async def delete_song(
     the already-downloaded dedupe resets for every user; Navidrome's watcher
     drops the track from the library on its next scan.
     """
+    # N2: with `Subsonic.DefaultReportRealPath=true` Navidrome reports the
+    # path as absolute inside its own container (`/music/<file>`). Strip that
+    # prefix so the remainder is library-relative; any other absolute path
+    # still fails the relative-path check below.
+    rel_path = req.path
+    nav_prefix = settings.navidrome_music_folder.rstrip("/")
+    if nav_prefix and rel_path.startswith(nav_prefix + "/"):
+        rel_path = rel_path[len(nav_prefix) + 1 :]
+
     root = Path(settings.music_output_dir).resolve()
-    full = _resolve_under_root(req.path, root)
+    full = _resolve_under_root(rel_path, root)
 
     if full.suffix.lower() not in _AUDIO_SUFFIXES:
         raise HTTPException(

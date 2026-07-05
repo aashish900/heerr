@@ -418,6 +418,18 @@ Passes `--lyrics` to spotDL when enabled so downloaded MP3s carry embedded lyric
 
 **Commit:** `feat(backend): N1 — DELETE /library/song — remove file from music library (#41)`
 
+### [x] N2. Navidrome real-path handling — prefix stripping + operator requirement
+
+**Discovery (2026-07-05 smoke):** Navidrome (post-Big-File-Refactor) reports a **virtual path** built from tags (`AlbumArtist/Album/NN - Title.ext`) in the Subsonic `path` field — for spotDL's flat file layout this never matches disk, so N1 404'd. Setting `Subsonic.DefaultReportRealPath=true` (env `ND_SUBSONIC_DEFAULTREPORTREALPATH`) makes it report real paths, but (a) it only applies to **newly created player records** — existing clients keep `reportRealPath=false` until toggled in the web UI (Settings → Players) or their player row is deleted; and (b) the real path is reported **absolute inside Navidrome's container** (e.g. `/music/<file>`).
+
+**Files:** `backend/app/config.py` (new `navidrome_music_folder: str = "/music"`), `backend/app/api/v1/library.py` (strip the prefix before resolving; all other absolute paths still 422), `/.env.example` (documented block), `backend/tests/test_library_delete.py` (+7 tests).
+
+**Operator requirement (home server):** `ND_SUBSONIC_DEFAULTREPORTREALPATH=true` on the navidrome container **and** "Report Real Path" enabled for the heerr app's player record. Without these, deletes 404 against virtual paths.
+
+**Test gate:** prefixed absolute path stripped + deleted; relative path still works; absolute outside the prefix 422; traversal through the prefix (`/music/../…`) 422; bare prefix 422. Full suite green.
+
+**Commit:** `fix(backend): N2 — strip Navidrome music-folder prefix in DELETE /library/song (#41)`
+
 ---
 
 ## Cross-cutting reminders

@@ -129,12 +129,55 @@ async def test_delete_requires_download_scope(client, make_token):
         "/etc/passwd",
         "/tmp/abs.mp3",
         "",
+        # prefix-stripping must not open a traversal hole
+        "/music/../outside.mp3",
+        "/music/Artist/../../../outside.mp3",
+        # the bare prefix itself resolves to the root -> rejected
+        "/music",
+        "/music/",
     ],
 )
 async def test_invalid_path_returns_422(client, make_token, bad_path, music_dir):
     raw = await make_token()
     r = await _delete(client, raw, bad_path)
     assert r.status_code == 422
+
+
+# ---- navidrome music-folder prefix stripping (N2) --------------------------
+
+
+async def test_navidrome_prefixed_absolute_path_is_stripped_and_deleted(
+    client, make_token, music_dir
+):
+    """Navidrome with Subsonic.DefaultReportRealPath=true reports paths as
+    absolute inside ITS container (`/music/<file>`). The endpoint strips the
+    configured prefix and resolves the remainder under music_output_dir."""
+    raw = await make_token()
+    rel = "Taylor Swift - Paper Rings.mp3"
+    _write_song(music_dir, rel)
+
+    r = await _delete(client, raw, f"/music/{rel}")
+    assert r.status_code == 200
+    assert r.json()["deleted"] is True
+    assert not (music_dir / rel).exists()
+
+
+async def test_relative_path_still_works_alongside_prefix(client, make_token, music_dir):
+    raw = await make_token()
+    rel = "Artist/Album/01 - Song.mp3"
+    _write_song(music_dir, rel)
+
+    r = await _delete(client, raw, rel)
+    assert r.status_code == 200
+    assert not (music_dir / rel).exists()
+
+
+async def test_absolute_path_outside_prefix_still_422(client, make_token, music_dir):
+    raw = await make_token()
+    _write_song(music_dir, "safe.mp3")
+    r = await _delete(client, raw, str(music_dir / "safe.mp3"))
+    assert r.status_code == 422
+    assert (music_dir / "safe.mp3").exists()
 
 
 async def test_non_audio_suffix_returns_422(client, make_token, music_dir):
