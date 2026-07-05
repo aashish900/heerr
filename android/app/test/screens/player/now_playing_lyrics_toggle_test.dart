@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:audio_service/audio_service.dart';
@@ -10,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:heerr/api/subsonic_client.dart';
 import 'package:heerr/models/job_view.dart';
 import 'package:heerr/models/queue_response.dart';
+import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/player/heerr_audio_handler.dart';
 import 'package:heerr/player/player_provider.dart';
 import 'package:heerr/providers/queue.dart';
@@ -56,10 +58,14 @@ ResponseBody _json(String body) => ResponseBody.fromString(
       },
     );
 
-PlayerSnapshot _snap({MediaItem? item, bool playing = false}) {
+PlayerSnapshot _snap({
+  MediaItem? item,
+  bool playing = false,
+  Duration position = Duration.zero,
+}) {
   return PlayerSnapshot(
     item: item,
-    state: PlaybackState(playing: playing),
+    state: PlaybackState(playing: playing, updatePosition: position),
   );
 }
 
@@ -87,6 +93,13 @@ Widget _wrap({
 }) {
   return ProviderScope(
     overrides: <Override>[
+      // #26: lyricsForProvider now resolves the offline lyrics cache; a
+      // temp docs dir keeps path_provider out of widget tests. Creds stay
+      // null here so the cache is a no-op.
+      applicationDocumentsDirectoryProvider.overrideWith(
+        (ApplicationDocumentsDirectoryRef ref) async =>
+            Directory.systemTemp.createTempSync('heerr-lyrics-toggle-'),
+      ),
       subsonicDioClientProvider.overrideWith(
         (Ref<AsyncValue<Dio>> ref) async {
           final Dio dio = Dio(BaseOptions(baseUrl: 'http://navi.test'));
@@ -219,5 +232,41 @@ void main() {
 
     expect(find.byKey(const Key('now-playing-lyrics-empty')), findsOneWidget);
     expect(adapter.calls, 0);
+  });
+
+  testWidgets(
+      'synced lyrics render the timed pane with the position line active (#26)',
+      (WidgetTester tester) async {
+    final _FakeAdapter adapter = _FakeAdapter(
+      (_) => _json('''
+{"subsonic-response":{"status":"ok","version":"1.16.1",
+  "lyricsList":{"structuredLyrics":[
+    {"synced":true,"line":[
+      {"start":0,"value":"First line"},
+      {"start":60000,"value":"Second line"}]}
+  ]}}}'''),
+    );
+    // Position 61s → the second line is the active one.
+    await tester.pumpWidget(_wrap(
+      snapshot: _snap(item: _item(), position: const Duration(seconds: 61)),
+      adapter: adapter,
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(_toggleKey));
+    await tester.pumpAndSettle();
+
+    // Synced pane, not the plain scroll view.
+    expect(
+        find.byKey(const Key('now-playing-lyrics-synced')), findsOneWidget);
+    expect(find.byKey(const Key('now-playing-lyrics-scroll')), findsNothing);
+    expect(find.text('First line'), findsOneWidget);
+    expect(find.text('Second line'), findsOneWidget);
+
+    // Active line is bold; the other is not.
+    final Text active = tester.widget<Text>(find.text('Second line'));
+    final Text inactive = tester.widget<Text>(find.text('First line'));
+    expect(active.style?.fontWeight, FontWeight.w700);
+    expect(inactive.style?.fontWeight, isNot(FontWeight.w700));
   });
 }

@@ -7,8 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:heerr/models/subsonic/album.dart';
+import 'package:heerr/models/subsonic/lyrics.dart';
 import 'package:heerr/models/subsonic/playlist.dart';
 import 'package:heerr/models/subsonic/song.dart';
+import 'package:heerr/offline/lyrics_cache.dart';
 import 'package:heerr/offline/offline_downloader.dart';
 import 'package:heerr/offline/offline_manifest.dart';
 import 'package:heerr/offline/offline_paths.dart';
@@ -23,6 +25,7 @@ import 'package:heerr/providers/prefs_storage.dart';
 import 'package:heerr/providers/profiles/active_profile.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/providers/server_creds.dart';
+import 'package:heerr/services/lyrics_service.dart';
 
 // ---------------------------------------------------------------------------
 // Stubs
@@ -158,6 +161,10 @@ _Env _buildEnv({
   // tests can opt into sync-all without enumerating the library twice.
   List<Album>? libraryAlbumList,
   List<Playlist>? libraryPlaylistList,
+  // #26: every env stubs the lyrics service so the download hook never
+  // touches real network. Default resolves to null (no lyrics, no cache
+  // write); tests inject a recording or throwing fake as needed.
+  LyricsService? lyricsService,
 }) {
   // A1: Navidrome creds now come from the active profile, not legacy keys.
   // A5: offline prefs live in the (same fake) prefs store.
@@ -206,6 +213,10 @@ _Env _buildEnv({
         (Ref<AsyncValue<Playlist>> ref) async =>
             Playlist(id: e.key, name: e.key, entry: e.value),
       ),
+    lyricsServiceProvider.overrideWith(
+      (Ref<AsyncValue<LyricsService>> ref) async =>
+          lyricsService ?? _NullLyricsService(),
+    ),
   ];
 
   return _Env(
@@ -232,6 +243,52 @@ Future<void> _seedMarkers(
     ),
   );
   c.invalidate(offlineManifestProvider);
+}
+
+/// #26: default env stub — no lyrics anywhere, no network, no cache write.
+class _NullLyricsService extends LyricsService {
+  _NullLyricsService() : super(Dio());
+
+  @override
+  Future<Lyrics?> resolve({
+    required String songId,
+    required String artist,
+    required String title,
+  }) async =>
+      null;
+}
+
+/// #26: fake lyrics resolver — always returns one synced line.
+class _FakeLyricsService extends LyricsService {
+  _FakeLyricsService() : super(Dio());
+
+  final List<String> resolvedSongIds = <String>[];
+
+  @override
+  Future<Lyrics?> resolve({
+    required String songId,
+    required String artist,
+    required String title,
+  }) async {
+    resolvedSongIds.add(songId);
+    return Lyrics(
+      value: 'lyrics for $songId',
+      lines: <LyricsLine>[LyricsLine(start: 0, value: 'lyrics for $songId')],
+    );
+  }
+}
+
+/// #26: fake resolver whose failure must not fail the song download.
+class _ThrowingLyricsService extends LyricsService {
+  _ThrowingLyricsService() : super(Dio());
+
+  @override
+  Future<Lyrics?> resolve({
+    required String songId,
+    required String artist,
+    required String title,
+  }) async =>
+      throw StateError('lyrics backend down');
 }
 
 const Song _s1 = Song(id: 'so-1', title: 't1', suffix: 'mp3');
@@ -282,6 +339,50 @@ void main() {
       expect(m.songs.length, 2);
       expect(m.songs['so-1']!.state, OfflineSongState.ready);
       expect(m.songs['so-2']!.state, OfflineSongState.ready);
+    });
+
+    test('successful download also caches lyrics per song (#26)', () async {
+      final _FakeLyricsService lyrics = _FakeLyricsService();
+      final _Env env = _buildEnv(
+        tmp: tmp,
+        albumStubs: <String, List<Song>>{
+          'al-1': <Song>[_s1, _s2],
+        },
+        lyricsService: lyrics,
+      );
+      addTearDown(env.container.dispose);
+
+      await env.container.read(offlineSettingsProvider.future);
+      await _seedMarkers(env.container, albums: <String>{'al-1'});
+      await env.container.read(offlineSyncProvider.notifier).syncNow();
+
+      expect(lyrics.resolvedSongIds.toSet(), <String>{'so-1', 'so-2'});
+      final ServerCreds settings = env.container.read(serverCredsProvider);
+      final OfflinePaths paths =
+          await env.container.read(offlinePathsProvider.future);
+      final Lyrics? cached =
+          await LyricsCache(paths).read(settings, 'so-1');
+      expect(cached!.value, 'lyrics for so-1');
+      expect(cached.lines!.single.start, 0);
+    });
+
+    test('lyrics failure does not fail the song download (#26)', () async {
+      final _Env env = _buildEnv(
+        tmp: tmp,
+        albumStubs: <String, List<Song>>{
+          'al-1': <Song>[_s1],
+        },
+        lyricsService: _ThrowingLyricsService(),
+      );
+      addTearDown(env.container.dispose);
+
+      await env.container.read(offlineSettingsProvider.future);
+      await _seedMarkers(env.container, albums: <String>{'al-1'});
+      final OfflineSyncResult r =
+          await env.container.read(offlineSyncProvider.notifier).syncNow();
+
+      expect(r.downloadedCount, 1);
+      expect(r.failedCount, 0);
     });
 
     test('second syncNow is a no-op when everything is ready', () async {

@@ -6,7 +6,7 @@ part of 'lyrics.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$lyricsForHash() => r'606b9476c6d019f1e5a05c5e1c0f24f73ed71992';
+String _$lyricsForHash() => r'f445277901feff89a8ad4aa3940b96ddbe6c37e6';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -31,11 +31,14 @@ class _SystemHash {
 
 /// Wraps lyrics resolution for the Now Playing screen (P2). The two-stage
 /// strategy (Navidrome `getLyricsBySongId` → LRCLib fallback) lives in
-/// [LyricsService]; this provider is now pure state orchestration.
+/// [LyricsService]; this provider orchestrates state plus the #26 offline
+/// cache: every successful resolve is persisted per-server, and the cache
+/// is served when the network resolve fails or comes back empty (the
+/// tailnet-unreachable case), so downloaded songs keep their lyrics.
 ///
-/// Returns [Lyrics] with `value` set to plain text when lyrics are found, or
-/// `null` when neither source has them. Non-404 non-70 Navidrome [ApiError]s
-/// propagate so the UI shows the error pane.
+/// Returns [Lyrics] (with timed `lines` when the source was synced), or
+/// `null` when neither source nor the cache has them. Non-404 non-70
+/// Navidrome [ApiError]s propagate only when the cache has nothing.
 ///
 /// Copied from [lyricsFor].
 @ProviderFor(lyricsFor)
@@ -43,32 +46,41 @@ const lyricsForProvider = LyricsForFamily();
 
 /// Wraps lyrics resolution for the Now Playing screen (P2). The two-stage
 /// strategy (Navidrome `getLyricsBySongId` → LRCLib fallback) lives in
-/// [LyricsService]; this provider is now pure state orchestration.
+/// [LyricsService]; this provider orchestrates state plus the #26 offline
+/// cache: every successful resolve is persisted per-server, and the cache
+/// is served when the network resolve fails or comes back empty (the
+/// tailnet-unreachable case), so downloaded songs keep their lyrics.
 ///
-/// Returns [Lyrics] with `value` set to plain text when lyrics are found, or
-/// `null` when neither source has them. Non-404 non-70 Navidrome [ApiError]s
-/// propagate so the UI shows the error pane.
+/// Returns [Lyrics] (with timed `lines` when the source was synced), or
+/// `null` when neither source nor the cache has them. Non-404 non-70
+/// Navidrome [ApiError]s propagate only when the cache has nothing.
 ///
 /// Copied from [lyricsFor].
 class LyricsForFamily extends Family<AsyncValue<Lyrics?>> {
   /// Wraps lyrics resolution for the Now Playing screen (P2). The two-stage
   /// strategy (Navidrome `getLyricsBySongId` → LRCLib fallback) lives in
-  /// [LyricsService]; this provider is now pure state orchestration.
+  /// [LyricsService]; this provider orchestrates state plus the #26 offline
+  /// cache: every successful resolve is persisted per-server, and the cache
+  /// is served when the network resolve fails or comes back empty (the
+  /// tailnet-unreachable case), so downloaded songs keep their lyrics.
   ///
-  /// Returns [Lyrics] with `value` set to plain text when lyrics are found, or
-  /// `null` when neither source has them. Non-404 non-70 Navidrome [ApiError]s
-  /// propagate so the UI shows the error pane.
+  /// Returns [Lyrics] (with timed `lines` when the source was synced), or
+  /// `null` when neither source nor the cache has them. Non-404 non-70
+  /// Navidrome [ApiError]s propagate only when the cache has nothing.
   ///
   /// Copied from [lyricsFor].
   const LyricsForFamily();
 
   /// Wraps lyrics resolution for the Now Playing screen (P2). The two-stage
   /// strategy (Navidrome `getLyricsBySongId` → LRCLib fallback) lives in
-  /// [LyricsService]; this provider is now pure state orchestration.
+  /// [LyricsService]; this provider orchestrates state plus the #26 offline
+  /// cache: every successful resolve is persisted per-server, and the cache
+  /// is served when the network resolve fails or comes back empty (the
+  /// tailnet-unreachable case), so downloaded songs keep their lyrics.
   ///
-  /// Returns [Lyrics] with `value` set to plain text when lyrics are found, or
-  /// `null` when neither source has them. Non-404 non-70 Navidrome [ApiError]s
-  /// propagate so the UI shows the error pane.
+  /// Returns [Lyrics] (with timed `lines` when the source was synced), or
+  /// `null` when neither source nor the cache has them. Non-404 non-70
+  /// Navidrome [ApiError]s propagate only when the cache has nothing.
   ///
   /// Copied from [lyricsFor].
   LyricsForProvider call(String songId, String artist, String title) {
@@ -97,21 +109,27 @@ class LyricsForFamily extends Family<AsyncValue<Lyrics?>> {
 
 /// Wraps lyrics resolution for the Now Playing screen (P2). The two-stage
 /// strategy (Navidrome `getLyricsBySongId` → LRCLib fallback) lives in
-/// [LyricsService]; this provider is now pure state orchestration.
+/// [LyricsService]; this provider orchestrates state plus the #26 offline
+/// cache: every successful resolve is persisted per-server, and the cache
+/// is served when the network resolve fails or comes back empty (the
+/// tailnet-unreachable case), so downloaded songs keep their lyrics.
 ///
-/// Returns [Lyrics] with `value` set to plain text when lyrics are found, or
-/// `null` when neither source has them. Non-404 non-70 Navidrome [ApiError]s
-/// propagate so the UI shows the error pane.
+/// Returns [Lyrics] (with timed `lines` when the source was synced), or
+/// `null` when neither source nor the cache has them. Non-404 non-70
+/// Navidrome [ApiError]s propagate only when the cache has nothing.
 ///
 /// Copied from [lyricsFor].
 class LyricsForProvider extends AutoDisposeFutureProvider<Lyrics?> {
   /// Wraps lyrics resolution for the Now Playing screen (P2). The two-stage
   /// strategy (Navidrome `getLyricsBySongId` → LRCLib fallback) lives in
-  /// [LyricsService]; this provider is now pure state orchestration.
+  /// [LyricsService]; this provider orchestrates state plus the #26 offline
+  /// cache: every successful resolve is persisted per-server, and the cache
+  /// is served when the network resolve fails or comes back empty (the
+  /// tailnet-unreachable case), so downloaded songs keep their lyrics.
   ///
-  /// Returns [Lyrics] with `value` set to plain text when lyrics are found, or
-  /// `null` when neither source has them. Non-404 non-70 Navidrome [ApiError]s
-  /// propagate so the UI shows the error pane.
+  /// Returns [Lyrics] (with timed `lines` when the source was synced), or
+  /// `null` when neither source nor the cache has them. Non-404 non-70
+  /// Navidrome [ApiError]s propagate only when the cache has nothing.
   ///
   /// Copied from [lyricsFor].
   LyricsForProvider(String songId, String artist, String title)

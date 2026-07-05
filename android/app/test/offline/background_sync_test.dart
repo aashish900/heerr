@@ -25,6 +25,8 @@ import 'package:heerr/providers/prefs_storage.dart';
 import 'package:heerr/providers/profiles/active_profile.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/providers/server_creds.dart';
+import 'package:heerr/models/subsonic/lyrics.dart';
+import 'package:heerr/services/lyrics_service.dart';
 
 // ---------------------------------------------------------------------------
 // Stubs (mirror offline_sync_test.dart so the Q1 test exercises the same
@@ -150,8 +152,25 @@ ProviderContainer _buildContainer({
           (Ref<AsyncValue<Album>> ref) async =>
               Album(id: e.key, name: e.key, song: e.value),
         ),
+      // #26: stub the sync tick's lyrics hook — no lyrics, no network.
+      lyricsServiceProvider.overrideWith(
+        (Ref<AsyncValue<LyricsService>> ref) async => _NullLyricsService(),
+      ),
     ],
   );
+}
+
+/// #26: no-lyrics stub so the download hook never touches real network.
+class _NullLyricsService extends LyricsService {
+  _NullLyricsService() : super(Dio());
+
+  @override
+  Future<Lyrics?> resolve({
+    required String songId,
+    required String artist,
+    required String title,
+  }) async =>
+      null;
 }
 
 Future<void> _seedMarker(ProviderContainer c, String albumId) async {

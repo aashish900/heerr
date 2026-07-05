@@ -105,6 +105,22 @@ class OfflinePaths {
     return Directory('${root.path}/covers_hi');
   }
 
+  /// #26: directory holding cached lyrics JSON, one file per song id.
+  /// Written on every successful online resolve and at offline-download
+  /// time, served when the network resolve fails.
+  Directory? lyricsDir(ServerCreds settings) {
+    final Directory? root = serverRoot(settings);
+    if (root == null) return null;
+    return Directory('${root.path}/lyrics');
+  }
+
+  File? lyricsFile(ServerCreds settings, String songId) {
+    final Directory? dir = lyricsDir(settings);
+    if (dir == null) return null;
+    final String safe = songId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    return File('${dir.path}/$safe.json');
+  }
+
   File? coverFile(ServerCreds settings, String coverArtId) {
     final Directory? dir = coversDir(settings);
     if (dir == null) return null;

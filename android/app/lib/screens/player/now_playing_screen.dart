@@ -341,6 +341,7 @@ class _Body extends ConsumerWidget {
                   songId: item.extras?['subsonicId'] as String?,
                   artist: item.artist ?? '',
                   title: item.title,
+                  position: position,
                 )
               : _CoverArt(artUri: item.artUri),
         ),

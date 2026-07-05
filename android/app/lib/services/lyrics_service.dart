@@ -66,8 +66,18 @@ class LyricsService {
       final dynamic data = res.data;
       if (data is! Map<String, dynamic>) return null;
       final String? plain = data['plainLyrics'] as String?;
-      if (plain == null || plain.trim().isEmpty) return null;
-      return Lyrics(value: plain.trim());
+      // #26: LRCLib also serves `syncedLyrics` (LRC). Parse for the timed
+      // pane; plain text stays as the fallback body.
+      final String? synced = data['syncedLyrics'] as String?;
+      final List<LyricsLine> lines =
+          synced == null ? const <LyricsLine>[] : parseLrc(synced);
+      if ((plain == null || plain.trim().isEmpty) && lines.isEmpty) {
+        return null;
+      }
+      final String body = (plain != null && plain.trim().isNotEmpty)
+          ? plain.trim()
+          : lines.map((LyricsLine l) => l.value).join('\n');
+      return Lyrics(value: body, lines: lines.isEmpty ? null : lines);
     } on DioException catch (e) {
       // 404 = LRCLib found nothing; other network errors are non-fatal too.
       if (e.response?.statusCode == 404) return null;
@@ -84,13 +94,25 @@ class LyricsService {
     if (first is! Map<String, dynamic>) return null;
     final dynamic lines = first['line'];
     if (lines is! List || lines.isEmpty) return null;
-    final String text = lines
-        .whereType<Map<String, dynamic>>()
+    final List<Map<String, dynamic>> rows =
+        lines.whereType<Map<String, dynamic>>().toList();
+    final String text = rows
         .map((Map<String, dynamic> l) => (l['value'] as String?) ?? '')
         .join('\n')
         .trim();
     if (text.isEmpty) return null;
-    return Lyrics(value: text);
+    // #26: Navidrome marks synced structured lyrics with `synced: true` and
+    // a per-line `start` offset (ms). Carry them for the timed pane.
+    List<LyricsLine>? timed;
+    if (first['synced'] == true) {
+      timed = <LyricsLine>[
+        for (final Map<String, dynamic> l in rows)
+          if (l['start'] is int && (l['value'] as String?) != null)
+            LyricsLine(start: l['start'] as int, value: l['value'] as String),
+      ];
+      if (timed.isEmpty) timed = null;
+    }
+    return Lyrics(value: text, lines: timed);
   }
 }
 

@@ -9,6 +9,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/profile.dart';
 import '../models/subsonic/album.dart';
+import '../models/subsonic/lyrics.dart';
 import '../models/subsonic/artist.dart';
 import '../models/subsonic/playlist.dart';
 import '../models/subsonic/song.dart';
@@ -19,6 +20,8 @@ import '../providers/library/library_playlist.dart';
 import '../providers/library/library_playlists.dart';
 import '../providers/profiles/active_profile.dart';
 import '../providers/server_creds.dart';
+import '../services/lyrics_service.dart';
+import 'lyrics_cache.dart';
 import 'offline_downloader.dart';
 import 'offline_manifest.dart';
 import 'offline_paths.dart';
@@ -328,6 +331,10 @@ class OfflineSync extends _$OfflineSync {
             songsState[next.id] = result;
             if (result.state == OfflineSongState.ready) {
               downloadedCount += 1;
+              // #26: fetch + persist lyrics alongside the audio so they
+              // survive going offline. Best-effort — a lyrics failure never
+              // fails the song download.
+              await _cacheLyricsBestEffort(next, settings, paths);
             } else {
               failedCount += 1;
             }
@@ -368,6 +375,34 @@ class OfflineSync extends _$OfflineSync {
   /// Dedup is by the returned map's key (`song.id`), so a song that lives in
   /// both a marked album and a marked playlist (or in the full-library walk
   /// when sync-all is on) lands in `out` exactly once.
+  /// #26: resolve + persist lyrics for a freshly-downloaded song. Skips when
+  /// a cached file already exists (downloads only re-run for non-ready
+  /// entries, so this is once per song in practice; the exists-check guards
+  /// the retry-after-failure path). Every failure is swallowed — lyrics are
+  /// an enhancement to the download, never a gate on it.
+  Future<void> _cacheLyricsBestEffort(
+    Song song,
+    ServerCreds settings,
+    OfflinePaths paths,
+  ) async {
+    try {
+      final File? existing = paths.lyricsFile(settings, song.id);
+      if (existing == null || await existing.exists()) return;
+      final LyricsService service =
+          await ref.read(lyricsServiceProvider.future);
+      final Lyrics? lyrics = await service.resolve(
+        songId: song.id,
+        artist: song.artist ?? '',
+        title: song.title,
+      );
+      if (lyrics != null) {
+        await LyricsCache(paths).write(settings, song.id, lyrics);
+      }
+    } catch (e) {
+      debugPrint('offline_sync: lyrics fetch failed for ${song.id}: $e');
+    }
+  }
+
   Future<Map<String, Song>> _resolveTargets(
     OfflineManifest manifest,
     OfflineSettingsValue offline,

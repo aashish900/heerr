@@ -2158,3 +2158,14 @@ UX revision of the U1 commit above, per user request. A plain tap of the downloa
 
 - **`pubspec.yaml`** — `3.5.0` → `4.1.0` (pubspec had drifted behind the `v4.*` tags; CI now injects the tag as versionName regardless, but local builds should agree with the release line).
 - Bundles: V1 back-stack fix (manifest opt-out), #36 app-version footer, #35 add-to-queue + Now Playing queue remove/reorder. Tagged `v4.1.0`.
+
+## 2026-07-05 — #26: synced lyrics + offline lyrics cache
+
+- **`lib/models/subsonic/lyrics.dart`** — new `LyricsLine(start, value)` freezed model; `Lyrics` gains `List<LyricsLine>? lines` (serialized, so the offline cache round-trips sync data). New pure `parseLrc()` — LRC → timed lines (multi-timestamp lines, 1–3 digit fractions normalised to ms, metadata tags / untimed lines skipped, sorted by start).
+- **`lib/services/lyrics_service.dart`** — both stages now carry timing: Navidrome structured lyrics with `synced: true` map per-line `start` offsets; LRCLib's `syncedLyrics` is parsed via `parseLrc`. Plain text stays the fallback body.
+- **`lib/offline/lyrics_cache.dart`** (new) — per-server lyrics cache at `<serverKey>/lyrics/<songId>.json`; fail-soft (I/O errors swallowed) like the L5 library cache. Path helpers added to `offline_paths.dart`.
+- **`lib/offline/offline_sync.dart`** — `_cacheLyricsBestEffort`: after each successful song download the tick resolves + persists lyrics (skips when already cached; failures never fail the download).
+- **`lib/providers/library/lyrics.dart`** — `lyricsFor` writes the cache on every successful online resolve and serves it when the network resolve throws (ApiError) or returns empty — downloaded songs keep lyrics offline. No-cache errors still rethrow to the error pane.
+- **`lib/screens/player/now_playing_lyrics.dart`** — `_LyricsPane` takes the live `position`; timed lyrics render a synced view (`now-playing-lyrics-synced`): active line highlighted primary/bold, kept near-centre via `Scrollable.ensureVisible`; non-lazy list so seek jumps still scroll. Plain lyrics render as before.
+- **Known gaps:** songs downloaded before this build have no cached lyrics until their lyrics are opened once online (no backfill pass); the LRCLib fallback needs internet at download time (Navidrome-sourced lyrics are tailnet-only).
+- **Tests:** `test/models/lyrics_parse_test.dart` (5), synced + cache groups in `lyrics_test.dart` (6, harness gains temp-docs/creds/LRCLib-adapter knobs), sync-hook tests in `offline_sync_test.dart` (2, env now always stubs `lyricsServiceProvider` so no test touches real network), synced-pane widget test in `now_playing_lyrics_toggle_test.dart`. Full suite 679 green; analyze clean.
