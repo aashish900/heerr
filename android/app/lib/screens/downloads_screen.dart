@@ -6,11 +6,13 @@ import '../models/subsonic/album.dart';
 import '../models/subsonic/playlist.dart';
 import '../models/subsonic/song.dart';
 import '../offline/offline_manifest.dart';
+import '../offline/offline_marker.dart';
 import '../player/playback_actions.dart';
 import '../providers/downloaded_songs.dart';
 import '../providers/library/library_album.dart';
 import '../providers/library/library_playlist.dart';
 import '../router.dart';
+import '../widgets/error_snackbar.dart';
 import '../widgets/library_cover_art.dart';
 import '../widgets/library_result_tile.dart';
 
@@ -236,12 +238,50 @@ class _SongsTab extends ConsumerWidget {
               title: Text(s.title),
               subtitle: subtitle.isNotEmpty ? Text(subtitle) : null,
               onTap: () => playSongFromSubsonic(ref, context, s),
+              onLongPress: () => _confirmDeleteSong(context, ref, s),
             );
           },
         );
       },
     );
   }
+}
+
+Future<void> _confirmDeleteSong(
+  BuildContext context,
+  WidgetRef ref,
+  Song song,
+) async {
+  final bool? confirmed = await showDialog<bool>(
+    context: context,
+    builder: (BuildContext ctx) => AlertDialog(
+      title: const Text('Delete from device?'),
+      content: Text(
+        '"${song.title}" will be removed from your device. '
+        'It stays in your Navidrome library and will re-download '
+        'on the next sync if the album is still marked offline.',
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+  await ref.read(offlineMarkerProvider.notifier).deleteSongLocally(song.id);
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(
+      duration: kSnackBarDuration,
+      content: Text('Deleted "${song.title}" from device'),
+    ));
 }
 
 class _EmptyView extends StatelessWidget {

@@ -42,6 +42,8 @@ class AddToPlaylistSheet extends ConsumerWidget {
     required this.songIds,
     this.findSimilarSeed,
     this.queueSongs = const <Song>[],
+    this.onRemoveFromPlaylist,
+    this.removeFromPlaylistName,
     super.key,
   });
 
@@ -55,6 +57,14 @@ class AddToPlaylistSheet extends ConsumerWidget {
   /// already playing is a no-op the user doesn't need.
   final List<Song> queueSongs;
 
+  /// When non-null, renders a "Remove from [removeFromPlaylistName]" destructive
+  /// tile at the top of the sheet. Only shown when the caller knows the user
+  /// owns the playlist (gate is the caller's responsibility).
+  final Future<void> Function()? onRemoveFromPlaylist;
+
+  /// Display name for the playlist used in the remove tile label.
+  final String? removeFromPlaylistName;
+
   /// When non-null, renders a "Find similar →" entry at the top of the
   /// sheet. Tapping it sets [manualSeedProvider] to this seed and
   /// navigates to `/library/recommendations`. Passed by single-song
@@ -67,6 +77,8 @@ class AddToPlaylistSheet extends ConsumerWidget {
     required List<String> songIds,
     SeedTrack? findSimilarSeed,
     List<Song> queueSongs = const <Song>[],
+    Future<void> Function()? onRemoveFromPlaylist,
+    String? removeFromPlaylistName,
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -76,6 +88,8 @@ class AddToPlaylistSheet extends ConsumerWidget {
         songIds: songIds,
         findSimilarSeed: findSimilarSeed,
         queueSongs: queueSongs,
+        onRemoveFromPlaylist: onRemoveFromPlaylist,
+        removeFromPlaylistName: removeFromPlaylistName,
       ),
     );
   }
@@ -169,6 +183,7 @@ class AddToPlaylistSheet extends ConsumerWidget {
         ref.watch(libraryPlaylistsProvider);
     final ServerCreds settings = ref.watch(serverCredsProvider);
     final String? username = settings.navidromeUsername;
+    final ColorScheme cs = Theme.of(context).colorScheme;
 
     return SafeArea(
       child: Padding(
@@ -186,6 +201,23 @@ class AddToPlaylistSheet extends ConsumerWidget {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
+            if (onRemoveFromPlaylist != null) ...<Widget>[
+              ListTile(
+                key: const Key('add-to-playlist-remove'),
+                leading: Icon(Icons.remove_circle_outline, color: cs.error),
+                title: Text(
+                  removeFromPlaylistName != null
+                      ? 'Remove from ${removeFromPlaylistName!}'
+                      : 'Remove from playlist',
+                  style: TextStyle(color: cs.error),
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  onRemoveFromPlaylist!();
+                },
+              ),
+              const Divider(height: 1),
+            ],
             if (queueSongs.isNotEmpty) ...<Widget>[
               ListTile(
                 key: const Key('add-to-playlist-add-to-queue'),

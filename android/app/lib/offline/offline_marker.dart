@@ -1,7 +1,11 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../providers/server_creds.dart';
 import 'offline_manifest.dart';
+import 'offline_paths.dart';
 
 part 'offline_marker.g.dart';
 
@@ -80,6 +84,41 @@ class OfflineMarker extends _$OfflineMarker {
 
   bool isMarkedArtist(OfflineManifest m, String artistId) =>
       m.markedArtists.contains(artistId);
+
+  /// Deletes the local audio file + lyrics cache for [songId] and removes its
+  /// entry from the manifest. The album/playlist mark is left intact, so the
+  /// song will re-download on the next sync unless the user also unmarks it.
+  Future<void> deleteSongLocally(String songId) async {
+    final ServerCreds settings = ref.read(serverCredsProvider);
+    final OfflinePaths paths = await ref.read(offlinePathsProvider.future);
+    final OfflineManifestStore store =
+        await ref.read(offlineManifestStoreProvider.future);
+    final OfflineManifest current = await store.load(settings);
+
+    final OfflineSongEntry? entry = current.songs[songId];
+    if (entry?.localPath != null) {
+      try {
+        final File f = File(entry!.localPath!);
+        if (await f.exists()) await f.delete();
+      } catch (e) {
+        debugPrint('offline_marker: delete audio failed for $songId: $e');
+      }
+    }
+
+    final File? lyricsFile = paths.lyricsFile(settings, songId);
+    if (lyricsFile != null) {
+      try {
+        if (await lyricsFile.exists()) await lyricsFile.delete();
+      } catch (e) {
+        debugPrint('offline_marker: delete lyrics failed for $songId: $e');
+      }
+    }
+
+    final Map<String, OfflineSongEntry> updated =
+        Map<String, OfflineSongEntry>.from(current.songs)..remove(songId);
+    await store.save(settings, current.copyWith(songs: updated));
+    ref.invalidate(offlineManifestProvider);
+  }
 
   Future<void> _mutate(
     OfflineManifest Function(OfflineManifest) transform,

@@ -360,7 +360,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
             child: Text(e is ApiError ? e.message : 'Error: $e'),
           ),
           data: (Playlist p) =>
-              _isEditing ? _buildEditBody(p) : _buildViewBody(ref, p),
+              _isEditing ? _buildEditBody(p) : _buildViewBody(ref, p, canEdit: canEdit),
         ),
       ),
     );
@@ -369,7 +369,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
   // -----------------------------------------------------------------
   // View mode body — same as M3.
   // -----------------------------------------------------------------
-  Widget _buildViewBody(WidgetRef ref, Playlist playlist) {
+  Widget _buildViewBody(WidgetRef ref, Playlist playlist, {required bool canEdit}) {
     if (playlist.entry.isEmpty) {
       return const EmptyState(
         icon: Icons.queue_music_outlined,
@@ -427,6 +427,29 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
             songIds: <String>[s.id],
             findSimilarSeed: seedForSong(s),
             queueSongs: <Song>[s],
+            removeFromPlaylistName: canEdit ? playlist.name : null,
+            onRemoveFromPlaylist: canEdit
+                ? () async {
+                    try {
+                      await ref
+                          .read(playlistMutationsProvider.notifier)
+                          .removeSongsAtIndices(
+                            playlistId: playlist.id,
+                            indices: <int>[idx],
+                          );
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(SnackBar(
+                          duration: kSnackBarDuration,
+                          content: Text('Removed from ${playlist.name}'),
+                        ));
+                    } on ApiError catch (e) {
+                      if (!mounted) return;
+                      showApiError(context, e);
+                    }
+                  }
+                : null,
           ),
         );
       },

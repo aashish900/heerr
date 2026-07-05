@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../api/api_error.dart';
 import '../models/enums.dart';
 import '../models/job_view.dart';
+import '../services/backend_service.dart';
 import '../models/queue_response.dart';
 import '../player/playback_actions.dart';
 import '../providers/queue.dart';
@@ -154,11 +155,38 @@ class _JobTile extends ConsumerWidget {
               tooltip: 'Play',
               onPressed: () => playJobDoneFromSubsonic(ref, context, job),
             ),
+          if (job.state == JobState.failed)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Retry',
+              onPressed: () => _retry(context, ref),
+            ),
           StatusPill(state: job.state),
         ],
       ),
       onTap: () => context.push(Routes.job(job.jobId)),
     );
+  }
+
+  Future<void> _retry(BuildContext context, WidgetRef ref) async {
+    try {
+      final BackendService svc = await ref.read(backendServiceProvider.future);
+      await svc.download(
+        sourceUrl: job.sourceUrl,
+        sourceType: job.sourceType.name,
+        displayName: job.displayName,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(
+          duration: kSnackBarDuration,
+          content: Text('Queued'),
+        ));
+    } on ApiError catch (e) {
+      if (!context.mounted) return;
+      showApiError(context, e);
+    }
   }
 
   String _shortId(String id) {

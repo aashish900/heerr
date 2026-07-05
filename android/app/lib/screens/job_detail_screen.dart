@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_error.dart';
+import '../models/enums.dart';
 import '../models/job_view.dart';
+import '../services/backend_service.dart';
 import '../providers/job_status.dart';
 import '../widgets/error_snackbar.dart';
 import '../widgets/skeleton.dart';
@@ -38,12 +40,12 @@ class JobDetailScreen extends ConsumerWidget {
   }
 }
 
-class _JobBody extends StatelessWidget {
+class _JobBody extends ConsumerWidget {
   const _JobBody({required this.job});
   final JobView job;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final DateTime now = DateTime.now();
     final String? name = job.displayName;
     final bool hasName = name != null && name.isNotEmpty;
@@ -80,8 +82,37 @@ class _JobBody extends StatelessWidget {
         if (job.outputPath != null)
           _Field(label: 'output path', value: job.outputPath!, copyable: true),
         if (job.error != null) _ErrorField(message: job.error!),
+        if (job.state == JobState.failed) ...<Widget>[
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry download'),
+            onPressed: () => _retry(context, ref),
+          ),
+        ],
       ],
     );
+  }
+
+  Future<void> _retry(BuildContext context, WidgetRef ref) async {
+    try {
+      final BackendService svc = await ref.read(backendServiceProvider.future);
+      await svc.download(
+        sourceUrl: job.sourceUrl,
+        sourceType: job.sourceType.name,
+        displayName: job.displayName,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(
+          duration: kSnackBarDuration,
+          content: Text('Queued'),
+        ));
+    } on ApiError catch (e) {
+      if (!context.mounted) return;
+      showApiError(context, e);
+    }
   }
 }
 
