@@ -2182,6 +2182,18 @@ Completes issue #41 (device-only delete shipped in `64c8e47`). Consumes backend 
 - **`pubspec.yaml`** — `4.2.0`.
 - **Tests (+19):** `test/services/backend_service_test.dart`, `test/providers/library/library_delete_test.dart`, `test/screens/downloads_screen_delete_test.dart`, `test/widgets/add_to_playlist_delete_from_server_test.dart`. Full suite 698 passed; `flutter analyze` clean; `build_runner` clean.
 
+## 2026-07-05 — Now Playing redesign (Spotify-style) + test fixes
+
+- **`lib/screens/player/now_playing_screen.dart`** — full rewrite: removed AppBar; added custom `_Header` (back button, "NOW PLAYING" label, sleep chip, `PopupMenuButton` key `now-playing-overflow`); replaced fixed `Column`+`Expanded(_QueueList)` with `SingleChildScrollView`+`Column`; added `_WideCoverArt` (full-width cover, rounded corners); queue now opens via `showModalBottomSheet` triggered by `_BottomActionsRow`; lyrics always visible by scrolling (no toggle).
+- **`lib/screens/player/now_playing_transport.dart`** — shuffle/repeat buttons styled with `StadiumBorder` + `primaryContainer` fill when active; added `_BottomActionsRow` widget (speaker placeholder left, queue button `now-playing-queue-button` right).
+- **`lib/screens/player/now_playing_lyrics.dart`** — restructured: `_LyricsSection` always rendered in the scrollable body; `_SyncedLyrics` uses `Column` (not `ListView`) so `Scrollable.ensureVisible` bubbles to the parent `SingleChildScrollView`; removed `_LyricsBox`, `_LyricsPane`, toggle bool.
+- **`test/screens/player/now_playing_lyrics_toggle_test.dart`** — rewritten for always-visible lyrics (removed toggle tap logic).
+- **`test/screens/player/now_playing_screen_test.dart`** — added `_NoopAdapter`/`lyricsServiceProvider`/`offlinePathsProvider` overrides; queue-button interactions now use `ensureVisible` before tap; lifecycle test updated.
+- **`test/screens/player/now_playing_modes_test.dart`** — added `_NullOfflinePaths`-equivalent stubs; `ensureVisible` before each transport icon tap (cover art pushes buttons off-screen in 800 px test viewport).
+- **`test/screens/player/now_playing_sleep_timer_test.dart`** — added `lyricsServiceProvider` override to prevent real HTTP.
+- **`test/screens/player/now_playing_add_to_playlist_test.dart`** — added `_NullOfflinePaths` subclass overriding `serverRoot → null`; overrides `offlinePathsProvider` to cut dart:io `file.exists()` call that hangs `pumpAndSettle` under fake-async (real OS I/O is never drained by Flutter's fake-async pump loop).
+- All 33 player tests pass; `flutter analyze` clean.
+
 ## 2026-07-05 — W1 smoke verified on-device (v4.2.0)
 
 Delete from device / server / both verified on the Pixel against the home server (backend N1+N2 deployed). Smoke surfaced two operator prerequisites, now documented in ROADMAP Phase W + backend N2: Navidrome must report real paths (`ND_SUBSONIC_DEFAULTREPORTREALPATH=true` + per-player "Report Real Path" on `heerr [Dart]`), and the app needs one re-search so the L5 cache drops pre-flag virtual paths. Tagged `v4.2.0`.

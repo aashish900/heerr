@@ -751,3 +751,13 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Trade-off:** No predictive-back system animation on Android 14+. The opt-out flag is deprecated-path (Android intends to remove it in a future release), so this must be revisited when targetSdk moves past the flag's removal — at which point the per-route-PopScope shim or an upstream fix becomes mandatory. Tracked implicitly by this ADR.
 
 **Reference:** `android/app/android/app/src/main/AndroidManifest.xml` (`<application>` comment cites the mechanism), `android/app/lib/router.dart` (shell PopScope), CHANGELOG 2026-07-04.
+
+## 2026-07-05 — Now Playing: always-visible scrollable lyrics, queue bottom sheet, Spotify-style layout
+
+**Context:** User requested a redesigned Now Playing screen: full-width cover art, rounded pill-style shuffle/loop buttons, queue behind a hamburger bottom sheet, 3-dot overflow menu, and lyrics visible by scrolling (not toggled).
+
+**Decision:** Replace the fixed `Column`+`Expanded(_QueueList)` body with a `SingleChildScrollView`+`Column` that always includes `_LyricsSection` at the bottom. Queue moves to `showModalBottomSheet`. `_SyncedLyrics` uses a `Column` (not `ListView`) so `Scrollable.ensureVisible` for auto-scroll targets the parent `SingleChildScrollView`. Shuffle/repeat styled with `StadiumBorder` + `primaryContainer` fill when active.
+
+**Why:** Single scroll axis simplifies the layout; always-visible lyrics require no toggle state; synced lyrics auto-scroll via `Scrollable.ensureVisible` only works when the `Scrollable` ancestor is the page-level one (a nested `ListView` creates a competing `Scrollable` that consumes the scroll event).
+
+**Alternatives considered:** Keep the toggle — rejected, user explicitly requested no toggle. Use a `CustomScrollView` with slivers — rejected, adds complexity without benefit at this screen's size.

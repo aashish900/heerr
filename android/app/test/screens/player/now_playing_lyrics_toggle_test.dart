@@ -93,9 +93,6 @@ Widget _wrap({
 }) {
   return ProviderScope(
     overrides: <Override>[
-      // #26: lyricsForProvider now resolves the offline lyrics cache; a
-      // temp docs dir keeps path_provider out of widget tests. Creds stay
-      // null here so the cache is a no-op.
       applicationDocumentsDirectoryProvider.overrideWith(
         (ApplicationDocumentsDirectoryRef ref) async =>
             Directory.systemTemp.createTempSync('heerr-lyrics-toggle-'),
@@ -125,8 +122,6 @@ Widget _wrap({
   );
 }
 
-const Key _toggleKey = Key('now-playing-lyrics-toggle');
-
 void main() {
   setUp(() {
     paletteExtractorOverride = (Uri? _) async => null;
@@ -135,20 +130,7 @@ void main() {
     paletteExtractorOverride = dominantColorFor;
   });
 
-  testWidgets('toggle button is visible in the AppBar',
-      (WidgetTester tester) async {
-    final _FakeAdapter adapter = _FakeAdapter(
-      (_) => _json('{"subsonic-response":{"status":"ok"}}'),
-    );
-    await tester.pumpWidget(_wrap(
-      snapshot: _snap(item: _item()),
-      adapter: adapter,
-    ));
-    await tester.pumpAndSettle();
-    expect(find.byKey(_toggleKey), findsOneWidget);
-  });
-
-  testWidgets('tap toggles cover ↔ lyrics; second tap reverts',
+  testWidgets('lyrics section is visible by default — no toggle needed',
       (WidgetTester tester) async {
     final _FakeAdapter adapter = _FakeAdapter(
       (_) => _json('''
@@ -162,17 +144,8 @@ void main() {
       adapter: adapter,
     ));
     await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('now-playing-lyrics-scroll')), findsNothing);
-
-    await tester.tap(find.byKey(_toggleKey));
-    await tester.pumpAndSettle();
     expect(find.byKey(const Key('now-playing-lyrics-scroll')), findsOneWidget);
     expect(find.textContaining('Lyric line one'), findsOneWidget);
-
-    await tester.tap(find.byKey(_toggleKey));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('now-playing-lyrics-scroll')), findsNothing);
   });
 
   testWidgets('Subsonic code 70 → "No lyrics for this track" empty state',
@@ -187,10 +160,6 @@ void main() {
       adapter: adapter,
     ));
     await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(_toggleKey));
-    await tester.pumpAndSettle();
-
     expect(find.byKey(const Key('now-playing-lyrics-empty')), findsOneWidget);
     expect(find.text('No lyrics for this track'), findsOneWidget);
   });
@@ -207,10 +176,6 @@ void main() {
       adapter: adapter,
     ));
     await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(_toggleKey));
-    await tester.pumpAndSettle();
-
     expect(find.byKey(const Key('now-playing-lyrics-error')), findsOneWidget);
   });
 
@@ -219,17 +184,11 @@ void main() {
     final _FakeAdapter adapter = _FakeAdapter(
       (_) => throw StateError('should not be called'),
     );
-    // Provide an item with no subsonicId and no artist/title so both
-    // stages short-circuit without hitting the network.
     await tester.pumpWidget(_wrap(
       snapshot: _snap(item: _item(subsonicId: null, artist: null, title: '')),
       adapter: adapter,
     ));
     await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(_toggleKey));
-    await tester.pumpAndSettle();
-
     expect(find.byKey(const Key('now-playing-lyrics-empty')), findsOneWidget);
     expect(adapter.calls, 0);
   });
@@ -253,12 +212,8 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(_toggleKey));
-    await tester.pumpAndSettle();
-
-    // Synced pane, not the plain scroll view.
-    expect(
-        find.byKey(const Key('now-playing-lyrics-synced')), findsOneWidget);
+    // Synced pane is directly visible — no toggle needed.
+    expect(find.byKey(const Key('now-playing-lyrics-synced')), findsOneWidget);
     expect(find.byKey(const Key('now-playing-lyrics-scroll')), findsNothing);
     expect(find.text('First line'), findsOneWidget);
     expect(find.text('Second line'), findsOneWidget);

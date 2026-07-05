@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:audio_service/audio_service.dart';
@@ -10,7 +11,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:heerr/api/subsonic_client.dart';
 import 'package:heerr/models/job_view.dart';
 import 'package:heerr/models/queue_response.dart';
+import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/player/heerr_audio_handler.dart';
+import 'package:heerr/services/lyrics_service.dart';
 import 'package:heerr/player/player_provider.dart';
 import 'package:heerr/player/sleep_timer.dart';
 import 'package:heerr/providers/queue.dart';
@@ -67,6 +70,10 @@ MediaItem _item() => const MediaItem(
 Widget _wrap({Duration? sleepValue}) {
   return ProviderScope(
     overrides: <Override>[
+      applicationDocumentsDirectoryProvider.overrideWith(
+        (ApplicationDocumentsDirectoryRef ref) async =>
+            Directory.systemTemp.createTempSync('heerr-sleep-timer-'),
+      ),
       subsonicDioClientProvider.overrideWith(
         (Ref<AsyncValue<Dio>> ref) async {
           final Dio dio = Dio(BaseOptions(baseUrl: 'http://navi.test'));
@@ -74,6 +81,12 @@ Widget _wrap({Duration? sleepValue}) {
           return dio;
         },
       ),
+      lyricsServiceProvider.overrideWith((LyricsServiceRef ref) async {
+        final Dio subsonic = await ref.watch(subsonicDioClientProvider.future);
+        final Dio lrcLib = Dio(BaseOptions(baseUrl: 'http://navi.test'));
+        lrcLib.httpClientAdapter = _NoopAdapter();
+        return LyricsService(subsonic, lrcLibDio: lrcLib);
+      }),
       playerSnapshotProvider.overrideWith(
         (Ref<AsyncValue<PlayerSnapshot>> ref) =>
             Stream<PlayerSnapshot>.value(_snap(item: _item())),

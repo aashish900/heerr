@@ -1,14 +1,20 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:heerr/api/subsonic_client.dart';
 import 'package:heerr/models/job_view.dart';
 import 'package:heerr/models/queue_response.dart';
+import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/player/heerr_audio_handler.dart';
+import 'package:heerr/services/lyrics_service.dart';
 import 'package:heerr/player/player_provider.dart';
 import 'package:heerr/providers/queue.dart';
 import 'package:heerr/screens/player/now_playing_screen.dart';
@@ -34,6 +40,28 @@ class _StubQueue extends Queue {
   Future<void> resume() async {
     _resumeCalls++;
   }
+}
+
+// Noop HTTP adapter so the always-visible lyrics section gets a fast empty
+// response rather than hitting the network or blocking on real settings.
+class _NoopAdapter implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<dynamic>? cancelFuture,
+  ) async {
+    return ResponseBody.fromString(
+      '{"subsonic-response":{"status":"ok"}}',
+      200,
+      headers: <String, List<String>>{
+        'content-type': <String>['application/json'],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
 }
 
 PlayerSnapshot _snap({MediaItem? item, bool playing = false}) {
@@ -68,6 +96,25 @@ Widget _wrap({
 }) {
   return ProviderScope(
     overrides: <Override>[
+      // Always-visible lyrics section: stub the full lyrics service stack so
+      // no real HTTP calls are made and lyricsForProvider resolves fast.
+      applicationDocumentsDirectoryProvider.overrideWith(
+        (ApplicationDocumentsDirectoryRef ref) async =>
+            Directory.systemTemp.createTempSync('heerr-np-screen-'),
+      ),
+      subsonicDioClientProvider.overrideWith(
+        (Ref<AsyncValue<Dio>> ref) async {
+          final Dio dio = Dio(BaseOptions(baseUrl: 'http://navi.test'));
+          dio.httpClientAdapter = _NoopAdapter();
+          return dio;
+        },
+      ),
+      lyricsServiceProvider.overrideWith((LyricsServiceRef ref) async {
+        final Dio subsonic = await ref.watch(subsonicDioClientProvider.future);
+        final Dio lrcLib = Dio(BaseOptions(baseUrl: 'http://navi.test'));
+        lrcLib.httpClientAdapter = _NoopAdapter();
+        return LyricsService(subsonic, lrcLibDio: lrcLib);
+      }),
       if (handler != null) audioHandlerProvider.overrideWithValue(handler),
       playerSnapshotProvider.overrideWith(
         (Ref<AsyncValue<PlayerSnapshot>> ref) =>
@@ -132,9 +179,6 @@ void main() {
 
   testWidgets('renders queue items with current track marked',
       (WidgetTester tester) async {
-    // Tall viewport so the queue list at the bottom has room for both
-    // tiles — the cover art + scrubber + transport eat most of the default
-    // 600px height.
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
@@ -149,6 +193,12 @@ void main() {
       queue: <MediaItem>[a, b],
     ));
     await tester.pumpAndSettle();
+
+    // Open the queue sheet via the bottom-bar queue button.
+    await tester.ensureVisible(find.byKey(const Key('now-playing-queue-button')));
+    await tester.tap(find.byKey(const Key('now-playing-queue-button')));
+    await tester.pumpAndSettle();
+
     expect(find.text('Track A'), findsWidgets);
     expect(find.text('Track B'), findsOneWidget);
     // The current track gets the equalizer icon.
@@ -180,6 +230,10 @@ void main() {
         queue: <MediaItem>[a, b, c],
         handler: handler,
       ));
+      await tester.pumpAndSettle();
+      // Open queue sheet before interacting with rows.
+      await tester.ensureVisible(find.byKey(const Key('now-playing-queue-button')));
+      await tester.tap(find.byKey(const Key('now-playing-queue-button')));
       await tester.pumpAndSettle();
     }
 
@@ -221,6 +275,12 @@ void main() {
       queue: const <MediaItem>[],
     ));
     await tester.pumpAndSettle();
+
+    // Open the queue sheet.
+    await tester.ensureVisible(find.byKey(const Key('now-playing-queue-button')));
+    await tester.tap(find.byKey(const Key('now-playing-queue-button')));
+    await tester.pumpAndSettle();
+
     expect(find.text('Queue is empty.'), findsOneWidget);
   });
 
@@ -270,8 +330,6 @@ void main() {
       ));
       await tester.pumpAndSettle();
       expect(find.byType(DecoratedBox), findsWidgets);
-      // No tint means the helper widget falls through to the raw child;
-      // having a non-null colour gates the gradient path.
     },
   );
 
@@ -291,13 +349,28 @@ void main() {
     expect(_pauseCalls, 0);
     expect(_resumeCalls, 0);
 
-    // Use a builder we can toggle, keeping ProviderScope alive across the
-    // remount so the resume() call in NowPlayingScreen.dispose can still
-    // resolve the provider's notifier.
     final ValueNotifier<bool> showPlayer = ValueNotifier<bool>(true);
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
+          applicationDocumentsDirectoryProvider.overrideWith(
+            (ApplicationDocumentsDirectoryRef ref) async =>
+                Directory.systemTemp.createTempSync('heerr-np-lifecycle-'),
+          ),
+          subsonicDioClientProvider.overrideWith(
+            (Ref<AsyncValue<Dio>> ref) async {
+              final Dio dio = Dio(BaseOptions(baseUrl: 'http://navi.test'));
+              dio.httpClientAdapter = _NoopAdapter();
+              return dio;
+            },
+          ),
+          lyricsServiceProvider.overrideWith((LyricsServiceRef ref) async {
+            final Dio subsonic =
+                await ref.watch(subsonicDioClientProvider.future);
+            final Dio lrcLib = Dio(BaseOptions(baseUrl: 'http://navi.test'));
+            lrcLib.httpClientAdapter = _NoopAdapter();
+            return LyricsService(subsonic, lrcLibDio: lrcLib);
+          }),
           playerSnapshotProvider.overrideWith(
             (Ref<AsyncValue<PlayerSnapshot>> ref) =>
                 Stream<PlayerSnapshot>.value(

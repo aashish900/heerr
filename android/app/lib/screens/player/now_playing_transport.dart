@@ -85,18 +85,26 @@ class _Transport extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final Color primary = Theme.of(context).colorScheme.primary;
+    final ColorScheme cs = Theme.of(context).colorScheme;
     final bool shuffleOn = shuffleMode != AudioServiceShuffleMode.none;
     final bool repeatOn = repeatMode != AudioServiceRepeatMode.none;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: <Widget>[
+        // Shuffle: pill-shaped filled background when active.
         IconButton(
-          iconSize: 28,
+          iconSize: 26,
           tooltip: shuffleOn ? 'Shuffle on' : 'Shuffle off',
-          color: shuffleOn ? primary : null,
           icon: const Icon(Icons.shuffle_rounded),
+          style: shuffleOn
+              ? IconButton.styleFrom(
+                  backgroundColor: cs.primaryContainer,
+                  foregroundColor: cs.onPrimaryContainer,
+                  shape: const StadiumBorder(),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                )
+              : IconButton.styleFrom(foregroundColor: cs.onSurfaceVariant),
           onPressed: () {
             final HeerrAudioHandler h = ref.read(audioHandlerProvider);
             h.setShuffleMode(shuffleOn
@@ -131,22 +139,60 @@ class _Transport extends ConsumerWidget {
           icon: const Icon(Icons.skip_next_rounded),
           onPressed: () => ref.read(audioHandlerProvider).skipToNext(),
         ),
+        // Repeat: pill-shaped filled background when active.
         IconButton(
-          iconSize: 28,
+          iconSize: 26,
           tooltip: repeatMode == AudioServiceRepeatMode.one
               ? 'Repeat one'
               : repeatOn
                   ? 'Repeat all'
                   : 'Repeat off',
-          color: repeatOn ? primary : null,
           icon: Icon(repeatMode == AudioServiceRepeatMode.one
               ? Icons.repeat_one_rounded
               : Icons.repeat_rounded),
+          style: repeatOn
+              ? IconButton.styleFrom(
+                  backgroundColor: cs.primaryContainer,
+                  foregroundColor: cs.onPrimaryContainer,
+                  shape: const StadiumBorder(),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                )
+              : IconButton.styleFrom(foregroundColor: cs.onSurfaceVariant),
           onPressed: () => ref
               .read(audioHandlerProvider)
               .setRepeatMode(_nextRepeat(repeatMode)),
         ),
       ],
+    );
+  }
+}
+
+/// Row below transport with device picker (placeholder) and queue trigger.
+class _BottomActionsRow extends StatelessWidget {
+  const _BottomActionsRow({required this.onQueueTap});
+
+  final VoidCallback onQueueTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: <Widget>[
+          const IconButton(
+            icon: Icon(Icons.speaker_outlined),
+            tooltip: 'Audio device',
+            onPressed: null,
+          ),
+          const Spacer(),
+          IconButton(
+            key: const Key('now-playing-queue-button'),
+            icon: const Icon(Icons.queue_music_rounded),
+            tooltip: 'Queue',
+            onPressed: onQueueTap,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -172,17 +218,9 @@ class _QueueList extends ConsumerWidget {
             ),
           );
         }
-        // #35: reorder via the trailing drag handle, remove via
-        // swipe-to-dismiss. Keys are index+id on purpose: MediaItem ids
-        // can repeat in a queue (same song queued twice) and Reorderable/
-        // Dismissible require unique keys; the provider re-emits and
-        // rebuilds after every mutation, so index-based keys stay valid
-        // for the lifetime of one build, which is all the gesture needs.
         return ReorderableListView.builder(
           buildDefaultDragHandles: false,
           itemCount: items.length,
-          // onReorderItem (3.42+) already adjusts newIndex to
-          // remove-then-insert semantics — no manual `-1` needed.
           onReorderItem: (int oldIndex, int newIndex) {
             ref.read(audioHandlerProvider).moveQueueItem(oldIndex, newIndex);
           },

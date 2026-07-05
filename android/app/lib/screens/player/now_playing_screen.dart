@@ -21,34 +21,23 @@ import '../../widgets/add_to_playlist_sheet.dart';
 import '../../widgets/error_snackbar.dart';
 import '../../widgets/preview_badge.dart';
 
-// A17: per-section private widgets live in sibling part files to keep this
-// screen file readable. They share this library's imports + privacy.
 part 'now_playing_lyrics.dart';
 part 'now_playing_transport.dart';
 part 'now_playing_sleep_timer.dart';
 
 /// Injection point for tests — swap `dominantColorFor` with a deterministic
-/// fake (e.g. `(_) async => Colors.purple`) so widget tests don't hit the
-/// network and don't depend on `package:palette_generator`'s decode path.
+/// fake so widget tests don't hit the network or palette_generator decode path.
 typedef PaletteExtractor = Future<Color?> Function(Uri? artUri);
 
 @visibleForTesting
 PaletteExtractor paletteExtractorOverride = dominantColorFor;
 
-/// Full-screen Now Playing surface. Cover art on top, title/artist, scrubber
-/// bound to the live position, transport controls, and the queue list at the
-/// bottom.
+/// Full-screen Now Playing surface. Big cover art, title/artist with inline
+/// favourite, scrubber, transport with rounded shuffle/loop, bottom-bar with
+/// queue trigger, and always-visible lyrics that appear when the user scrolls.
 ///
-/// State sources:
-///   * [playerSnapshotProvider] — current `MediaItem` + `PlaybackState` (the
-///     `playing` flag, the projected position, the duration via item).
-///   * [playerQueueProvider] — queue list for the bottom section.
-///
-/// Position ticker: PlaybackState only emits on state changes (play, pause,
-/// seek, buffer). To keep the scrubber smooth between events we rebuild every
-/// 250ms via a private `Stream.periodic` while playing. The position is read
-/// from the snapshot's `state.position` getter, which already extrapolates
-/// from `updatePosition + elapsed * speed` (see PlaybackState in audio_service).
+/// Layout: [SingleChildScrollView] → [Column] so the lyrics section is
+/// reachable by scrolling without a separate nested scroll view.
 class NowPlayingScreen extends ConsumerStatefulWidget {
   const NowPlayingScreen({super.key});
 
@@ -60,20 +49,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   Timer? _ticker;
   Duration? _scrubOverride;
 
-  // Cover-art-derived tint colour. Recomputed when the current MediaItem's
-  // artUri changes. Null while loading or when extraction fails — the body
-  // falls back to the default surface in that case.
   Uri? _tintArtUri;
   Color? _tintColor;
 
-  // P2: lyrics view toggle. Persisted as widget state — survives screen
-  // rebuilds but resets on Now Playing pop / push (intentional; lyrics is
-  // a per-session view choice, not a global preference).
-  bool _showLyrics = false;
-
-  // Cached queue notifier so dispose() doesn't have to read it through `ref`
-  // (Riverpod invalidates the ref before State.dispose runs — caching here
-  // means resume() can fire even during teardown).
   Queue? _queueNotifier;
 
   @override
@@ -82,31 +60,22 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     _ticker = Timer.periodic(const Duration(milliseconds: 250), (_) {
       if (mounted) setState(() {});
     });
-    // K1 lifecycle: pause the /queue poller while Now Playing is foreground.
-    // The queue + reactive-promotion logic stays paused; the user can't see
-    // it from here. Resumed in dispose().
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       try {
         final Queue q = ref.read(queueProvider.notifier);
         _queueNotifier = q;
         q.pause();
-      } catch (_) {
-        // Provider may not be initialised yet (rare); ignore.
-      }
+      } catch (_) {}
     });
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
-    // Use the cached notifier so we don't have to touch `ref` — Riverpod
-    // invalidates it before this dispose runs.
     try {
       _queueNotifier?.resume();
-    } catch (_) {
-      // Notifier may already be disposed; ignore.
-    }
+    } catch (_) {}
     super.dispose();
   }
 
@@ -118,10 +87,6 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     );
   }
 
-  /// Opens [AddToPlaylistSheet] for the track that is currently playing.
-  /// The Subsonic song id lives in the MediaItem's `subsonicId` extra (see
-  /// [songToMediaItem]); tracks without one (non-Subsonic playback) can't be
-  /// added to a server-side playlist, so we surface a snackbar instead.
   void _openAddToPlaylist(BuildContext context) {
     final MediaItem? item = ref.read(playerSnapshotProvider).valueOrNull?.item;
     final Song? song = item == null ? null : songFromMediaItem(item);
@@ -138,15 +103,37 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     );
   }
 
+  void _openQueueSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.7,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                'Queue',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const Expanded(child: _QueueList()),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _maybeRefreshTint(Uri? artUri) {
     if (artUri == _tintArtUri) return;
     _tintArtUri = artUri;
     final Uri? captured = artUri;
     paletteExtractorOverride(captured).then((Color? c) {
       if (!mounted) return;
-      // Stale-response guard: another item may have started while we were
-      // extracting; only apply this colour if the current artUri still
-      // matches the one we kicked off the extraction for.
       if (_tintArtUri != captured) return;
       setState(() => _tintColor = c);
     });
@@ -154,66 +141,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final AsyncValue<PlayerSnapshot> snap =
-        ref.watch(playerSnapshotProvider);
-
-    final Duration? sleepRemaining = ref.watch(sleepTimerNotifierProvider);
-
-    final MediaItem? currentItem = snap.valueOrNull?.item;
-    final Song? currentSong =
-        currentItem != null && !isPreviewMediaItem(currentItem)
-            ? songFromMediaItem(currentItem)
-            : null;
+    final AsyncValue<PlayerSnapshot> snap = ref.watch(playerSnapshotProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Now playing'),
-        backgroundColor: _tintColor?.withValues(alpha: 0.6),
-        actions: <Widget>[
-          if (sleepRemaining != null)
-            _SleepCountdownChip(remaining: sleepRemaining),
-          if (currentSong != null) _FavouriteButton(song: currentSong),
-          IconButton(
-            key: const Key('now-playing-lyrics-toggle'),
-            tooltip: _showLyrics ? 'Show cover art' : 'Show lyrics',
-            icon: Icon(
-              _showLyrics ? Icons.image_outlined : Icons.lyrics_outlined,
-            ),
-            onPressed: () => setState(() => _showLyrics = !_showLyrics),
-          ),
-          PopupMenuButton<String>(
-            key: const Key('now-playing-overflow'),
-            tooltip: 'More',
-            icon: const Icon(Icons.more_vert),
-            onSelected: (String v) {
-              if (v == 'sleep') {
-                _openSleepTimerSheet(context);
-              } else if (v == 'add_to_playlist') {
-                _openAddToPlaylist(context);
-              }
-            },
-            itemBuilder: (BuildContext _) => const <PopupMenuEntry<String>>[
-              PopupMenuItem<String>(
-                key: Key('now-playing-add-to-playlist'),
-                value: 'add_to_playlist',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.playlist_add),
-                  title: Text('Add to playlist'),
-                ),
-              ),
-              PopupMenuItem<String>(
-                value: 'sleep',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.bedtime_outlined),
-                  title: Text('Sleep timer'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
       body: snap.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (Object e, _) => Center(child: Text('Player error: $e')),
@@ -228,7 +158,6 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             color: _tintColor,
             child: _Body(
               snapshot: s,
-              showLyrics: _showLyrics,
               scrubOverride: _scrubOverride,
               onSeekStart: (Duration d) => setState(() => _scrubOverride = d),
               onSeekUpdate: (Duration d) => setState(() => _scrubOverride = d),
@@ -236,6 +165,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                 ref.read(audioHandlerProvider).seek(d);
                 setState(() => _scrubOverride = null);
               },
+              onQueueTap: () => _openQueueSheet(context),
+              onSleepTap: () => _openSleepTimerSheet(context),
+              onAddToPlaylist: () => _openAddToPlaylist(context),
             ),
           );
         },
@@ -244,9 +176,6 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   }
 }
 
-/// Heart icon in the Now Playing AppBar. Watches [favouriteSongIdsProvider]
-/// so the filled/outlined state updates immediately after a toggle.
-/// Only rendered for Subsonic tracks (preview MediaItems have no song id).
 class _FavouriteButton extends ConsumerWidget {
   const _FavouriteButton({required this.song});
 
@@ -277,8 +206,8 @@ class _FavouriteButton extends ConsumerWidget {
   }
 }
 
-/// Vertical gradient from [color] (top, at low opacity) to the default M3
-/// surface (bottom). Null [color] → no gradient applied.
+/// Vertical gradient from [color] (top) to the M3 surface (bottom).
+/// Null [color] → no gradient, raw child returned.
 class _TintedBackground extends StatelessWidget {
   const _TintedBackground({required this.color, required this.child});
 
@@ -308,118 +237,208 @@ class _TintedBackground extends StatelessWidget {
   }
 }
 
+class _Header extends StatelessWidget {
+  const _Header({
+    required this.sleepRemaining,
+    required this.onSleepTap,
+    required this.onAddToPlaylist,
+  });
+
+  final Duration? sleepRemaining;
+  final VoidCallback onSleepTap;
+  final VoidCallback onAddToPlaylist;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: Row(
+        children: <Widget>[
+          const BackButton(),
+          Expanded(
+            child: Text(
+              'NOW PLAYING',
+              textAlign: TextAlign.center,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(letterSpacing: 1.5),
+            ),
+          ),
+          if (sleepRemaining != null)
+            _SleepCountdownChip(remaining: sleepRemaining!),
+          PopupMenuButton<String>(
+            key: const Key('now-playing-overflow'),
+            tooltip: 'More',
+            icon: const Icon(Icons.more_vert),
+            onSelected: (String v) {
+              if (v == 'sleep') {
+                onSleepTap();
+              } else if (v == 'add_to_playlist') {
+                onAddToPlaylist();
+              }
+            },
+            itemBuilder: (BuildContext _) => const <PopupMenuEntry<String>>[
+              PopupMenuItem<String>(
+                key: Key('now-playing-add-to-playlist'),
+                value: 'add_to_playlist',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.playlist_add),
+                  title: Text('Add to playlist'),
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'sleep',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.bedtime_outlined),
+                  title: Text('Sleep timer'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Body extends ConsumerWidget {
   const _Body({
     required this.snapshot,
-    required this.showLyrics,
     required this.scrubOverride,
     required this.onSeekStart,
     required this.onSeekUpdate,
     required this.onSeekEnd,
+    required this.onQueueTap,
+    required this.onSleepTap,
+    required this.onAddToPlaylist,
   });
 
   final PlayerSnapshot snapshot;
-  final bool showLyrics;
   final Duration? scrubOverride;
   final ValueChanged<Duration> onSeekStart;
   final ValueChanged<Duration> onSeekUpdate;
   final ValueChanged<Duration> onSeekEnd;
+  final VoidCallback onQueueTap;
+  final VoidCallback onSleepTap;
+  final VoidCallback onAddToPlaylist;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final MediaItem item = snapshot.item!;
     final Duration duration = item.duration ?? Duration.zero;
     final Duration position = scrubOverride ?? snapshot.state.position;
+    final Song? currentSong =
+        !isPreviewMediaItem(item) ? songFromMediaItem(item) : null;
+    final Duration? sleepRemaining = ref.watch(sleepTimerNotifierProvider);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        const SizedBox(height: 16),
-        Center(
-          child: showLyrics
-              ? _LyricsPane(
-                  songId: item.extras?['subsonicId'] as String?,
-                  artist: item.artist ?? '',
-                  title: item.title,
-                  position: position,
-                )
-              : _CoverArt(artUri: item.artUri),
-        ),
-        const SizedBox(height: 24),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              if (isPreviewMediaItem(item)) ...<Widget>[
-                const PreviewBadge(),
-                const SizedBox(height: 8),
-              ],
-              Text(
-                item.title,
-                style: Theme.of(context).textTheme.titleLarge,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (item.artist != null) ...<Widget>[
-                const SizedBox(height: 4),
-                Text(
-                  item.artist!,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ],
-            ],
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          SafeArea(
+            bottom: false,
+            child: _Header(
+              sleepRemaining: sleepRemaining,
+              onSleepTap: onSleepTap,
+              onAddToPlaylist: onAddToPlaylist,
+            ),
           ),
-        ),
-        _Scrubber(
-          position: position,
-          duration: duration,
-          onSeekStart: onSeekStart,
-          onSeekUpdate: onSeekUpdate,
-          onSeekEnd: onSeekEnd,
-        ),
-        _Transport(
-          playing: snapshot.isPlaying,
-          repeatMode: snapshot.state.repeatMode,
-          shuffleMode: snapshot.state.shuffleMode,
-        ),
-        const SizedBox(height: 8),
-        const Divider(height: 1),
-        const Expanded(child: _QueueList()),
-      ],
+          _WideCoverArt(artUri: item.artUri),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 16, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      if (isPreviewMediaItem(item)) ...<Widget>[
+                        const PreviewBadge(),
+                        const SizedBox(height: 8),
+                      ],
+                      Text(
+                        item.title,
+                        style: Theme.of(context).textTheme.titleLarge,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (item.artist != null) ...<Widget>[
+                        const SizedBox(height: 4),
+                        Text(
+                          item.artist!,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (currentSong != null) _FavouriteButton(song: currentSong),
+              ],
+            ),
+          ),
+          _Scrubber(
+            position: position,
+            duration: duration,
+            onSeekStart: onSeekStart,
+            onSeekUpdate: onSeekUpdate,
+            onSeekEnd: onSeekEnd,
+          ),
+          _Transport(
+            playing: snapshot.isPlaying,
+            repeatMode: snapshot.state.repeatMode,
+            shuffleMode: snapshot.state.shuffleMode,
+          ),
+          _BottomActionsRow(onQueueTap: onQueueTap),
+          _LyricsSection(
+            songId: item.extras?['subsonicId'] as String?,
+            artist: item.artist ?? '',
+            title: item.title,
+            position: position,
+          ),
+          SizedBox(height: MediaQuery.paddingOf(context).bottom + 16),
+        ],
+      ),
     );
   }
 }
 
-class _CoverArt extends StatelessWidget {
-  const _CoverArt({required this.artUri});
+class _WideCoverArt extends StatelessWidget {
+  const _WideCoverArt({required this.artUri});
 
   final Uri? artUri;
 
   @override
   Widget build(BuildContext context) {
+    final double size = MediaQuery.sizeOf(context).width - 48;
     final ColorScheme cs = Theme.of(context).colorScheme;
-    final Uri? uri = artUri;
     final Widget placeholder = Container(
-      width: 240,
-      height: 240,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(Icons.music_note, size: 96, color: cs.onSurfaceVariant),
+      child: Icon(Icons.music_note, size: size * 0.3, color: cs.onSurfaceVariant),
     );
-    if (uri == null) return placeholder;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: Image.network(
-        uri.toString(),
-        width: 240,
-        height: 240,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => placeholder,
-      ),
+    final Uri? uri = artUri;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+      child: uri == null
+          ? placeholder
+          : ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                uri.toString(),
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => placeholder,
+              ),
+            ),
     );
   }
 }
-

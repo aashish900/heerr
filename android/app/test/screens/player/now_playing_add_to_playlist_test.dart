@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:audio_service/audio_service.dart';
@@ -11,6 +12,8 @@ import 'package:heerr/api/subsonic_client.dart';
 import 'package:heerr/models/job_view.dart';
 import 'package:heerr/models/queue_response.dart';
 import 'package:heerr/models/subsonic/playlist.dart';
+import 'package:heerr/offline/offline_paths.dart';
+import 'package:heerr/services/lyrics_service.dart';
 import 'package:heerr/player/heerr_audio_handler.dart';
 import 'package:heerr/player/player_provider.dart';
 import 'package:heerr/providers/library/library_playlists.dart';
@@ -51,6 +54,16 @@ class _NoopAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+// Prevents file.exists() I/O inside LyricsCache.read when creds are non-null.
+// Without this, pumpAndSettle hangs: real OS I/O is never drained by
+// Flutter's fake-async pump loop.
+class _NullOfflinePaths extends OfflinePaths {
+  _NullOfflinePaths() : super(Directory.systemTemp);
+
+  @override
+  Directory? serverRoot(ServerCreds settings) => null;
+}
+
 PlayerSnapshot _snap(MediaItem item) =>
     PlayerSnapshot(item: item, state: PlaybackState(playing: true));
 
@@ -67,6 +80,9 @@ Widget _wrap({MediaItem? item}) {
   final MediaItem playing = item ?? _item();
   return ProviderScope(
     overrides: <Override>[
+      offlinePathsProvider.overrideWith(
+        (OfflinePathsRef ref) async => _NullOfflinePaths(),
+      ),
       subsonicDioClientProvider.overrideWith(
         (Ref<AsyncValue<Dio>> ref) async {
           final Dio dio = Dio(BaseOptions(baseUrl: 'http://navi.test'));
@@ -74,6 +90,12 @@ Widget _wrap({MediaItem? item}) {
           return dio;
         },
       ),
+      lyricsServiceProvider.overrideWith((LyricsServiceRef ref) async {
+        final Dio subsonic = await ref.watch(subsonicDioClientProvider.future);
+        final Dio lrcLib = Dio(BaseOptions(baseUrl: 'http://navi.test'));
+        lrcLib.httpClientAdapter = _NoopAdapter();
+        return LyricsService(subsonic, lrcLibDio: lrcLib);
+      }),
       playerSnapshotProvider.overrideWith(
         (Ref<AsyncValue<PlayerSnapshot>> ref) =>
             Stream<PlayerSnapshot>.value(_snap(playing)),
