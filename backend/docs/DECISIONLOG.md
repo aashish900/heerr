@@ -401,3 +401,25 @@ Sub-decisions locked across J1–J10:
 **Reference:** `backend/app/services/preview_resolver.py` (K1), `backend/app/api/v1/preview.py` + `backend/app/api/deps.py::bearer_token_query_or_header` (K2), `backend/app/config.py` preview fields (K3). Tests: `backend/tests/test_preview_resolver.py`, `test_preview.py`, `test_config.py`. Planning spike (2026-06-23): yt-dlp resolves a watch URL → single https googlevideo audio URL + headers; a Range request returns 206; googlevideo 302-redirects (proxy uses `follow_redirects=True`). Roadmap Phase K (K1–K5); CHANGELOG `2026-06-23 — Phase K`. Android consumer: `android/docs/ROADMAP.md` Phase T.
 
 **Reference:** `backend/alembic/versions/0011_users_settings.py`; `backend/app/models/user.py`; `backend/app/schemas/settings.py`; `backend/app/api/v1/settings.py`; `backend/app/api/v1/router.py`; `backend/app/services/recommenders/factory.py`. Tests: `backend/tests/test_migration_0011.py`, `test_recommend_factory.py`, `test_settings.py`. CHANGELOG entry `2026-06-19 — M5`.
+
+## 2026-07-05 — Phase N: DELETE /library/song — delete-by-Subsonic-path, download scope
+
+**Context:** Issue #41 asks for deleting downloaded songs from the device, the server, or both. The device half shipped on the Android side (`64c8e47`). The backend had no way to remove a file from the music library — the only cleanup path was SSH + `rm` + waiting for Navidrome's watcher.
+
+**Decision:** New `DELETE /api/v1/library/song` (body `{path}`) guarded by the existing `download` scope. `path` is the Navidrome-relative path the client already has from the Subsonic API (`song.path`); the backend resolves it under `music_output_dir`, validates containment + an audio-suffix allowlist, unlinks the file, deletes **all** `downloads` rows whose `output_path` matches (regardless of user), and prunes now-empty parent directories up to the library root.
+
+**Why:**
+- **Delete by path, not by `downloads` row.** `workers.py` records `downloads` rows only for `song`-type jobs; files landed by album/playlist jobs have no row at all. The Subsonic path is the only identifier that covers every file in the library, including tracks heerr never downloaded.
+- **Reuse the `download` scope.** The tokens table check-constraint only allows `['read','download']`; a new `delete` scope would need an Alembic migration, a login-shim change, and a re-login on every device profile. Semantically "may add/remove library content" is one capability for a household app on a tailnet. (User decision 2026-07-05.)
+- **Cross-user `downloads` cleanup.** The file is shared — once it's gone, *every* user's already-downloaded dim/dedupe state is stale, so all matching rows go, not just the caller's.
+- **Suffix allowlist.** Containment alone would still allow deleting `cover.jpg` or Navidrome sidecar files; restricting to audio suffixes makes the endpoint incapable of touching anything but tracks.
+- **No Navidrome API call.** The watcher already handles removal the same way it handles ingest (~1 min); triggering a scan via the Subsonic API would add a second credential path the backend doesn't otherwise have.
+
+**Alternatives considered:**
+- **New `delete` scope** — cleaner semantics; rejected for migration + forced re-login cost (revisit if tokens are ever handed to less-trusted parties).
+- **Delete by `downloads.id` / `source_url`** — rejected: misses album/playlist-job files and library content heerr didn't download.
+- **Admin-only (`is_admin`)** — rejected: deletion is a first-class app feature for every household user, not an operator action.
+
+**Trade-off:** Any authenticated user can delete any track in the shared library (deletes are inherently cross-user because the file is). Accepted at household scale on a Tailscale-only network. Assumption to verify at smoke: Navidrome's music folder and the backend's `music_output_dir` mount the same directory (`/data/media/music`), so Subsonic-relative paths resolve 1:1.
+
+**Reference:** `backend/app/api/v1/library.py`, `backend/app/schemas/library.py`, `backend/tests/test_library_delete.py`. Roadmap Phase N. Android consumer: `android/docs/ROADMAP.md` Phase W.

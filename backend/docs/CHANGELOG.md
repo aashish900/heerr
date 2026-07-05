@@ -882,3 +882,12 @@ lyrics paths verified plus a regression sweep of the wider backend surface:
 - **Enabled** — `SPOTDL_EMBED_LYRICS=true` + `docker compose up -d --force-recreate heerr-backend` → re-downloaded track carried an embedded `USLT` lyrics frame.
 - **Regression sweep** — `/health`, `POST /auth/login`, `POST /search`, `POST /download` → `done`, per-user dedupe (`deduped:true`), `GET /preview/stream` Range → 206, `GET /recommend/health` all green.
 - A temporary `backend/docs/SMOKE-TEST.md` checklist drove the run and was removed afterward (kept ephemeral by design).
+
+## 2026-07-05 — N1: DELETE /library/song — remove file from music library (#41)
+
+Server half of issue #41 (device half shipped in `64c8e47`). Lets the app delete a track from the Navidrome library by its Subsonic-relative path.
+
+- **`backend/app/api/v1/library.py`** (new) — `DELETE /library/song` (`download` scope): resolves `{path}` under `music_output_dir` with traversal rejection + audio-suffix allowlist (`.mp3/.m4a/.flac/.ogg/.opus/.wav`), 404 on missing file, unlinks, deletes all `downloads` rows with the matching `output_path` (cross-user dedupe reset), prunes empty parent dirs up to the library root.
+- **`backend/app/schemas/library.py`** (new) — `DeleteSongRequest` / `DeleteSongResponse`.
+- **`backend/app/api/v1/router.py`** — register `library.router`.
+- **Tests:** `backend/tests/test_library_delete.py` (new, 12 tests) — auth/scope, traversal + absolute + empty-path 422s, non-audio 422, missing-file 404, happy path incl. multi-row `downloads` cleanup, dir pruning (empty pruned / non-empty kept). Full suite 437 passed; ruff clean.

@@ -4,7 +4,7 @@ Track progress through the backend build. Each milestone = one git commit with a
 
 See `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file is the *how* / *when*.
 
-**Status (2026-06-24):** Phases A–L complete. v3.2.0 smoke passed on home server 2026-06-24 — preview stream, Range/206, album URL → 422, and kill-switch all verified. L1 (`SPOTDL_EMBED_LYRICS` toggle) landed 2026-06-24 — backend roadmap closed.
+**Status (2026-07-05):** Phases A–L complete (roadmap closed 2026-06-24), reopened for Phase N — library delete (issue #41 remainder). N1 landed 2026-07-05; smoke pending.
 
 **Conventions:**
 - TDD per CLAUDE.md §2 — tests written first, land in same commit as code.
@@ -399,6 +399,27 @@ Passes `--lyrics` to spotDL when enabled so downloaded MP3s carry embedded lyric
 
 ---
 
+## Phase N — Library delete
+
+**Architecture note:** Closes the server half of issue #41 (the Android "delete from device" half shipped in `64c8e47`). The device identifies a track by its Navidrome-relative path (Subsonic `song.path`); the backend resolves it under `music_output_dir`, deletes the file, and clears every user's `downloads` row for that file so already-downloaded dedupe resets. Delete-by-path (not by `downloads` row) is deliberate: album/playlist jobs write files with **no** `downloads` rows (`workers.py` only records song jobs), so path is the only identifier that covers the whole library. Guarded by the existing `download` scope — no new scope, no migration, no re-login. ("M" milestone numbers were already consumed by the 2026-06-18/19 DEBT band, hence N.)
+
+### [x] N1. `DELETE /api/v1/library/song`
+**Files:**
+- New: `backend/app/api/v1/library.py`, `backend/app/schemas/library.py`, `backend/tests/test_library_delete.py`.
+- Modified: `backend/app/api/v1/router.py` (register `library.router`).
+
+**Deliverable:** `DELETE /api/v1/library/song` with body `{path: <subsonic-relative-path>}` → deletes the file under `music_output_dir`, removes all `downloads` rows with that `output_path`, prunes now-empty parent dirs up to (not including) the library root, returns `{deleted: true, path}`. Navidrome's watcher drops the track on its next scan.
+
+**Validation:** 422 on absolute paths, traversal (resolved path must stay under `music_output_dir`), and non-audio suffixes (allowlist `.mp3/.m4a/.flac/.ogg/.opus/.wav` — cover art and sidecar files are untouchable). 404 when the file doesn't exist. 401/403 per the standard bearer + `require_scope("download")` deps.
+
+**Test gate:** `backend/tests/test_library_delete.py` — auth (401/403), traversal/absolute/empty path 422s, non-audio 422, missing-file 404, happy path (file gone + both `downloads` rows for the same `output_path` gone), empty-dir pruning + non-empty-dir preservation. Full suite green.
+
+**Smoke:** on the home server — delete a library track from the app, confirm the file is gone on disk, Navidrome drops it after rescan, search shows the track un-dimmed, and a re-download works (no dedupe ghost). Pending (runs with the Android W1 smoke).
+
+**Commit:** `feat(backend): N1 — DELETE /library/song — remove file from music library (#41)`
+
+---
+
 ## Cross-cutting reminders
 
 - **`.env` never committed.** Only `.env.example`.
@@ -419,7 +440,7 @@ Passes `--lyrics` to spotDL when enabled so downloaded MP3s carry embedded lyric
 
 ## Roadmap complete when
 
-1. All milestone boxes checked (A1–H1, I1–I5, J1–J12, K1–K5, L1).
+1. All milestone boxes checked (A1–H1, I1–I5, J1–J12, K1–K5, L1, N1).
 2. Every test gate green at its milestone.
 3. H1 smoke succeeds against the real home stack.
 4. J12 multi-user smoke succeeds against the real home stack.
