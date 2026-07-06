@@ -761,3 +761,13 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Why:** Single scroll axis simplifies the layout; always-visible lyrics require no toggle state; synced lyrics auto-scroll via `Scrollable.ensureVisible` only works when the `Scrollable` ancestor is the page-level one (a nested `ListView` creates a competing `Scrollable` that consumes the scroll event).
 
 **Alternatives considered:** Keep the toggle — rejected, user explicitly requested no toggle. Use a `CustomScrollView` with slivers — rejected, adds complexity without benefit at this screen's size.
+
+## 2026-07-06 — Lyrics UX: preview card + modal full-screen sheet (Spotify reference)
+
+**Context:** User supplied two Spotify screenshots: lyrics as a tinted card on Now Playing, and a fully pulled-up state that is full-screen lyrics with the album cover as a small top-left thumbnail.
+
+**Decision:** Card on the Now Playing scroll page shows a sliding fixed window of synced lines (no inner scrolling); tapping card/expand opens a full-height `showModalBottomSheet` (`isScrollControlled`) that hosts its own `SingleChildScrollView`, ticker, and `playerSnapshotProvider` watch. Auto-scroll (`Scrollable.ensureVisible`) lives only in the expanded sheet.
+
+**Why:** Keeping the full auto-scrolling lyrics list inside a fixed-height card would make `ensureVisible` bubble to the page-level scrollable and yank the whole Now Playing page (the 2026-07-05 design relied on exactly that bubbling). A windowed preview sidesteps nested-scroll conflicts entirely. The modal sheet gives drag-down-to-dismiss for free, matching the "pulled up" gesture.
+
+**Alternatives considered:** `DraggableScrollableSheet` persistently embedded on the screen — rejected: competes with the existing page scroll and complicates the layout for no gain over a modal. Dedicated go_router route — rejected: loses the sheet drag-dismiss gesture and modal barrier semantics.

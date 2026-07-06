@@ -159,6 +159,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             color: _tintColor,
             child: _Body(
               snapshot: s,
+              tintColor: _tintColor,
               scrubOverride: _scrubOverride,
               onSeekStart: (Duration d) => setState(() => _scrubOverride = d),
               onSeekUpdate: (Duration d) => setState(() => _scrubOverride = d),
@@ -308,6 +309,7 @@ class _Header extends StatelessWidget {
 class _Body extends ConsumerWidget {
   const _Body({
     required this.snapshot,
+    required this.tintColor,
     required this.scrubOverride,
     required this.onSeekStart,
     required this.onSeekUpdate,
@@ -318,6 +320,7 @@ class _Body extends ConsumerWidget {
   });
 
   final PlayerSnapshot snapshot;
+  final Color? tintColor;
   final Duration? scrubOverride;
   final ValueChanged<Duration> onSeekStart;
   final ValueChanged<Duration> onSeekUpdate;
@@ -399,6 +402,7 @@ class _Body extends ConsumerWidget {
             artist: item.artist ?? '',
             title: item.title,
             position: position,
+            tintColor: tintColor,
           ),
           SizedBox(height: MediaQuery.paddingOf(context).bottom + 16),
         ],

@@ -2216,3 +2216,10 @@ Completes issue #41 (device-only delete shipped in `64c8e47`). Consumes backend 
 ## 2026-07-05 — W1 smoke verified on-device (v4.2.0)
 
 Delete from device / server / both verified on the Pixel against the home server (backend N1+N2 deployed). Smoke surfaced two operator prerequisites, now documented in ROADMAP Phase W + backend N2: Navidrome must report real paths (`ND_SUBSONIC_DEFAULTREPORTREALPATH=true` + per-player "Report Real Path" on `heerr [Dart]`), and the app needs one re-search so the L5 cache drops pre-flag virtual paths. Tagged `v4.2.0`.
+
+## 2026-07-06 — Spotify-style lyrics card + full-screen lyrics sheet
+
+- **`lib/screens/player/now_playing_lyrics.dart`** — rewritten. Inline lyrics section replaced by a palette-tinted rounded card (`now-playing-lyrics-card`) with a "Lyrics" header and expand affordance (`now-playing-lyrics-expand`). Synced lyrics in the card render as a sliding 5-line preview window (`_SyncedLyricsPreview`, active line ±) instead of the full auto-scrolling list; plain lyrics capped at 8 lines. New `_ExpandedLyricsSheet` (full-height modal bottom sheet, `now-playing-lyrics-sheet`): collapse chevron (`lyrics-sheet-collapse`), title/artist header, album-art corner thumbnail (`lyrics-sheet-art`, `_CornerArt`), big bold auto-scrolling `_SyncedLyrics` — sung+active lines full-contrast, upcoming dimmed. Sheet watches `playerSnapshotProvider` with its own 250 ms ticker. Shared `activeLyricsIndex()` extracted.
+- **`lib/screens/player/now_playing_screen.dart`** — `_Body` gains `tintColor`; palette tint now flows into the lyrics card and sheet background.
+- **`test/screens/player/now_playing_lyrics_expand_test.dart`** — new: card + expand affordance render; expand opens sheet with corner art and lyrics; chevron collapses.
+- Full suite 699 tests pass; `flutter analyze` clean.

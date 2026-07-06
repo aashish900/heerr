@@ -1,45 +1,83 @@
 part of 'now_playing_screen.dart';
 
-/// Always-visible lyrics section rendered below the transport controls.
-/// The user reaches it by scrolling the parent [SingleChildScrollView].
-/// No toggle — lyrics are always in the widget tree.
+/// Spotify-style lyrics card rendered below the transport controls, tinted
+/// with the album palette colour. Shows a preview window of the lyrics;
+/// tapping the card (or the expand affordance) opens the full-screen
+/// [_ExpandedLyricsSheet].
 class _LyricsSection extends StatelessWidget {
   const _LyricsSection({
     required this.songId,
     required this.artist,
     required this.title,
     required this.position,
+    required this.tintColor,
   });
 
   final String? songId;
   final String artist;
   final String title;
   final Duration position;
+  final Color? tintColor;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        const Divider(height: 1),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
-          child: Text(
-            'Lyrics',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    final Color bg = tintColor ?? cs.surfaceContainerHighest;
+    final Color fg =
+        ThemeData.estimateBrightnessForColor(bg) == Brightness.dark
+            ? Colors.white
+            : Colors.black87;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+      child: Material(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: const Key('now-playing-lyrics-card'),
+          onTap: () => _ExpandedLyricsSheet.show(context, tintColor),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        'Lyrics',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleSmall
+                            ?.copyWith(color: fg, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    IconButton(
+                      key: const Key('now-playing-lyrics-expand'),
+                      tooltip: 'Expand lyrics',
+                      icon: Icon(Icons.open_in_full, size: 18, color: fg),
+                      onPressed: () =>
+                          _ExpandedLyricsSheet.show(context, tintColor),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: _LyricsContent(
+                    songId: songId,
+                    artist: artist,
+                    title: title,
+                    position: position,
+                    expanded: false,
+                    foreground: fg,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        _LyricsContent(
-          songId: songId,
-          artist: artist,
-          title: title,
-          position: position,
-        ),
-        const SizedBox(height: 16),
-      ],
+      ),
     );
   }
 }
@@ -51,89 +89,184 @@ class _LyricsSection extends StatelessWidget {
 ///  - Provider loading → spinner.
 ///  - Provider error → readable error line.
 ///  - Provider data null or empty text → empty state.
-///  - Provider data with timed lines → [_SyncedLyrics].
-///  - Provider data plain text → selectable scrollable block.
+///  - Provider data with timed lines → preview window ([expanded] false) or
+///    the big auto-scrolling [_SyncedLyrics] ([expanded] true).
+///  - Provider data plain text → capped preview or full selectable block.
 class _LyricsContent extends ConsumerWidget {
   const _LyricsContent({
     required this.songId,
     required this.artist,
     required this.title,
     required this.position,
+    required this.expanded,
+    required this.foreground,
   });
 
   final String? songId;
   final String artist;
   final String title;
   final Duration position;
+  final bool expanded;
+  final Color foreground;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if ((songId == null || songId!.isEmpty) && artist.isEmpty && title.isEmpty) {
-      return const Center(
-        key: Key('now-playing-lyrics-empty'),
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Text('No lyrics for this track'),
-        ),
-      );
+      return _emptyState();
     }
     final AsyncValue<Lyrics?> async =
         ref.watch(lyricsForProvider(songId ?? '', artist, title));
     return async.when(
-      loading: () => const Center(
-        key: Key('now-playing-lyrics-loading'),
+      loading: () => Center(
+        key: const Key('now-playing-lyrics-loading'),
         child: Padding(
-          padding: EdgeInsets.all(24),
-          child: CircularProgressIndicator(),
+          padding: const EdgeInsets.all(24),
+          child: CircularProgressIndicator(color: foreground),
         ),
       ),
       error: (Object e, _) => Center(
         key: const Key('now-playing-lyrics-error'),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.symmetric(vertical: 16),
           child: Text(
             e is ApiError ? e.message : 'Lyrics error: $e',
             textAlign: TextAlign.center,
+            style: TextStyle(color: foreground),
           ),
         ),
       ),
       data: (Lyrics? lyrics) {
         final String? value = lyrics?.value;
         if (value == null || value.trim().isEmpty) {
-          return const Center(
-            key: Key('now-playing-lyrics-empty'),
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: Text('No lyrics for this track'),
-            ),
-          );
+          return _emptyState();
         }
         final List<LyricsLine>? lines = lyrics?.lines;
         if (lines != null && lines.isNotEmpty) {
-          return _SyncedLyrics(lines: lines, position: position);
+          return expanded
+              ? _SyncedLyrics(
+                  lines: lines,
+                  position: position,
+                  foreground: foreground,
+                )
+              : _SyncedLyricsPreview(
+                  lines: lines,
+                  position: position,
+                  foreground: foreground,
+                );
         }
-        return Padding(
-          key: const Key('now-playing-lyrics-scroll'),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          child: SelectableText(
+        if (expanded) {
+          return SelectableText(
             value,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: foreground,
+                  fontWeight: FontWeight.w700,
+                  height: 1.4,
+                ),
+          );
+        }
+        return Text(
+          value,
+          key: const Key('now-playing-lyrics-scroll'),
+          maxLines: 8,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: foreground,
+                fontWeight: FontWeight.w600,
+                height: 1.5,
+              ),
         );
       },
     );
   }
+
+  Widget _emptyState() {
+    return Center(
+      key: const Key('now-playing-lyrics-empty'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Text(
+          'No lyrics for this track',
+          style: TextStyle(color: foreground.withValues(alpha: 0.7)),
+        ),
+      ),
+    );
+  }
 }
 
-/// #26: synced lyrics. Highlights the active line and scrolls it into view via
-/// [Scrollable.ensureVisible], which bubbles up to the parent
-/// [SingleChildScrollView] (the whole Now Playing page) because this widget
-/// uses a [Column], not a nested [ListView] with its own [Scrollable].
-class _SyncedLyrics extends StatefulWidget {
-  const _SyncedLyrics({required this.lines, required this.position});
+/// Fixed window of synced lines shown inside the lyrics card: the line before
+/// the active one plus the next few. No scrolling — the window slides as
+/// playback advances.
+class _SyncedLyricsPreview extends StatelessWidget {
+  const _SyncedLyricsPreview({
+    required this.lines,
+    required this.position,
+    required this.foreground,
+  });
+
+  static const int _windowSize = 5;
 
   final List<LyricsLine> lines;
   final Duration position;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    final int current = activeLyricsIndex(lines, position);
+    final int start = (current - 1)
+        .clamp(0, (lines.length - _windowSize).clamp(0, lines.length));
+    final int end = (start + _windowSize).clamp(0, lines.length);
+    final TextStyle? base = Theme.of(context).textTheme.titleMedium;
+    return Column(
+      key: const Key('now-playing-lyrics-synced'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        for (int i = start; i < end; i++)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Text(
+              lines[i].value,
+              style: base?.copyWith(
+                color: i == current
+                    ? foreground
+                    : foreground.withValues(alpha: 0.55),
+                fontWeight: i == current ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Index of the last line whose start time is at or before [position],
+/// or -1 when playback hasn't reached the first line yet.
+int activeLyricsIndex(List<LyricsLine> lines, Duration position) {
+  final int ms = position.inMilliseconds;
+  int idx = -1;
+  for (int i = 0; i < lines.length; i++) {
+    if (lines[i].start <= ms) {
+      idx = i;
+    } else {
+      break;
+    }
+  }
+  return idx;
+}
+
+/// #26: synced lyrics for the expanded sheet. Big bold lines — sung and
+/// active lines at full contrast, upcoming lines dimmed. Scrolls the active
+/// line into view via [Scrollable.ensureVisible], which bubbles up to the
+/// sheet's [SingleChildScrollView].
+class _SyncedLyrics extends StatefulWidget {
+  const _SyncedLyrics({
+    required this.lines,
+    required this.position,
+    required this.foreground,
+  });
+
+  final List<LyricsLine> lines;
+  final Duration position;
+  final Color foreground;
 
   @override
   State<_SyncedLyrics> createState() => _SyncedLyricsState();
@@ -152,30 +285,17 @@ class _SyncedLyricsState extends State<_SyncedLyrics> {
     );
   }
 
-  int _currentIndex() {
-    final int ms = widget.position.inMilliseconds;
-    int idx = -1;
-    for (int i = 0; i < widget.lines.length; i++) {
-      if (widget.lines[i].start <= ms) {
-        idx = i;
-      } else {
-        break;
-      }
-    }
-    return idx;
-  }
-
   @override
   void didUpdateWidget(covariant _SyncedLyrics old) {
     super.didUpdateWidget(old);
-    final int idx = _currentIndex();
+    final int idx = activeLyricsIndex(widget.lines, widget.position);
     if (idx < 0 || idx == _lastScrolledIndex) return;
     _lastScrolledIndex = idx;
     final BuildContext? lineContext = _lineKeys[idx].currentContext;
     if (lineContext == null) return;
     Scrollable.ensureVisible(
       lineContext,
-      alignment: 0.4,
+      alignment: 0.35,
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOut,
     );
@@ -183,27 +303,204 @@ class _SyncedLyricsState extends State<_SyncedLyrics> {
 
   @override
   Widget build(BuildContext context) {
-    final int current = _currentIndex();
-    final TextTheme text = Theme.of(context).textTheme;
-    final ColorScheme cs = Theme.of(context).colorScheme;
+    final int current = activeLyricsIndex(widget.lines, widget.position);
+    final TextStyle? base = Theme.of(context).textTheme.headlineSmall;
     return Column(
-      key: const Key('now-playing-lyrics-synced'),
+      key: const Key('now-playing-lyrics-synced-expanded'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         for (int i = 0; i < widget.lines.length; i++)
           Padding(
             key: _lineKeys[i],
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+            padding: const EdgeInsets.symmetric(vertical: 6),
             child: Text(
               widget.lines[i].value,
-              style: (i == current ? text.bodyLarge : text.bodyMedium)
-                  ?.copyWith(
-                color: i == current ? cs.primary : cs.onSurfaceVariant,
-                fontWeight: i == current ? FontWeight.w700 : null,
+              style: base?.copyWith(
+                color: i <= current
+                    ? widget.foreground
+                    : widget.foreground.withValues(alpha: 0.4),
+                fontWeight: FontWeight.w700,
+                height: 1.3,
               ),
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Full-screen lyrics view (Spotify-style "pulled up" state): drag-down /
+/// chevron to dismiss, album-art thumbnail in the top-left corner, big bold
+/// auto-scrolling lyrics. Watches [playerSnapshotProvider] itself so it stays
+/// current across track changes, with its own 250 ms ticker for position.
+class _ExpandedLyricsSheet extends ConsumerStatefulWidget {
+  const _ExpandedLyricsSheet({required this.tintColor});
+
+  final Color? tintColor;
+
+  static void show(BuildContext context, Color? tintColor) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ExpandedLyricsSheet(tintColor: tintColor),
+    );
+  }
+
+  @override
+  ConsumerState<_ExpandedLyricsSheet> createState() =>
+      _ExpandedLyricsSheetState();
+}
+
+class _ExpandedLyricsSheetState extends ConsumerState<_ExpandedLyricsSheet> {
+  Timer? _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    final Color bg = Color.lerp(
+      widget.tintColor ?? cs.surfaceContainerHigh,
+      Colors.black,
+      0.45,
+    )!;
+    final PlayerSnapshot? snap =
+        ref.watch(playerSnapshotProvider).valueOrNull;
+    final MediaItem? item = snap?.item;
+
+    return Container(
+      key: const Key('now-playing-lyrics-sheet'),
+      height: MediaQuery.sizeOf(context).height,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: SafeArea(
+        child: item == null
+            ? const Center(child: Text('Nothing is playing.'))
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+                    child: Row(
+                      children: <Widget>[
+                        IconButton(
+                          key: const Key('lyrics-sheet-collapse'),
+                          tooltip: 'Collapse',
+                          icon: const Icon(Icons.keyboard_arrow_down),
+                          color: Colors.white,
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                        Expanded(
+                          child: Column(
+                            children: <Widget>[
+                              Text(
+                                item.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(color: Colors.white),
+                              ),
+                              if (item.artist != null)
+                                Text(
+                                  item.artist!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(color: Colors.white70),
+                                ),
+                            ],
+                          ),
+                        ),
+                        // Balances the leading IconButton so the title stays
+                        // centred.
+                        const SizedBox(width: 48),
+                      ],
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 20, 24, 4),
+                      child: _CornerArt(artUri: item.artUri),
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+                      child: _LyricsContent(
+                        songId: item.extras?['subsonicId'] as String?,
+                        artist: item.artist ?? '',
+                        title: item.title,
+                        position: snap!.state.position,
+                        expanded: true,
+                        foreground: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+/// Small album-art thumbnail pinned to the top-left corner of the expanded
+/// lyrics sheet.
+class _CornerArt extends StatelessWidget {
+  const _CornerArt({required this.artUri});
+
+  static const double _size = 88;
+
+  final Uri? artUri;
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget placeholder = Container(
+      width: _size,
+      height: _size,
+      decoration: BoxDecoration(
+        color: Colors.white12,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: const Icon(Icons.music_note, color: Colors.white54),
+    );
+    final Uri? uri = artUri;
+    return KeyedSubtree(
+      key: const Key('lyrics-sheet-art'),
+      child: uri == null
+          ? placeholder
+          : ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.network(
+                uri.toString(),
+                width: _size,
+                height: _size,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => placeholder,
+              ),
+            ),
     );
   }
 }
