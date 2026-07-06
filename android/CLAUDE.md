@@ -40,6 +40,12 @@ For the build sequence: `android/docs/ROADMAP.md`.
 
 ---
 
+## Version sync
+
+Backend and Android always share the same version. When bumping, update all five locations in one commit — see `/CLAUDE.md` §3 "Version sync" for the exact file list.
+
+---
+
 ## Development workflow
 
 - **TDD by default.** Widget tests for screens (`flutter_test` + `WidgetTester`). Unit tests for providers/services. Write the failing test first, then the implementation.

@@ -93,6 +93,17 @@ These apply regardless of which app you're working on.
 - **Backend first, Android client second.** Don't propose `android/` work until the backend endpoint it depends on exists and is curl-testable. (The Android client is built with Flutter; the dir is named `android/` to reflect the deployment target — there is no iOS port.)
 - **iOS is out of scope.** Don't suggest iOS-aware code, Cupertino widgets where Material works, or Xcode/CocoaPods steps.
 
+### Version sync
+
+**Backend and Android always share the same version string.** Never bump one without the other.
+
+When changing the version, update all of these in the same commit:
+- `backend/pyproject.toml` — `version = "…"`
+- `backend/app/main.py` — `version="…"` in `create_app()`
+- `android/app/pubspec.yaml` — `version: …`
+- `backend/docs/ROADMAP.md` — status-line version reference
+- `android/docs/ROADMAP.md` — status-line version reference
+
 ### Source-citation discipline
 
 - Cite docs / file paths / log lines for non-trivial claims. Use `file:line` for code references.

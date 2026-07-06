@@ -47,6 +47,12 @@ For outstanding work: `backend/docs/DEBT.md`.
 
 ---
 
+## Version sync
+
+Backend and Android always share the same version. When bumping, update all five locations in one commit — see `/CLAUDE.md` §3 "Version sync" for the exact file list.
+
+---
+
 ## Development workflow
 
 - **TDD by default.** Write the failing test, then the implementation. No production logic merges without a test that exercises it first.
