@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -75,6 +76,8 @@ ProviderContainer _container({
         },
       ),
       seedCollectionProvider.overrideWith((Ref<AsyncValue<List<SeedTrack>>> _) async => seeds),
+      // Pinned RNG so sampling assertions are deterministic.
+      recommendationRngProvider.overrideWithValue(Random(42)),
     ],
   );
 }
@@ -202,15 +205,21 @@ void main() {
     expect(body['limit'], 20);
     final List<dynamic> seeds = body['seeds'] as List<dynamic>;
     expect(seeds, hasLength(2));
-    final Map<String, dynamic> s0 = seeds[0] as Map<String, dynamic>;
-    final Map<String, dynamic> s1 = seeds[1] as Map<String, dynamic>;
-    expect(s0['title'], 'A');
-    expect(s0['artist'], 'X');
+    // Sampling shuffles the seed order, so assert membership not position.
+    final Set<String> titles = seeds
+        .map((dynamic s) => (s as Map<String, dynamic>)['title'] as String)
+        .toSet();
+    final Set<String> artists = seeds
+        .map((dynamic s) => (s as Map<String, dynamic>)['artist'] as String)
+        .toSet();
+    expect(titles, <String>{'A', 'B'});
+    expect(artists, <String>{'X', 'Y'});
     // Backend accepts source_url=null as default; the freezed model may
     // strip nulls from toJson, so accept either shape.
-    expect(s0['source_url'], anyOf(isNull, equals(null)));
-    expect(s1['title'], 'B');
-    expect(s1['artist'], 'Y');
+    expect(
+      (seeds[0] as Map<String, dynamic>)['source_url'],
+      anyOf(isNull, equals(null)),
+    );
   });
 
   test('parses the results list into RecommendedTrack objects', () async {
@@ -403,6 +412,128 @@ void main() {
     expect(seeds, hasLength(1));
     expect((seeds.single as Map<String, dynamic>)['title'], 'Manual');
     expect((seeds.single as Map<String, dynamic>)['artist'], 'M');
+  });
+
+  group('seed sampling + TTL (#38)', () {
+    List<SeedTrack> manySeeds(int n) => List<SeedTrack>.generate(
+          n,
+          (int i) => SeedTrack(title: 'T$i', artist: 'A$i'),
+        );
+
+    List<String> seedTitles(_FakeAdapter adapter, int requestIndex) {
+      final Map<String, dynamic> body =
+          jsonDecode(utf8.decode(adapter.bodies[requestIndex]))
+              as Map<String, dynamic>;
+      return (body['seeds'] as List<dynamic>)
+          .map((dynamic s) => (s as Map<String, dynamic>)['title'] as String)
+          .toList();
+    }
+
+    test('POSTs a sampled subset of the seed collection', () async {
+      final _FakeAdapter adapter = _FakeAdapter(
+        (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
+      );
+      final ProviderContainer c =
+          _container(adapter: adapter, seeds: manySeeds(20));
+      addTearDown(c.dispose);
+
+      await c.read(recommendationsProvider.future);
+
+      final List<String> titles = seedTitles(adapter, 0);
+      expect(titles, hasLength(kSeedSampleSize));
+      expect(titles.toSet().length, kSeedSampleSize);
+      for (final String t in titles) {
+        expect(t, matches(RegExp(r'^T\d+$')));
+      }
+    });
+
+    test('manual seed is sent alone and unsampled', () async {
+      final _FakeAdapter adapter = _FakeAdapter(
+        (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
+      );
+      final ProviderContainer c =
+          _container(adapter: adapter, seeds: manySeeds(20));
+      addTearDown(c.dispose);
+
+      c.read(manualSeedProvider.notifier).state =
+          const SeedTrack(title: 'Manual', artist: 'M');
+      await c.read(recommendationsProvider.future);
+
+      expect(seedTitles(adapter, 0), <String>['Manual']);
+    });
+
+    test('refreshIfStale no-ops within maxAge', () async {
+      final _FakeAdapter adapter = _FakeAdapter(
+        (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
+      );
+      final ProviderContainer c =
+          _container(adapter: adapter, seeds: manySeeds(20));
+      addTearDown(c.dispose);
+
+      await c.read(recommendationsProvider.future);
+      c.read(recommendationsProvider.notifier).refreshIfStale();
+      await c.read(recommendationsProvider.future);
+
+      expect(adapter.requests, hasLength(1));
+    });
+
+    test('refreshIfStale(maxAge: zero) re-fetches with a different sample',
+        () async {
+      final _FakeAdapter adapter = _FakeAdapter(
+        (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
+      );
+      final ProviderContainer c =
+          _container(adapter: adapter, seeds: manySeeds(20));
+      addTearDown(c.dispose);
+
+      await c.read(recommendationsProvider.future);
+      c
+          .read(recommendationsProvider.notifier)
+          .refreshIfStale(maxAge: Duration.zero);
+      await c.read(recommendationsProvider.future);
+
+      expect(adapter.requests, hasLength(2));
+      expect(seedTitles(adapter, 0), isNot(equals(seedTitles(adapter, 1))),
+          reason: 'successive samples from the stateful RNG must differ');
+    });
+
+    test('refreshIfStale no-ops when a manual seed is active even if stale',
+        () async {
+      final _FakeAdapter adapter = _FakeAdapter(
+        (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
+      );
+      final ProviderContainer c =
+          _container(adapter: adapter, seeds: manySeeds(20));
+      addTearDown(c.dispose);
+
+      c.read(manualSeedProvider.notifier).state =
+          const SeedTrack(title: 'Manual', artist: 'M');
+      await c.read(recommendationsProvider.future);
+      c
+          .read(recommendationsProvider.notifier)
+          .refreshIfStale(maxAge: Duration.zero);
+      await c.read(recommendationsProvider.future);
+
+      expect(adapter.requests, hasLength(1));
+    });
+
+    test('keepAlive: state survives without listeners (no re-POST on re-read)',
+        () async {
+      final _FakeAdapter adapter = _FakeAdapter(
+        (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
+      );
+      final ProviderContainer c =
+          _container(adapter: adapter, seeds: manySeeds(20));
+      addTearDown(c.dispose);
+
+      await c.read(recommendationsProvider.future);
+      // Let any auto-dispose teardown run — keepAlive must prevent it.
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      await c.read(recommendationsProvider.future);
+
+      expect(adapter.requests, hasLength(1));
+    });
   });
 
   test('backend error surfaces as ApiError', () async {

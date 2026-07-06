@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:heerr/models/recommended_track.dart';
 import 'package:heerr/offline/offline_sync.dart';
+import 'package:heerr/providers/recommendations.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/router.dart';
 import 'package:heerr/theme.dart';
@@ -60,6 +62,18 @@ class _StubSync extends OfflineSync {
   }
 }
 
+class _StubRecs extends Recommendations {
+  int refreshIfStaleCalls = 0;
+
+  @override
+  Future<List<RecommendedTrack>> build() async => const <RecommendedTrack>[];
+
+  @override
+  void refreshIfStale({Duration maxAge = const Duration(minutes: 30)}) {
+    refreshIfStaleCalls += 1;
+  }
+}
+
 void main() {
   Future<void> sendLifecycle(WidgetTester tester, String state) async {
     final ByteData? msg = const StringCodec().encodeMessage(state);
@@ -110,5 +124,31 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(stub.resumeCalls, greaterThanOrEqualTo(1));
+  });
+
+  testWidgets('resumed → calls refreshIfStale() on Recommendations (#38)', (
+    WidgetTester tester,
+  ) async {
+    final _StubSync sync = _StubSync();
+    final _StubRecs recs = _StubRecs();
+    await tester.pumpWidget(ProviderScope(
+      overrides: <Override>[
+        secureStorageProvider
+            .overrideWith((Ref<SecureStorage> _) => _NoopStorage()),
+        offlineSyncProvider.overrideWith(() => sync),
+        recommendationsProvider.overrideWith(() => recs),
+      ],
+      child: MaterialApp.router(
+        theme: heerrDarkTheme(),
+        routerConfig: buildHeerrRouter(),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    final int before = recs.refreshIfStaleCalls;
+
+    await sendLifecycle(tester, 'AppLifecycleState.resumed');
+    await tester.pumpAndSettle();
+
+    expect(recs.refreshIfStaleCalls, greaterThan(before));
   });
 }

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -133,6 +135,31 @@ Future<List<Song>> _fetchFavouriteSongs(SeedCollectionRef ref) async {
   return detail.entry;
 }
 
+/// Number of seeds actually sent per `POST /recommend` request. Deliberately
+/// smaller than [_kMaxSeeds]: the backend is deterministic for a given seed
+/// set, so sampling a random subset per request is what makes a refresh
+/// return *different* recommendations (#38).
+const int kSeedSampleSize = 8;
+
+/// Injectable RNG for [sampleSeeds] so tests can pin a seed. The single
+/// instance is stateful on purpose — successive refreshes draw successive
+/// shuffles from it, guaranteeing variety even when the underlying seed
+/// collection is unchanged.
+final recommendationRngProvider = Provider<Random>((Ref ref) => Random());
+
+/// Pure, testable sampling: a shuffled copy of [seeds] capped at
+/// [sampleSize]. Shuffles even when `seeds.length <= sampleSize` so seed
+/// *order* also varies per request (engines rank per seed). Never mutates
+/// the input.
+List<SeedTrack> sampleSeeds(
+  List<SeedTrack> seeds, {
+  required Random rng,
+  int sampleSize = kSeedSampleSize,
+}) {
+  final List<SeedTrack> copy = List<SeedTrack>.of(seeds)..shuffle(rng);
+  return copy.length <= sampleSize ? copy : copy.sublist(0, sampleSize);
+}
+
 /// Recommendation results from the heerr backend (`POST /api/v1/recommend`).
 ///
 /// Reads the user's seed collection via [seedCollectionProvider] (N2), POSTs
@@ -144,16 +171,32 @@ Future<List<Song>> _fetchFavouriteSongs(SeedCollectionRef ref) async {
 /// results, so the empty-seed case is meaningful there. ytmusic and lastfm
 /// engines will return `[]` for empty seeds; the screen renders the
 /// empty-state widget.
-@riverpod
+/// Freshness window for [Recommendations.refreshIfStale] (#38). Calls newer
+/// than this no-op; older ones invalidate so the next read re-fetches with a
+/// fresh seed sample.
+const Duration _kRecsMaxAge = Duration(minutes: 30);
+
+@Riverpod(keepAlive: true)
 class Recommendations extends _$Recommendations {
+  /// Set at build *start* so a [refreshIfStale] racing an in-flight build
+  /// no-ops (cold start: Home initState fires while the first build runs).
+  DateTime? _lastFetchAt;
+
   @override
   Future<List<RecommendedTrack>> build() async {
+    _lastFetchAt = DateTime.now();
     final SeedTrack? manual = ref.watch(manualSeedProvider);
     final List<SeedTrack> seeds;
     if (manual != null) {
+      // "Find similar" — sole seed, never sampled.
       seeds = <SeedTrack>[manual];
     } else {
-      seeds = await ref.watch(seedCollectionProvider.future);
+      // `read`, not `watch`, for the RNG — its identity must not trigger
+      // rebuilds; its statefulness across rebuilds is what varies the sample.
+      seeds = sampleSeeds(
+        await ref.watch(seedCollectionProvider.future),
+        rng: ref.read(recommendationRngProvider),
+      );
     }
 
     final BackendService backend =
@@ -204,6 +247,19 @@ class Recommendations extends _$Recommendations {
   Future<void> refresh() async {
     ref.invalidateSelf();
     await future;
+  }
+
+  /// Re-fetch when the cached feed is older than [maxAge]. No-ops when the
+  /// cache is fresh or when a manual "Find similar" seed is active — the
+  /// seeded view must never be silently replaced by the general feed
+  /// (invalidating would re-run the same sole seed, but the reload flash is
+  /// unwanted on a screen the user deliberately opened). Cheap to call from
+  /// Home-open / app-resume paths (#38).
+  void refreshIfStale({Duration maxAge = _kRecsMaxAge}) {
+    if (ref.read(manualSeedProvider) != null) return;
+    final DateTime? last = _lastFetchAt;
+    if (last != null && DateTime.now().difference(last) < maxAge) return;
+    ref.invalidateSelf();
   }
 }
 

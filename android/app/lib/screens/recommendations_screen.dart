@@ -45,7 +45,20 @@ class _RecommendationsScreenState extends ConsumerState<RecommendationsScreen> {
         ref.watch(recommendationsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('For You')),
+      appBar: AppBar(
+        title: const Text('For You'),
+        actions: <Widget>[
+          // #38 — explicit "fetch new recommendations". Re-samples the seed
+          // collection, so successive taps return different results.
+          IconButton(
+            key: const Key('for-you-refresh'),
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+            onPressed: () =>
+                ref.read(recommendationsProvider.notifier).refresh(),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: () =>
             ref.read(recommendationsProvider.notifier).refresh(),

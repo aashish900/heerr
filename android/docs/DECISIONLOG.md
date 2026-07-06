@@ -771,3 +771,28 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Why:** Keeping the full auto-scrolling lyrics list inside a fixed-height card would make `ensureVisible` bubble to the page-level scrollable and yank the whole Now Playing page (the 2026-07-05 design relied on exactly that bubbling). A windowed preview sidesteps nested-scroll conflicts entirely. The modal sheet gives drag-down-to-dismiss for free, matching the "pulled up" gesture.
 
 **Alternatives considered:** `DraggableScrollableSheet` persistently embedded on the screen — rejected: competes with the existing page scroll and complicates the layout for no gain over a modal. Dedicated go_router route — rejected: loses the sheet drag-dismiss gesture and modal barrier semantics.
+
+---
+
+## 2026-07-06 — For You refresh: keepAlive TTL notifier + client-side seed sampling (#38)
+
+**Context:** Issue #38 — the "For you" / "Picked for you" feed was effectively static. Pull-to-refresh existed on both Home and the For You screen, but the backend's `POST /api/v1/recommend` is deterministic for a given seed set (no shuffle/offset param), so a refresh re-served the same list. There was also no visible refresh affordance and no staleness-driven auto-refresh: `recommendationsProvider` was non-keepAlive, so it merely re-fetched (identically) on every Home re-mount.
+
+**Decision:**
+1. **`Recommendations` becomes `@Riverpod(keepAlive: true)` with a 30-min `refreshIfStale`** — same `_lastFetchAt` pattern as `RecommendHealthNotifier`. Fired post-frame on every Home mount and on app resume (`LifecycleCoordinator.unawaitedResume`). Never fires while a manual "Find similar" seed is active. `_lastFetchAt` is set at build *start* so a `refreshIfStale` racing an in-flight build no-ops.
+2. **Client-side seed sampling for variety.** `sampleSeeds()` (pure, RNG-injected via `recommendationRngProvider`) shuffles the up-to-20 collected seeds and sends only `kSeedSampleSize = 8` per request. The `Random` instance is stateful across rebuilds, so every refresh draws a different subset/order → different backend results, with zero backend change. The manual "Find similar" seed stays sole and unsampled.
+3. **Visible refresh affordances:** an IconButton on Home's "Picked for you"/"Discover" section header (Discover taps also invalidate `homeRandomSongsProvider` so the fallback reshuffles) and on the For You screen's AppBar.
+
+**Why:**
+- keepAlive is what makes a TTL meaningful — without it the provider dies on every Home exit (plain `GoRoute`, screen re-mounts per visit) and re-fetches identical results each time. keepAlive both removes that waste and makes `_lastFetchAt` durable.
+- Profile-switch safety is free: `build()` watches `backendServiceProvider → dioClientProvider → activeProfileProvider`, so a profile switch still rebuilds the notifier. **Fragility note:** if that watch chain is ever refactored away, recommendations would leak across profiles — re-audit this ADR then.
+- Sampling client-side keeps the slice pure-Android (`/CLAUDE.md` §3 backend-first rule untouched) and works with every engine unchanged, since engines rank per seed.
+
+**Alternatives considered:**
+- **Backend randomization param** (shuffle/exclude on `POST /recommend`). Stronger variety (could exclude already-shown tracks), but a cross-slice change touching all engine implementations; deferred — client sampling is sufficient for the issue.
+- **Side-car keepAlive timestamp provider** (leave `Recommendations` auto-dispose). Rejected: the TTL would be theater — the provider re-fetches on every Home visit regardless.
+- **TTL only / button only.** The issue says "either… or"; both together cost little and cover both the passive (stale feed silently renews) and active ("show me something new" tap) cases.
+
+**Trade-off:** Recommendations stay RAM-cached for the app's lifetime (20 tracks — negligible). `invalidateSelf` drops state to loading, so a refresh shows a brief skeleton flash; a keep-previous-data refinement can be layered later if it bothers.
+
+**Reference:** `android/app/lib/{providers/recommendations.dart, screens/home/home_screen.dart, screens/recommendations_screen.dart, app/lifecycle_coordinator.dart}`. Tests: `test/providers/{seed_sampling,recommendations_provider}_test.dart`, `test/screens/{home/home_screen,recommendations_screen}_test.dart`, `test/app/lifecycle_coordinator_test.dart`. CHANGELOG entry 2026-07-06.

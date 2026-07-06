@@ -2228,3 +2228,16 @@ Delete from device / server / both verified on the Pixel against the home server
 
 - **`assets/icons/shuffle.svg`** — filled-triangle arrowheads replaced with the same open-chevron polylines `repeat.svg` uses; sized to 3.5-unit depth after two on-device iterations (4 = touching, 3.2 = too small).
 - No code changes. Tagged `v4.3.0-rc7`.
+
+## 2026-07-06 — For You: refresh affordance + 30-min TTL + seed sampling (#38)
+
+- **`lib/providers/recommendations.dart`** — `Recommendations` is now `@Riverpod(keepAlive: true)` with `_lastFetchAt` + `refreshIfStale({maxAge: 30 min})` (mirrors `RecommendHealthNotifier`; no-ops while fresh or when a manual "Find similar" seed is active). New `sampleSeeds()` pure function + `kSeedSampleSize = 8` + `recommendationRngProvider` (injectable `Random`): each build POSTs a random 8-of-20 shuffled seed subset, so a refresh returns *different* results despite the backend being deterministic per seed set. Manual seed stays sole + unsampled. Profile-switch safety is inherited from the `backendServiceProvider → dioClientProvider → activeProfileProvider` watch chain.
+- **`lib/screens/recommendations_screen.dart`** — AppBar gains a refresh action (`for-you-refresh`) calling `recommendationsProvider.notifier.refresh()`.
+- **`lib/screens/home/home_screen.dart`** — `HomeScreen` converted to `ConsumerStatefulWidget`; `initState` fires `refreshIfStale()` post-frame on every Home visit. "Picked for you"/"Discover" header row gains a refresh IconButton (`home-recs-refresh`); on the Discover fallback it also invalidates `homeRandomSongsProvider`.
+- **`lib/app/lifecycle_coordinator.dart`** — app-resume now also calls `recommendationsProvider.notifier.refreshIfStale()` beside the existing health check.
+- **New:** `test/providers/seed_sampling_test.dart` — 5 unit tests (size cap, pass-through, seeded determinism, successive-draw variety, input immutability).
+- **`test/providers/recommendations_provider_test.dart`** — pinned-RNG override; 6 new tests (sampled subset on the wire, manual-seed unsampled, TTL no-op / zero-maxAge re-fetch with different sample, manual-seed TTL guard, keepAlive survives listener removal); first-seeds assertion made order-independent (sampling shuffles).
+- **`test/screens/recommendations_screen_test.dart`** — 2 new tests (refresh action renders; tap calls notifier).
+- **`test/screens/home/home_screen_test.dart`** — 4 new tests (header icon renders; tap refreshes; Discover tap re-fetches random songs; mount fires `refreshIfStale`).
+- **`test/app/lifecycle_coordinator_test.dart`** — 1 new test (resume → `refreshIfStale` on `Recommendations`).
+- Full suite 717 tests pass; `flutter analyze` clean.

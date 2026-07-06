@@ -5,10 +5,34 @@ import 'package:go_router/go_router.dart';
 
 import 'package:heerr/models/recommended_track.dart';
 import 'package:heerr/models/subsonic/album.dart';
+import 'package:heerr/models/subsonic/song.dart';
 import 'package:heerr/providers/home/home_providers.dart';
+import 'package:heerr/providers/recommendations.dart';
 import 'package:heerr/screens/home/home_screen.dart';
 import 'package:heerr/widgets/home_grid_tile.dart';
 import 'package:heerr/widgets/home_section.dart';
+
+/// Recording double for [Recommendations] — Home reads the notifier for the
+/// section refresh button and the mount-time [Recommendations.refreshIfStale].
+class _StubRecs extends Recommendations {
+  _StubRecs([this._tracks = const <RecommendedTrack>[]]);
+  final List<RecommendedTrack> _tracks;
+  int refreshCalls = 0;
+  int refreshIfStaleCalls = 0;
+
+  @override
+  Future<List<RecommendedTrack>> build() async => _tracks;
+
+  @override
+  Future<void> refresh() async {
+    refreshCalls++;
+  }
+
+  @override
+  void refreshIfStale({Duration maxAge = const Duration(minutes: 30)}) {
+    refreshIfStaleCalls++;
+  }
+}
 
 // Minimal router with a Home root + a dummy /library/album/:id sink so
 // `context.push(Routes.libraryAlbum(...))` doesn't blow up on tap.
@@ -310,4 +334,107 @@ void main() {
       expect(find.text('Queue page'), findsOneWidget);
     },
   );
+
+  group('For You refresh (#38)', () {
+    testWidgets('Picked for you header shows a refresh icon',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(overrides: <Override>[
+        homeRecentProvider.overrideWith((_) async => <Album>[]),
+        homeMostPlayedProvider.overrideWith((_) async => <Album>[]),
+        homeRandomSongsProvider.overrideWith((_) async => const <Never>[]),
+        homeRecommendationsProvider.overrideWith(
+          (_) async => (
+            tracks: <RecommendedTrack>[
+              const RecommendedTrack(
+                title: 'Rec',
+                artist: 'RA',
+                sourceUrl: 'https://music.youtube.com/watch?v=xxx',
+              ),
+            ],
+            isFallback: false,
+          ),
+        ),
+        recommendationsProvider.overrideWith(_StubRecs.new),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('home-recs-refresh')), findsOneWidget);
+    });
+
+    testWidgets('tapping the section refresh triggers recommendations refresh',
+        (WidgetTester tester) async {
+      final _StubRecs stub = _StubRecs();
+      await tester.pumpWidget(_wrap(overrides: <Override>[
+        homeRecentProvider.overrideWith((_) async => <Album>[]),
+        homeMostPlayedProvider.overrideWith((_) async => <Album>[]),
+        homeRandomSongsProvider.overrideWith((_) async => const <Never>[]),
+        homeRecommendationsProvider.overrideWith(
+          (_) async => (
+            tracks: <RecommendedTrack>[
+              const RecommendedTrack(
+                title: 'Rec',
+                artist: 'RA',
+                sourceUrl: 'https://music.youtube.com/watch?v=xxx',
+              ),
+            ],
+            isFallback: false,
+          ),
+        ),
+        recommendationsProvider.overrideWith(() => stub),
+      ]));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('home-recs-refresh')));
+      await tester.pump();
+
+      expect(stub.refreshCalls, 1);
+    });
+
+    testWidgets('Discover (fallback) refresh also re-fetches random songs',
+        (WidgetTester tester) async {
+      int randomFetches = 0;
+      final _StubRecs stub = _StubRecs(); // empty → fallback path
+      await tester.pumpWidget(_wrap(overrides: <Override>[
+        homeRecentProvider.overrideWith((_) async => <Album>[]),
+        homeMostPlayedProvider.overrideWith((_) async => <Album>[]),
+        homeRandomSongsProvider.overrideWith((_) async {
+          randomFetches++;
+          return <Song>[
+            const Song(id: 's-1', title: 'Random Song', artist: 'Random A'),
+          ];
+        }),
+        // Real homeRecommendationsProvider: empty recs → fallback branch
+        // watches homeRandomSongsProvider, so invalidating it re-fetches.
+        recommendationsProvider.overrideWith(() => stub),
+      ]));
+      await tester.pumpAndSettle();
+      expect(find.text('Discover'), findsOneWidget);
+      expect(randomFetches, 1);
+
+      await tester.tap(find.byKey(const Key('home-recs-refresh')));
+      await tester.pumpAndSettle();
+
+      expect(stub.refreshCalls, 1);
+      // The invalidation cascades through homeRecommendationsProvider's own
+      // rebuild, so the exact count varies — the contract is "re-fetched".
+      expect(randomFetches, greaterThanOrEqualTo(2));
+    });
+
+    testWidgets('Home mount fires refreshIfStale',
+        (WidgetTester tester) async {
+      final _StubRecs stub = _StubRecs();
+      await tester.pumpWidget(_wrap(overrides: <Override>[
+        homeRecentProvider.overrideWith((_) async => <Album>[]),
+        homeMostPlayedProvider.overrideWith((_) async => <Album>[]),
+        homeRandomSongsProvider.overrideWith((_) async => const <Never>[]),
+        homeRecommendationsProvider.overrideWith(
+          (_) async => (tracks: <RecommendedTrack>[], isFallback: true),
+        ),
+        recommendationsProvider.overrideWith(() => stub),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(stub.refreshIfStaleCalls, 1);
+    });
+  });
 }

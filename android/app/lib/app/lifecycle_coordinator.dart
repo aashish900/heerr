@@ -105,6 +105,9 @@ class _LifecycleCoordinatorState extends ConsumerState<LifecycleCoordinator>
     // notifier guards on a 60 s TTL so this is cheap to fire on every
     // foreground transition.
     ref.read(recommendHealthNotifierProvider.notifier).refreshIfStale();
+    // #38: refresh the For You feed when stale (30 min TTL; no-ops while
+    // fresh or when a manual "Find similar" seed is active).
+    ref.read(recommendationsProvider.notifier).refreshIfStale();
   }
 
   Future<void> _cancelBackgroundSync() async {

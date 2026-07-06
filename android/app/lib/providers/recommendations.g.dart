@@ -36,27 +36,12 @@ final seedCollectionProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef SeedCollectionRef = AutoDisposeFutureProviderRef<List<SeedTrack>>;
-String _$recommendationsHash() => r'5d69080feaca6cf1470310f291fca44e2a491dc7';
+String _$recommendationsHash() => r'4a7ebcac39b9461499985f56d914e6d0c47c6790';
 
-/// Recommendation results from the heerr backend (`POST /api/v1/recommend`).
-///
-/// Reads the user's seed collection via [seedCollectionProvider] (N2), POSTs
-/// `{seeds, limit: 20}` to the backend, returns the parsed [RecommendedTrack]
-/// list for the UI.
-///
-/// When the seed collection is empty, still calls the backend with
-/// `seeds: []` — the listenbrainz engine drives its own history-based
-/// results, so the empty-seed case is meaningful there. ytmusic and lastfm
-/// engines will return `[]` for empty seeds; the screen renders the
-/// empty-state widget.
-///
-/// Copied from [Recommendations].
+/// See also [Recommendations].
 @ProviderFor(Recommendations)
 final recommendationsProvider =
-    AutoDisposeAsyncNotifierProvider<
-      Recommendations,
-      List<RecommendedTrack>
-    >.internal(
+    AsyncNotifierProvider<Recommendations, List<RecommendedTrack>>.internal(
       Recommendations.new,
       name: r'recommendationsProvider',
       debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -66,7 +51,7 @@ final recommendationsProvider =
       allTransitiveDependencies: null,
     );
 
-typedef _$Recommendations = AutoDisposeAsyncNotifier<List<RecommendedTrack>>;
+typedef _$Recommendations = AsyncNotifier<List<RecommendedTrack>>;
 String _$recommendHealthNotifierHash() =>
     r'11162029cc7983c9f0d208d905d452428f73aa15';
 

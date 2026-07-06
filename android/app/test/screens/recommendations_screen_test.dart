@@ -213,6 +213,31 @@ void main() {
     // download" (action='download').
     expect(find.textContaining('download'), findsWidgets);
   });
+
+  testWidgets('AppBar shows a refresh action (#38)',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(overrides: <Override>[
+      recommendationsProvider.overrideWith(() =>
+          _StubRecs(Future<List<RecommendedTrack>>.value(const <RecommendedTrack>[]))),
+    ]));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('for-you-refresh')), findsOneWidget);
+  });
+
+  testWidgets('tapping the refresh action calls the notifier (#38)',
+      (WidgetTester tester) async {
+    final _StubRecs stub =
+        _StubRecs(Future<List<RecommendedTrack>>.value(const <RecommendedTrack>[]));
+    await tester.pumpWidget(_wrap(overrides: <Override>[
+      recommendationsProvider.overrideWith(() => stub),
+    ]));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('for-you-refresh')));
+    await tester.pump();
+
+    expect(stub.refreshCalls, 1);
+  });
 }
 
 /// Test double for [Recommendations]. The generated `_$Recommendations`
@@ -221,7 +246,13 @@ void main() {
 class _StubRecs extends Recommendations {
   _StubRecs(this._future);
   final Future<List<RecommendedTrack>> _future;
+  int refreshCalls = 0;
 
   @override
   Future<List<RecommendedTrack>> build() => _future;
+
+  @override
+  Future<void> refresh() async {
+    refreshCalls++;
+  }
 }

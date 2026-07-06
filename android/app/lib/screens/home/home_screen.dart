@@ -6,6 +6,7 @@ import '../../models/recommended_track.dart';
 import '../../models/subsonic/album.dart';
 import '../../providers/home/home_providers.dart';
 import '../../providers/library/library_search_query.dart';
+import '../../providers/recommendations.dart';
 import '../../router.dart' show Routes;
 import '../../widgets/empty_state.dart';
 import '../../widgets/home_grid_tile.dart';
@@ -32,8 +33,26 @@ String greetingForHour(int hour) {
 ///   - "Jump back in" — horizontal scroll of recently-played albums.
 ///   - "Most played" — horizontal scroll of frequent albums.
 ///   - "Picked for you" / "Discover" lands in O4.
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // #38 — the recommendations feed is keep-alive; refresh it when stale
+    // (30 min TTL) on every Home visit. No-ops while fresh or when a manual
+    // "Find similar" seed is active. Post-frame so we don't mutate provider
+    // state mid-build (same pattern as the Settings health check).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(recommendationsProvider.notifier).refreshIfStale();
+    });
+  }
 
   Future<void> _refresh(WidgetRef ref) async {
     // Invalidate each Home provider so the next read re-fetches.
@@ -49,7 +68,7 @@ class HomeScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final String greeting = greetingForHour(DateTime.now().hour);
     return Scaffold(
       appBar: AppBar(
@@ -252,9 +271,30 @@ class _RecommendationsSection extends ConsumerWidget {
             children: <Widget>[
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: Text(
-                  header,
-                  style: Theme.of(context).textTheme.titleLarge,
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        header,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    // #38 — explicit "fetch new recommendations". Re-samples
+                    // the seed collection so successive taps differ. On the
+                    // Discover fallback, also reshuffle the random songs the
+                    // section is actually showing.
+                    IconButton(
+                      key: const Key('home-recs-refresh'),
+                      icon: const Icon(Icons.refresh),
+                      tooltip: 'New recommendations',
+                      onPressed: () {
+                        ref.read(recommendationsProvider.notifier).refresh();
+                        if (data.isFallback) {
+                          ref.invalidate(homeRandomSongsProvider);
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ),
               SizedBox(
