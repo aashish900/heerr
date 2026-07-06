@@ -193,6 +193,7 @@ class _Body extends ConsumerWidget {
             songIds: <String>[s.id],
             findSimilarSeed: seedForSong(s),
             queueSongs: <Song>[s],
+            editMetadataSong: s,
             deleteFromServerSong: s,
           ),
         );

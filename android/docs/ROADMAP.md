@@ -4,7 +4,7 @@ Track progress through the Android client build. Each milestone = one git commit
 
 See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
-**Status (2026-07-05):** Phases A–W complete. Phase W (delete from server / device / both, issue #41) shipped and smoke-verified on-device 2026-07-05 at `v4.2.0` — depends on backend Phase N (`DELETE /library/song` + Navidrome real-path config, see backend ROADMAP N2).
+**Status (2026-07-06):** Phases A–Y complete. Phase Y (edit song metadata — title/album/artist + cover art, issue #44) shipped 2026-07-06 at `v4.3.0` — depends on backend Phase O (`PATCH /library/song`, see backend ROADMAP O2). On-device smoke pending backend 3.3.0 deploy.
 
 **Conventions:**
 - TDD by default (CLAUDE.md §2) — widget tests / unit tests written first, land in the same commit as code.
@@ -789,6 +789,25 @@ Fires only when the shell route is the top route (pushed detail screens pop them
 **Test gate:** service transport tests (DELETE shape, 404/403/network → typed `ApiError`); notifier tests (path guard, invalidation-on-success, no-invalidation-on-failure); Downloads sheet widget tests (three options, disabled-without-path, confirm-gated calls, cancel); sheet tile tests (render/hide rules, confirm fires + pops, cancel keeps sheet). Full suite green; `flutter analyze` clean.
 **Smoke:** ✅ Passed on the Pixel against the home server 2026-07-05. Operator prerequisites discovered during the smoke (Navidrome reports virtual paths by default): `ND_SUBSONIC_DEFAULTREPORTREALPATH=true` on the navidrome container **and** "Report Real Path" enabled on the app's `heerr [Dart]` player record per user (the flag only defaults new player records); app-side re-search needed once so the L5 cache drops old virtual paths. Backend N2 strips the `/music/` prefix Navidrome reports.
 **Commit:** `feat(flutter): W1 — delete song from server / device / both (#41)`
+
+---
+
+## Phase Y — Edit song metadata (#44, v4.3.0)
+
+**Architecture note:** Issue #44 — YT-Music downloads sometimes carry wrong titles / cover art. The client sends changed tags + an optional cover image to the backend's new multipart `PATCH /api/v1/library/song` (backend Phase O), identifying the file by the Subsonic-relative `Song.path` the client already holds. The backend rewrites tags in place (never renames), so `Song.path` stays stable; Navidrome re-reads the file on its next scan (~1 min). Mirrors the Phase W shape (service method → keepAlive notifier → long-press-sheet tile), plus L5 cover-cache eviction. Phase letter is **Y** (not X) — `DEBT.md` uses item IDs X1–X7. **Depends on backend O2.**
+
+### [x] Y1. Edit-metadata service + notifier + cover-cache eviction
+**Files (new):** `android/app/lib/providers/library/library_edit.dart` (`LibraryEdit` keepAlive notifier — guards `song.path` + at-least-one-change, calls `BackendService.editLibrarySong`, invalidates the same 9 library/downloads/home read providers as `LibraryDelete`; when a cover was uploaded also deletes the L5 cached cover JPG for `song.coverArt` and clears the in-memory image cache), `android/app/test/providers/library/library_edit_test.dart`.
+**Files (modify):** `android/app/lib/api/endpoints.dart` (`libraryEditSong`), `android/app/lib/services/backend_service.dart` (`editLibrarySong({path, title?, album?, artist?, coverBytes?})` — `FormData` multipart, only-present fields, JPEG cover part via `DioMediaType`), `android/app/test/services/backend_service_test.dart` (PATCH shape, field presence, cover part, 404/403/network → typed `ApiError`).
+**Test gate:** service transport tests; notifier tests (path guard, nothing-to-change guard, invalidation-on-success, no-invalidation-on-failure, cover-file eviction only on cover edits). Full suite green; `flutter analyze` clean.
+**Commit:** `feat(flutter): Y1 — edit-metadata service + notifier + cover-cache eviction (#44)`
+
+### [x] Y2. Edit screen + sheet tile + wiring
+**Files (new):** `android/app/lib/screens/library/edit_song_metadata_screen.dart` (full-screen editor, root-navigator push — no go_router route; cover preview via picked `Image.memory` else `LibraryCoverArt`; "Change cover" through `image_picker`; three prefilled fields; Save sends only changed non-empty fields, disabled when unchanged or pending; success → pop + snackbar; errors via `showApiError`), `android/app/lib/providers/library/song_cover_image_picker.dart` (gallery-pick seam, 1024 px / q85), `android/app/test/screens/library/edit_song_metadata_test.dart`, `android/app/test/widgets/add_to_playlist_edit_metadata_test.dart`.
+**Files (modify):** `android/app/lib/widgets/add_to_playlist_sheet.dart` (optional `editMetadataSong` → non-destructive "Edit metadata…" tile above the delete tile, hidden when null or `path == null`; tap pops sheet then pushes the screen), album/playlist-detail + library-search song rows (pass `editMetadataSong: s` alongside the existing `deleteFromServerSong: s`), `android/app/pubspec.yaml` → `4.3.0`.
+**Test gate:** screen tests (prefill, Save-disabled-until-change, only-changed-fields, cover pick sends bytes, success pops + snackbar); sheet-tile tests (render/hide rules, tap closes sheet + pushes screen). Full suite green; `flutter analyze` clean; `build_runner` clean.
+**Smoke (Pixel + home server, pending backend 3.3.0 deploy):** edit a mis-tagged YTM download → correct after rescan; upload cover → new art renders in app (cache evicted) + Navidrome web; file path unchanged (offline copy still plays; no dedupe re-download offered).
+**Commit:** `feat(flutter): Y2 — edit song metadata screen — title/album/artist + cover upload (#44)`
 
 ---
 

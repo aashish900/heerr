@@ -427,6 +427,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
             songIds: <String>[s.id],
             findSimilarSeed: seedForSong(s),
             queueSongs: <Song>[s],
+            editMetadataSong: s,
             deleteFromServerSong: s,
             removeFromPlaylistName: canEdit ? playlist.name : null,
             onRemoveFromPlaylist: canEdit

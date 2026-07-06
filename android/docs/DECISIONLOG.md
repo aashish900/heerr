@@ -820,3 +820,30 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Trade-off:** Metadata doesn't roam — a re-install or second device starts blank (creds re-login already; meta is cosmetic). Avatar bytes aren't encrypted at rest, but they sit in app-private storage like cover art and offline audio.
 
 **Reference:** `android/app/lib/{screens/profile/profile_screen.dart, providers/profiles/{profile_meta,profile_avatar,profile_image_picker}.dart, models/profile_meta.dart, utils/word_limit.dart, providers/profiles/profile_registry.dart, screens/home/home_screen.dart, router.dart}`. Tests per the CHANGELOG entry. CHANGELOG 2026-07-06.
+
+## 2026-07-06 — Phase Y: edit song metadata — full-screen form off the long-press sheet, tags-only, cover-cache eviction (#44)
+
+**Context:** Issue #44 — YT-Music downloads sometimes carry a wrong title or cover art versus what was searched. The client needs to let the user correct a song's title / album / artist and replace its embedded cover. The server half (backend Phase O) rewrites tags in place in the audio file and never renames it. This ADR captures the client-side decisions.
+
+**Decision:**
+1. **Entry point is an "Edit metadata…" tile in the existing add-to-playlist long-press sheet** (`add_to_playlist_sheet.dart`), sitting just above the Phase-W "Delete from server…" tile and gated on the same `song.path != null` rule. Same three single-song callers pass it (`album_detail`, `playlist_detail`, `library_search_results`); album-level / multi-song callers leave it null.
+2. **The editor is a full-screen route pushed on the root navigator**, not a dialog and not a go_router route — cover preview + three text fields is too much for a dialog, and there's no deep-link need.
+3. **Only changed, non-empty fields are sent.** A field equal to its original value, or cleared to empty, is omitted. v1 has no "delete a tag" affordance (the backend rejects blank tags), and Save is disabled until something actually changes.
+4. **Cover-cache eviction lives in the `LibraryEdit` notifier.** On a cover upload it deletes the L5 cached cover JPG keyed by `song.coverArt` and clears the in-memory `imageCache`. Navidrome keeps the same cover id across a tag rescan, so without eviction `LibraryCoverArt` would re-serve the old art from disk forever.
+5. **The picker is a provider seam** (`songCoverImagePickerProvider`, 1024 px / quality 85) mirroring the #37 avatar picker, so widget tests stub it instead of launching the platform photo picker.
+
+**Why:**
+- **Reusing the long-press sheet** means zero new navigation surface and a consistent gesture — the user who knows long-press for "add to playlist" / "delete from server" gets "edit metadata" in the same place. Cheap to add, cheap to remove.
+- **Full-screen over dialog** because the cover preview wants real estate and the form is three fields plus an image action; a cramped dialog would fight the cover.
+- **Changed-fields-only** keeps the multipart request minimal and sidesteps the backend's blank-tag rejection without the client having to model "clear this tag" — a feature nobody asked for in v1.
+- **Eviction in the notifier**, not the widget, keeps it a single chokepoint: every surface that shows the cover (`LibraryCoverArt`) benefits without per-screen code, exactly like the invalidation list.
+
+**Alternatives considered:**
+- **A per-song detail screen with an Edit button.** More surface area and new navigation the app doesn't currently have; rejected for v1 in favour of the existing sheet.
+- **Inline-editable dialog.** Rejected — see "full-screen over dialog".
+- **Skip cover eviction and rely on provider invalidation.** Invalidating the library providers re-fetches metadata but not the on-disk cover cache (keyed by cover id, which is unchanged); the stale JPG would win forever. Eviction is mandatory.
+- **Album-wide cover apply.** Out of scope by the backend ADR / user decision (per-song embed only). Could be layered as a client-side loop later.
+
+**Trade-off:** After an edit the library shows stale metadata / cover until Navidrome's next scan (~1 min) — the same accepted lag as Phase W deletes; the success snackbar says so. And because the cover id is unchanged, a re-fetch between the edit and the rescan can momentarily re-cache the *old* art; it self-corrects on the next fetch after the rescan.
+
+**Reference:** `android/app/lib/{providers/library/{library_edit,song_cover_image_picker}.dart, services/backend_service.dart, api/endpoints.dart, screens/library/edit_song_metadata_screen.dart, widgets/add_to_playlist_sheet.dart}`. Backend side: `PATCH /api/v1/library/song` (backend `docs/DECISIONLOG.md` 2026-07-06, ROADMAP Phase O). Milestones Y1–Y2.

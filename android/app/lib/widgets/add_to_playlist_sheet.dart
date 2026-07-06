@@ -13,6 +13,7 @@ import '../providers/library/playlist_mutations.dart';
 import '../providers/recommendations.dart';
 import '../providers/server_creds.dart';
 import '../router.dart';
+import '../screens/library/edit_song_metadata_screen.dart';
 import 'error_snackbar.dart';
 import 'playlist_dialogs.dart';
 
@@ -46,6 +47,7 @@ class AddToPlaylistSheet extends ConsumerWidget {
     this.onRemoveFromPlaylist,
     this.removeFromPlaylistName,
     this.deleteFromServerSong,
+    this.editMetadataSong,
     super.key,
   });
 
@@ -80,6 +82,11 @@ class AddToPlaylistSheet extends ConsumerWidget {
   /// multi-song callers leave it null.
   final Song? deleteFromServerSong;
 
+  /// Y2 (#44): when non-null and the song carries a Subsonic `path`, renders
+  /// an "Edit metadata…" tile that pushes [EditSongMetadataScreen]. Same
+  /// single-song callers as [deleteFromServerSong].
+  final Song? editMetadataSong;
+
   static Future<void> show({
     required BuildContext context,
     required List<String> songIds,
@@ -88,6 +95,7 @@ class AddToPlaylistSheet extends ConsumerWidget {
     Future<void> Function()? onRemoveFromPlaylist,
     String? removeFromPlaylistName,
     Song? deleteFromServerSong,
+    Song? editMetadataSong,
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -100,6 +108,7 @@ class AddToPlaylistSheet extends ConsumerWidget {
         onRemoveFromPlaylist: onRemoveFromPlaylist,
         removeFromPlaylistName: removeFromPlaylistName,
         deleteFromServerSong: deleteFromServerSong,
+        editMetadataSong: editMetadataSong,
       ),
     );
   }
@@ -237,6 +246,17 @@ class AddToPlaylistSheet extends ConsumerWidget {
     }
   }
 
+  /// Y2 (#44): pop the sheet, then push the full-screen editor on the root
+  /// navigator so it covers the whole screen (not just over the sheet).
+  void _onEditMetadata(BuildContext sheetContext, Song song) {
+    Navigator.of(sheetContext).pop();
+    Navigator.of(sheetContext, rootNavigator: true).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EditSongMetadataScreen(song: song),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<List<Playlist>> playlistsAsync =
@@ -351,6 +371,19 @@ class AddToPlaylistSheet extends ConsumerWidget {
                 },
               ),
             ),
+            if (editMetadataSong != null &&
+                editMetadataSong!.path != null &&
+                editMetadataSong!.path!.isNotEmpty) ...<Widget>[
+              const Divider(height: 1),
+              ListTile(
+                key: const Key('add-to-playlist-edit-metadata'),
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('Edit metadata…'),
+                subtitle:
+                    const Text('Change title, artist, album, or cover art'),
+                onTap: () => _onEditMetadata(context, editMetadataSong!),
+              ),
+            ],
             if (deleteFromServerSong != null &&
                 deleteFromServerSong!.path != null &&
                 deleteFromServerSong!.path!.isNotEmpty) ...<Widget>[
