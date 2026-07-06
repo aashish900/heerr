@@ -33,5 +33,11 @@ class Endpoints {
   /// library on the server; Navidrome drops the track on its next scan.
   static const String libraryDeleteSong = '/library/song';
 
+  /// Phase Y (#44): backend O2 — multipart `PATCH /library/song`. Form fields
+  /// `path` (required) + optional `title`/`album`/`artist` + optional `cover`
+  /// file rewrite the audio file's tags / embedded cover in place. Same path
+  /// as [libraryDeleteSong]; the HTTP verb distinguishes them.
+  static const String libraryEditSong = '/library/song';
+
   static String status(String jobId) => '/status/$jobId';
 }

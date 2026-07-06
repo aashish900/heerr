@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -108,6 +110,36 @@ class BackendService {
         Endpoints.libraryDeleteSong,
         data: <String, String>{'path': path},
       ),
+      (dynamic data) {},
+    );
+  }
+
+  /// `PATCH /library/song` (#44) → rewrite a track's tags and/or embedded
+  /// cover art in place. Sent as multipart so tags + cover travel in one
+  /// request; only the provided fields are included. The backend never
+  /// renames the file, so `Song.path` stays stable; Navidrome re-reads the
+  /// tags on its next scan (~1 min). [coverBytes] must be JPEG or PNG.
+  Future<void> editLibrarySong({
+    required String path,
+    String? title,
+    String? album,
+    String? artist,
+    Uint8List? coverBytes,
+  }) {
+    final FormData form = FormData.fromMap(<String, dynamic>{
+      'path': path,
+      'title': ?title,
+      'album': ?album,
+      'artist': ?artist,
+      if (coverBytes != null)
+        'cover': MultipartFile.fromBytes(
+          coverBytes,
+          filename: 'cover.jpg',
+          contentType: DioMediaType('image', 'jpeg'),
+        ),
+    });
+    return apiCall<void>(
+      () => _dio.patch<dynamic>(Endpoints.libraryEditSong, data: form),
       (dynamic data) {},
     );
   }
