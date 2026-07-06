@@ -2223,3 +2223,8 @@ Delete from device / server / both verified on the Pixel against the home server
 - **`lib/screens/player/now_playing_screen.dart`** — `_Body` gains `tintColor`; palette tint now flows into the lyrics card and sheet background.
 - **`test/screens/player/now_playing_lyrics_expand_test.dart`** — new: card + expand affordance render; expand opens sheet with corner art and lyrics; chevron collapses.
 - Full suite 699 tests pass; `flutter analyze` clean.
+
+## 2026-07-06 — Shuffle arrowheads matched to repeat's chevron style (rc7)
+
+- **`assets/icons/shuffle.svg`** — filled-triangle arrowheads replaced with the same open-chevron polylines `repeat.svg` uses; sized to 3.5-unit depth after two on-device iterations (4 = touching, 3.2 = too small).
+- No code changes. Tagged `v4.3.0-rc7`.
