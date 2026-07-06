@@ -442,3 +442,30 @@ Sub-decisions locked across J1–J10:
 **Trade-off:** The feature now depends on a non-default Navidrome config knob plus a per-player toggle. Accepted: it's a one-time operator step on a single home server, documented in `.env.example` and ROADMAP N2. Prefix stripping is narrowly scoped — only the exact configured prefix is stripped; every other absolute path still 422s, and traversal through the prefix is caught by the existing containment check.
 
 **Reference:** `backend/app/config.py` (`navidrome_music_folder`), `backend/app/api/v1/library.py`, `backend/tests/test_library_delete.py` (N2 group). CHANGELOG `2026-07-05 — N2`.
+
+## 2026-07-06 — Song metadata edit: single multipart PATCH, tags-only rewrite, no file rename, wav excluded (#44)
+
+**Context:** Issue #44 — songs downloaded via YT Music sometimes carry wrong titles / cover art. Navidrome is read-only for tags (it indexes what's in the files), so fixing metadata means rewriting the audio file's tags server-side. Phase O ships the server half; the Android client (Phase Y) consumes it.
+
+**Decision:**
+1. **Single multipart `PATCH /api/v1/library/song`** — `path` + optional `title`/`album`/`artist` form fields + optional `cover` file part, guarded by the existing `download` scope. 422 when nothing to update.
+2. **Tags-only rewrite; the file is never renamed or moved.** `Song.path`, offline manifests, and `downloads` dedupe rows all key on the path staying stable. No DB writes at all — Navidrome re-reads the file on its next scan (mtime bump from `save()`).
+3. **Cover embedded per-song only** (ID3 APIC / MP4 `covr` / FLAC picture / Ogg base64 `metadata_block_picture`), replacing any existing cover with exactly one. No album-wide rewrite.
+4. **`.wav` excluded** (`EDITABLE_SUFFIXES` in `app/services/tag_editor.py` omits it) — RIFF tagging is nonstandard and players handle it inconsistently; spotDL's default output is `.mp3`.
+5. **Image validation by magic bytes** (JPEG/PNG only, 5 MB cap) — the declared content-type is never trusted.
+6. **Fields are single strings** — Subsonic exposes artist as one display string; "multiple singers" = comma-separated in one field.
+7. **mutagen runs in a worker thread** (`anyio.to_thread.run_sync`) — it's sync IO and must not block the event loop.
+
+**Why:**
+- One multipart request means the client's one Save can't half-succeed across two endpoints (tags written, cover failed) — no partial-state UX to explain or roll back. `python-multipart` is required for the cover either way.
+- Path stability is the invariant everything downstream leans on (delete-by-path, offline `serverKey` manifests, dedupe). Renaming files to match titles would invalidate all three for cosmetic benefit Navidrome doesn't need — it displays tags, not filenames.
+- Reusing the Phase N plumbing (`_resolve_under_root`, `/music` prefix strip — extracted to a shared `_strip_navidrome_prefix` helper — and `require_scope("download")`) keeps the new surface consistent with delete: same path semantics, same auth, same error envelope.
+
+**Alternatives considered:**
+- **Two endpoints (JSON PATCH for tags + separate cover upload).** Cleaner REST separation; rejected for the partial-success reason above.
+- **Rename the file to match the new title.** Rejected — breaks the path-stability invariant (see Why).
+- **Album-wide cover rewrite.** Rejected for v1 by user decision; per-song embed is predictable and touches one file per edit. Can be layered on later as a client-side loop if wanted.
+- **Editing tags via Navidrome.** No Subsonic/native API for tag writes exists; Navidrome is deliberately read-only over its library.
+- **Support `.wav`.** Rejected — mutagen can write RIFF INFO/ID3-in-WAV chunks but player/indexer support is inconsistent; not worth the risk for a format spotDL doesn't emit by default.
+
+**Trade-off:** After an edit the library shows stale metadata until Navidrome's next scan (~1 min) — same accepted lag as Phase N deletes; the client snackbar says so.

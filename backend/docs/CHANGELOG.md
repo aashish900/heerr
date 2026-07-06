@@ -913,3 +913,10 @@ Server half of issue #44 begins: in-place tag editing for library files. Files a
 - **`backend/pyproject.toml`** — add `mutagen ^1.47` + `python-multipart` (needed for the O2 multipart endpoint).
 - **`backend/tests/fixtures/silence.{mp3,m4a,flac,ogg,opus,wav}`** (new) — ~0.1 s ffmpeg-generated silence per format.
 - **Tests:** `backend/tests/test_tag_editor.py` (new, 35 tests) — per-format tag + cover round-trips, partial writes, cover replacement, image sniffing. Full suite 479 passed; ruff + mypy clean.
+
+## 2026-07-06 — O2: PATCH /library/song — edit tags + upload cover art (#44)
+
+- **`backend/app/api/v1/library.py`** — new multipart `PATCH /library/song` (`download` scope): Navidrome prefix strip → `_resolve_under_root` → suffix ∈ `EDITABLE_SUFFIXES` (422 with explicit `.wav` detail) → 404 missing → blank-field + nothing-to-update 422s → cover ≤ 5 MB + magic-byte sniff → thread-offloaded `write_tags` / `embed_cover` → `{updated, path, fields}`. The N2 prefix-strip logic extracted to a shared `_strip_navidrome_prefix` helper (delete endpoint now uses it too).
+- **`backend/app/schemas/library.py`** — `LibraryEditResponse(updated, path, fields)`.
+- **`backend/pyproject.toml` + `backend/app/main.py`** — version → `3.3.0`.
+- **Tests:** `backend/tests/test_library_edit.py` (new, 29 tests) — auth/scope, parametrized bad paths, `.wav`/non-audio 422s, 404, blank-field / no-fields / bad-image / oversize-cover 422s, per-format happy path (tags via mutagen re-read + file never renamed), title-only partial, cover-only, tags+cover, Navidrome-prefixed path. Full suite 508 passed; ruff + mypy clean.

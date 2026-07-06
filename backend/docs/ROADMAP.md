@@ -4,7 +4,7 @@ Track progress through the backend build. Each milestone = one git commit with a
 
 See `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file is the *how* / *when*.
 
-**Status (2026-07-06):** Phases A–N complete. Phase O (song metadata edit, issue #44) in progress: O1 (tag-editor service) shipped 2026-07-06; O2 (PATCH endpoint) pending.
+**Status (2026-07-06):** Phases A–O complete. Phase O (song metadata edit, issue #44) shipped 2026-07-06 at `3.3.0`: O1 tag-editor service + O2 multipart PATCH endpoint. Home-server smoke pending deploy.
 
 **Conventions:**
 - TDD per CLAUDE.md §2 — tests written first, land in same commit as code.
@@ -447,7 +447,7 @@ Passes `--lyrics` to spotDL when enabled so downloaded MP3s carry embedded lyric
 
 **Commit:** `feat(backend): O1 — tag-editor service — mutagen tag write + cover embed (#44)`
 
-### [ ] O2. `PATCH /api/v1/library/song` — edit tags + upload cover
+### [x] O2. `PATCH /api/v1/library/song` — edit tags + upload cover
 **Files:**
 - New: `backend/tests/test_library_edit.py`.
 - Modified: `backend/app/api/v1/library.py` (PATCH handler; extract shared prefix-strip helper), `backend/app/schemas/library.py` (`LibraryEditResponse`), `backend/pyproject.toml` + `backend/app/main.py` → `3.3.0`.

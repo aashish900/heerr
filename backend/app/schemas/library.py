@@ -13,3 +13,11 @@ class DeleteSongRequest(BaseModel):
 class DeleteSongResponse(BaseModel):
     deleted: bool
     path: str
+
+
+class LibraryEditResponse(BaseModel):
+    updated: bool
+    # Echoes the request path verbatim (possibly Navidrome-prefixed).
+    path: str
+    # Which fields were written: subset of ["title", "album", "artist", "cover"].
+    fields: list[str]
