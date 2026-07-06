@@ -2194,6 +2194,11 @@ Completes issue #41 (device-only delete shipped in `64c8e47`). Consumes backend 
 - **`test/screens/player/now_playing_add_to_playlist_test.dart`** — added `_NullOfflinePaths` subclass overriding `serverRoot → null`; overrides `offlinePathsProvider` to cut dart:io `file.exists()` call that hangs `pumpAndSettle` under fake-async (real OS I/O is never drained by Flutter's fake-async pump loop).
 - All 33 player tests pass; `flutter analyze` clean.
 
+## 2026-07-06 — Shuffle glyph redrawn (rc5)
+
+- **`assets/icons/shuffle.svg`** — redrawn: open-chevron arrowheads (which overlapped line ends into blobs on-device) replaced with small filled triangles; over-wavy Béziers flattened to gentle single-crossing curves with horizontal lead-ins.
+- Modes tests pass; no code changes. Tagged `v4.3.0-rc5`.
+
 ## 2026-07-06 — Custom SVG glyphs for shuffle/repeat (rc4)
 
 - **New:** `assets/icons/shuffle.svg`, `repeat.svg`, `repeat_one.svg` — hand-drawn curvy/flowing glyphs matching the reference design; Material's `_rounded` icon variants only soften stroke corners, the glyph shapes don't exist in the built-in set.
