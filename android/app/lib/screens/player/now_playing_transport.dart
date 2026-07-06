@@ -92,12 +92,21 @@ class _Transport extends ConsumerWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: <Widget>[
-        // Shuffle: bare icon, accent-tinted when active (Spotify-style).
+        // Shuffle: custom curvy glyph, accent-tinted when active. Material's
+        // shuffle_rounded only rounds stroke corners — the flowing crossed
+        // arrows in the reference design need a bundled SVG.
         IconButton(
-          iconSize: 26,
+          key: const Key('now-playing-shuffle'),
           tooltip: shuffleOn ? 'Shuffle on' : 'Shuffle off',
-          icon: const Icon(Icons.shuffle_rounded),
-          color: shuffleOn ? cs.primary : cs.onSurfaceVariant,
+          icon: SvgPicture.asset(
+            'assets/icons/shuffle.svg',
+            width: 26,
+            height: 26,
+            colorFilter: ColorFilter.mode(
+              shuffleOn ? cs.primary : cs.onSurfaceVariant,
+              BlendMode.srcIn,
+            ),
+          ),
           onPressed: () {
             final HeerrAudioHandler h = ref.read(audioHandlerProvider);
             h.setShuffleMode(shuffleOn
@@ -139,18 +148,26 @@ class _Transport extends ConsumerWidget {
           icon: const Icon(Icons.skip_next_rounded),
           onPressed: () => ref.read(audioHandlerProvider).skipToNext(),
         ),
-        // Repeat: bare icon, accent-tinted when active (Spotify-style).
+        // Repeat: custom rounded-loop glyph (bundled SVG, same reason as
+        // shuffle), accent-tinted when active.
         IconButton(
-          iconSize: 26,
+          key: const Key('now-playing-repeat'),
           tooltip: repeatMode == AudioServiceRepeatMode.one
               ? 'Repeat one'
               : repeatOn
                   ? 'Repeat all'
                   : 'Repeat off',
-          icon: Icon(repeatMode == AudioServiceRepeatMode.one
-              ? Icons.repeat_one_rounded
-              : Icons.repeat_rounded),
-          color: repeatOn ? cs.primary : cs.onSurfaceVariant,
+          icon: SvgPicture.asset(
+            repeatMode == AudioServiceRepeatMode.one
+                ? 'assets/icons/repeat_one.svg'
+                : 'assets/icons/repeat.svg',
+            width: 26,
+            height: 26,
+            colorFilter: ColorFilter.mode(
+              repeatOn ? cs.primary : cs.onSurfaceVariant,
+              BlendMode.srcIn,
+            ),
+          ),
           onPressed: () => ref
               .read(audioHandlerProvider)
               .setRepeatMode(_nextRepeat(repeatMode)),

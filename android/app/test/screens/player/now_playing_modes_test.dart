@@ -5,6 +5,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -103,6 +104,15 @@ Widget _wrap(PlayerSnapshot snapshot, HeerrAudioHandler handler) {
   );
 }
 
+// Shuffle/repeat render bundled SVG glyphs, not Material icons — find them
+// by the asset path baked into the SvgPicture's loader.
+Finder _svgAsset(String asset) => find.byWidgetPredicate(
+      (Widget w) =>
+          w is SvgPicture &&
+          w.bytesLoader is SvgAssetLoader &&
+          (w.bytesLoader as SvgAssetLoader).assetName == asset,
+    );
+
 void main() {
   late _MockHandler handler;
 
@@ -125,8 +135,8 @@ void main() {
   testWidgets('shuffle + repeat buttons render', (WidgetTester tester) async {
     await tester.pumpWidget(_wrap(_snap(), handler));
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.shuffle_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.repeat_rounded), findsOneWidget);
+    expect(_svgAsset('assets/icons/shuffle.svg'), findsOneWidget);
+    expect(_svgAsset('assets/icons/repeat.svg'), findsOneWidget);
   });
 
   testWidgets('repeat-one state shows repeat_one icon',
@@ -135,16 +145,16 @@ void main() {
       _wrap(_snap(repeat: AudioServiceRepeatMode.one), handler),
     );
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.repeat_one_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.repeat_rounded), findsNothing);
+    expect(_svgAsset('assets/icons/repeat_one.svg'), findsOneWidget);
+    expect(_svgAsset('assets/icons/repeat.svg'), findsNothing);
   });
 
   testWidgets('tap repeat from none → setRepeatMode(all)',
       (WidgetTester tester) async {
     await tester.pumpWidget(_wrap(_snap(), handler));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byIcon(Icons.repeat_rounded));
-    await tester.tap(find.byIcon(Icons.repeat_rounded));
+    await tester.ensureVisible(find.byKey(const Key('now-playing-repeat')));
+    await tester.tap(find.byKey(const Key('now-playing-repeat')));
     await tester.pumpAndSettle();
     verify(() => handler.setRepeatMode(AudioServiceRepeatMode.all)).called(1);
   });
@@ -155,8 +165,8 @@ void main() {
       _wrap(_snap(repeat: AudioServiceRepeatMode.all), handler),
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byIcon(Icons.repeat_rounded));
-    await tester.tap(find.byIcon(Icons.repeat_rounded));
+    await tester.ensureVisible(find.byKey(const Key('now-playing-repeat')));
+    await tester.tap(find.byKey(const Key('now-playing-repeat')));
     await tester.pumpAndSettle();
     verify(() => handler.setRepeatMode(AudioServiceRepeatMode.one)).called(1);
   });
@@ -167,8 +177,8 @@ void main() {
       _wrap(_snap(repeat: AudioServiceRepeatMode.one), handler),
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byIcon(Icons.repeat_one_rounded));
-    await tester.tap(find.byIcon(Icons.repeat_one_rounded));
+    await tester.ensureVisible(find.byKey(const Key('now-playing-repeat')));
+    await tester.tap(find.byKey(const Key('now-playing-repeat')));
     await tester.pumpAndSettle();
     verify(() => handler.setRepeatMode(AudioServiceRepeatMode.none)).called(1);
   });
@@ -177,8 +187,8 @@ void main() {
       (WidgetTester tester) async {
     await tester.pumpWidget(_wrap(_snap(), handler));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byIcon(Icons.shuffle_rounded));
-    await tester.tap(find.byIcon(Icons.shuffle_rounded));
+    await tester.ensureVisible(find.byKey(const Key('now-playing-shuffle')));
+    await tester.tap(find.byKey(const Key('now-playing-shuffle')));
     await tester.pumpAndSettle();
     verify(() => handler.setShuffleMode(AudioServiceShuffleMode.all)).called(1);
   });
@@ -189,8 +199,8 @@ void main() {
       _wrap(_snap(shuffle: AudioServiceShuffleMode.all), handler),
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byIcon(Icons.shuffle_rounded));
-    await tester.tap(find.byIcon(Icons.shuffle_rounded));
+    await tester.ensureVisible(find.byKey(const Key('now-playing-shuffle')));
+    await tester.tap(find.byKey(const Key('now-playing-shuffle')));
     await tester.pumpAndSettle();
     verify(() => handler.setShuffleMode(AudioServiceShuffleMode.none)).called(1);
   });

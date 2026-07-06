@@ -2194,6 +2194,14 @@ Completes issue #41 (device-only delete shipped in `64c8e47`). Consumes backend 
 - **`test/screens/player/now_playing_add_to_playlist_test.dart`** — added `_NullOfflinePaths` subclass overriding `serverRoot → null`; overrides `offlinePathsProvider` to cut dart:io `file.exists()` call that hangs `pumpAndSettle` under fake-async (real OS I/O is never drained by Flutter's fake-async pump loop).
 - All 33 player tests pass; `flutter analyze` clean.
 
+## 2026-07-06 — Custom SVG glyphs for shuffle/repeat (rc4)
+
+- **New:** `assets/icons/shuffle.svg`, `repeat.svg`, `repeat_one.svg` — hand-drawn curvy/flowing glyphs matching the reference design; Material's `_rounded` icon variants only soften stroke corners, the glyph shapes don't exist in the built-in set.
+- **`lib/screens/player/now_playing_transport.dart`** — shuffle/repeat render via `SvgPicture.asset` with the same tint logic (primary when active); buttons gain keys `now-playing-shuffle` / `now-playing-repeat`.
+- **`lib/screens/player/now_playing_screen.dart`** — added `flutter_svg` import (part-file parent).
+- **`test/screens/player/now_playing_modes_test.dart`** — finders switched from `find.byIcon` to button keys + SVG-asset-path predicate.
+- All 33 player tests pass; `flutter analyze` clean. Tagged `v4.3.0-rc4`.
+
 ## 2026-07-06 — Transport buttons matched to reference screenshot
 
 - **`lib/screens/player/now_playing_transport.dart`** — play/pause is now a big filled circle (`IconButton.filled`, `onSurface` background, plain `play_arrow_rounded`/`pause_rounded` glyph); shuffle/repeat reverted from pill-when-active to bare icons tinted `primary` when active.
