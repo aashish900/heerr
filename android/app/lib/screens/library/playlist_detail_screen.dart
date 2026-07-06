@@ -393,6 +393,28 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
         final Song s = playlist.entry[idx];
         final bool isCurrent = s.id == currentSubsonicId;
         final OfflineSongEntry? offline = manifest?.songs[s.id];
+        final Future<void> Function()? removeCallback = canEdit
+            ? () async {
+                try {
+                  await ref
+                      .read(playlistMutationsProvider.notifier)
+                      .removeSongsAtIndices(
+                        playlistId: playlist.id,
+                        indices: <int>[idx],
+                      );
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(SnackBar(
+                      duration: kSnackBarDuration,
+                      content: Text('Removed from ${playlist.name}'),
+                    ));
+                } on ApiError catch (e) {
+                  if (!mounted) return;
+                  showApiError(context, e);
+                }
+              }
+            : null;
         return ListTile(
           leading: LibraryCoverArt(coverArtId: s.coverArt, size: 40),
           title: Text(
@@ -413,6 +435,11 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
           ),
           trailing: SongRowActions(
             song: s,
+            findSimilarSeed: seedForSong(s),
+            editMetadataSong: s,
+            deleteFromServerSong: s,
+            removeFromPlaylistName: canEdit ? playlist.name : null,
+            onRemoveFromPlaylist: removeCallback,
             trailingStatus:
                 _buildSongTrailing(isCurrent, offline, containerMarked),
           ),
@@ -430,28 +457,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
             editMetadataSong: s,
             deleteFromServerSong: s,
             removeFromPlaylistName: canEdit ? playlist.name : null,
-            onRemoveFromPlaylist: canEdit
-                ? () async {
-                    try {
-                      await ref
-                          .read(playlistMutationsProvider.notifier)
-                          .removeSongsAtIndices(
-                            playlistId: playlist.id,
-                            indices: <int>[idx],
-                          );
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(SnackBar(
-                          duration: kSnackBarDuration,
-                          content: Text('Removed from ${playlist.name}'),
-                        ));
-                    } on ApiError catch (e) {
-                      if (!mounted) return;
-                      showApiError(context, e);
-                    }
-                  }
-                : null,
+            onRemoveFromPlaylist: removeCallback,
           ),
         );
       },

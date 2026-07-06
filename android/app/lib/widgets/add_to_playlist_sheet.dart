@@ -265,143 +265,166 @@ class AddToPlaylistSheet extends ConsumerWidget {
     final String? username = settings.navidromeUsername;
     final ColorScheme cs = Theme.of(context).colorScheme;
 
+    final bool showDelete = deleteFromServerSong != null &&
+        deleteFromServerSong!.path != null &&
+        deleteFromServerSong!.path!.isNotEmpty;
+
     return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Text(
-                'Add ${_songCountLabel()} to playlist',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ),
-            if (onRemoveFromPlaylist != null) ...<Widget>[
-              ListTile(
-                key: const Key('add-to-playlist-remove'),
-                leading: Icon(Icons.remove_circle_outline, color: cs.error),
-                title: Text(
-                  removeFromPlaylistName != null
-                      ? 'Remove from ${removeFromPlaylistName!}'
-                      : 'Remove from playlist',
-                  style: TextStyle(color: cs.error),
-                ),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  onRemoveFromPlaylist!();
-                },
-              ),
-              const Divider(height: 1),
-            ],
-            if (queueSongs.isNotEmpty) ...<Widget>[
-              ListTile(
-                key: const Key('add-to-playlist-add-to-queue'),
-                leading: const Icon(Icons.playlist_play),
-                title: const Text('Add to queue'),
-                subtitle: const Text('Play after the current queue'),
-                onTap: () => _onAddToQueue(context, ref),
-              ),
-              const Divider(height: 1),
-            ],
-            if (findSimilarSeed != null) ...<Widget>[
-              ListTile(
-                key: const Key('add-to-playlist-find-similar'),
-                leading: const Icon(Icons.recommend_outlined),
-                title: const Text('Find similar →'),
-                subtitle:
-                    const Text('Recommendations seeded from this song'),
-                onTap: () => _onFindSimilar(context, ref),
-              ),
-              const Divider(height: 1),
-            ],
-            ListTile(
-              leading: const Icon(Icons.add),
-              title: const Text('Create new playlist…'),
-              onTap: () => _onCreateNew(context, ref),
-            ),
-            const Divider(height: 1),
-            Flexible(
-              child: playlistsAsync.when(
-                loading: () => const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                error: (Object e, _) => Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                   child: Text(
-                    e is ApiError ? e.message : 'Error: $e',
+                    'Add ${_songCountLabel()} to playlist',
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
-                data: (List<Playlist> all) {
-                  final List<Playlist> editable = <Playlist>[
-                    for (final Playlist p in all)
-                      if (p.owner != null &&
-                          username != null &&
-                          p.owner == username)
-                        p,
-                  ];
-                  if (editable.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.fromLTRB(16, 16, 16, 24),
-                      child: Text(
-                        'No editable playlists yet. Tap "Create new playlist…" above.',
+                // 1. Add to queue
+                if (queueSongs.isNotEmpty) ...<Widget>[
+                  ListTile(
+                    key: const Key('add-to-playlist-add-to-queue'),
+                    leading: const Icon(Icons.playlist_play),
+                    title: const Text('Add to queue'),
+                    subtitle: const Text('Play after the current queue'),
+                    onTap: () => _onAddToQueue(context, ref),
+                  ),
+                  const Divider(height: 1),
+                ],
+                // 2. Edit metadata
+                if (editMetadataSong != null &&
+                    editMetadataSong!.path != null &&
+                    editMetadataSong!.path!.isNotEmpty) ...<Widget>[
+                  ListTile(
+                    key: const Key('add-to-playlist-edit-metadata'),
+                    leading: const Icon(Icons.edit_outlined),
+                    title: const Text('Edit metadata…'),
+                    subtitle: const Text(
+                        'Change title, artist, album, or cover art'),
+                    onTap: () => _onEditMetadata(context, editMetadataSong!),
+                  ),
+                  const Divider(height: 1),
+                ],
+                // 3. Find similar
+                if (findSimilarSeed != null) ...<Widget>[
+                  ListTile(
+                    key: const Key('add-to-playlist-find-similar'),
+                    leading: const Icon(Icons.recommend_outlined),
+                    title: const Text('Find similar →'),
+                    subtitle:
+                        const Text('Recommendations seeded from this song'),
+                    onTap: () => _onFindSimilar(context, ref),
+                  ),
+                  const Divider(height: 1),
+                ],
+                // 4. Add to playlist (submenu)
+                ExpansionTile(
+                  key: const Key('add-to-playlist-expand'),
+                  leading: const Icon(Icons.playlist_add),
+                  title: const Text('Add to playlist'),
+                  children: <Widget>[
+                    ListTile(
+                      leading: const Icon(Icons.add),
+                      title: const Text('Create new playlist…'),
+                      onTap: () => _onCreateNew(context, ref),
+                    ),
+                    const Divider(height: 1),
+                    playlistsAsync.when(
+                      loading: () => const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(child: CircularProgressIndicator()),
                       ),
-                    );
-                  }
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: editable.length,
-                    itemBuilder: (BuildContext c, int i) {
-                      final Playlist p = editable[i];
-                      return ListTile(
-                        leading: const Icon(Icons.queue_music_outlined),
-                        title: Text(p.name),
-                        subtitle: p.songCount == null
-                            ? null
-                            : Text('${p.songCount} songs'),
-                        onTap: () => _onAddToExisting(context, ref, p),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-            if (editMetadataSong != null &&
-                editMetadataSong!.path != null &&
-                editMetadataSong!.path!.isNotEmpty) ...<Widget>[
-              const Divider(height: 1),
-              ListTile(
-                key: const Key('add-to-playlist-edit-metadata'),
-                leading: const Icon(Icons.edit_outlined),
-                title: const Text('Edit metadata…'),
-                subtitle:
-                    const Text('Change title, artist, album, or cover art'),
-                onTap: () => _onEditMetadata(context, editMetadataSong!),
-              ),
-            ],
-            if (deleteFromServerSong != null &&
-                deleteFromServerSong!.path != null &&
-                deleteFromServerSong!.path!.isNotEmpty) ...<Widget>[
-              const Divider(height: 1),
-              ListTile(
-                key: const Key('add-to-playlist-delete-from-server'),
-                leading: Icon(Icons.cloud_off_outlined, color: cs.error),
-                title: Text(
-                  'Delete from server…',
-                  style: TextStyle(color: cs.error),
+                      error: (Object e, _) => Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                        child: Text(
+                          e is ApiError ? e.message : 'Error: $e',
+                        ),
+                      ),
+                      data: (List<Playlist> all) {
+                        final List<Playlist> editable = <Playlist>[
+                          for (final Playlist p in all)
+                            if (p.owner != null &&
+                                username != null &&
+                                p.owner == username)
+                              p,
+                        ];
+                        if (editable.isEmpty) {
+                          return const Padding(
+                            padding: EdgeInsets.fromLTRB(16, 16, 16, 24),
+                            child: Text(
+                              'No editable playlists yet. Tap "Create new playlist…" above.',
+                            ),
+                          );
+                        }
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            for (final Playlist p in editable)
+                              ListTile(
+                                leading:
+                                    const Icon(Icons.queue_music_outlined),
+                                title: Text(p.name),
+                                subtitle: p.songCount == null
+                                    ? null
+                                    : Text('${p.songCount} songs'),
+                                onTap: () =>
+                                    _onAddToExisting(context, ref, p),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
                 ),
-                subtitle:
-                    const Text('Removes the file from the Navidrome library'),
-                onTap: () =>
-                    _onDeleteFromServer(context, ref, deleteFromServerSong!),
-              ),
-            ],
-          ],
+                // 5. Remove from playlist
+                if (onRemoveFromPlaylist != null) ...<Widget>[
+                  const Divider(height: 1),
+                  ListTile(
+                    key: const Key('add-to-playlist-remove'),
+                    leading:
+                        Icon(Icons.remove_circle_outline, color: cs.error),
+                    title: Text(
+                      removeFromPlaylistName != null
+                          ? 'Remove from ${removeFromPlaylistName!}'
+                          : 'Remove from playlist',
+                      style: TextStyle(color: cs.error),
+                    ),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      onRemoveFromPlaylist!();
+                    },
+                  ),
+                ],
+                // 6. Delete from server
+                if (showDelete) ...<Widget>[
+                  const Divider(height: 1),
+                  ListTile(
+                    key: const Key('add-to-playlist-delete-from-server'),
+                    leading:
+                        Icon(Icons.cloud_off_outlined, color: cs.error),
+                    title: Text(
+                      'Delete from server…',
+                      style: TextStyle(color: cs.error),
+                    ),
+                    subtitle: const Text(
+                        'Removes the file from the Navidrome library'),
+                    onTap: () => _onDeleteFromServer(
+                        context, ref, deleteFromServerSong!),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
     );

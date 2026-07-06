@@ -158,6 +158,8 @@ void main() {
 
     // Sheet for the single playing track.
     expect(find.text('Add 1 song to playlist'), findsOneWidget);
+    await tester.tap(find.text('Add to playlist'));
+    await tester.pumpAndSettle();
     expect(find.text('Create new playlist…'), findsOneWidget);
   });
 

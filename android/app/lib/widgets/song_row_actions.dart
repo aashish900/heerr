@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_error.dart';
+import '../models/seed_track.dart';
 import '../models/subsonic/song.dart';
 import '../providers/library/favourites.dart';
 import '../providers/library/playlist_mutations.dart';
@@ -14,19 +15,31 @@ import 'error_snackbar.dart';
 ///      Favourites playlist). Tap toggles membership via
 ///      `PlaylistMutations.toggleFavourite`. Lazy-creates the
 ///      "Favourites" playlist on first ever tap.
-///   2. "Add to playlist…" `more_vert` button → opens
-///      [AddToPlaylistSheet] with this song's id (visible discoverable
-///      alternative to the M3 long-press affordance).
+///   2. `more_vert` button → opens [AddToPlaylistSheet] with the same
+///      options as a long-press on the row (queue, edit metadata, find
+///      similar, playlist submenu, remove, delete).
 ///   3. Optional [trailingStatus] icon (now-playing, offline state,
 ///      scheduled badge) appended to the right of the actions.
 class SongRowActions extends ConsumerWidget {
   const SongRowActions({
     required this.song,
+    this.findSimilarSeed,
+    this.editMetadataSong,
+    this.deleteFromServerSong,
+    this.onRemoveFromPlaylist,
+    this.removeFromPlaylistName,
     this.trailingStatus,
     super.key,
   });
 
   final Song song;
+
+  /// Forwarded to [AddToPlaylistSheet] — mirrors the long-press params.
+  final SeedTrack? findSimilarSeed;
+  final Song? editMetadataSong;
+  final Song? deleteFromServerSong;
+  final Future<void> Function()? onRemoveFromPlaylist;
+  final String? removeFromPlaylistName;
 
   /// Existing trailing widget (now-playing indicator / offline-state
   /// glyph / scheduled badge) appended after the action buttons. Null
@@ -70,11 +83,16 @@ class SongRowActions extends ConsumerWidget {
         IconButton(
           visualDensity: VisualDensity.compact,
           icon: const Icon(Icons.more_vert),
-          tooltip: 'Add to playlist…',
+          tooltip: 'Song options',
           onPressed: () => AddToPlaylistSheet.show(
             context: context,
             songIds: <String>[song.id],
             queueSongs: <Song>[song],
+            findSimilarSeed: findSimilarSeed,
+            editMetadataSong: editMetadataSong,
+            deleteFromServerSong: deleteFromServerSong,
+            onRemoveFromPlaylist: onRemoveFromPlaylist,
+            removeFromPlaylistName: removeFromPlaylistName,
           ),
         ),
         if (trailingStatus != null) ...<Widget>[

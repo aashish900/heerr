@@ -220,6 +220,8 @@ void main() {
         // Sheet rendered.
         expect(find.text('Add 1 song to playlist'), findsOneWidget);
 
+        await tester.tap(find.text('Add to playlist'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Morning'));
         await tester.pumpAndSettle();
 
@@ -262,6 +264,8 @@ void main() {
 
         expect(find.text('Add 2 songs to playlist'), findsOneWidget);
 
+        await tester.tap(find.text('Add to playlist'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Morning'));
         await tester.pumpAndSettle();
 

@@ -179,6 +179,9 @@ class _Body extends ConsumerWidget {
               : Text(_formatDuration(s.duration!)),
           trailing: SongRowActions(
             song: s,
+            findSimilarSeed: seedForSong(s),
+            editMetadataSong: s,
+            deleteFromServerSong: s,
             trailingStatus:
                 _buildSongTrailing(isCurrent, offline, containerMarked),
           ),

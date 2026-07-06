@@ -178,6 +178,8 @@ void main() {
       );
 
       expect(find.text('Add 1 song to playlist'), findsOneWidget);
+      await tester.tap(find.text('Add to playlist'));
+      await tester.pumpAndSettle();
       expect(find.text('Create new playlist…'), findsOneWidget);
       expect(find.text('Morning'), findsOneWidget);
       expect(find.text('Workout'), findsOneWidget);
@@ -219,6 +221,8 @@ void main() {
           ],
           username: 'phone',
         );
+        await tester.tap(find.text('Add to playlist'));
+        await tester.pumpAndSettle();
         expect(find.text('Create new playlist…'), findsOneWidget);
         expect(
           find.textContaining('No editable playlists yet'),
@@ -243,6 +247,8 @@ void main() {
           ],
           username: null,
         );
+        await tester.tap(find.text('Add to playlist'));
+        await tester.pumpAndSettle();
         expect(find.text('Morning'), findsNothing);
         expect(find.text('Workout'), findsNothing);
         expect(
@@ -271,6 +277,8 @@ void main() {
           username: 'phone',
         );
 
+        await tester.tap(find.text('Add to playlist'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Morning'));
         await tester.pumpAndSettle();
 
@@ -305,6 +313,8 @@ void main() {
           username: 'phone',
         );
 
+        await tester.tap(find.text('Add to playlist'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Create new playlist…'));
         await tester.pumpAndSettle();
 
@@ -343,6 +353,8 @@ void main() {
           username: 'phone',
         );
 
+        await tester.tap(find.text('Add to playlist'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Create new playlist…'));
         await tester.pumpAndSettle();
         await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
@@ -371,6 +383,8 @@ void main() {
           username: 'phone',
         );
 
+        await tester.tap(find.text('Add to playlist'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Morning'));
         await tester.pumpAndSettle();
 
@@ -399,6 +413,8 @@ void main() {
           username: 'phone',
         );
 
+        await tester.tap(find.text('Add to playlist'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Morning'));
         await tester.pumpAndSettle();
 
