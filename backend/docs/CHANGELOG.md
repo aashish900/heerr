@@ -904,3 +904,12 @@ Smoke against the home server exposed that Navidrome reports virtual (tag-derive
 ## 2026-07-05 — Phase N smoke verified on the home server
 
 Delete-from-server verified end-to-end with N2 deployed: curl with the Navidrome-reported `/music/<file>` path → `{"deleted": true}` + file gone on disk; in-app delete works after the operator steps (ND_SUBSONIC_DEFAULTREPORTREALPATH=true + "Report Real Path" on the app's `heerr [Dart]` player records + one app re-search to refresh cached paths). ROADMAP N1/N2 smoke notes flipped to verified.
+
+## 2026-07-06 — O1: tag-editor service — mutagen tag write + cover embed (#44)
+
+Server half of issue #44 begins: in-place tag editing for library files. Files are never renamed — `Song.path`, offline manifests, and `downloads` dedupe rows stay stable.
+
+- **`backend/app/services/tag_editor.py`** (new) — `EDITABLE_SUFFIXES` (`.wav` excluded — nonstandard RIFF tagging), `sniff_image` (magic-byte JPEG/PNG only), `write_tags` (mutagen easy-tag layer, partial writes), `embed_cover` (per-format: ID3 APIC / MP4 covr / FLAC picture / Ogg base64 `metadata_block_picture`, replaces any existing cover). Pure-sync; endpoint callers offload to a thread.
+- **`backend/pyproject.toml`** — add `mutagen ^1.47` + `python-multipart` (needed for the O2 multipart endpoint).
+- **`backend/tests/fixtures/silence.{mp3,m4a,flac,ogg,opus,wav}`** (new) — ~0.1 s ffmpeg-generated silence per format.
+- **Tests:** `backend/tests/test_tag_editor.py` (new, 35 tests) — per-format tag + cover round-trips, partial writes, cover replacement, image sniffing. Full suite 479 passed; ruff + mypy clean.

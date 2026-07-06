@@ -4,7 +4,7 @@ Track progress through the backend build. Each milestone = one git commit with a
 
 See `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file is the *how* / *when*.
 
-**Status (2026-07-05):** Phases A–N complete. Phase N (library delete, issue #41 remainder) shipped 2026-07-05: N1 endpoint + N2 Navidrome real-path fix; smoke passed on the home server the same day (v4.2.0).
+**Status (2026-07-06):** Phases A–N complete. Phase O (song metadata edit, issue #44) in progress: O1 (tag-editor service) shipped 2026-07-06; O2 (PATCH endpoint) pending.
 
 **Conventions:**
 - TDD per CLAUDE.md §2 — tests written first, land in same commit as code.
@@ -429,6 +429,36 @@ Passes `--lyrics` to spotDL when enabled so downloaded MP3s carry embedded lyric
 **Test gate:** prefixed absolute path stripped + deleted; relative path still works; absolute outside the prefix 422; traversal through the prefix (`/music/../…`) 422; bare prefix 422. Full suite green.
 
 **Commit:** `fix(backend): N2 — strip Navidrome music-folder prefix in DELETE /library/song (#41)`
+
+---
+
+## Phase O — Song metadata edit (#44)
+
+**Architecture note:** Server half of issue #44 (mis-tagged YT Music downloads). Rewrites tags (title / album / artist) and embeds per-song cover art **in place** in the file under `music_output_dir` — the file is never renamed, so `Song.path`, offline manifests, and `downloads` dedupe rows stay stable; no DB writes at all. Navidrome re-reads the file on its next scan (mtime bump from `save()`). Reuses the Phase N path plumbing (`_resolve_under_root` + `/music` prefix strip) and `require_scope("download")`. `.wav` excluded — RIFF tagging is nonstandard; spotDL's default output is `.mp3`. Single multipart `PATCH` (tags + optional cover in one request) so the client's one Save can't half-succeed across two endpoints.
+
+### [x] O1. Tag-editor service — mutagen tag write + cover embed
+**Files:**
+- New: `backend/app/services/tag_editor.py`, `backend/tests/test_tag_editor.py`, `backend/tests/fixtures/silence.{mp3,m4a,flac,ogg,opus,wav}`.
+- Modified: `backend/pyproject.toml` (add `mutagen ^1.47`, `python-multipart`).
+
+**Deliverable:** `EDITABLE_SUFFIXES = {".mp3", ".m4a", ".flac", ".ogg", ".opus"}`; `sniff_image(bytes)` (magic-byte JPEG/PNG detection, never trusts declared content-type); `write_tags(path, *, title, album, artist)` via `mutagen.File(easy=True)` (only non-None fields written, returns the written field names); `embed_cover(path, data, mime)` per-format (ID3 APIC / MP4 `covr` / FLAC picture / Ogg-Vorbis+Opus base64 `metadata_block_picture`), replacing any existing cover with exactly one. Pure-sync module — endpoint callers offload via `anyio.to_thread.run_sync`. Fixtures are ~0.1 s ffmpeg-generated silence per format (`ffmpeg -f lavfi -i anullsrc=r=44100:cl=mono -t 0.1 …`; ogg needs `cl=stereo` + `-c:a vorbis -strict experimental` — the builtin encoder is stereo-only).
+
+**Test gate:** per-format tag round-trip; partial write leaves other fields untouched; per-format cover round-trip + replace-leaves-exactly-one + tags preserved across embed; `sniff_image` accepts jpeg/png, rejects gif/webp/garbage/truncated-magic. Full suite green; ruff + mypy clean.
+
+**Commit:** `feat(backend): O1 — tag-editor service — mutagen tag write + cover embed (#44)`
+
+### [ ] O2. `PATCH /api/v1/library/song` — edit tags + upload cover
+**Files:**
+- New: `backend/tests/test_library_edit.py`.
+- Modified: `backend/app/api/v1/library.py` (PATCH handler; extract shared prefix-strip helper), `backend/app/schemas/library.py` (`LibraryEditResponse`), `backend/pyproject.toml` + `backend/app/main.py` → `3.3.0`.
+
+**Deliverable:** Multipart `PATCH /api/v1/library/song` — `path` + optional `title`/`album`/`artist` as form fields, optional `cover` file; `require_scope("download")`. Flow: Navidrome prefix strip → `_resolve_under_root` → suffix ∈ `EDITABLE_SUFFIXES` (422, explicit `.wav` detail) → 404 missing → 422 when no field and no cover → cover ≤ 5 MB + `sniff_image` (422 on bad type) → thread-offloaded `write_tags` / `embed_cover` → `{updated: true, path, fields}`. Logged with the `username` key.
+
+**Test gate:** 401/403; parametrized 422s (traversal, absolute-outside-prefix, empty path, `.wav`, non-audio suffix, no-fields, bad image bytes, oversize cover); 404 missing file; multipart happy path per format asserting tags via mutagen re-read **and file path unchanged on disk**; Navidrome-prefixed path works; tags-only and cover-only requests work independently. Full suite green; ruff + mypy clean.
+
+**Smoke (home server):** curl multipart against a real track → tags + cover visible in Navidrome after rescan; file path unchanged; dedupe row untouched.
+
+**Commit:** `feat(backend): O2 — PATCH /library/song — edit tags + upload cover art (#44)`
 
 ---
 

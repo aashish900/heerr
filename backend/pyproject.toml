@@ -20,6 +20,8 @@ uvicorn = {version = "^0.32", extras = ["standard"]}
 httpx = "^0.28"
 ytmusicapi = ">=0.25"
 yt-dlp = ">=2025.1"
+mutagen = "^1.47"
+python-multipart = "^0.0.32"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3"
