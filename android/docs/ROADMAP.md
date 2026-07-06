@@ -4,7 +4,7 @@ Track progress through the Android client build. Each milestone = one git commit
 
 See `PLAN.md` for the *what*; this file is the *how* / *when*.
 
-**Status (2026-07-06):** Phases A–Y complete. Phase Y (edit song metadata — title/album/artist + cover art, issue #44) shipped 2026-07-06 at `v4.3.0` — depends on backend Phase O (`PATCH /library/song`, see backend ROADMAP O2). On-device smoke pending backend 3.3.0 deploy.
+**Status (2026-07-06):** Phases A–Y complete. Phase Y (edit song metadata — title/album/artist + cover art, issue #44) shipped 2026-07-06 at `v4.6.0` — depends on backend Phase O (`PATCH /library/song`, see backend ROADMAP O2). On-device smoke pending backend 4.6.0 deploy.
 
 **Conventions:**
 - TDD by default (CLAUDE.md §2) — widget tests / unit tests written first, land in the same commit as code.
