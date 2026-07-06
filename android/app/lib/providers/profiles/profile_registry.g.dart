@@ -6,7 +6,7 @@ part of 'profile_registry.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$profileRegistryHash() => r'9dbbc3a35873ccfb284c329c635834923ecab74e';
+String _$profileRegistryHash() => r'667ed7fb191512b9207c2318c770568a8c7d0755';
 
 /// Persistent list of [Profile]s plus the currently-active id.
 ///

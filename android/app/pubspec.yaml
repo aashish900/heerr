@@ -55,6 +55,11 @@ dependencies:
   # offline/offline_paths.dart to resolve the app-private documents dir.
   path_provider: ^2.1.0
 
+  # #37: gallery pick for the profile avatar. Downscales at pick time
+  # (maxWidth/maxHeight 512, quality 85) so the stored file stays small;
+  # uses the Android 13+ photo picker — no storage permission needed.
+  image_picker: ^1.1.0
+
   # A5: plain (non-secret) key-value store for the offline-download
   # preferences. These aren't secrets, so they were moved out of
   # flutter_secure_storage / EncryptedSharedPreferences to avoid the

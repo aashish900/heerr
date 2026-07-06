@@ -796,3 +796,27 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Trade-off:** Recommendations stay RAM-cached for the app's lifetime (20 tracks — negligible). `invalidateSelf` drops state to loading, so a refresh shows a brief skeleton flash; a keep-previous-data refinement can be layered later if it bothers.
 
 **Reference:** `android/app/lib/{providers/recommendations.dart, screens/home/home_screen.dart, screens/recommendations_screen.dart, app/lifecycle_coordinator.dart}`. Tests: `test/providers/{seed_sampling,recommendations_provider}_test.dart`, `test/screens/{home/home_screen,recommendations_screen}_test.dart`, `test/app/lifecycle_coordinator_test.dart`. CHANGELOG entry 2026-07-06.
+
+---
+
+## 2026-07-06 — Profile page: local-only metadata, prefs + file storage split (#37)
+
+**Context:** Issue #37 asks for a profile page with picture, name, optional nickname, and an optional 100-word bio; picture upload/change/remove with a size limit. Nothing server-side stores per-user display metadata (Navidrome has no bio/avatar surface the app consumes; the heerr backend is ingestion-only), so the feature is device-local, per profile.
+
+**Decision:**
+1. **Pure-client, local-only state.** Nickname + bio live in plain `shared_preferences` as `profile_meta_<profileId>` JSON (`ProfileMetaNotifier`, keepAlive, rebuilt on profile switch via `activeProfileProvider`). The avatar is a file at `<appDocs>/avatars/<profileId>_<micros>.jpg`. Name edits the existing `Profile.displayName` via a new in-place `ProfileRegistry.updateDisplayName` — it was already the handle shown in Settings.
+2. **Storage split per the A5 rule.** The keystore holds secrets only; nickname/bio are prefs, image bytes are files. Nothing new enters secure storage (displayName was already in the registry blob).
+3. **Fresh file path per avatar change.** Flutter's `FileImage` cache is path-keyed; writing the new picture under a new `<micros>` name (then sweeping old files) guarantees the UI never shows a stale image. Writes are atomic (tmp + rename, L1 pattern).
+4. **Size limit = downscale-at-pick + 2 MB backstop.** `image_picker` (512 px box, quality 85) makes any source photo small at pick time; `setAvatar` still rejects > `kMaxAvatarBytes` (2 MB) with `AvatarTooLargeError` → snackbar. The picker sits behind `profileImagePickerProvider` so widget tests never touch the platform channel.
+5. **Bio limit enforced at the input.** `WordLimitTextInputFormatter(100)` rejects over-limit edits (deletions always pass); a live counter renders in the field's helper text. No truncate-on-save ambiguity.
+6. **Entry point + nickname surface (user-selected).** A circular avatar button on the Home AppBar pushes the top-level `/profile` route; the nickname personalises the Home greeting ("Good evening, Al"). Blank name falls back to the Navidrome username so the Settings list never shows an empty row; blank nickname/bio persist as null.
+
+**Alternatives considered:**
+- **Extend `Profile` with nickname/bio/avatar fields.** One store, but pushes non-secrets into the keystore blob and bloats the registry JSON rewritten on every mutation. Rejected per A5.
+- **Server-side profile storage (backend endpoint or Navidrome).** No existing surface; a new backend phase for cosmetic device state violates "backend first only when the client needs it". Rejected — revisit only if profiles must roam across devices.
+- **Character limit instead of word limit.** Issue explicitly says 100 words.
+- **Hard reject on file size with no downscale.** Worse UX — modern phone photos are 3–10 MB, so most picks would fail. Rejected in the planning Q&A.
+
+**Trade-off:** Metadata doesn't roam — a re-install or second device starts blank (creds re-login already; meta is cosmetic). Avatar bytes aren't encrypted at rest, but they sit in app-private storage like cover art and offline audio.
+
+**Reference:** `android/app/lib/{screens/profile/profile_screen.dart, providers/profiles/{profile_meta,profile_avatar,profile_image_picker}.dart, models/profile_meta.dart, utils/word_limit.dart, providers/profiles/profile_registry.dart, screens/home/home_screen.dart, router.dart}`. Tests per the CHANGELOG entry. CHANGELOG 2026-07-06.

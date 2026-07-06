@@ -2249,3 +2249,18 @@ Delete from device / server / both verified on the Pixel against the home server
 - **`lib/screens/recommendations_screen.dart`** — AppBar action swapped to the shared button; grid dims to 40 % while a refresh is in flight (`when` already keeps previous data on refresh by default).
 - **New:** `test/widgets/recommendations_refresh_button_test.dart` — 3 tests (idle bare + tap fires refresh; busy tonal variant + tap no-op; `onBeforeRefresh` ordering).
 - Full suite 720 tests pass; `flutter analyze` clean.
+
+## 2026-07-06 — Profile page: avatar + name + nickname + bio (#37)
+
+- **New:** `lib/screens/profile/profile_screen.dart` — `/profile` full-screen page (top-level route, like `/player`): circular avatar with add/change/remove via a bottom sheet, Name field (edits `Profile.displayName` on the registry; blank falls back to the Navidrome username), Nickname field, Bio multiline field capped at 100 words with a live `N/100 words` counter. Everything optional.
+- **New:** `lib/models/profile_meta.dart` — freezed `ProfileMeta(nickname?, bio?)`.
+- **New:** `lib/providers/profiles/profile_meta.dart` — keepAlive notifier persisting meta as JSON in plain `shared_preferences` (`profile_meta_<profileId>`, A5 rule: keystore is for secrets only); per-profile via `activeProfileProvider` watch; blank→null; corrupt JSON→empty.
+- **New:** `lib/providers/profiles/profile_avatar.dart` — avatar file store at `<appDocs>/avatars/<profileId>_<micros>.jpg` (fresh path per change defeats `FileImage` cache staleness; atomic tmp+rename; old-file sweep; per-profile). `kMaxAvatarBytes` 2 MB backstop → `AvatarTooLargeError` → "Image too large" snackbar.
+- **New:** `lib/providers/profiles/profile_image_picker.dart` — gallery-pick seam; production impl uses `image_picker` (512 px box, quality 85 downscale at pick time).
+- **New:** `lib/utils/word_limit.dart` — `countWords` + `WordLimitTextInputFormatter` (rejects over-limit edits, allows deletions).
+- **`lib/providers/profiles/profile_registry.dart`** — new `updateDisplayName(id, name)` in-place mutator (preserves list order, unlike `addProfile`'s remove-and-append).
+- **`lib/screens/home/home_screen.dart`** — AppBar gains a profile avatar button (`home-profile-avatar`, pic or person glyph) → pushes `/profile`; greeting becomes "Good morning, <nickname>" when a nickname is set.
+- **`lib/router.dart`** — `Routes.profile` + top-level `/profile` route.
+- **`pubspec.yaml`** — add `image_picker: ^1.1.0` (Android 13+ photo picker; no storage permission).
+- **Tests (28 new):** `test/utils/word_limit_test.dart` (6), `test/providers/profiles/profile_meta_test.dart` (5), `test/providers/profiles/profile_avatar_test.dart` (6), `profile_registry_test.dart` (+2 updateDisplayName), `test/screens/profile/profile_screen_test.dart` (7: render, save, blank-name fallback, 100-word block, pick, remove, oversize snackbar), `test/screens/home/home_screen_test.dart` (+3: avatar routes, nickname greeting, plain greeting).
+- Full suite 748 tests pass; `flutter analyze` clean.

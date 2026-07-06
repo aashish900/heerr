@@ -284,5 +284,45 @@ void main() {
           await c.read(profileRegistryProvider.future);
       expect(s.activeId, isNull);
     });
+
+    group('updateDisplayName (#37)', () {
+      test('updates in place, preserving list order + persistence', () async {
+        final _FakeSecureStorage fake = _FakeSecureStorage();
+        final ProviderContainer c = _container(fake);
+        addTearDown(c.dispose);
+        final ProfileRegistry reg = c.read(profileRegistryProvider.notifier);
+        await reg.addProfile(_profile(id: 'p1', displayName: 'alice'));
+        await reg.addProfile(_profile(id: 'p2', displayName: 'bob'));
+
+        await reg.updateDisplayName('p1', 'Alice Cooper');
+
+        final ProfileRegistryState s =
+            await c.read(profileRegistryProvider.future);
+        expect(s.profiles.map((Profile p) => p.id), <String>['p1', 'p2'],
+            reason: 'in-place update must not reorder');
+        expect(s.profiles.first.displayName, 'Alice Cooper');
+
+        // Persisted — a fresh container reads the new name back.
+        final ProviderContainer c2 = _container(fake);
+        addTearDown(c2.dispose);
+        final ProfileRegistryState s2 =
+            await c2.read(profileRegistryProvider.future);
+        expect(s2.profiles.first.displayName, 'Alice Cooper');
+      });
+
+      test('unknown id is a no-op', () async {
+        final _FakeSecureStorage fake = _FakeSecureStorage();
+        final ProviderContainer c = _container(fake);
+        addTearDown(c.dispose);
+        final ProfileRegistry reg = c.read(profileRegistryProvider.notifier);
+        await reg.addProfile(_profile(id: 'p1', displayName: 'alice'));
+
+        await reg.updateDisplayName('nope', 'X');
+
+        final ProfileRegistryState s =
+            await c.read(profileRegistryProvider.future);
+        expect(s.profiles.single.displayName, 'alice');
+      });
+    });
   });
 }

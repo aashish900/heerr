@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:heerr/models/profile_meta.dart';
 import 'package:heerr/models/recommended_track.dart';
 import 'package:heerr/models/subsonic/album.dart';
 import 'package:heerr/models/subsonic/song.dart';
 import 'package:heerr/providers/home/home_providers.dart';
+import 'package:heerr/providers/profiles/profile_meta.dart';
 import 'package:heerr/providers/recommendations.dart';
 import 'package:heerr/screens/home/home_screen.dart';
 import 'package:heerr/widgets/home_grid_tile.dart';
@@ -49,6 +51,10 @@ GoRouter _testRouter() {
         path: '/queue',
         builder: (_, _) => const Scaffold(body: Text('Queue page')),
       ),
+      GoRoute(
+        path: '/profile',
+        builder: (_, _) => const Scaffold(body: Text('Profile page')),
+      ),
     ],
   );
 }
@@ -72,6 +78,14 @@ Widget _wrap({required List<Override> overrides}) {
 
 Album _album(String id, String name, {String? artist}) {
   return Album(id: id, name: name, artist: artist);
+}
+
+class _StubMeta extends ProfileMetaNotifier {
+  _StubMeta(this._nickname);
+  final String? _nickname;
+
+  @override
+  Future<ProfileMeta> build() async => ProfileMeta(nickname: _nickname);
 }
 
 void main() {
@@ -334,6 +348,58 @@ void main() {
       expect(find.text('Queue page'), findsOneWidget);
     },
   );
+
+  group('Profile entry point + nickname greeting (#37)', () {
+    List<Override> emptyHome() => <Override>[
+          homeRecentProvider.overrideWith((_) async => <Album>[]),
+          homeMostPlayedProvider.overrideWith((_) async => <Album>[]),
+          homeRandomSongsProvider.overrideWith((_) async => const <Never>[]),
+          homeRecommendationsProvider.overrideWith(
+            (_) async => (tracks: <RecommendedTrack>[], isFallback: true),
+          ),
+          recommendationsProvider.overrideWith(_StubRecs.new),
+        ];
+
+    testWidgets('AppBar shows a profile avatar that routes to /profile',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(overrides: emptyHome()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('home-profile-avatar')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Profile page'), findsOneWidget);
+    });
+
+    testWidgets('greeting appends the nickname when one is set',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(overrides: <Override>[
+        ...emptyHome(),
+        profileMetaNotifierProvider.overrideWith(() => _StubMeta('Al')),
+      ]));
+      await tester.pumpAndSettle();
+
+      final AppBar bar = tester.widget<AppBar>(find.byType(AppBar));
+      final String title = (bar.title! as Text).data!;
+      expect(title, endsWith(', Al'));
+    });
+
+    testWidgets('greeting stays plain without a nickname',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(overrides: <Override>[
+        ...emptyHome(),
+        profileMetaNotifierProvider.overrideWith(() => _StubMeta(null)),
+      ]));
+      await tester.pumpAndSettle();
+
+      final AppBar bar = tester.widget<AppBar>(find.byType(AppBar));
+      final String title = (bar.title! as Text).data!;
+      expect(
+        <String>['Good morning', 'Good afternoon', 'Good evening'],
+        contains(title),
+      );
+    });
+  });
 
   group('For You refresh (#38)', () {
     testWidgets('Picked for you header shows a refresh icon',

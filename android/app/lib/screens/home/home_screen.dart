@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +8,8 @@ import '../../models/recommended_track.dart';
 import '../../models/subsonic/album.dart';
 import '../../providers/home/home_providers.dart';
 import '../../providers/library/library_search_query.dart';
+import '../../providers/profiles/profile_avatar.dart';
+import '../../providers/profiles/profile_meta.dart';
 import '../../providers/recommendations.dart';
 import '../../router.dart' show Routes;
 import '../../widgets/empty_state.dart';
@@ -71,7 +75,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final String greeting = greetingForHour(DateTime.now().hour);
+    // #37: personalise the greeting with the profile nickname when set.
+    final String? nickname =
+        ref.watch(profileMetaNotifierProvider).valueOrNull?.nickname;
+    final String greeting = nickname == null
+        ? greetingForHour(DateTime.now().hour)
+        : '${greetingForHour(DateTime.now().hour)}, $nickname';
     return Scaffold(
       appBar: AppBar(
         title: Text(greeting),
@@ -81,11 +90,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             tooltip: 'Queue',
             onPressed: () => context.go(Routes.queue),
           ),
+          const _ProfileAvatarButton(),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: () => _refresh(ref),
         child: const _HomeBody(),
+      ),
+    );
+  }
+}
+
+/// Profile entry point (#37): a small circular avatar in the Home AppBar —
+/// the profile picture when one is set, a person glyph otherwise. Taps push
+/// the full-screen `/profile` page.
+class _ProfileAvatarButton extends ConsumerWidget {
+  const _ProfileAvatarButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final File? avatar = ref.watch(profileAvatarProvider).valueOrNull;
+    return IconButton(
+      key: const Key('home-profile-avatar'),
+      tooltip: 'Profile',
+      onPressed: () => context.push(Routes.profile),
+      icon: CircleAvatar(
+        radius: 15,
+        foregroundImage: avatar != null ? FileImage(avatar) : null,
+        child: avatar == null
+            ? const Icon(Icons.person_outline, size: 18)
+            : null,
       ),
     );
   }

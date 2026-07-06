@@ -15,6 +15,7 @@ import 'screens/library/library_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/library/playlist_detail_screen.dart';
 import 'screens/player/now_playing_screen.dart';
+import 'screens/profile/profile_screen.dart';
 import 'screens/queue_screen.dart';
 import 'screens/recommendations_screen.dart';
 import 'screens/settings_screen.dart';
@@ -30,6 +31,7 @@ class Routes {
   static const String queue = '/queue';
   static const String settings = '/settings';
   static const String login = '/login';
+  static const String profile = '/profile';
 
   // Library detail (Subsonic via Navidrome). Nested under the library
   // route so the URL shape and the navigation hierarchy match.
@@ -162,6 +164,12 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
         path: '/player',
         builder: (BuildContext context, GoRouterState state) =>
             const NowPlayingScreen(),
+      ),
+      // Profile page (#37) — top-level full-screen push, like Now Playing.
+      GoRoute(
+        path: Routes.profile,
+        builder: (BuildContext context, GoRouterState state) =>
+            const ProfileScreen(),
       ),
     ],
   );

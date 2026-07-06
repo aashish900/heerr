@@ -113,6 +113,27 @@ class ProfileRegistry extends _$ProfileRegistry {
     state = AsyncData((profiles: next, activeId: current.activeId));
   }
 
+  /// Rename the profile with [id] in place (#37 — profile page Name edit).
+  /// Preserves list order (unlike [addProfile]'s remove-and-append). No-op
+  /// if [id] is not in the registry.
+  Future<void> updateDisplayName(String id, String displayName) async {
+    final ProfileRegistryState current = await future;
+    bool changed = false;
+    final List<Profile> next = <Profile>[
+      for (final Profile p in current.profiles)
+        if (p.id == id)
+          (() {
+            changed = true;
+            return p.copyWith(displayName: displayName);
+          })()
+        else
+          p,
+    ];
+    if (!changed) return;
+    await _writeIndex(next);
+    state = AsyncData((profiles: next, activeId: current.activeId));
+  }
+
   Future<void> _writeIndex(List<Profile> profiles) async {
     final SecureStorage store = ref.read(secureStorageProvider);
     final String json = jsonEncode(<String, Object?>{
