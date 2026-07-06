@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -398,6 +400,73 @@ void main() {
         <String>['Good morning', 'Good afternoon', 'Good evening'],
         contains(title),
       );
+    });
+  });
+
+  group('Network error state (#45)', () {
+    List<Override> allFailing() => <Override>[
+          homeRecentProvider.overrideWith(
+              (_) async => throw const SocketException('no network')),
+          homeMostPlayedProvider.overrideWith(
+              (_) async => throw const SocketException('no network')),
+          homeRandomSongsProvider.overrideWith(
+              (_) async => throw const SocketException('no network')),
+          homeRecommendationsProvider.overrideWith(
+              (_) async => throw const SocketException('no network')),
+          recommendationsProvider.overrideWith(_StubRecs.new),
+        ];
+
+    testWidgets("all providers fail → 'Can't reach server' shown",
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(overrides: allFailing()));
+      await tester.pumpAndSettle();
+
+      expect(find.text("Can't reach server"), findsOneWidget);
+      expect(find.text('Check that Tailscale is connected.'), findsOneWidget);
+    });
+
+    testWidgets('all providers fail → Retry button present',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(overrides: allFailing()));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('home-retry-button')), findsOneWidget);
+    });
+
+    testWidgets('tapping Retry re-fetches providers',
+        (WidgetTester tester) async {
+      int recentFetchCount = 0;
+      await tester.pumpWidget(_wrap(overrides: <Override>[
+        homeRecentProvider.overrideWith((_) async {
+          recentFetchCount++;
+          throw const SocketException('no network');
+        }),
+        homeMostPlayedProvider.overrideWith(
+            (_) async => throw const SocketException('no network')),
+        homeRandomSongsProvider.overrideWith(
+            (_) async => throw const SocketException('no network')),
+        homeRecommendationsProvider.overrideWith(
+            (_) async => throw const SocketException('no network')),
+        recommendationsProvider.overrideWith(_StubRecs.new),
+      ]));
+      await tester.pumpAndSettle();
+      expect(recentFetchCount, 1);
+
+      await tester.tap(find.byKey(const Key('home-retry-button')));
+      await tester.pumpAndSettle();
+
+      expect(recentFetchCount, greaterThanOrEqualTo(2));
+    });
+
+    testWidgets('error state is scrollable (RefreshIndicator still works)',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(overrides: allFailing()));
+      await tester.pumpAndSettle();
+
+      // The RefreshIndicator wraps _HomeBody; even in the error state the
+      // body must expose a scrollable so pull-to-refresh is reachable.
+      expect(find.byType(RefreshIndicator), findsOneWidget);
+      expect(find.byType(ListView), findsWidgets);
     });
   });
 

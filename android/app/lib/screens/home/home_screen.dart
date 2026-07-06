@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -125,11 +126,87 @@ class _ProfileAvatarButton extends ConsumerWidget {
   }
 }
 
-class _HomeBody extends ConsumerWidget {
+class _HomeBody extends ConsumerStatefulWidget {
   const _HomeBody();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_HomeBody> createState() => _HomeBodyState();
+}
+
+class _HomeBodyState extends ConsumerState<_HomeBody> {
+  // Auto-retry: fire every 5 s, up to 6 attempts (30 s ceiling).
+  // After exhaustion the user must tap Retry manually.
+  static const int _kMaxAutoRetries = 6;
+  static const Duration _kAutoRetryInterval = Duration(seconds: 5);
+
+  int _autoRetryCount = 0;
+  Timer? _retryTimer;
+
+  @override
+  void dispose() {
+    _retryTimer?.cancel();
+    super.dispose();
+  }
+
+  void _scheduleAutoRetry() {
+    if (_retryTimer?.isActive ?? false) return;
+    if (_autoRetryCount >= _kMaxAutoRetries) return;
+    _retryTimer = Timer(_kAutoRetryInterval, () {
+      if (!mounted) return;
+      setState(() => _autoRetryCount++);
+      _invalidateAll();
+    });
+  }
+
+  void _cancelAutoRetry({bool resetCount = false}) {
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    if (resetCount) setState(() => _autoRetryCount = 0);
+  }
+
+  void _invalidateAll() {
+    ref.invalidate(homeRecentProvider);
+    ref.invalidate(homeMostPlayedProvider);
+    ref.invalidate(homeRandomSongsProvider);
+    ref.invalidate(homeRecommendationsProvider);
+  }
+
+  void _manualRetry() {
+    _cancelAutoRetry(resetCount: true);
+    _invalidateAll();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Use homeRecentProvider as the canonical network signal. When it
+    // enters error state, schedule the auto-retry timer. When it enters
+    // loading or data, cancel (data also resets the counter).
+    ref.listen<AsyncValue<List<Album>>>(
+      homeRecentProvider,
+      (_, AsyncValue<List<Album>> next) {
+        if (next.hasError) {
+          _scheduleAutoRetry();
+        } else {
+          _cancelAutoRetry(resetCount: next.hasValue);
+        }
+      },
+    );
+
+    final AsyncValue<List<Album>> recent = ref.watch(homeRecentProvider);
+    final AsyncValue<List<Album>> mostPlayed = ref.watch(homeMostPlayedProvider);
+    final AsyncValue<HomeRecommendations> recs =
+        ref.watch(homeRecommendationsProvider);
+
+    final bool allFailed =
+        recent.hasError && mostPlayed.hasError && recs.hasError;
+
+    if (allFailed) {
+      return _NetworkErrorBody(
+        autoRetrying: _autoRetryCount < _kMaxAutoRetries,
+        onRetry: _manualRetry,
+      );
+    }
+
     return ListView(
       // AlwaysScrollable so the RefreshIndicator works even when content
       // doesn't fill the viewport (e.g. on the full-empty home state).
@@ -141,6 +218,74 @@ class _HomeBody extends ConsumerWidget {
         _JumpBackInSection(),
         _MostPlayedSection(),
         _RecommendationsSection(),
+      ],
+    );
+  }
+}
+
+/// Shown when all Home providers fail simultaneously (e.g. Tailscale off).
+/// Wrapped in a scrollable list so the parent [RefreshIndicator] still
+/// responds to pull-down gestures alongside the manual Retry button.
+class _NetworkErrorBody extends StatelessWidget {
+  const _NetworkErrorBody({
+    required this.autoRetrying,
+    required this.onRetry,
+  });
+
+  final bool autoRetrying;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    final TextTheme tt = Theme.of(context).textTheme;
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: <Widget>[
+        SizedBox(
+          height: MediaQuery.of(context).size.height * 0.65,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Icon(Icons.wifi_off_outlined,
+                      size: 56, color: cs.onSurfaceVariant),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Can't reach server",
+                    style: tt.titleLarge,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Check that Tailscale is connected.',
+                    style: tt.bodyMedium
+                        ?.copyWith(color: cs.onSurfaceVariant),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  if (autoRetrying)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        'Retrying automatically…',
+                        style: tt.bodySmall
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                    ),
+                  FilledButton.icon(
+                    key: const Key('home-retry-button'),
+                    onPressed: onRetry,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }

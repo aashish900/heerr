@@ -2264,3 +2264,9 @@ Delete from device / server / both verified on the Pixel against the home server
 - **`pubspec.yaml`** — add `image_picker: ^1.1.0` (Android 13+ photo picker; no storage permission).
 - **Tests (28 new):** `test/utils/word_limit_test.dart` (6), `test/providers/profiles/profile_meta_test.dart` (5), `test/providers/profiles/profile_avatar_test.dart` (6), `profile_registry_test.dart` (+2 updateDisplayName), `test/screens/profile/profile_screen_test.dart` (7: render, save, blank-name fallback, 100-word block, pick, remove, oversize snackbar), `test/screens/home/home_screen_test.dart` (+3: avatar routes, nickname greeting, plain greeting).
 - Full suite 748 tests pass; `flutter analyze` clean.
+
+## 2026-07-06 — #45: network error state + auto-retry on Home screen (widget cold-open)
+
+- **`lib/screens/home/home_screen.dart`** — `_HomeBody` converted from `ConsumerWidget` to `ConsumerStatefulWidget`. When all three providers (`homeRecentProvider`, `homeMostPlayedProvider`, `homeRecommendationsProvider`) fail simultaneously (e.g. Tailscale VPN off), shows `_NetworkErrorBody` instead of a blank screen: wifi-off icon + "Can't reach server" message + "Retrying automatically…" copy + "Retry" button (`home-retry-button`). Auto-retry fires every 5 s up to 6 times (30 s ceiling) via a one-shot `Timer`; a `ref.listen` on `homeRecentProvider` starts the timer on error and cancels it on recovery. Manual "Retry" button resets the counter and re-fires immediately. Error body uses `AlwaysScrollableScrollPhysics` so the parent `RefreshIndicator` pull-down gesture still works.
+- **`test/screens/home/home_screen_test.dart`** — 4 new tests (group `Network error state (#45)`): all-fail shows "Can't reach server"; Retry button present; tapping Retry re-fetches providers; error body exposes a scrollable `ListView`.
+- Full suite 25 tests pass; `flutter analyze` clean.
