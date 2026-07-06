@@ -2241,3 +2241,11 @@ Delete from device / server / both verified on the Pixel against the home server
 - **`test/screens/home/home_screen_test.dart`** — 4 new tests (header icon renders; tap refreshes; Discover tap re-fetches random songs; mount fires `refreshIfStale`).
 - **`test/app/lifecycle_coordinator_test.dart`** — 1 new test (resume → `refreshIfStale` on `Recommendations`).
 - Full suite 717 tests pass; `flutter analyze` clean.
+
+## 2026-07-06 — For You refresh button redesign: tint-on-busy + spin + dim (#38 follow-up)
+
+- **New:** `lib/widgets/recommendations_refresh_button.dart` — `RecommendationsRefreshButton`: bare white `IconButton` at rest (matches other AppBar/header icons); while `recommendationsProvider` is loading it swaps to `IconButton.filledTonal` (the tint *is* the busy indicator) with the refresh icon spinning (`RotationTransition`, 900 ms loop, finishes the current turn on stop). Busy-variant taps are deliberate no-ops (never `onPressed: null`, so no disabled-grey flash). Optional `onBeforeRefresh` callback.
+- **`lib/screens/home/home_screen.dart`** — `_RecommendationsSection` header uses the new button (Discover fallback passes `onBeforeRefresh` to invalidate `homeRandomSongsProvider`). Section `when` gains `skipLoadingOnReload: true` + `skipError: true`: a refresh keeps the previous cards visible (dimmed to 40 % via `AnimatedOpacity`) instead of the skeleton flash; a failed refresh keeps them too, surfaced once per error class via a new `reactToApiError` listen.
+- **`lib/screens/recommendations_screen.dart`** — AppBar action swapped to the shared button; grid dims to 40 % while a refresh is in flight (`when` already keeps previous data on refresh by default).
+- **New:** `test/widgets/recommendations_refresh_button_test.dart` — 3 tests (idle bare + tap fires refresh; busy tonal variant + tap no-op; `onBeforeRefresh` ordering).
+- Full suite 720 tests pass; `flutter analyze` clean.

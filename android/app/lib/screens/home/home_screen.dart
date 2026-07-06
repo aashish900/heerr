@@ -9,6 +9,8 @@ import '../../providers/library/library_search_query.dart';
 import '../../providers/recommendations.dart';
 import '../../router.dart' show Routes;
 import '../../widgets/empty_state.dart';
+import '../../widgets/error_snackbar.dart';
+import '../../widgets/recommendations_refresh_button.dart';
 import '../../widgets/home_grid_tile.dart';
 import '../../widgets/home_recommendation_card.dart';
 import '../../widgets/home_section.dart';
@@ -255,7 +257,18 @@ class _RecommendationsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<HomeRecommendations> async =
         ref.watch(homeRecommendationsProvider);
+    // #38: a failed refresh keeps the previous cards on screen (skipError
+    // below) — surface the failure once per error class instead.
+    ref.listen(homeRecommendationsProvider,
+        (AsyncValue<HomeRecommendations>? prev,
+                AsyncValue<HomeRecommendations> next) =>
+            reactToApiError(context, prev, next));
     return async.when(
+      // #38: on refresh, keep showing the previous picks (dimmed via the
+      // AnimatedOpacity below) instead of dropping to the skeleton. The
+      // skeleton still renders on first load (no previous value).
+      skipLoadingOnReload: true,
+      skipError: true,
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
         child: SkeletonBox(width: double.infinity, height: 280),
@@ -283,32 +296,35 @@ class _RecommendationsSection extends ConsumerWidget {
                     // the seed collection so successive taps differ. On the
                     // Discover fallback, also reshuffle the random songs the
                     // section is actually showing.
-                    IconButton(
+                    RecommendationsRefreshButton(
                       key: const Key('home-recs-refresh'),
-                      icon: const Icon(Icons.refresh),
-                      tooltip: 'New recommendations',
-                      onPressed: () {
-                        ref.read(recommendationsProvider.notifier).refresh();
-                        if (data.isFallback) {
-                          ref.invalidate(homeRandomSongsProvider);
-                        }
-                      },
+                      onBeforeRefresh: data.isFallback
+                          ? () => ref.invalidate(homeRandomSongsProvider)
+                          : null,
                     ),
                   ],
                 ),
               ),
-              SizedBox(
-                height: 280,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: data.tracks.length,
-                  separatorBuilder: (_, _) =>
-                      const SizedBox(width: _kCardSpacing),
-                  itemBuilder: (BuildContext c, int i) =>
-                      HomeRecommendationCard(
-                    track: data.tracks[i],
-                    width: _kCardWidth,
+              // #38: dim the previous picks while a refresh is in flight —
+              // paired with skipLoadingOnReload above, so the cards stay
+              // visible (no skeleton flash) and the spin/dim signal "new
+              // ones coming".
+              AnimatedOpacity(
+                opacity: async.isLoading ? 0.4 : 1,
+                duration: const Duration(milliseconds: 200),
+                child: SizedBox(
+                  height: 280,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: data.tracks.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(width: _kCardSpacing),
+                    itemBuilder: (BuildContext c, int i) =>
+                        HomeRecommendationCard(
+                      track: data.tracks[i],
+                      width: _kCardWidth,
+                    ),
                   ),
                 ),
               ),

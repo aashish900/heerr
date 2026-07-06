@@ -8,6 +8,7 @@ import '../models/recommended_track.dart';
 import '../providers/recommendations.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/home_recommendation_card.dart';
+import '../widgets/recommendations_refresh_button.dart';
 import '../widgets/skeleton.dart';
 
 /// "For You" — Phase N3. Reads [recommendationsProvider], renders
@@ -47,15 +48,13 @@ class _RecommendationsScreenState extends ConsumerState<RecommendationsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('For You'),
-        actions: <Widget>[
+        actions: const <Widget>[
           // #38 — explicit "fetch new recommendations". Re-samples the seed
-          // collection, so successive taps return different results.
-          IconButton(
-            key: const Key('for-you-refresh'),
-            icon: const Icon(Icons.refresh),
+          // collection, so successive taps return different results. Bare
+          // white icon at rest; tonal disc + spin while fetching.
+          RecommendationsRefreshButton(
+            key: Key('for-you-refresh'),
             tooltip: 'Refresh',
-            onPressed: () =>
-                ref.read(recommendationsProvider.notifier).refresh(),
           ),
         ],
       ),
@@ -78,20 +77,27 @@ class _RecommendationsScreenState extends ConsumerState<RecommendationsScreen> {
             const double spacing = 12;
             final double cardWidth =
                 (MediaQuery.of(context).size.width - padding * 2 - spacing) / 2;
-            return GridView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(padding),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: spacing,
-                crossAxisSpacing: spacing,
-                // cover (cardWidth tall) + 8 gap + two text lines (~52).
-                childAspectRatio: cardWidth / (cardWidth + 56),
-              ),
-              itemCount: tracks.length,
-              itemBuilder: (BuildContext c, int i) => HomeRecommendationCard(
-                track: tracks[i],
-                width: cardWidth,
+            // #38: `when` skips loading on refresh by default, so the
+            // previous grid stays visible during a refresh — dim it while
+            // the fetch is in flight (matches the Home section).
+            return AnimatedOpacity(
+              opacity: async.isLoading ? 0.4 : 1,
+              duration: const Duration(milliseconds: 200),
+              child: GridView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(padding),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: spacing,
+                  crossAxisSpacing: spacing,
+                  // cover (cardWidth tall) + 8 gap + two text lines (~52).
+                  childAspectRatio: cardWidth / (cardWidth + 56),
+                ),
+                itemCount: tracks.length,
+                itemBuilder: (BuildContext c, int i) => HomeRecommendationCard(
+                  track: tracks[i],
+                  width: cardWidth,
+                ),
               ),
             );
           },
