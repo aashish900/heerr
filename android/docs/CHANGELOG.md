@@ -2194,6 +2194,12 @@ Completes issue #41 (device-only delete shipped in `64c8e47`). Consumes backend 
 - **`test/screens/player/now_playing_add_to_playlist_test.dart`** — added `_NullOfflinePaths` subclass overriding `serverRoot → null`; overrides `offlinePathsProvider` to cut dart:io `file.exists()` call that hangs `pumpAndSettle` under fake-async (real OS I/O is never drained by Flutter's fake-async pump loop).
 - All 33 player tests pass; `flutter analyze` clean.
 
+## 2026-07-06 — Transport buttons matched to reference screenshot
+
+- **`lib/screens/player/now_playing_transport.dart`** — play/pause is now a big filled circle (`IconButton.filled`, `onSurface` background, plain `play_arrow_rounded`/`pause_rounded` glyph); shuffle/repeat reverted from pill-when-active to bare icons tinted `primary` when active.
+- **`test/screens/player/now_playing_screen_test.dart`** — play/pause assertions updated for the new glyphs.
+- All 33 player tests pass; `flutter analyze` clean. Tagged `v4.3.0-rc3`.
+
 ## 2026-07-05 — W1 smoke verified on-device (v4.2.0)
 
 Delete from device / server / both verified on the Pixel against the home server (backend N1+N2 deployed). Smoke surfaced two operator prerequisites, now documented in ROADMAP Phase W + backend N2: Navidrome must report real paths (`ND_SUBSONIC_DEFAULTREPORTREALPATH=true` + per-player "Report Real Path" on `heerr [Dart]`), and the app needs one re-search so the L5 cache drops pre-flag virtual paths. Tagged `v4.2.0`.

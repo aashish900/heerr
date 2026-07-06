@@ -92,19 +92,12 @@ class _Transport extends ConsumerWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: <Widget>[
-        // Shuffle: pill-shaped filled background when active.
+        // Shuffle: bare icon, accent-tinted when active (Spotify-style).
         IconButton(
           iconSize: 26,
           tooltip: shuffleOn ? 'Shuffle on' : 'Shuffle off',
           icon: const Icon(Icons.shuffle_rounded),
-          style: shuffleOn
-              ? IconButton.styleFrom(
-                  backgroundColor: cs.primaryContainer,
-                  foregroundColor: cs.onPrimaryContainer,
-                  shape: const StadiumBorder(),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                )
-              : IconButton.styleFrom(foregroundColor: cs.onSurfaceVariant),
+          color: shuffleOn ? cs.primary : cs.onSurfaceVariant,
           onPressed: () {
             final HeerrAudioHandler h = ref.read(audioHandlerProvider);
             h.setShuffleMode(shuffleOn
@@ -118,11 +111,18 @@ class _Transport extends ConsumerWidget {
           icon: const Icon(Icons.skip_previous_rounded),
           onPressed: () => ref.read(audioHandlerProvider).skipToPrevious(),
         ),
-        IconButton(
-          iconSize: 56,
+        // Big filled circle (white in the dark theme) with a plain glyph,
+        // matching the reference layout.
+        IconButton.filled(
+          iconSize: 40,
           tooltip: playing ? 'Pause' : 'Play',
+          style: IconButton.styleFrom(
+            backgroundColor: cs.onSurface,
+            foregroundColor: cs.surface,
+            padding: const EdgeInsets.all(12),
+          ),
           icon: Icon(
-            playing ? Icons.pause_circle_filled : Icons.play_circle_fill,
+            playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
           ),
           onPressed: () {
             final HeerrAudioHandler h = ref.read(audioHandlerProvider);
@@ -139,7 +139,7 @@ class _Transport extends ConsumerWidget {
           icon: const Icon(Icons.skip_next_rounded),
           onPressed: () => ref.read(audioHandlerProvider).skipToNext(),
         ),
-        // Repeat: pill-shaped filled background when active.
+        // Repeat: bare icon, accent-tinted when active (Spotify-style).
         IconButton(
           iconSize: 26,
           tooltip: repeatMode == AudioServiceRepeatMode.one
@@ -150,14 +150,7 @@ class _Transport extends ConsumerWidget {
           icon: Icon(repeatMode == AudioServiceRepeatMode.one
               ? Icons.repeat_one_rounded
               : Icons.repeat_rounded),
-          style: repeatOn
-              ? IconButton.styleFrom(
-                  backgroundColor: cs.primaryContainer,
-                  foregroundColor: cs.onPrimaryContainer,
-                  shape: const StadiumBorder(),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                )
-              : IconButton.styleFrom(foregroundColor: cs.onSurfaceVariant),
+          color: repeatOn ? cs.primary : cs.onSurfaceVariant,
           onPressed: () => ref
               .read(audioHandlerProvider)
               .setRepeatMode(_nextRepeat(repeatMode)),

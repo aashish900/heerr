@@ -162,9 +162,9 @@ void main() {
     expect(find.text('Artist A'), findsOneWidget);
     // duration 3:30
     expect(find.text('3:30'), findsOneWidget);
-    // paused → play_circle_fill on the centre transport.
-    expect(find.byIcon(Icons.play_circle_fill), findsOneWidget);
-    expect(find.byIcon(Icons.pause_circle_filled), findsNothing);
+    // paused → play glyph on the centre filled-circle transport button.
+    expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.pause_rounded), findsNothing);
   });
 
   testWidgets('renders pause icon when playing',
@@ -173,8 +173,8 @@ void main() {
       snapshot: _snap(item: _item(), playing: true),
     ));
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.pause_circle_filled), findsOneWidget);
-    expect(find.byIcon(Icons.play_circle_fill), findsNothing);
+    expect(find.byIcon(Icons.pause_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.play_arrow_rounded), findsNothing);
   });
 
   testWidgets('renders queue items with current track marked',
