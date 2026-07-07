@@ -4,7 +4,7 @@ Track progress through the backend build. Each milestone = one git commit with a
 
 See `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file is the *how* / *when*.
 
-**Status (2026-07-07):** Phases A–O complete. Phase O (song metadata edit, issue #44) shipped 2026-07-06 at `4.6.2`; `4.6.4` (2026-07-07) is a UI-only patch (custom download icon). Home-server smoke pending deploy.
+**Status (2026-07-07):** Phases A–O complete. Phase O (song metadata edit, issue #44) shipped 2026-07-06 at `4.6.2`; `4.6.7` (2026-07-07) replaces the app icon with the heerr H-logo on a black background.
 
 **Conventions:**
 - TDD per CLAUDE.md §2 — tests written first, land in same commit as code.
