@@ -15,6 +15,7 @@ import 'screens/library/library_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/library/playlist_detail_screen.dart';
 import 'screens/player/now_playing_screen.dart';
+import 'screens/profile/edit_server_details_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/queue_screen.dart';
 import 'screens/recommendations_screen.dart';
@@ -32,6 +33,7 @@ class Routes {
   static const String settings = '/settings';
   static const String login = '/login';
   static const String profile = '/profile';
+  static const String editServerDetails = '/edit-server-details';
 
   // Library detail (Subsonic via Navidrome). Nested under the library
   // route so the URL shape and the navigation hierarchy match.
@@ -170,6 +172,12 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
         path: Routes.profile,
         builder: (BuildContext context, GoRouterState state) =>
             const ProfileScreen(),
+      ),
+      // Edit server details — reached from the Profile page 3-dot menu.
+      GoRoute(
+        path: Routes.editServerDetails,
+        builder: (BuildContext context, GoRouterState state) =>
+            const EditServerDetailsScreen(),
       ),
     ],
   );

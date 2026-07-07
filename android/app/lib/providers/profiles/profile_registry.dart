@@ -134,6 +134,41 @@ class ProfileRegistry extends _$ProfileRegistry {
     state = AsyncData((profiles: next, activeId: current.activeId));
   }
 
+  /// Update the server credentials for profile [id] in place. Also refreshes
+  /// the heerr bearer token (the caller must have just called authLogin to
+  /// obtain [heerrBearerToken] and the echoed-back [navidromeBaseUrl]).
+  /// Preserves list order. No-op if [id] is not in the registry.
+  Future<void> updateServerDetails(
+    String id, {
+    required String heerrBaseUrl,
+    required String heerrBearerToken,
+    required String navidromeBaseUrl,
+    required String navidromeUsername,
+    required String navidromePassword,
+  }) async {
+    final ProfileRegistryState current = await future;
+    bool changed = false;
+    final List<Profile> next = <Profile>[
+      for (final Profile p in current.profiles)
+        if (p.id == id)
+          (() {
+            changed = true;
+            return p.copyWith(
+              heerrBaseUrl: heerrBaseUrl,
+              heerrBearerToken: heerrBearerToken,
+              navidromeBaseUrl: navidromeBaseUrl,
+              navidromeUsername: navidromeUsername,
+              navidromePassword: navidromePassword,
+            );
+          })()
+        else
+          p,
+    ];
+    if (!changed) return;
+    await _writeIndex(next);
+    state = AsyncData((profiles: next, activeId: current.activeId));
+  }
+
   Future<void> _writeIndex(List<Profile> profiles) async {
     final SecureStorage store = ref.read(secureStorageProvider);
     final String json = jsonEncode(<String, Object?>{

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../models/profile.dart';
 import '../../models/profile_meta.dart';
@@ -11,7 +12,10 @@ import '../../providers/profiles/profile_avatar.dart';
 import '../../providers/profiles/profile_image_picker.dart';
 import '../../providers/profiles/profile_meta.dart';
 import '../../providers/profiles/profile_registry.dart';
+import '../../router.dart';
 import '../../utils/word_limit.dart';
+
+enum _ProfileMenuAction { editServerDetails }
 
 /// Bio word cap (#37).
 const int kBioMaxWords = 100;
@@ -137,7 +141,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (meta != null) _seedMeta(meta);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(
+        title: const Text('Profile'),
+        actions: <Widget>[
+          PopupMenuButton<_ProfileMenuAction>(
+            onSelected: (_ProfileMenuAction action) {
+              switch (action) {
+                case _ProfileMenuAction.editServerDetails:
+                  context.push(Routes.editServerDetails);
+              }
+            },
+            itemBuilder: (BuildContext context) =>
+                <PopupMenuEntry<_ProfileMenuAction>>[
+              const PopupMenuItem<_ProfileMenuAction>(
+                value: _ProfileMenuAction.editServerDetails,
+                child: Text('Edit server details'),
+              ),
+            ],
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: <Widget>[

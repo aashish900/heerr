@@ -2286,3 +2286,11 @@ Delete from device / server / both verified on the Pixel against the home server
 - **`lib/screens/library/{album_detail,playlist_detail,library_search_results}`** — pass `editMetadataSong: s` alongside the existing `deleteFromServerSong: s` on the song-row long-press.
 - **`pubspec.yaml`** → `4.3.0`.
 - **Tests:** `test/screens/library/edit_song_metadata_test.dart` (new, 6: prefill, Save-disabled-until-change, changed-fields-only, original-value-is-not-a-change, cover pick sends bytes, success pops + snackbar); `test/widgets/add_to_playlist_edit_metadata_test.dart` (new, 4: render/hide rules, tap closes sheet + pushes screen). Full suite green; `flutter analyze` clean; `build_runner` clean. On-device smoke pending backend 3.3.0 deploy.
+
+## 2026-07-07 — Edit server details from Profile 3-dot menu
+
+- **`lib/providers/profiles/profile_registry.dart`** — added `updateServerDetails()` method: updates `heerrBaseUrl`, `heerrBearerToken`, `navidromeBaseUrl`, `navidromeUsername`, `navidromePassword` in-place for a given profile id, writes secure storage, emits new state.
+- **`lib/screens/profile/edit_server_details_screen.dart`** (new) — `EditServerDetailsScreen`: pre-fills heerr URL, Navidrome username, and password from the active profile; "Test connection" calls `authLogin` and shows success/error snackbar without saving; "Save" calls `authLogin` to get a fresh token then calls `updateServerDetails` and pops.
+- **`lib/router.dart`** — added `Routes.editServerDetails = '/edit-server-details'`; registered the new `GoRoute` for it.
+- **`lib/screens/profile/profile_screen.dart`** — added `PopupMenuButton` to AppBar with "Edit server details" item that pushes `Routes.editServerDetails`; added `_ProfileMenuAction` enum; added `go_router` import.
+- `flutter analyze` clean; all 774 tests pass.
