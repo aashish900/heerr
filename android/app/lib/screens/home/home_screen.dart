@@ -31,7 +31,7 @@ String greetingForHour(int hour) {
   return 'Good evening';
 }
 
-/// Spotify-style Home: greeting + quick-access grid + horizontal sections.
+/// Home screen: greeting + quick-access grid + horizontal sections.
 ///
 /// Layout:
 ///   - AppBar greeting + Queue shortcut.

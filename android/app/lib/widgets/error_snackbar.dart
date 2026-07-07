@@ -42,7 +42,7 @@ SnackBar buildApiErrorSnackBar(ApiError error, {String? action}) {
       ),
     RateLimitedError(retryAfter: final Duration retryAfter) => SnackBar(
         content:
-            Text('Spotify rate-limited — retry in ${retryAfter.inSeconds}s'),
+            Text('Rate-limited — retry in ${retryAfter.inSeconds}s'),
         duration: Duration(seconds: retryAfter.inSeconds.clamp(2, 10)),
       ),
     NetworkError() => const SnackBar(

@@ -14,7 +14,7 @@ import 'package:flutter/foundation.dart';
 /// Retries on:
 ///   * connection / send / receive timeouts and connection errors (the request
 ///     likely never reached or never completed) — exponential backoff.
-///   * HTTP 503 — the backend forwards Spotify's upstream rate-limit. Honours
+///   * HTTP 503 — the backend forwards an upstream rate-limit. Honours
 ///     `Retry-After` when present, but only retries when the suggested wait is
 ///     short ([maxRetryAfter]); a long rate-limit is left to surface as a
 ///     `RateLimitedError` so the user sees the real countdown instead of the

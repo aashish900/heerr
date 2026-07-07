@@ -41,14 +41,14 @@ final class UnprocessableError extends ApiError {
   String get message => detail ?? 'invalid request';
 }
 
-/// 503 — upstream Spotify rate-limit. Backend forwards `Retry-After` from
-/// Spotify; we parse it for the retry banner.
+/// 503 — upstream rate-limit. Backend forwards `Retry-After`; we parse it
+/// for the retry banner.
 final class RateLimitedError extends ApiError {
   const RateLimitedError({required this.retryAfter, super.detail});
   final Duration retryAfter;
   @override
   String get message =>
-      detail ?? 'Spotify rate-limited — retry in ${retryAfter.inSeconds}s';
+      detail ?? 'Rate-limited — retry in ${retryAfter.inSeconds}s';
 }
 
 /// Network failure — DNS, TCP, TLS, timeout, etc. UI: snackbar "can't reach

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'library_cover_art.dart';
 
-/// Horizontal Spotify-style section: bold header + horizontal-scroll row of
+/// Horizontal section: bold header + horizontal-scroll row of
 /// square cover-art cards. Used for "Jump back in", "Most played", and any
 /// other Album/Playlist horizontal section on the Home screen.
 class HomeSection extends StatelessWidget {

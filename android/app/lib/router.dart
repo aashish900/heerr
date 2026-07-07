@@ -235,9 +235,8 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
     _NavTab(
       path: Routes.library,
       label: 'Library',
-      // Custom 3D-stack icon (`assets/icons/library.svg`, sourced from
-      // the brand-feeling Spotify-style mark). `null` icon fields mark
-      // that this tab renders via [_buildLibraryIcon] / -selected.
+      // Custom 3D-stack icon (`assets/icons/library.svg`). `null` icon
+      // fields mark that this tab renders via [_buildLibraryIcon] / -selected.
       icon: null,
       selectedIcon: null,
     ),

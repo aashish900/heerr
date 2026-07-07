@@ -1,6 +1,6 @@
 part of 'now_playing_screen.dart';
 
-/// Spotify-style lyrics card rendered below the transport controls, tinted
+/// Lyrics card rendered below the transport controls, tinted
 /// with the album palette colour. Shows a preview window of the lyrics;
 /// tapping the card (or the expand affordance) opens the full-screen
 /// [_ExpandedLyricsSheet].
@@ -331,7 +331,7 @@ class _SyncedLyricsState extends State<_SyncedLyrics> {
   }
 }
 
-/// Full-screen lyrics view (Spotify-style "pulled up" state): drag-down /
+/// Full-screen lyrics view (drag-up / "pulled up" state): drag-down /
 /// chevron to dismiss, album-art thumbnail in the top-left corner, big bold
 /// auto-scrolling lyrics. Watches [playerSnapshotProvider] itself so it stays
 /// current across track changes, with its own 250 ms ticker for position.

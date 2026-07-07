@@ -4,7 +4,7 @@ import 'library_cover_art.dart';
 
 /// Compact 2-column tile for the Home quick-access grid. 56 px square
 /// cover-art flush-left, single-line title flowing into the remaining
-/// width. Spotify-style dark-surface card with rounded corners.
+/// width. Dark-surface card with rounded corners.
 class HomeGridTile extends StatelessWidget {
   const HomeGridTile({
     required this.title,
