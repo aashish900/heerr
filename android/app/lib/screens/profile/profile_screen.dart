@@ -137,6 +137,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
       content: Text('Profile saved'),
     ));
+    context.go(Routes.home);
   }
 
   @override
