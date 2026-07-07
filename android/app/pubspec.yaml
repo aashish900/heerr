@@ -2,7 +2,7 @@ name: heerr
 description: heerr Android client — thin REST client for the heerr FastAPI backend.
 publish_to: 'none'
 
-version: 4.6.0
+version: 4.6.2
 
 environment:
   sdk: ^3.12.0

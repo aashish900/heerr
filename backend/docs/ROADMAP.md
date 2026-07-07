@@ -4,7 +4,7 @@ Track progress through the backend build. Each milestone = one git commit with a
 
 See `DECISIONLOG.md` 2026-06-08 entries for the *what*; this file is the *how* / *when*.
 
-**Status (2026-07-06):** Phases A–O complete. Phase O (song metadata edit, issue #44) shipped 2026-07-06 at `4.6.0`: O1 tag-editor service + O2 multipart PATCH endpoint. Home-server smoke pending deploy.
+**Status (2026-07-06):** Phases A–O complete. Phase O (song metadata edit, issue #44) shipped 2026-07-06 at `4.6.2`: O1 tag-editor service + O2 multipart PATCH endpoint. Home-server smoke pending deploy.
 
 **Conventions:**
 - TDD per CLAUDE.md §2 — tests written first, land in same commit as code.
