@@ -2314,3 +2314,17 @@ Delete from device / server / both verified on the Pixel against the home server
 - **`lib/screens/library/playlist_detail_screen.dart`** — AppBar action replaced with `DownloadIcon(filled: isMarked)`.
 - **`lib/screens/settings_offline.dart`** — `SwitchListTile.secondary` replaced with `DownloadIcon(filled: false)`.
 - **`lib/screens/settings_screen.dart`** — `_CollapsibleSection.icon: IconData` changed to `leading: Widget`; Offline downloads caller updated to `DownloadIcon(filled: false)`; Profiles/Recommendations callers updated to `Icon(...)`; import added. `flutter analyze` clean.
+
+---
+
+## 2026-07-07 — v4.6.5: replace download icon with custom PNG asset
+
+- **`assets/icons/download_file.png`** — new PNG asset (arrow-into-tray icon).
+- **`lib/widgets/download_icon.dart`** — replaced `CustomPainter` circle+chevron with `Image.asset` coloured via `BlendMode.srcIn`; `filled: true` → heerrGreen, `filled: false` → `IconTheme` colour (white).
+- **`lib/widgets/library_result_tile.dart`** — all `Icons.download_for_offline` / `Icons.download_for_offline_outlined` uses replaced with `DownloadIcon`; import added.
+- **`lib/widgets/result_tile.dart`** — `Icons.download_outlined` (tappable) and `Icons.download_done` (badge) replaced with `DownloadIcon`; import added.
+- **`lib/widgets/home_recommendation_card.dart`** — `Icons.download` replaced with `DownloadIcon(filled: false, size: 20)`; import added.
+- **`lib/screens/library/album_detail_screen.dart`** — per-song downloaded badge `Icons.download_done` replaced with `DownloadIcon(filled: true, size: 18)`.
+- **`lib/screens/library/playlist_detail_screen.dart`** — per-song pending badge `Icons.download_for_offline_outlined` and downloaded badge `Icons.download_done` replaced with `DownloadIcon`.
+- **`test/widgets/library_result_tile_test.dart`** — updated finders from `find.byIcon(Icons.download_*)` to `find.byType(DownloadIcon)` / `find.byWidgetPredicate`.
+- **`test/widgets/result_tile_test.dart`** — same finder updates; import added. 774 tests green.
