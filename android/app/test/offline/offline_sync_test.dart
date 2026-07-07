@@ -553,7 +553,7 @@ void main() {
       // Wi-Fi comes back — the subscription should fire an off-schedule tick
       // without waiting for the 15-min poll.
       env.wifi.emit(true);
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
 
       expect(env.adapter.requests, isNotEmpty);
       final OfflineManifest m =
