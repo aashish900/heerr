@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -93,6 +95,10 @@ class _ProfileRow extends ConsumerWidget {
               child: Text('Switch to this profile'),
             ),
           const PopupMenuItem<_RowAction>(
+            value: _RowAction.editServerDetails,
+            child: Text('Edit server details'),
+          ),
+          const PopupMenuItem<_RowAction>(
             value: _RowAction.remove,
             child: Text('Remove'),
           ),
@@ -116,6 +122,13 @@ class _ProfileRow extends ConsumerWidget {
     switch (action) {
       case _RowAction.switchTo:
         await _switchTo(context, ref);
+      case _RowAction.editServerDetails:
+        unawaited(context.push(
+          Uri(
+            path: Routes.editServerDetails,
+            queryParameters: <String, String>{'profileId': profile.id},
+          ).toString(),
+        ));
       case _RowAction.remove:
         await _remove(context, ref);
     }
@@ -190,7 +203,7 @@ class _ProfileRow extends ConsumerWidget {
   }
 }
 
-enum _RowAction { switchTo, remove }
+enum _RowAction { switchTo, editServerDetails, remove }
 
 String _formatRelative(DateTime when) {
   final DateTime now = DateTime.now().toUtc();

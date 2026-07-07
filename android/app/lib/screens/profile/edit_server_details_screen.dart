@@ -9,7 +9,10 @@ import '../../providers/profiles/profile_registry.dart';
 import '../../widgets/error_snackbar.dart';
 
 class EditServerDetailsScreen extends ConsumerStatefulWidget {
-  const EditServerDetailsScreen({super.key});
+  const EditServerDetailsScreen({super.key, this.profileId});
+
+  /// Id of the profile to edit. Falls back to the active profile when null.
+  final String? profileId;
 
   @override
   ConsumerState<EditServerDetailsScreen> createState() =>
@@ -26,15 +29,29 @@ class _EditServerDetailsScreenState
   bool _obscure = true;
   bool _busy = false;
 
+  /// Returns the profile this screen is editing — either the one identified by
+  /// [EditServerDetailsScreen.profileId] or, as a fallback, the active profile.
+  Profile? _targetProfile() {
+    if (widget.profileId != null) {
+      final ProfileRegistryState? state =
+          ref.read(profileRegistryProvider).valueOrNull;
+      final Profile? found = state?.profiles
+          .where((Profile p) => p.id == widget.profileId)
+          .firstOrNull;
+      if (found != null) return found;
+    }
+    return ref.read(activeProfileProvider);
+  }
+
   @override
   void initState() {
     super.initState();
-    final Profile? active = ref.read(activeProfileProvider);
-    _urlCtrl = TextEditingController(text: active?.heerrBaseUrl ?? '');
+    final Profile? target = _targetProfile();
+    _urlCtrl = TextEditingController(text: target?.heerrBaseUrl ?? '');
     _usernameCtrl =
-        TextEditingController(text: active?.navidromeUsername ?? '');
+        TextEditingController(text: target?.navidromeUsername ?? '');
     _passwordCtrl =
-        TextEditingController(text: active?.navidromePassword ?? '');
+        TextEditingController(text: target?.navidromePassword ?? '');
   }
 
   @override
@@ -72,12 +89,12 @@ class _EditServerDetailsScreenState
   }
 
   Future<void> _save() async {
-    final Profile? active = ref.read(activeProfileProvider);
-    if (active == null) return;
+    final Profile? target = _targetProfile();
+    if (target == null) return;
     final AuthLoginResponse? res = await _callLogin();
     if (res == null || !mounted) return;
     await ref.read(profileRegistryProvider.notifier).updateServerDetails(
-          active.id,
+          target.id,
           heerrBaseUrl: _urlCtrl.text.trim(),
           heerrBearerToken: res.token,
           navidromeBaseUrl: res.navidromeUrl,

@@ -173,11 +173,15 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
         builder: (BuildContext context, GoRouterState state) =>
             const ProfileScreen(),
       ),
-      // Edit server details — reached from the Profile page 3-dot menu.
+      // Edit server details — reached from the profiles list 3-dot menu.
+      // Optional ?profileId= selects which profile to edit; falls back to
+      // the active profile when absent.
       GoRoute(
         path: Routes.editServerDetails,
         builder: (BuildContext context, GoRouterState state) =>
-            const EditServerDetailsScreen(),
+            EditServerDetailsScreen(
+          profileId: state.uri.queryParameters['profileId'],
+        ),
       ),
     ],
   );
