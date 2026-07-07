@@ -2302,3 +2302,15 @@ Delete from device / server / both verified on the Pixel against the home server
 - **`lib/api/auth_login.dart`** — `AuthLoginResponse` gains `profile: BackendProfileData`; parsed from `LoginResponse.profile`.
 - **`lib/screens/profile/profile_screen.dart`** — `unawaited(pushProfileToBackend(ref))` after `setAvatar`, `removeAvatar`, and `_save`; fires on every write-through.
 - **`lib/screens/auth/login_screen.dart`** — `_hydrateBackendProfile()` called after addProfile/setActive; restores displayName, nickname/bio, and avatar from the login response profile if non-null. All 774 tests pass; `flutter analyze` clean.
+
+---
+
+## 2026-07-07 — Replace download icon with custom rounded-chevron arrow (no bar)
+
+- **`lib/widgets/download_icon.dart`** (new) — `DownloadIcon` widget backed by `CustomPainter`. `filled: false` draws a circle outline + rounded-shaft chevron arrow in the ambient `IconTheme` colour. `filled: true` draws a solid heerr-green (#1DB954) disc with a near-black (#1A1A1A) arrow. Arrow is 20 % thicker than the Material baseline; shaft connects directly into the chevron apex with round caps and join throughout; no horizontal bar.
+- **`lib/router.dart`** — Downloads nav tab changed from `Icons.download_for_offline_outlined` / `Icons.download_for_offline` to `icon: null, selectedIcon: null`; added `_buildDownloadsIcon()` builder (mirrors `_buildLibraryIcon` pattern); `_iconFor()` now dispatches on `tab.path` instead of `tab.icon == null`; added import for `download_icon.dart`.
+- **`lib/screens/library/album_detail_screen.dart`** — AppBar action replaced with `DownloadIcon(filled: isMarked)`; per-song row "pending download" indicator replaced with `DownloadIcon(filled: false, size: 18)`.
+- **`lib/screens/library/artist_detail_screen.dart`** — AppBar action replaced with `DownloadIcon(filled: isMarked)`; unused `theme.dart` import removed.
+- **`lib/screens/library/playlist_detail_screen.dart`** — AppBar action replaced with `DownloadIcon(filled: isMarked)`.
+- **`lib/screens/settings_offline.dart`** — `SwitchListTile.secondary` replaced with `DownloadIcon(filled: false)`.
+- **`lib/screens/settings_screen.dart`** — `_CollapsibleSection.icon: IconData` changed to `leading: Widget`; Offline downloads caller updated to `DownloadIcon(filled: false)`; Profiles/Recommendations callers updated to `Icon(...)`; import added. `flutter analyze` clean.

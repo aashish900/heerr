@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import 'widgets/download_icon.dart';
+
 import 'app/lifecycle_coordinator.dart';
 import 'providers/library/library_search_query.dart';
 import 'providers/profiles/profile_registry.dart';
@@ -242,8 +244,10 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
     _NavTab(
       path: Routes.downloads,
       label: 'Downloads',
-      icon: Icons.download_for_offline_outlined,
-      selectedIcon: Icons.download_for_offline,
+      // Custom download icon rendered via [_buildDownloadsIcon]. null fields
+      // signal that the tab bypasses the generic Icon() path.
+      icon: null,
+      selectedIcon: null,
     ),
     _NavTab(
       path: Routes.settings,
@@ -252,6 +256,16 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
       selectedIcon: Icons.settings,
     ),
   ];
+
+  /// Downloads tab: green disc + dark arrow when selected, outline when not.
+  Widget _buildDownloadsIcon(BuildContext context, {required bool selected}) {
+    if (selected) {
+      return const DownloadIcon(filled: true, size: 24);
+    }
+    final Color tint =
+        IconTheme.of(context).color ?? Theme.of(context).colorScheme.onSurface;
+    return DownloadIcon(filled: false, color: tint, size: 24);
+  }
 
   /// Renders the Library tab icon from the bundled SVG. Tinted to match
   /// the active NavigationBar icon-theme color so it follows the M3
@@ -283,11 +297,12 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
     return 0;
   }
 
-  /// Library uses an SVG asset; every other tab is a Material `IconData`.
-  /// Returns null when the tab has no `IconData` set (i.e. Library).
   Widget _iconFor(BuildContext context, _NavTab tab, {required bool selected}) {
-    if (tab.icon == null) {
+    if (tab.path == Routes.library) {
       return _buildLibraryIcon(context, selected: selected);
+    }
+    if (tab.path == Routes.downloads) {
+      return _buildDownloadsIcon(context, selected: selected);
     }
     return Icon(selected ? tab.selectedIcon : tab.icon);
   }

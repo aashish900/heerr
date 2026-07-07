@@ -11,6 +11,7 @@ import '../../player/playback_actions.dart';
 import '../../player/player_provider.dart';
 import '../../providers/library/library_album.dart';
 import '../../theme.dart';
+import '../../widgets/download_icon.dart';
 import '../../widgets/add_to_playlist_sheet.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/library_cover_art.dart';
@@ -51,12 +52,7 @@ class AlbumDetailScreen extends ConsumerWidget {
         )),
         actions: <Widget>[
           IconButton(
-            icon: Icon(
-              isMarked
-                  ? Icons.download_for_offline
-                  : Icons.download_for_offline_outlined,
-              color: isMarked ? heerrGreen : null,
-            ),
+            icon: DownloadIcon(filled: isMarked),
             tooltip:
                 isMarked ? 'Unmark for offline' : 'Mark for offline',
             onPressed: () {
@@ -223,10 +219,7 @@ class _Body extends ConsumerWidget {
         // produced a manifest entry yet. Mirror the AppBar's outlined
         // download glyph so the user sees a consistent "will be
         // downloaded" signal from artist → album → song.
-        return const Icon(
-          Icons.download_for_offline_outlined,
-          size: 18,
-        );
+        return const DownloadIcon(filled: false, size: 18);
       }
       return null;
     }

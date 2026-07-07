@@ -26,7 +26,7 @@ class _OfflineSection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         SwitchListTile(
-          secondary: const Icon(Icons.download_for_offline_outlined),
+          secondary: const DownloadIcon(filled: false),
           title: const Text('Offline downloads'),
           subtitle: const Text(
             'Marked albums and playlists download to the device. '

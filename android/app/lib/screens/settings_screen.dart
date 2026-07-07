@@ -13,6 +13,7 @@ import '../offline/offline_sync.dart';
 import '../providers/recommendations.dart';
 import '../providers/server_creds.dart';
 import '../theme.dart';
+import '../widgets/download_icon.dart';
 import '../widgets/error_snackbar.dart';
 import 'settings/profiles_section.dart';
 
@@ -54,18 +55,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // Profiles (the primary credential surface) stays open by default;
           // the heavier Offline + Recommendations sections start collapsed.
           _CollapsibleSection(
-            icon: Icons.people_outline,
+            leading: Icon(Icons.people_outline),
             title: 'Profiles',
             initiallyExpanded: true,
             child: ProfilesSection(),
           ),
           _CollapsibleSection(
-            icon: Icons.download_for_offline_outlined,
+            leading: DownloadIcon(filled: false),
             title: 'Offline downloads',
             child: _OfflineSection(),
           ),
           _CollapsibleSection(
-            icon: Icons.recommend_outlined,
+            leading: Icon(Icons.recommend_outlined),
             title: 'Recommendations',
             child: _RecommendationsSection(),
           ),
@@ -105,13 +106,13 @@ class _AppVersionTile extends ConsumerWidget {
 /// [initiallyExpanded].
 class _CollapsibleSection extends StatelessWidget {
   const _CollapsibleSection({
-    required this.icon,
+    required this.leading,
     required this.title,
     required this.child,
     this.initiallyExpanded = false,
   });
 
-  final IconData icon;
+  final Widget leading;
   final String title;
   final Widget child;
   final bool initiallyExpanded;
@@ -120,7 +121,7 @@ class _CollapsibleSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return ExpansionTile(
       key: Key('settings-section-$title'),
-      leading: Icon(icon),
+      leading: leading,
       title: Text(
         title,
         style: const TextStyle(fontWeight: FontWeight.w600),

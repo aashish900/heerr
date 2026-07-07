@@ -14,6 +14,7 @@ import '../../providers/library/library_playlist.dart';
 import '../../providers/library/playlist_mutations.dart';
 import '../../providers/server_creds.dart';
 import '../../theme.dart';
+import '../../widgets/download_icon.dart';
 import '../../widgets/add_to_playlist_sheet.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_snackbar.dart';
@@ -294,12 +295,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
               )
             else ...<Widget>[
               IconButton(
-                icon: Icon(
-                  isMarked
-                      ? Icons.download_for_offline
-                      : Icons.download_for_offline_outlined,
-                  color: isMarked ? heerrGreen : null,
-                ),
+                icon: DownloadIcon(filled: isMarked),
                 tooltip:
                     isMarked ? 'Unmark for offline' : 'Mark for offline',
                 onPressed: () {

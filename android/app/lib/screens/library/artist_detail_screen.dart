@@ -6,11 +6,11 @@ import '../../api/api_error.dart';
 import '../../models/subsonic/album.dart';
 import '../../models/subsonic/artist.dart';
 import '../../offline/offline_manifest.dart';
+import '../../widgets/download_icon.dart';
 import '../../offline/offline_marker.dart';
 import '../../player/playback_actions.dart';
 import '../../providers/library/library_artist.dart';
 import '../../router.dart';
-import '../../theme.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/library_result_tile.dart';
 import '../../widgets/skeleton.dart';
@@ -41,12 +41,7 @@ class ArtistDetailScreen extends ConsumerWidget {
         )),
         actions: <Widget>[
           IconButton(
-            icon: Icon(
-              isMarked
-                  ? Icons.download_for_offline
-                  : Icons.download_for_offline_outlined,
-              color: isMarked ? heerrGreen : null,
-            ),
+            icon: DownloadIcon(filled: isMarked),
             tooltip: isMarked
                 ? 'Unmark artist for offline'
                 : 'Mark every album for offline',
