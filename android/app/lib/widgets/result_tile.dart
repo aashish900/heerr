@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/search_result_item.dart';
 import '../providers/download.dart';
+import 'download_icon.dart';
 
 /// One row in the Search screen's results list. Dims when the backend hint
 /// says the track is already downloaded.
@@ -109,10 +110,10 @@ class _Trailing extends StatelessWidget {
       );
     }
     if (alreadyDownloaded) {
-      return const Icon(Icons.download_done);
+      return const DownloadIcon(filled: true);
     }
     return IconButton(
-      icon: const Icon(Icons.download_outlined),
+      icon: const DownloadIcon(filled: false),
       tooltip: 'Download',
       onPressed: onDownload,
     );

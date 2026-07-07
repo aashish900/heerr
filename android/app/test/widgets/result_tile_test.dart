@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:heerr/models/search_result_item.dart';
+import 'package:heerr/widgets/download_icon.dart';
 import 'package:heerr/widgets/result_tile.dart';
 
 SearchResultItem _item({bool alreadyDownloaded = false}) {
@@ -46,7 +47,7 @@ void main() {
     await _pump(tester, onPreview: () {});
     expect(find.byIcon(Icons.play_circle_outline), findsOneWidget);
     // Download affordance still present alongside it.
-    expect(find.byIcon(Icons.download_outlined), findsOneWidget);
+    expect(find.byWidgetPredicate((Widget w) => w is DownloadIcon && !w.filled), findsOneWidget);
   });
 
   testWidgets('no preview button when onPreview is null',
@@ -81,7 +82,7 @@ void main() {
       onPreview: () => previews++,
     );
 
-    await tester.tap(find.byIcon(Icons.download_outlined));
+    await tester.tap(find.byWidgetPredicate((Widget w) => w is DownloadIcon && !w.filled));
     await tester.pumpAndSettle();
 
     expect(downloads, 1);
@@ -128,7 +129,7 @@ void main() {
     int previews = 0;
     await _pump(tester, alreadyDownloaded: true, onPreview: () => previews++);
 
-    expect(find.byIcon(Icons.download_done), findsOneWidget);
+    expect(find.byWidgetPredicate((Widget w) => w is DownloadIcon && w.filled), findsOneWidget);
     await tester.tap(find.byIcon(Icons.play_circle_outline));
     await tester.pumpAndSettle();
     expect(previews, 1);

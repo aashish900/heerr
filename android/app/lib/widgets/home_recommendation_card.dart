@@ -8,6 +8,7 @@ import '../models/recommended_track.dart';
 import '../models/subsonic/song.dart';
 import '../player/playback_actions.dart';
 import '../providers/download.dart';
+import 'download_icon.dart';
 import 'error_snackbar.dart';
 import 'library_cover_art.dart';
 
@@ -136,8 +137,7 @@ class HomeRecommendationCard extends ConsumerWidget {
                                 color: Colors.white,
                               ),
                             )
-                          : const Icon(Icons.download,
-                              size: 20, color: Colors.white),
+                          : const DownloadIcon(filled: false, size: 20),
                     ),
                   ),
               ],

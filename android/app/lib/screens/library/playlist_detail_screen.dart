@@ -470,20 +470,13 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
     }
     if (offline == null) {
       if (containerMarked) {
-        return const Icon(
-          Icons.download_for_offline_outlined,
-          size: 18,
-        );
+        return const DownloadIcon(filled: false, size: 18);
       }
       return null;
     }
     switch (offline.state) {
       case OfflineSongState.ready:
-        return const Icon(
-          Icons.download_done,
-          color: heerrGreen,
-          size: 18,
-        );
+        return const DownloadIcon(filled: true, size: 18);
       case OfflineSongState.downloading:
         return const SizedBox(
           width: 18,

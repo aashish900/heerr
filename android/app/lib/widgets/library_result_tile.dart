@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import 'download_icon.dart';
 import 'library_cover_art.dart';
 
 /// One row in a Library list (Artists / Albums / Playlists). Mirrors the
@@ -70,12 +71,7 @@ class LibraryResultTile extends StatelessWidget {
       trailing = const Icon(Icons.play_arrow, color: heerrGreen);
     } else if (onMarkToggle != null) {
       trailing = IconButton(
-        icon: Icon(
-          isMarkedForOffline
-              ? Icons.download_for_offline
-              : Icons.download_for_offline_outlined,
-          color: isMarkedForOffline ? heerrGreen : null,
-        ),
+        icon: DownloadIcon(filled: isMarkedForOffline),
         onPressed: onMarkToggle,
         tooltip: isMarkedForOffline ? 'Unmark for offline' : 'Mark for offline',
       );
@@ -89,11 +85,7 @@ class LibraryResultTile extends StatelessWidget {
           children: <Widget>[
             const Padding(
               padding: EdgeInsets.only(right: 4),
-              child: Icon(
-                Icons.download_for_offline,
-                color: heerrGreen,
-                size: 18,
-              ),
+              child: DownloadIcon(filled: true, size: 18),
             ),
             IconButton(
               icon: const Icon(Icons.play_arrow_outlined),
@@ -111,11 +103,7 @@ class LibraryResultTile extends StatelessWidget {
       }
     } else if (isMarkedForOffline) {
       // No play button, no toggle, but tile is marked — show passive badge.
-      trailing = const Icon(
-        Icons.download_for_offline,
-        color: heerrGreen,
-        size: 18,
-      );
+      trailing = const DownloadIcon(filled: true, size: 18);
     } else {
       trailing = null;
     }

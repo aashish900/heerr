@@ -225,11 +225,7 @@ class _Body extends ConsumerWidget {
     }
     switch (offline.state) {
       case OfflineSongState.ready:
-        return const Icon(
-          Icons.download_done,
-          color: heerrGreen,
-          size: 18,
-        );
+        return const DownloadIcon(filled: true, size: 18);
       case OfflineSongState.downloading:
         return const SizedBox(
           width: 18,

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:heerr/providers/secure_storage.dart';
-import 'package:heerr/theme.dart';
+import 'package:heerr/widgets/download_icon.dart';
 import 'package:heerr/widgets/library_result_tile.dart';
 
 class _NoopStorage implements SecureStorage {
@@ -43,8 +43,7 @@ void main() {
       await tester.pump();
       // Only one play_arrow (the green now-playing one). No download icon.
       expect(find.byIcon(Icons.play_arrow), findsOneWidget);
-      expect(find.byIcon(Icons.download_for_offline), findsNothing);
-      expect(find.byIcon(Icons.download_for_offline_outlined), findsNothing);
+      expect(find.byType(DownloadIcon), findsNothing);
       expect(find.byIcon(Icons.play_arrow_outlined), findsNothing);
     });
 
@@ -60,8 +59,14 @@ void main() {
         isMarkedForOffline: false,
       )));
       await tester.pump();
-      expect(find.byIcon(Icons.download_for_offline_outlined), findsOneWidget);
-      expect(find.byIcon(Icons.download_for_offline), findsNothing);
+      expect(
+        find.byWidgetPredicate((Widget w) => w is DownloadIcon && !w.filled),
+        findsOneWidget,
+      );
+      expect(
+        find.byWidgetPredicate((Widget w) => w is DownloadIcon && w.filled),
+        findsNothing,
+      );
     });
 
     testWidgets('onMarkToggle → filled green icon when marked', (
@@ -76,10 +81,10 @@ void main() {
         isMarkedForOffline: true,
       )));
       await tester.pump();
-      final Icon icon = tester.widget<Icon>(
-        find.byIcon(Icons.download_for_offline),
+      final DownloadIcon icon = tester.widget<DownloadIcon>(
+        find.byType(DownloadIcon),
       );
-      expect(icon.color, heerrGreen);
+      expect(icon.filled, isTrue);
     });
 
     testWidgets('mark toggle fires onMarkToggle', (
@@ -95,7 +100,7 @@ void main() {
         isMarkedForOffline: false,
       )));
       await tester.pump();
-      await tester.tap(find.byIcon(Icons.download_for_offline_outlined));
+      await tester.tap(find.byType(IconButton));
       expect(count, 1);
     });
 
@@ -113,7 +118,7 @@ void main() {
       )));
       await tester.pump();
       // Both the marker badge (passive, no toggle) and the play button.
-      expect(find.byIcon(Icons.download_for_offline), findsOneWidget);
+      expect(find.byType(DownloadIcon), findsOneWidget);
       expect(find.byIcon(Icons.play_arrow_outlined), findsOneWidget);
     });
 
@@ -130,7 +135,7 @@ void main() {
       )));
       await tester.pump();
       expect(find.byIcon(Icons.play_arrow_outlined), findsOneWidget);
-      expect(find.byIcon(Icons.download_for_offline), findsNothing);
+      expect(find.byType(DownloadIcon), findsNothing);
     });
   });
 
