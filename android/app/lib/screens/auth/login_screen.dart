@@ -4,10 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'dart:convert';
+import 'dart:typed_data';
+
 import '../../api/api_error.dart';
 import '../../api/auth_login.dart';
+import '../../api/backend_profile.dart';
 import '../../dev_defaults.dart';
 import '../../models/profile.dart';
+import '../../providers/profiles/profile_avatar.dart';
+import '../../providers/profiles/profile_meta.dart';
 import '../../providers/profiles/profile_registry.dart';
 import '../../router.dart';
 import '../../widgets/error_snackbar.dart';
@@ -70,6 +76,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
       await ref.read(profileRegistryProvider.notifier).addProfile(profile);
       await ref.read(profileRegistryProvider.notifier).setActive(profile.id);
+      await _hydrateBackendProfile(profile.id, res.profile);
       if (!mounted) return;
       context.go(Routes.home);
     } on ApiError catch (e) {
@@ -77,6 +84,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       showApiError(context, e, action: 'sign in');
     } finally {
       if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  /// Hydrates local state from whatever the backend already has stored for
+  /// this user. Called immediately after addProfile/setActive so re-logins
+  /// restore display name, nickname, bio and avatar without the user having
+  /// to re-enter them.
+  Future<void> _hydrateBackendProfile(
+      String profileId, BackendProfileData bp) async {
+    if (bp.displayName != null) {
+      await ref
+          .read(profileRegistryProvider.notifier)
+          .updateDisplayName(profileId, bp.displayName!);
+    }
+    if (bp.nickname != null || bp.bio != null) {
+      await ref
+          .read(profileMetaNotifierProvider.notifier)
+          .save(nickname: bp.nickname, bio: bp.bio);
+    }
+    if (bp.avatarB64 != null) {
+      try {
+        final Uint8List bytes = base64Decode(bp.avatarB64!);
+        await ref.read(profileAvatarProvider.notifier).setAvatar(bytes);
+      } on Exception {
+        // Corrupt avatar from backend — skip silently.
+      }
     }
   }
 

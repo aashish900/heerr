@@ -100,7 +100,7 @@ async def test_login_new_user_happy_path(app_sm, cleanup):
         r = await c.post("/api/v1/auth/login", json={"username": username, "password": "pw"})
     assert r.status_code == 200
     body = r.json()
-    assert set(body) == {"token", "scopes", "navidrome_url", "navidrome_username"}
+    assert set(body) == {"token", "scopes", "navidrome_url", "navidrome_username", "profile"}
     assert body["navidrome_url"] == _NAVIDROME_URL
     assert body["navidrome_username"] == username
     assert body["scopes"] == ["read", "download"]

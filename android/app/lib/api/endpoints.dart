@@ -39,5 +39,9 @@ class Endpoints {
   /// as [libraryDeleteSong]; the HTTP verb distinguishes them.
   static const String libraryEditSong = '/library/song';
 
+  /// Profile store: `GET /profile` (fetch on login) and `PUT /profile`
+  /// (write-through on every profile save).
+  static const String profile = '/profile';
+
   static String status(String jobId) => '/status/$jobId';
 }

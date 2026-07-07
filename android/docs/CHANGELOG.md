@@ -2294,3 +2294,11 @@ Delete from device / server / both verified on the Pixel against the home server
 - **`lib/router.dart`** — added `Routes.editServerDetails = '/edit-server-details'`; registered the new `GoRoute` for it.
 - **`lib/screens/profile/profile_screen.dart`** — added `PopupMenuButton` to AppBar with "Edit server details" item that pushes `Routes.editServerDetails`; added `_ProfileMenuAction` enum; added `go_router` import.
 - `flutter analyze` clean; all 774 tests pass.
+
+## 2026-07-07 — Android profile sync to backend
+
+- **`lib/api/endpoints.dart`** — `Endpoints.profile = '/profile'`.
+- **`lib/api/backend_profile.dart`** (new) — `BackendProfileData` DTO; `putBackendProfile()` one-shot PUT; `pushProfileToBackend(WidgetRef)` assembles full local state (displayName + meta + avatar file → base64) and fires the PUT best-effort.
+- **`lib/api/auth_login.dart`** — `AuthLoginResponse` gains `profile: BackendProfileData`; parsed from `LoginResponse.profile`.
+- **`lib/screens/profile/profile_screen.dart`** — `unawaited(pushProfileToBackend(ref))` after `setAvatar`, `removeAvatar`, and `_save`; fires on every write-through.
+- **`lib/screens/auth/login_screen.dart`** — `_hydrateBackendProfile()` called after addProfile/setActive; restores displayName, nickname/bio, and avatar from the login response profile if non-null. All 774 tests pass; `flutter analyze` clean.

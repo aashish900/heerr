@@ -920,3 +920,16 @@ Server half of issue #44 begins: in-place tag editing for library files. Files a
 - **`backend/app/schemas/library.py`** — `LibraryEditResponse(updated, path, fields)`.
 - **`backend/pyproject.toml` + `backend/app/main.py`** — version → `3.3.0`.
 - **Tests:** `backend/tests/test_library_edit.py` (new, 29 tests) — auth/scope, parametrized bad paths, `.wav`/non-audio 422s, 404, blank-field / no-fields / bad-image / oversize-cover 422s, per-format happy path (tags via mutagen re-read + file never renamed), title-only partial, cover-only, tags+cover, Navidrome-prefixed path. Full suite 508 passed; ruff + mypy clean.
+
+## 2026-07-07 — Backend profile store (display_name, nickname, bio, avatar)
+
+- **`alembic/versions/0012_users_profile.py`** (new) — adds `display_name TEXT NULL`, `nickname TEXT NULL`, `bio TEXT NULL`, `avatar_data BYTEA NULL` to `users`.
+- **`app/models/user.py`** — four new nullable mapped columns.
+- **`app/schemas/profile.py`** (new) — `UserProfileResponse` + `UserProfileUpdate` (avatar transported as base64 string).
+- **`app/api/v1/profile.py`** (new) — `GET /api/v1/profile` (fetch) + `PUT /api/v1/profile` (full replace, bearer-auth required).
+- **`app/api/v1/router.py`** — include profile router.
+- **`app/schemas/auth.py`** — `LoginResponse` gains `profile: UserProfileResponse` so the client gets stored profile data on login in one shot.
+- **`app/api/v1/auth.py`** — populate `profile` in `LoginResponse` from the upserted user row.
+- **`tests/test_migration_0012.py`** (new) — 4 tests: null defaults, text round-trips, binary avatar round-trip.
+- **`tests/test_profile.py`** (new) — 6 tests: GET null, PUT round-trip, GET-after-PUT, avatar PUT/GET, clear avatar, auth guard.
+- **`tests/test_auth_login.py`** — updated key-set assertion to include `"profile"`. All 518 tests pass.

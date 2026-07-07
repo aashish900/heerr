@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -5,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../api/backend_profile.dart';
 import '../../models/profile.dart';
 import '../../models/profile_meta.dart';
 import '../../providers/profiles/active_profile.dart';
@@ -71,6 +73,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (bytes == null || !mounted) return; // cancelled
     try {
       await ref.read(profileAvatarProvider.notifier).setAvatar(bytes);
+      unawaited(pushProfileToBackend(ref));
     } on AvatarTooLargeError {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -103,7 +106,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   title: const Text('Remove photo'),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
-                    ref.read(profileAvatarProvider.notifier).removeAvatar();
+                    ref
+                        .read(profileAvatarProvider.notifier)
+                        .removeAvatar()
+                        .then((_) => pushProfileToBackend(ref));
                   },
                 ),
             ],
@@ -126,6 +132,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     await ref
         .read(profileMetaNotifierProvider.notifier)
         .save(nickname: _nickname.text, bio: _bio.text);
+    unawaited(pushProfileToBackend(ref));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
       content: Text('Profile saved'),

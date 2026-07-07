@@ -32,6 +32,13 @@ class User(Base):
     last_login_at: Mapped[datetime | None] = mapped_column(
         sa.TIMESTAMP(timezone=True), nullable=True
     )
+    # Profile fields (migration 0012). All nullable — unset until the user
+    # saves their profile for the first time.
+    display_name: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    nickname: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    bio: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    avatar_data: Mapped[bytes | None] = mapped_column(sa.LargeBinary, nullable=True)
+
     # Per-user recommendation config (lastfm_username, listenbrainz_token, ...).
     # Always an object — NOT NULL with a '{}' server default (migration 0011).
     settings: Mapped[dict[str, Any]] = mapped_column(

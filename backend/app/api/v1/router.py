@@ -7,6 +7,7 @@ from app.api.v1 import (
     health,
     library,
     preview,
+    profile,
     queue,
     recommend,
     search,
@@ -25,4 +26,5 @@ api_v1.include_router(library.router)
 api_v1.include_router(preview.router)
 api_v1.include_router(recommend.router)
 api_v1.include_router(settings.router)
+api_v1.include_router(profile.router)
 api_v1.include_router(admin.router)

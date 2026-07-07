@@ -1,5 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.profile import UserProfileResponse
+
 
 class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -13,3 +15,4 @@ class LoginResponse(BaseModel):
     scopes: list[str]
     navidrome_url: str
     navidrome_username: str
+    profile: UserProfileResponse

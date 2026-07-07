@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import 'api_error.dart';
+import 'backend_profile.dart';
 import 'endpoints.dart';
 
 /// Successful response from `POST /auth/login` (backend J6).
@@ -17,12 +18,14 @@ class AuthLoginResponse {
     required this.scopes,
     required this.navidromeUrl,
     required this.navidromeUsername,
+    required this.profile,
   });
 
   final String token;
   final List<String> scopes;
   final String navidromeUrl;
   final String navidromeUsername;
+  final BackendProfileData profile;
 
   factory AuthLoginResponse.fromJson(Map<String, dynamic> json) {
     final List<dynamic> rawScopes =
@@ -33,6 +36,8 @@ class AuthLoginResponse {
           rawScopes.map((dynamic s) => s.toString()).toList(growable: false),
       navidromeUrl: json['navidrome_url'] as String,
       navidromeUsername: json['navidrome_username'] as String,
+      profile: BackendProfileData.fromJson(
+          (json['profile'] as Map<String, dynamic>?) ?? <String, dynamic>{}),
     );
   }
 }

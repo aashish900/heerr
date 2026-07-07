@@ -7,6 +7,7 @@ a heerr opaque token tied to that user, and return the raw token once.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import secrets
 from collections.abc import Awaitable, Callable
@@ -21,6 +22,7 @@ from app.config import Settings, get_settings
 from app.db import get_session
 from app.models import Token, User
 from app.schemas.auth import LoginRequest, LoginResponse
+from app.schemas.profile import UserProfileResponse
 from app.services.navidrome_auth import NavidromeUnreachable, verify_credentials
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -96,6 +98,12 @@ async def login(
         scopes=list(_DEFAULT_SCOPES),
         navidrome_url=settings.navidrome_url,
         navidrome_username=req.username,
+        profile=UserProfileResponse(
+            display_name=user.display_name,
+            nickname=user.nickname,
+            bio=user.bio,
+            avatar_b64=(base64.b64encode(user.avatar_data).decode() if user.avatar_data else None),
+        ),
     )
 
 
