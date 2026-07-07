@@ -10,6 +10,7 @@ import 'package:heerr/providers/library/library_playlist.dart';
 import 'package:heerr/providers/library/playlist_mutations.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/screens/library/playlist_detail_screen.dart';
+import 'package:heerr/widgets/download_icon.dart';
 import 'package:heerr/widgets/empty_state.dart';
 import 'package:heerr/widgets/skeleton.dart';
 
@@ -206,7 +207,10 @@ void main() {
       ]));
       await tester.pumpAndSettle();
       expect(
-        find.byIcon(Icons.download_for_offline_outlined),
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byType(DownloadIcon),
+        ),
         findsOneWidget,
       );
     },
