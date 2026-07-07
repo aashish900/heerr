@@ -93,7 +93,7 @@ void main() {
       expect(find.text('invalid spotify URI'), findsOneWidget);
     });
 
-    testWidgets('503 RateLimitedError → "Spotify rate-limited — retry in Ns"', (
+    testWidgets('503 RateLimitedError → "Rate-limited — retry in Ns"', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(_harness(
@@ -104,7 +104,7 @@ void main() {
       ));
       await _tapTrigger(tester);
       expect(
-        find.text('Spotify rate-limited — retry in 7s'),
+        find.text('Rate-limited — retry in 7s'),
         findsOneWidget,
       );
     });
