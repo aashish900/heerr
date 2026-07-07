@@ -17,6 +17,7 @@ import '../../providers/library/favourites.dart';
 import '../../providers/library/lyrics.dart';
 import '../../providers/library/playlist_mutations.dart';
 import '../../providers/queue.dart';
+import '../../theme.dart';
 import '../../utils/palette.dart';
 import '../../widgets/add_to_playlist_sheet.dart';
 import '../../widgets/error_snackbar.dart';
