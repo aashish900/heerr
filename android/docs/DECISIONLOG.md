@@ -867,3 +867,18 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **Real audio-amplitude waveform** — not possible in RemoteViews (no custom canvas); the cycling `ViewFlipper` of gradient frames is the only motion a widget can express (decorative).
 
 **Reference:** `android/app/android/app/src/main/{res/layout/hero_widget.xml, res/xml/hero_widget_info.xml, kotlin/com/aashish/heerr/HeroWidgetProvider.kt, AndroidManifest.xml, res/drawable/widget_{gradient_border,play_circle,logo_gradient,wave_1..8,progress,ic_album}.xml}`; `android/app/lib/widget/{now_playing_widget.dart, now_playing_widget_provider.dart}`; test `android/app/test/widget/now_playing_widget_updater_test.dart`. CHANGELOG 2026-07-10 (part 5).
+
+## 2026-07-10 — Retire classic/bar/pill widgets; hero is the only home-screen widget
+
+**Context:** Post-part-5 review flagged that the live 1s ticker's `pushPosition` called `HomeWidgetClientImpl.update()`, which looped over all four registered widget names (`NowPlayingWidgetProvider`, `BarWidgetProvider`, `PillWidgetProvider`, `HeroWidgetProvider`) every second while playing — redundant RemoteViews re-inflation (and ViewFlipper waveform resets) for three widgets the redesign no longer needs, now that the hero tile alone matches the brand concept and combines what the other three did separately (art + waveform + progress).
+
+**Decision:** Delete the three legacy widgets (Kotlin providers, layouts, `*_widget_info.xml`, manifest receivers, and their exclusive drawables) and make `HeroWidgetProvider` the only home-screen widget. `HomeWidgetClientImpl.update()` now targets `kHeroWidgetName` directly (no loop).
+
+**Why:** Simplicity — one widget to reason about, test-drive (well, smoke-test), and keep in sync with the `np_*` contract. The user confirmed this explicitly rather than keeping the legacy tiles around "for users who already added them" — there is no released version with widgets yet (still on `redesign/gradient-theme`, unreleased), so there's no migration concern.
+
+**Alternatives considered:**
+- **Keep all four, just fix the ticker to target hero only.** Rejected per explicit user instruction — the hero tile supersedes the other three for this app's design language; no reason to maintain four RemoteViews layouts against one data contract going forward.
+
+**Trade-off:** Users lose the option of a slim 1-row or 2x1 tile; only the 4x2 hero is available. Acceptable pre-release.
+
+**Reference:** `android/app/android/app/src/main/AndroidManifest.xml`; deleted files listed in CHANGELOG 2026-07-10 (part 6); `android/app/lib/widget/now_playing_widget.dart`.

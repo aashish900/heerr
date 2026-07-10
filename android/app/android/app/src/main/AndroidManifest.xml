@@ -78,50 +78,13 @@
             </intent-filter>
         </receiver>
 
-        <!-- #20: Now Playing home-screen widget. Display state is pushed from
-             Dart via the home_widget package; transport buttons broadcast
-             ACTION_MEDIA_BUTTON to the MediaButtonReceiver above. -->
-        <receiver
-            android:name=".NowPlayingWidgetProvider"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/now_playing_widget_info" />
-        </receiver>
-
-        <!-- Thin "bar" Now Playing widget (3x1/4x1): animated waveform +
-             inline title/artist + display-only progress bar. Shares the
-             home_widget data contract with the classic tile above. -->
-        <receiver
-            android:name=".BarWidgetProvider"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/bar_widget_info" />
-        </receiver>
-
-        <!-- Chubby "pill" Now Playing widget (2x1): circular cover art +
-             title/artist + animated waveform. Shares the same data contract. -->
-        <receiver
-            android:name=".PillWidgetProvider"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/pill_widget_info" />
-        </receiver>
-
-        <!-- 4x2 "hero" Now Playing widget: album art + title/artist + animated
-             gradient waveform + progress + m:ss times + transport, with an idle
-             "Start listening" state. Shares the same data contract. -->
+        <!-- #20: Now Playing home-screen widget — the 4x2 "hero" tile: album
+             art + title/artist + animated gradient waveform + progress +
+             m:ss times + transport, with an idle "Start listening" state.
+             Display state is pushed from Dart via the home_widget package;
+             transport buttons broadcast ACTION_MEDIA_BUTTON to the
+             MediaButtonReceiver above. (The earlier "classic"/"bar"/"pill"
+             widgets were retired in favour of this single tile.) -->
         <receiver
             android:name=".HeroWidgetProvider"
             android:exported="false">

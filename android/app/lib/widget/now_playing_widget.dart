@@ -15,12 +15,14 @@ import '../utils/palette.dart';
 
 /// #20: home-screen "Now Playing" widget.
 ///
-/// A compact single-row tile: a left cover-art thumbnail, track title +
-/// artist, and a play/pause / next / previous control row. Controls are
-/// wired natively in [NowPlayingWidgetProvider.kt] as `ACTION_MEDIA_BUTTON`
-/// broadcasts to `com.ryanheise.audioservice.MediaButtonReceiver`, so they
-/// drive the **live** audio_service MediaSession — no background isolate, no
-/// second player instance.
+/// The 4x2 "hero" tile: album art, track title + artist, a gradient
+/// waveform + progress bar with m:ss times, and a play/pause / next /
+/// previous control row (with an idle "Start listening" state when nothing
+/// is queued). Controls are wired natively in [HeroWidgetProvider.kt] as
+/// `ACTION_MEDIA_BUTTON` broadcasts to
+/// `com.ryanheise.audioservice.MediaButtonReceiver`, so they drive the
+/// **live** audio_service MediaSession — no background isolate, no second
+/// player instance.
 ///
 /// Cover art is rendered as a **small left thumbnail** only (the native side
 /// decodes it heavily downsampled). The earlier full-bleed-background bitmap
@@ -30,21 +32,10 @@ import '../utils/palette.dart';
 /// state + the cached art path; the native provider name + these data keys
 /// are the contract the RemoteViews reads.
 
-/// Must match the Kotlin `AppWidgetProvider` classes (and their manifest
-/// `<receiver android:name>` entries). All three home-screen widgets share the
-/// same `np_*` data keys; they differ only in how the native RemoteViews
-/// renders them.
-const String kNowPlayingWidgetName = 'NowPlayingWidgetProvider';
-
-/// Thin 3x1/4x1 "bar" widget (animated waveform + inline title/artist +
-/// display-only progress).
-const String kBarWidgetName = 'BarWidgetProvider';
-
-/// Chubby 2x1 "pill" widget (circular cover art + title/artist + waveform).
-const String kPillWidgetName = 'PillWidgetProvider';
-
-/// 4x2 "hero" widget (album art + title/artist + gradient waveform +
-/// progress + m:ss times + transport, with an idle "Start listening" state).
+/// Must match the Kotlin `HeroWidgetProvider` class (and its manifest
+/// `<receiver android:name>` entry). The only home-screen widget as of the
+/// gradient redesign — the earlier "classic"/"bar"/"pill" widgets were
+/// retired in favour of this single 4x2 tile.
 const String kHeroWidgetName = 'HeroWidgetProvider';
 
 const String kNpKeyHasTrack = 'np_has_track';
@@ -53,7 +44,7 @@ const String kNpKeyArtist = 'np_artist';
 const String kNpKeyPlaying = 'np_playing';
 
 /// Playback position / track duration in milliseconds, stored as decimal
-/// strings (empty when unknown). Consumed only by the bar widget's display-only
+/// strings (empty when unknown). Consumed by the hero widget's display-only
 /// progress bar. Strings (not ints) so the native side parses with
 /// `toLongOrNull`, matching the tint-key convention.
 const String kNpKeyPositionMs = 'np_position_ms';
@@ -156,17 +147,11 @@ class HomeWidgetClientImpl implements HomeWidgetClient {
 
   @override
   Future<void> update() async {
-    // Redraw all home-screen widgets; any not added by the user is a harmless
-    // no-op. They share the same `np_*` data, so a single push feeds whichever
-    // tiles are on the home screen.
-    for (final String name in const <String>[
-      kNowPlayingWidgetName,
-      kBarWidgetName,
-      kPillWidgetName,
-      kHeroWidgetName,
-    ]) {
-      await HomeWidget.updateWidget(name: name, androidName: name);
-    }
+    // Redraw the hero widget; a harmless no-op if the user hasn't added it.
+    await HomeWidget.updateWidget(
+      name: kHeroWidgetName,
+      androidName: kHeroWidgetName,
+    );
   }
 }
 
@@ -210,9 +195,9 @@ class NowPlayingWidgetUpdater {
       await _client.saveBool(kNpKeyPlaying, snapshot.isPlaying);
       await _client.saveString(kNpKeyTintArgb, await _resolveTint(item));
       await _client.saveString(kNpKeyArtPath, await _resolveArtPath(item));
-      // Bar-widget progress. Snapshots only emit on transport changes, so the
-      // bar snaps to the new position on play/pause/seek/track-change rather
-      // than ticking continuously — the battery-safe trade-off for a widget.
+      // Hero-widget progress. Snapshots only emit on transport changes, so
+      // this snaps to the new position on play/pause/seek/track-change; the
+      // live ticker ([pushPosition]) covers the in-between seconds.
       await _client.saveString(
         kNpKeyPositionMs,
         snapshot.position.inMilliseconds.toString(),
@@ -230,8 +215,8 @@ class NowPlayingWidgetUpdater {
 
   /// Lightweight position-only push for the live 1 s progress ticker. Writes
   /// just [kNpKeyPositionMs] and redraws — no tint/art re-resolution — so the
-  /// hero/bar progress advances each second without the per-track work [push]
-  /// does. Callers should only tick while a track is playing.
+  /// hero widget's progress advances each second without the per-track work
+  /// [push] does. Callers should only tick while a track is playing.
   Future<void> pushPosition(Duration position) async {
     try {
       await _client.saveString(

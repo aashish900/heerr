@@ -2376,3 +2376,12 @@ New 4x2 home-screen widget matching the concept art (magenta->violet gradient), 
 - **Dart** (`lib/widget/now_playing_widget.dart`): added `kHeroWidgetName` to the `update()` redraw loop; new `pushPosition(Duration)` that writes only `np_position_ms` + redraws. **`lib/widget/now_playing_widget_provider.dart`**: a `Timer.periodic(1s)` runs while `snapshot.isPlaying`, pushing the extrapolated `PlaybackState.position` each second so the progress bar + timestamps advance live; cancelled on pause/idle and `ref.onDispose`. Only ticks while the app process is alive.
 - **Tests**: added 2 `pushPosition` tests (position-only write; error-swallowing). `flutter analyze` clean; 776/776 green.
 - On-device smoke on the Pixel 7 is still pending (native RemoteViews are out of TDD scope) — verify both states, the gradient border/waveform/play-circle, the 1s tick, transport + tap-to-open, and that the existing 3 widgets show the gradient.
+
+## 2026-07-10 — Retire the classic/bar/pill widgets; hero-only + single-widget ticker (part 6)
+
+Review follow-up to part 5: keep only the new 4x2 hero widget, and stop the live 1s ticker fanning out to every registered widget name.
+
+- **Removed**: `kotlin/com/aashish/heerr/{NowPlayingWidgetProvider,BarWidgetProvider,PillWidgetProvider}.kt`, `res/layout/{now_playing_widget,bar_widget,pill_widget}.xml`, `res/xml/{now_playing_widget_info,bar_widget_info,pill_widget_info}.xml`, their `<receiver>` blocks in `AndroidManifest.xml`, and the drawables exclusive to them (`widget_background.xml`, `widget_pill_background.xml`). Drawables shared with the hero widget (`widget_wave_1..8`, `widget_progress`, `widget_ic_album`, `widget_ic_play/pause/next/previous`) are untouched.
+- **`lib/widget/now_playing_widget.dart`**: removed `kNowPlayingWidgetName` / `kBarWidgetName` / `kPillWidgetName`. `HomeWidgetClientImpl.update()` now redraws only `kHeroWidgetName` directly instead of looping over four (now one) registered widget names — the loop was flagged in review because it re-inflated every added widget's RemoteViews (including the ViewFlipper waveform) on every 1s `pushPosition` tick, not just on the transport-driven `push()`.
+- `proguard-rules.pro` comment updated (`NowPlayingWidgetProvider` → `HeroWidgetProvider`); no rule change (the `-keep` was already package-wide).
+- `flutter analyze` clean; 776/776 tests green (no test referenced the removed constants). `flutter build apk --debug` succeeds with the resources/receivers removed.
