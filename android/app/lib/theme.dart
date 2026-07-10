@@ -108,8 +108,7 @@ ThemeData heerrDarkTheme() {
       unselectedLabelColor: Color(0xFF808080),
       indicator: GradientTabIndicator(),
       indicatorSize: TabBarIndicatorSize.label,
-      dividerColor: Color(0xFF2E2E2E),
-      dividerHeight: 1,
+      dividerColor: Colors.transparent,
     ),
     chipTheme: ChipThemeData(
       backgroundColor: const Color(0xFF1A1A1A),

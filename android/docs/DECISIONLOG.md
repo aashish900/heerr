@@ -898,3 +898,31 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Trade-off:** 16dp-tall tap zones are below the 48dp touch-target guideline, and 10-zone granularity means seeks land within ~10% of the intended spot — acceptable given RemoteViews' hard ceiling on interactivity. A cold-started `AudioService` (app killed, stale widget) makes the first tap a no-op seek on an empty session rather than an error.
 
 **Reference:** `android/app/android/app/src/main/kotlin/com/aashish/heerr/{HeroWidgetProvider.kt, WidgetSeekReceiver.kt}`, `res/layout/hero_widget.xml`, `AndroidManifest.xml`, `build.gradle.kts`. CHANGELOG 2026-07-10 ("Widget polish").
+
+## 2026-07-10 — Widget idle icon: extract from the real app icon instead of hand-drawing a vector
+
+**Context:** The first widget-polish pass (see the tap-to-seek entry above) hand-drew a new `widget_logo_gradient.xml` vector approximating the concept art's idle-state mark. On review the user pointed out it still didn't match and asked whether the existing app-icon assets could be reused instead — `assets/icon.png` (and the generated launcher icons derived from it) already contain the exact "H + waveform" brand mark the concept art is showing.
+
+**Decision:** Write `tool/gen_widget_logo.py` (Pillow) to derive the widget's idle drawable directly from `assets/icon.png`: key out the icon's opaque black disc background (including its anti-aliased edge ring — plain color-threshold alone left a faint ~2-4px gray ring) to transparent, crop to the mark's bounding box, and write the result as `drawable-nodpi/widget_logo_gradient.png`, replacing the hand-drawn vector at the same resource name.
+
+**Why:** The app icon *is* the source of truth for the brand mark — re-deriving it by eye in a vector will always drift from the real asset. Extracting from the shipped PNG guarantees pixel-for-pixel fidelity to what the user actually approved as the app's identity, and is strictly less work to keep in sync if the icon is ever redesigned (rerun the script). `drawable-nodpi` (vs. per-density buckets) was chosen because the source is high-resolution (1024x1024) and downscales cleanly to the widget's small on-screen size; per-density duplication would add files without adding visible quality.
+
+**Alternatives considered:**
+- **Iterate on the hand-drawn vector further.** Rejected — the underlying problem is drawing-by-eye inherently drifts from the real asset; extraction removes the whole error class.
+- **Reference `ic_launcher_foreground.png` / `mipmap/ic_launcher.png` directly.** Considered, but both are adaptive-icon-shaped exports with extra padding/composition baked in for launcher use; extracting fresh from `assets/icon.png` gives more control over the crop and avoids depending on launcher-icon-specific artifacts.
+
+**Reference:** `android/app/tool/gen_widget_logo.py`, `android/app/android/app/src/main/res/drawable-nodpi/widget_logo_gradient.png`, `android/app/android/app/src/main/res/layout/hero_widget.xml`. CHANGELOG 2026-07-10 ("Follow-up: real app-icon mark...").
+
+## 2026-07-10 — Tab indicator's thin extension: paint it in the Decoration, not the TabBar divider
+
+**Context:** The first pass at the gradient tab indicator (see the "gradient tab indicator" changelog entry above) approximated the reference screenshot's thin extending line using `TabBarThemeData.dividerColor`/`dividerHeight`. On review the user reported only the bold bar was visible — no faint extension. Root cause: the theme divider spans the *entire* TabBar at a fixed neutral gray, not a magenta glow bleeding out from just the *selected* tab's indicator, so it never matched the reference even before the visibility question.
+
+**Decision:** Move the thin line into `GradientTabIndicator`'s own `BoxPainter`: a 1dp magenta line at 55% opacity, extending a configurable `fadeExtension` (default 20dp) past each end of the bold 3dp bar, fading to transparent via a 4-stop `LinearGradient` shader, painted underneath the bold bar. Reverted `dividerColor` back to `Colors.transparent`.
+
+**Why:** Only the indicator itself knows which tab is selected and where its bar sits; the divider is a TabBar-wide decoration with no notion of "selected." Flutter's `TabBar` does not clip indicator painting to the owning tab's segment, so painting outside the indicator's own rect is safe and is exactly how the reference's glow can visually bleed past the label into neighbouring tab space.
+
+**Alternatives considered:**
+- **Keep the divider, just recolor it magenta.** Rejected — still wrong scope (full-width across all tabs, not just fading from the selected one).
+- **Two separate `Container`s stacked in the tab's build method instead of a `Decoration`.** Rejected — the app's tabs are built via a plain `const TabBar(tabs: [...])` with no per-tab custom widget; keeping the whole visual in the theme's `Decoration` avoids touching every screen that uses `TabBar`.
+
+**Reference:** `android/app/lib/widgets/gradient_tab_indicator.dart`, `android/app/lib/theme.dart`, `android/app/test/widgets/gradient_tab_indicator_test.dart`. CHANGELOG 2026-07-10 ("Follow-up: real app-icon mark...").

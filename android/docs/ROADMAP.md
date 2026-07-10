@@ -2,9 +2,9 @@
 
 Track progress through the Android client build. Each milestone = one git commit with the test gate green where applicable. Tick the box when committed.
 
-See `PLAN.md` for the *what*; this file is the *how* / *when*.
+See `DECISIONLOG.md` for the *what*; this file is the *how* / *when*.
 
-**Status (2026-07-10):** Phases A–Y complete. Phase Y (edit song metadata — title/album/artist + cover art, issue #44) shipped 2026-07-06 at `v4.6.2`; `v4.7.0` (2026-07-10) is the app-wide gradient redesign — magenta→purple→violet theme across every screen + the new 4x2 gradient hero home-screen widget (replaces the classic/bar/pill widgets); `v4.7.1` (2026-07-10) polishes the hero widget (album-art fade, tap-to-seek, redrawn logo/waveform) and adds the gradient Library tab indicator.
+**Status (2026-07-10):** Phases A–Y complete. Phase Y (edit song metadata — title/album/artist + cover art, issue #44) shipped 2026-07-06 at `v4.6.2`; `v4.7.0` (2026-07-10) is the app-wide gradient redesign — magenta→purple→violet theme across every screen + the new 4x2 gradient hero home-screen widget (replaces the classic/bar/pill widgets); `v4.7.1` (2026-07-10) polishes the hero widget (album-art fade, tap-to-seek, redrawn logo/waveform) and adds the gradient Library tab indicator; `v4.7.2` (2026-07-10) fixes the widget idle icon to use the real app-icon mark and corrects the tab indicator's fade extension.
 
 **Conventions:**
 - TDD by default (CLAUDE.md §2) — widget tests / unit tests written first, land in the same commit as code.

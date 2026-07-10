@@ -5,11 +5,13 @@ import 'package:heerr/theme.dart';
 import 'package:heerr/widgets/gradient_tab_indicator.dart';
 
 void main() {
-  test('heerrDarkTheme uses GradientTabIndicator with a thin extension divider', () {
+  test('heerrDarkTheme uses GradientTabIndicator with a faint fading extension', () {
     final ThemeData theme = heerrDarkTheme();
-    expect(theme.tabBarTheme.indicator, isA<GradientTabIndicator>());
+    final Decoration? indicator = theme.tabBarTheme.indicator;
+    expect(indicator, isA<GradientTabIndicator>());
+    expect((indicator! as GradientTabIndicator).fadeExtension, greaterThan(0));
     expect(theme.tabBarTheme.indicatorSize, TabBarIndicatorSize.label);
-    expect(theme.tabBarTheme.dividerHeight, 1);
+    expect(theme.tabBarTheme.dividerColor, Colors.transparent);
   });
 
   testWidgets('gradient tab indicator paints without error across tab switches',

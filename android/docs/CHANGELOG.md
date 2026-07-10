@@ -2438,3 +2438,21 @@ User compared the shipped hero widget and Library tab bar against the original c
 - **`android/app/src/main/AndroidManifest.xml`** — registered `.WidgetSeekReceiver` (`exported="false"`, explicit-component broadcast, no intent-filter).
 - **`android/app/build.gradle.kts`** — added `implementation("androidx.media:media:1.7.0")` (compile-time visibility for `MediaBrowserCompat`/`MediaControllerCompat`; already on the runtime classpath via audio_service).
 - Verification: `flutter test` 778/778 green (776 prior + 2 new), `flutter analyze` clean, `flutter build apk --debug` succeeds. Native visuals/seek not yet smoke-tested on device.
+
+## 2026-07-10 — Follow-up: real app-icon mark for the widget idle state; tab indicator's missing fade
+
+User review of the previous widget-polish commit flagged two remaining mismatches against the concept art.
+
+- **`tool/gen_widget_logo.py`** (new, committed) — extracts the actual heerr "H + waveform" mark from `assets/icon.png` (the real app icon) instead of a hand-drawn vector approximation: keys out the icon's opaque black disc background (near-black pixels, including its anti-aliased edge ring) to transparent, crops to the mark's bounding box with 12px padding, writes `android/app/src/main/res/drawable-nodpi/widget_logo_gradient.png`.
+- **`android/app/src/main/res/drawable/widget_logo_gradient.xml`** — deleted (superseded by the extracted PNG of the same resource name in `drawable-nodpi/`).
+- **`android/app/src/main/res/layout/hero_widget.xml`** — idle logo `ImageView` resized 46x40dp → 40x40dp (square, matching the extracted asset's aspect ratio; `fitCenter` was leaving dead space in the old non-square box).
+- **`lib/widgets/gradient_tab_indicator.dart`** — the thin extension was wrongly implemented as `TabBarThemeData`'s full-width divider (wrong color, wrong scope — spans every tab, not just the selected one). Replaced with a `fadeExtension` (default 20dp) painted by the indicator itself: a 1dp magenta line at 55% opacity extending past each end of the bold 3dp bar and fading to transparent at the tips, drawn under the bold bar. `TabBar` doesn't clip indicator painting to a single tab's segment, so the fade is free to bleed into neighbouring tabs as in the reference screenshot.
+- **`lib/theme.dart`** — reverted the stopgap `dividerColor`/`dividerHeight` back to `dividerColor: Colors.transparent` (the indicator is now self-contained).
+- **`test/widgets/gradient_tab_indicator_test.dart`** — theme-wiring assertion updated to check `fadeExtension > 0` and `dividerColor == Colors.transparent` instead of the removed divider-height assumption.
+- Verification: `flutter test` 778/778 green, `flutter analyze` clean, `flutter build apk --debug` succeeds (confirms the `drawable-nodpi` PNG swap resolves cleanly with no resource-name collision from the deleted vector). Native visuals still pending on-device smoke.
+
+## 2026-07-10 — Version bump to 4.7.2; remove stray PLAN.md
+
+- **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.7.1 → 4.7.2 for the icon/indicator follow-up fixes, per the version-sync convention.
+- **`android/docs/PLAN.md`** — deleted. It held the ad-hoc widget-polish plan (superseded by the CHANGELOG/DECISIONLOG entries once implemented); its presence collided with `android/CLAUDE.md`'s pre-existing (and separately stale) reference to a `PLAN.md` as "the locked v1 contract."
+- **`android/docs/ROADMAP.md`** — the *what*-pointer in the header updated from the now-deleted `PLAN.md` to `DECISIONLOG.md`.
