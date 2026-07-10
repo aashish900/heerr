@@ -5,12 +5,19 @@ import 'package:heerr/theme.dart';
 import 'package:heerr/widgets/gradient_tab_indicator.dart';
 
 void main() {
-  test('heerrDarkTheme uses GradientTabIndicator with a faint fading extension', () {
+  test(
+      'heerrDarkTheme uses GradientTabIndicator with a full-width faint line',
+      () {
     final ThemeData theme = heerrDarkTheme();
     final Decoration? indicator = theme.tabBarTheme.indicator;
     expect(indicator, isA<GradientTabIndicator>());
-    expect((indicator! as GradientTabIndicator).fadeExtension, greaterThan(0));
-    expect(theme.tabBarTheme.indicatorSize, TabBarIndicatorSize.label);
+    final GradientTabIndicator gradientIndicator = indicator! as GradientTabIndicator;
+    expect(gradientIndicator.fadeAlpha, greaterThan(0));
+    expect(gradientIndicator.boldWidthFraction, greaterThan(0));
+    expect(gradientIndicator.boldWidthFraction, lessThanOrEqualTo(1));
+    // .tab (not .label) so the Decoration is handed the full selected tab's
+    // width — the faint line needs to span the whole tab, not just the label.
+    expect(theme.tabBarTheme.indicatorSize, TabBarIndicatorSize.tab);
     expect(theme.tabBarTheme.dividerColor, Colors.transparent);
   });
 

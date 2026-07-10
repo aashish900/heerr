@@ -3,11 +3,14 @@
 from the real app icon (assets/icon.png) instead of a hand-drawn
 approximation, so the widget matches the actual brand mark exactly.
 
-assets/icon.png is the mark on an opaque black disc (on transparent
-corners). The widget tile interior is itself near-black, so the disc would
-double up as a visible circle; this script keys out near-black opaque
-pixels back to transparent, keeping only the gradient mark, then crops
-tightly to its bounding box. Run from android/app/:
+assets/icon.png is the mark on an opaque black disc with a visible gray
+bezel stroke around its rim (on transparent corners) — the widget tile
+interior is itself near-black, so both the disc and its stroke would show
+as a ring. This script keys out any low-saturation (grayscale) pixel —
+which covers the black disc fill AND the gray stroke, since the brand
+mark's magenta/purple/blue bars are all highly saturated and never trip
+this filter — back to transparent, then crops tightly to the mark's
+bounding box. Run from android/app/:
 
     python3 tool/gen_widget_logo.py
 """
@@ -20,7 +23,7 @@ OUT = (
     Path(__file__).resolve().parent.parent
     / "android/app/src/main/res/drawable-nodpi/widget_logo_gradient.png"
 )
-BLACK_THRESHOLD = 24
+SATURATION_THRESHOLD = 15
 PADDING_PX = 12
 
 
@@ -31,9 +34,8 @@ def main() -> None:
     for y in range(h):
         for x in range(w):
             r, g, b, a = px[x, y]
-            # Also zero out the disc's anti-aliased edge ring (near-black,
-            # partially transparent), not just fully-opaque black.
-            if r < BLACK_THRESHOLD and g < BLACK_THRESHOLD and b < BLACK_THRESHOLD:
+            saturation = max(r, g, b) - min(r, g, b)
+            if saturation < SATURATION_THRESHOLD:
                 px[x, y] = (r, g, b, 0)
 
     bbox = im.getbbox()

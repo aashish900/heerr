@@ -926,3 +926,45 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **Two separate `Container`s stacked in the tab's build method instead of a `Decoration`.** Rejected — the app's tabs are built via a plain `const TabBar(tabs: [...])` with no per-tab custom widget; keeping the whole visual in the theme's `Decoration` avoids touching every screen that uses `TabBar`.
 
 **Reference:** `android/app/lib/widgets/gradient_tab_indicator.dart`, `android/app/lib/theme.dart`, `android/app/test/widgets/gradient_tab_indicator_test.dart`. CHANGELOG 2026-07-10 ("Follow-up: real app-icon mark...").
+
+## 2026-07-11 — Home Screen redesign scoping (mockup-first, own identity)
+
+**Context:** The app's Home Screen (greeting AppBar + recently-played grid + "Jump back in" / "Most played" / "Picked for you" horizontal shelves) reads as a Spotify clone. The user supplied a concept mockup (`Home Screen.png`, outside the repo) defining heerr's own layout: branded header, hero "Continue Listening" card, Quick Access shortcut cards, and a vertical "Recently Added" list. Four scope questions were put to the user before planning.
+
+**Decision:** (all confirmed by the user 2026-07-11)
+1. The old horizontal sections are **dropped entirely** — Home matches the mockup exactly.
+2. A **Favorites screen is built** in the same redesign (the `getStarred2` service call already exists; only the screen/route/provider are new).
+3. The mockup's Quick Access **"Edit" action is deferred** — static 4 cards, deferral logged in DEBT.md.
+4. The **MiniPlayer restyle is in scope** as the final task (it is visually part of the new design language even though it lives in the nav shell).
+
+**Why:** A partial adoption (mockup sections + legacy shelves below) would dilute the identity change the redesign exists to make; the hero card + Quick Access already cover the "jump back in" job the old shelves did. Favorites is cheap (backend support exists) and the card would otherwise point nowhere. Edit/reorder is pure customization machinery with no dependency on the layout — safe to defer. The MiniPlayer appears on the same screen as the redesign and would visibly clash if left in the old dominant-color-tint style.
+
+**Alternatives considered:**
+- **Keep "Picked for you" below Recently Added.** Rejected by user — full mockup fidelity preferred; recommendations remain reachable via the "For You" Quick Access card.
+- **Favorites card → Library placeholder.** Rejected — dead-end tap targets undermine the shortcut row's purpose.
+- **Build Edit/reorder now.** Rejected — storage + reorder UI + tests for a cosmetic feature; deferred to DEBT.
+
+**Reference:** `android/docs/HOMESCREEN.md` (full task breakdown). CHANGELOG 2026-07-11.
+
+## 2026-07-11 — Key the widget icon by saturation, not brightness
+
+**Context:** After the first icon-extraction fix (see the "extract from the real app icon" entry above), the user reported the disc's ring was still visible on-device. The extraction script keyed out pixels by brightness (`r,g,b < 24`), which correctly removed the disc's black fill but missed a fully-opaque gray bezel stroke baked into `assets/icon.png`'s rim — sampled at brightness up to ~190, far above the threshold, so it survived the first pass entirely.
+
+**Decision:** Key on saturation (`max(r,g,b) - min(r,g,b) < 15`) instead of brightness. Sampled the brand mark's bars at saturation 190-206 (highly saturated magenta/purple/blue) versus the disc fill and its stroke at saturation well under 15 (both grayscale) — one threshold now cleanly separates "part of the mark" from "part of the disc/bezel," regardless of how bright or dark the background element is.
+
+**Why:** Brightness-based keying only holds if the unwanted background is uniformly near-black; this icon's background has two distinct near-gray elements (a black fill and a lighter gray stroke) at very different brightness levels, so no single brightness threshold covers both without also risking eating into the mark's own dark-edge anti-aliasing. Saturation is the property that's actually invariant across "grayscale background" regardless of brightness, and is never true of the colorful mark.
+
+**Reference:** `android/app/tool/gen_widget_logo.py`. CHANGELOG 2026-07-11.
+
+## 2026-07-11 — Tab indicator's faint line needs TabBarIndicatorSize.tab, not .label
+
+**Context:** The second tab-indicator fix (see the "paint it in the Decoration" entry above) extended the faint line only a fixed 20dp past the label's own width, because the Decoration was sized off `TabBarIndicatorSize.label`. The user wanted the faint line to span the *entire* selected tab's width, matching the reference screenshot — not just peek out slightly past the label.
+
+**Decision:** Switch `TabBarThemeData.indicatorSize` to `TabBarIndicatorSize.tab`, so `GradientTabIndicator.paint()` receives the full tab segment's width as `configuration.size`. The faint line now draws across that entire width (with a short taper at the extreme ends instead of a hard cut); the bold gradient bar is drawn narrower (`boldWidthFraction`, default 0.5) and centered within it, approximating the label's width since Flutter's `Decoration` API gives a painter exactly one size per paint() call — there's no way to size the two layers independently without measuring label text manually.
+
+**Why:** `TabBarIndicatorSize.label` was the natural default for the bold bar alone (matches the earlier bugfix intent — hug the label), but it structurally cannot also supply "full tab width" to the same paint() call. `.tab` is the only sizing mode that gives the painter enough information to draw a genuinely full-width fade; the trade-off is the bold bar's width becomes an approximation (a fixed fraction of tab width) rather than an exact label measurement.
+
+**Alternatives considered:**
+- **Measure the label text width via `TextPainter` inside the indicator.** Rejected — adds a text-layout dependency inside a `Decoration`, coupling it to the app's specific `Tab` text styling; a fixed fraction is simpler and visually close enough for this app's short tab labels ("Artists"/"Albums"/"Playlists").
+
+**Reference:** `android/app/lib/widgets/gradient_tab_indicator.dart`, `android/app/lib/theme.dart`. CHANGELOG 2026-07-11.

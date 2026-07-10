@@ -2456,3 +2456,20 @@ User review of the previous widget-polish commit flagged two remaining mismatche
 - **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.7.1 → 4.7.2 for the icon/indicator follow-up fixes, per the version-sync convention.
 - **`android/docs/PLAN.md`** — deleted. It held the ad-hoc widget-polish plan (superseded by the CHANGELOG/DECISIONLOG entries once implemented); its presence collided with `android/CLAUDE.md`'s pre-existing (and separately stale) reference to a `PLAN.md` as "the locked v1 contract."
 - **`android/docs/ROADMAP.md`** — the *what*-pointer in the header updated from the now-deleted `PLAN.md` to `DECISIONLOG.md`.
+
+## 2026-07-11 — Home Screen redesign: planning round (docs only)
+
+- **`android/docs/HOMESCREEN.md`** (new) — detailed implementation plan for the mockup-driven Home Screen redesign (branded header, greeting block, Continue Listening hero card, Quick Access shortcut row, Recently Added vertical list, new Favorites + Recently Added screens, MiniPlayer restyle). 8 tasks, each with file paths, provider names, layout specs, and test requirements — written for handoff to an implementing agent. No code changed in this round.
+
+## 2026-07-11 — Follow-up 2: kill the widget icon's ghost ring; tab indicator fade spans the whole tab
+
+- **`tool/gen_widget_logo.py`** — the previous saturation-blind, brightness-only keying (near-black threshold) missed a fully-opaque gray bezel stroke baked into `assets/icon.png`'s disc edge (brightness up to ~190, well above the black threshold), which still showed as a faint ring on-device. Switched to a saturation-based filter (`max(r,g,b) - min(r,g,b) < 15`): the brand mark's magenta/purple/blue bars are all highly saturated (sat 190-206 sampled), while the disc fill and its stroke are both grayscale, so one threshold now removes the entire disc+ring cleanly regardless of brightness. Re-running the script shrank the cropped bounding box from 1024x1024 to 607x670 — confirms the ring is gone, not just dimmed.
+- **`android/app/src/main/res/layout/hero_widget.xml`** — idle logo `ImageView` 40x40dp → 48dp (20% larger, per request).
+- **`lib/widgets/gradient_tab_indicator.dart`** — the faint line previously only extended a fixed 20dp past the label's own width (`TabBarIndicatorSize.label`-scoped), so it never covered the *whole* selected tab. Since a `Decoration`'s `paint()` gets one `configuration.size` shared by both layers, switched indicator sizing to `TabBarIndicatorSize.tab`: the faint line (`fadeAlpha`, default 0.35) now spans the entire tab width with only a small taper at the very ends, while the bold gradient bar (`boldWidthFraction`, default 0.5 of tab width) stays narrower and centered on top, approximating the label's width.
+- **`lib/theme.dart`** — `tabBarTheme.indicatorSize` → `TabBarIndicatorSize.tab`.
+- **`test/widgets/gradient_tab_indicator_test.dart`** — updated for the renamed `fadeAlpha`/`boldWidthFraction` fields and `indicatorSize == .tab`.
+- Verification: `flutter test` 778/778 green, `flutter analyze` clean, `flutter build apk --debug` succeeds. Native visuals still pending on-device smoke.
+
+## 2026-07-11 — Home Screen redesign plan: Part B (adaptive art-driven theming)
+
+- **`android/docs/HOMESCREEN.md`** — added Part B (§7, tasks B1–B4) after user review: per-song adaptive theming of the hero card + MiniPlayer. Artwork is never recolored; instead — shared cached palette provider (promoting the existing `dominantColorFor` / `palette_generator` path), 18% brand-blend of the extracted color for accents (waveform tint, play-button glow), blurred-art backdrop under a darkening gradient on the hero card, 400 ms animated tint transitions on track change. Amended Task 7 so the MiniPlayer palette infrastructure is kept (not deleted) for B1 to build on. Docs only.
