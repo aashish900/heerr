@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../models/profile.dart';
 import '../../providers/profiles/profile_registry.dart';
 import '../../router.dart';
+import '../../theme.dart';
 
 /// Profiles management section shown in [SettingsScreen]. Lists every
 /// [Profile] in the registry with its display name + Navidrome username
@@ -59,7 +60,10 @@ class ProfilesSection extends ConsumerWidget {
                   ),
                 ),
               ListTile(
-                leading: const Icon(Icons.person_add_outlined),
+                leading: const Icon(
+                  Icons.person_add_outlined,
+                  color: heerrMagenta,
+                ),
                 title: const Text('Add profile'),
                 onTap: () => context.push(Routes.login),
               ),
@@ -79,9 +83,18 @@ class _ProfileRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final Color primary = Theme.of(context).colorScheme.primary;
     return ListTile(
-      leading: const Icon(Icons.person_outline),
-      title: Text(profile.displayName),
+      leading: Icon(
+        Icons.person_outline,
+        color: isActive ? primary : null,
+      ),
+      title: Text(
+        profile.displayName,
+        style: isActive
+            ? TextStyle(color: primary, fontWeight: FontWeight.w600)
+            : null,
+      ),
       subtitle: Text(
         '${profile.navidromeUsername} • last used '
         '${_formatRelative(profile.lastUsedAt)}',
@@ -105,12 +118,13 @@ class _ProfileRow extends ConsumerWidget {
         ],
       ),
       onTap: isActive ? null : () => _switchTo(context, ref),
-      // Visual marker for active row.
+      // Visual marker for active row: a rounded magenta-tinted pill with
+      // magenta title/icon, matching the redesign reference.
       selected: isActive,
-      selectedTileColor:
-          Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
-      iconColor:
-          isActive ? Theme.of(context).colorScheme.primary : null,
+      selectedTileColor: primary.withValues(alpha: 0.12),
+      shape: isActive
+          ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+          : null,
     );
   }
 

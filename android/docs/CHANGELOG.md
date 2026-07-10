@@ -2328,3 +2328,90 @@ Delete from device / server / both verified on the Pixel against the home server
 - **`lib/screens/library/playlist_detail_screen.dart`** — per-song pending badge `Icons.download_for_offline_outlined` and downloaded badge `Icons.download_done` replaced with `DownloadIcon`.
 - **`test/widgets/library_result_tile_test.dart`** — updated finders from `find.byIcon(Icons.download_*)` to `find.byType(DownloadIcon)` / `find.byWidgetPredicate`.
 - **`test/widgets/result_tile_test.dart`** — same finder updates; import added. 774 tests green.
+
+## 2026-07-10 — Redesign: gradient magenta/purple theme (move off Spotify green)
+
+Part 1 of the app-wide visual redesign toward the magenta→purple→violet brand identity (matches the new app icon). Theme + gradient accents only; per-screen layout passes follow.
+
+- **`lib/theme.dart`** — palette swapped from Spotify green to `heerrMagenta #F533C8` (primary), `heerrPurple #A93CF2` (secondary), `heerrViolet #6F4BF5` (tertiary); background deepened to `#0A0A0A`. New `heerrGradient` `LinearGradient` (magenta→purple→violet, topLeft→bottomRight). `onPrimary`/`onSecondary`/`onError` are black (contrast on the bright fills, ~7:1). Added themed `SliderTheme`, `SwitchTheme`, `ChipTheme`, `ProgressIndicatorTheme`, `DividerTheme`, `ListTileTheme`, `FloatingActionButtonTheme`, `TextButtonTheme`, `ElevatedButtonTheme`. Deleted the dead `heerrGreen`/`heerrGolden` aliases (zero references remained).
+- **New `lib/widgets/gradient_icon.dart`** — `ShaderMask` wrapper that gradient-tints any glyph (Icon or SVG) via `heerrGradient`.
+- **New `lib/widgets/gradient_button.dart`** — full-width gradient pill CTA (disabled → grey), the redesign's primary button.
+- **`lib/router.dart`** — selected bottom-nav icon wrapped in `GradientIcon` (active tab sweeps the gradient; unselected stay grey).
+- **`lib/screens/player/now_playing_transport.dart`** — play/pause is now a gradient circle with a black glyph; scrubber's played portion painted with the gradient via a custom `_GradientSliderTrackShape`; shuffle/repeat gradient-tinted when active (`_transportGlyph` helper).
+- **`lib/screens/profile/profile_screen.dart`** — Save button → `GradientButton`; avatar wrapped in a gradient ring (gradient circle → black gap → photo).
+- Solid-magenta call sites updated off the legacy green: `album_detail_screen`, `playlist_detail_screen`, `queue_screen`, `now_playing_lyrics`, `library_result_tile`, `mini_player` (fallback tint → `heerrPurple`), `download_icon`, `settings_recommendations`.
+- `flutter analyze` clean; 774/774 tests green.
+
+## 2026-07-10 — Redesign: Settings screen (gradient theme, part 2)
+
+Second per-screen pass of the redesign. Settings now matches the reference mock.
+
+- **`lib/screens/settings_screen.dart`** — section leading icons tinted `heerrMagenta` (Profiles people, Offline downloads, Recommendations, App-version info) instead of the default grey.
+- **`lib/screens/settings/profiles_section.dart`** — active-profile row now renders as a rounded magenta-tinted pill (tint bumped 0.08→0.12) with magenta title + person icon; "Add profile" icon tinted magenta. Non-active rows unchanged. Imports `theme.dart`.
+- `flutter analyze` clean; 774/774 tests green (profiles-section test asserts only `ListTile.selected`, untouched).
+
+## 2026-07-10 — Redesign: Home screen (gradient theme, part 3)
+
+Third per-screen pass. Home layout already matched the reference mock (greeting + search pill + quick-access grid + horizontal sections); this pass tightens the surfaces + adds the brand avatar ring.
+
+- **`lib/theme.dart`** — explicit neutral dark-grey `surfaceContainer*` ladder (Lowest `#0D0D0D` → Highest `#222222`). The raw `ColorScheme` was falling back to M3's purple-tinted defaults for `surfaceContainerHigh`; now grid tiles / cards (High `#1C1C1C`) and the search pill (Highest `#222222`) read as flat neutral greys like the mock.
+- **`lib/screens/home/home_screen.dart`** — AppBar profile avatar (`_ProfileAvatarButton`) wrapped in a gradient ring (gradient circle → black gap → avatar), consistent with the Profile screen. Imports `theme.dart`.
+- `flutter analyze` clean; 774/774 tests green (avatar test targets the `home-profile-avatar` key, unchanged).
+
+## 2026-07-10 — Redesign: Library + Downloads (gradient theme, part 4)
+
+Fourth per-screen pass. Both screens are tab-based; a shared TabBar theme + the Downloads empty-state icon bring them in line with the mock.
+
+- **`lib/theme.dart`** — new `TabBarThemeData`: selected label + underline indicator `heerrMagenta`, unselected label `#808080`, transparent divider. Covers both the Library (Artists/Albums/Playlists) and Downloads (Albums/Playlists/Songs) tab bars — previously the selected label fell back to white (M3 `onSurface` default).
+- **`lib/screens/downloads_screen.dart`** — empty-state icon (`album_outlined` concentric-ring vinyl, etc.) now rendered via `GradientIcon` (magenta→violet) instead of flat grey, matching the mock's coloured empty-state focal icon. Imports `gradient_icon.dart`. Message text stays grey.
+- `flutter analyze` clean; 774/774 tests green (`find.byIcon` still matches — the Icon stays as GradientIcon's child).
+
+## 2026-07-10 — Redesign: gradient "hero" home-screen widget (part 5)
+
+New 4x2 home-screen widget matching the concept art (magenta->violet gradient), plus a green->gradient recolor of the existing three widgets and a live 1s progress ticker. Pure-Android; shares the existing `np_*` home_widget data contract.
+
+- **New native widget** (`res/layout/hero_widget.xml`, `res/xml/hero_widget_info.xml`, `kotlin/com/aashish/heerr/HeroWidgetProvider.kt`, receiver in `AndroidManifest.xml`): 4x2 tile with two states toggled off `np_has_track` — idle (gradient heerr logo + "Start listening to your music" + flat white transport) and playing (album art + title/artist + animated gradient waveform + display-only progress + `m:ss` timestamps + gradient-circle play). Shared transport row (control ids appear once); provider swaps the play button's background to `widget_play_circle` only when a track is loaded. Reuses the `decodeScaledBitmap` + `mediaButtonIntent` + `HomeWidgetLaunchIntent` patterns; whitelisted RemoteViews classes only.
+- **New gradient drawables**: `widget_gradient_border.xml` (2dp gradient rim via layer-list), `widget_play_circle.xml` (gradient oval), `widget_logo_gradient.xml` (heerr H+waveform mark, drawn as a vector — no SVG source exists).
+- **Recolor (shared drawables)**: `widget_wave_1..8.xml` bars now step magenta->violet left->right; `widget_progress.xml` fill is a magenta->violet gradient; `widget_ic_album.xml` placeholder is magenta. Shared, so the Bar + Pill widgets get the gradient too.
+- **Dart** (`lib/widget/now_playing_widget.dart`): added `kHeroWidgetName` to the `update()` redraw loop; new `pushPosition(Duration)` that writes only `np_position_ms` + redraws. **`lib/widget/now_playing_widget_provider.dart`**: a `Timer.periodic(1s)` runs while `snapshot.isPlaying`, pushing the extrapolated `PlaybackState.position` each second so the progress bar + timestamps advance live; cancelled on pause/idle and `ref.onDispose`. Only ticks while the app process is alive.
+- **Tests**: added 2 `pushPosition` tests (position-only write; error-swallowing). `flutter analyze` clean; 776/776 green.
+- On-device smoke on the Pixel 7 is still pending (native RemoteViews are out of TDD scope) — verify both states, the gradient border/waveform/play-circle, the 1s tick, transport + tap-to-open, and that the existing 3 widgets show the gradient.
+
+## 2026-07-10 — Retire the classic/bar/pill widgets; hero-only + single-widget ticker (part 6)
+
+Review follow-up to part 5: keep only the new 4x2 hero widget, and stop the live 1s ticker fanning out to every registered widget name.
+
+- **Removed**: `kotlin/com/aashish/heerr/{NowPlayingWidgetProvider,BarWidgetProvider,PillWidgetProvider}.kt`, `res/layout/{now_playing_widget,bar_widget,pill_widget}.xml`, `res/xml/{now_playing_widget_info,bar_widget_info,pill_widget_info}.xml`, their `<receiver>` blocks in `AndroidManifest.xml`, and the drawables exclusive to them (`widget_background.xml`, `widget_pill_background.xml`). Drawables shared with the hero widget (`widget_wave_1..8`, `widget_progress`, `widget_ic_album`, `widget_ic_play/pause/next/previous`) are untouched.
+- **`lib/widget/now_playing_widget.dart`**: removed `kNowPlayingWidgetName` / `kBarWidgetName` / `kPillWidgetName`. `HomeWidgetClientImpl.update()` now redraws only `kHeroWidgetName` directly instead of looping over four (now one) registered widget names — the loop was flagged in review because it re-inflated every added widget's RemoteViews (including the ViewFlipper waveform) on every 1s `pushPosition` tick, not just on the transport-driven `push()`.
+- `proguard-rules.pro` comment updated (`NowPlayingWidgetProvider` → `HeroWidgetProvider`); no rule change (the `-keep` was already package-wide).
+- `flutter analyze` clean; 776/776 tests green (no test referenced the removed constants). `flutter build apk --debug` succeeds with the resources/receivers removed.
+- **`kotlin/com/aashish/heerr/HeroWidgetProvider.kt`**: `formatTime()` now formats with `Locale.US` instead of the default locale, so the `m:ss` timestamps always render Latin digits regardless of device locale (was flagged in review — `String.format` with no explicit locale can render localized digit glyphs, e.g. Arabic-Indic, under some locales).
+
+## 2026-07-10 — Redesign review sweep: stale-doc + test-harness cleanup (part 7)
+
+Full-branch review of redesign parts 1–6. Code was clean; the drift found was in docs and test scaffolding still referencing the retired Spotify-green theme (staleness rule: docs updated same turn as discovered).
+
+- **`android/CLAUDE.md`** — locked-stack "Theme" line updated: `ColorScheme.fromSeed(#1DB954)` → hand-built raw `ColorScheme` (magenta primary + `heerrGradient` hero accents).
+- **`android/docs/CONTEXT.md`** — stack-table Theme row + "Aesthetic" section rewritten for the gradient identity (magenta `#F533C8` → purple `#A93CF2` → violet `#6F4BF5` on `#0A0A0A`), noting the raw-ColorScheme approach and the gradient-on-hero-accents rule.
+- **`test/screens/home/home_screen_test.dart`**, **`test/widgets/home_recommendation_card_test.dart`** — both `_wrap` harnesses built a private `ColorScheme.fromSeed(#1DB954)` theme; now use the real `heerrDarkTheme()` so widget tests exercise the shipped theme.
+- **`lib/screens/player/now_playing_transport.dart`** — comment fix: the gradient play circle's glyph is black (matches `onPrimary`), not white as the comment claimed.
+- `flutter analyze` clean; 776/776 tests green.
+
+## 2026-07-10 — Hero widget reworked 4x2 → 4x1 to match the concept art (part 8)
+
+On-device smoke showed the 4x2 tile with big empty bands and an inset thumbnail; the concept is a single-row bar with edge-to-edge art. Native-only rework.
+
+- **`res/xml/hero_widget_info.xml`** — `targetCellHeight` 2→1, `minHeight` 110dp→40dp (40dp is what maps to 1 launcher row), `resizeMode` horizontal-only.
+- **`res/layout/hero_widget.xml`** — rewritten: FrameLayout root (2dp border inset) holding the two full-bleed state groups. Playing state: full-height 96dp-wide cover flush left → column of [title/artist/wide waveform + transport row] → progress bar + m:ss times spanning under the transport to the right edge (as in the concept). Idle state now carries its own transport ids (`widget_idle_prev/play/next`) — no shared transport row anymore.
+- **`kotlin/.../HeroWidgetProvider.kt`** — new `buildArtBitmap()`: center-crops the cover to the art view's real aspect (height read from `getAppWidgetOptions` `OPTION_APPWIDGET_MAX_HEIGHT`, fallback 110dp) and rounds the LEFT corners (26dp, matching the border's inner radius) natively, since RemoteViews can't clip; density capped at 2x to keep the bitmap under the Binder limit. `onAppWidgetOptionsChanged` override redraws on resize. Wires PendingIntents for both state groups' transports; the play-disc background is now static in the layout (idle has its own flat buttons, so the `setBackgroundResource` swap is gone). `MAX_ART_PX` 192→512 (source decode cap before the crop).
+- **`res/drawable/widget_wave_1..8.xml`** — regenerated wide: 21 bars / 110x24 viewport (was 5 bars / 26x24) so the waveform spans the text column like the concept; same stepped magenta→violet tinting, sine-sampled with advancing phase.
+- **`AndroidManifest.xml`** — receiver comment 4x2→4x1.
+- Verification: release build (`--build-number=120`) installed on the Pixel 7. NOTE: a previously-placed widget instance keeps its old 4x2 cell size — the user must remove + re-add the widget after this update; launcher provider-info caching may additionally need a launcher restart.
+
+## 2026-07-10 — Library "New playlist" FAB gets the brand gradient (part 9)
+
+On-device review: the Playlists tab's extended FAB rendered solid magenta (the theme's `floatingActionButtonTheme`), not the gradient a primary CTA should carry per the redesign rule.
+
+- **`lib/screens/library/library_tabs.dart`** — the `FloatingActionButton.extended` is now transparent/flat (elevation 0, black foreground) inside a `DecoratedBox` with `heerrGradient` at 16dp radius (matching the M3 extended-FAB shape); FABs can't take a gradient directly.
+- **`lib/screens/library/library_screen.dart`** — added the `theme.dart` import (library_tabs.dart is a `part of` it).
+- `flutter analyze` clean; 776/776 tests green (`find.byType(FloatingActionButton)` still matches — the FAB is wrapped, not replaced). Release build `--build-number=121` installed on the Pixel 7.

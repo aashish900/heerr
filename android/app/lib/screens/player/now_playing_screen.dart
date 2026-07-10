@@ -21,6 +21,7 @@ import '../../theme.dart';
 import '../../utils/palette.dart';
 import '../../widgets/add_to_playlist_sheet.dart';
 import '../../widgets/error_snackbar.dart';
+import '../../widgets/gradient_icon.dart';
 import '../../widgets/preview_badge.dart';
 
 part 'now_playing_lyrics.dart';

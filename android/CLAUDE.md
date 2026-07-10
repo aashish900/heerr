@@ -36,7 +36,7 @@ For the build sequence: `android/docs/ROADMAP.md`.
 - **JSON:** [freezed](https://pub.dev/packages/freezed) (immutable models + `copyWith`) + `json_serializable` (codegen).
 - **Token storage:** [flutter_secure_storage](https://pub.dev/packages/flutter_secure_storage) — Android EncryptedSharedPreferences. Never `shared_preferences` for the bearer token.
 - **Navigation:** [go_router](https://pub.dev/packages/go_router) — declarative routes.
-- **Theme:** Material 3, dark mode, `ColorScheme.fromSeed(#1DB954, Brightness.dark)`. No light-mode variant in v1.
+- **Theme:** Material 3, dark mode, hand-built raw `ColorScheme` in `lib/theme.dart` — magenta `#F533C8` primary with the magenta→purple→violet `heerrGradient` on hero accents (2026-07 gradient redesign; replaced the original `fromSeed(#1DB954)`). No light-mode variant in v1.
 
 ---
 

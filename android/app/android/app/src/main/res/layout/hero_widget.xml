@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 4x1 "hero" Now Playing widget. One layout, two states toggled by the
+     provider off np_has_track:
+       - hero_idle_group   : gradient heerr logo + "Start listening…" prompt
+                             + flat white transport.
+       - hero_playing_group: full-height album art flush against the left edge
+                             (left corners rounded natively by the provider) +
+                             title/artist + wide animated gradient waveform +
+                             a progress bar spanning under the transport to the
+                             right edge with m:ss times at both ends + gradient
+                             play disc.
+     Matches the redesign concept art (idle top / playing bottom). The play /
+     prev / next control ids appear once per state group here — unlike the old
+     4x2 layout there is no shared transport row, because the playing state's
+     transport sits inside its own column structure; the provider wires the
+     PendingIntents on both sets. Uses only RemoteViews-whitelisted classes
+     (LinearLayout / FrameLayout / ViewFlipper / ImageView / ImageButton /
+     TextView / ProgressBar) — never a bare <View>. Field ids must match
+     HeroWidgetProvider.kt. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_gradient_border"
+    android:padding="2dp">
+
+    <!-- IDLE -->
+    <LinearLayout
+        android:id="@+id/hero_idle_group"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="10dp">
+
+        <ImageView
+            android:layout_width="46dp"
+            android:layout_height="40dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/widget_logo_gradient"
+            android:contentDescription="heerr" />
+
+        <LinearLayout
+            android:layout_width="1dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="14dp"
+            android:background="#2E2E2E" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="14dp"
+            android:layout_marginEnd="6dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:text="heerr" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxLines="2"
+                android:ellipsize="end"
+                android:textColor="#B0B0B0"
+                android:textSize="12sp"
+                android:text="Start listening to your music" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/widget_idle_prev"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@android:color/transparent"
+            android:scaleType="fitCenter"
+            android:padding="8dp"
+            android:src="@drawable/widget_ic_previous"
+            android:contentDescription="Previous" />
+
+        <ImageButton
+            android:id="@+id/widget_idle_play"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="2dp"
+            android:layout_marginEnd="2dp"
+            android:background="@android:color/transparent"
+            android:scaleType="fitCenter"
+            android:padding="8dp"
+            android:src="@drawable/widget_ic_play"
+            android:contentDescription="Play" />
+
+        <ImageButton
+            android:id="@+id/widget_idle_next"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@android:color/transparent"
+            android:scaleType="fitCenter"
+            android:padding="8dp"
+            android:src="@drawable/widget_ic_next"
+            android:contentDescription="Next" />
+    </LinearLayout>
+
+    <!-- PLAYING -->
+    <LinearLayout
+        android:id="@+id/hero_playing_group"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <!-- Full-height cover, flush against the tile's left edge; the
+             provider rounds the bitmap's left corners to hug the border. -->
+        <ImageView
+            android:id="@+id/widget_art"
+            android:layout_width="96dp"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@drawable/widget_ic_album"
+            android:contentDescription="Album art" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp">
+
+            <!-- Top row: title/artist/waveform column + transport on the right. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/widget_title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:maxLines="1"
+                        android:ellipsize="end"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp"
+                        android:textStyle="bold"
+                        android:text="heerr" />
+
+                    <TextView
+                        android:id="@+id/widget_artist"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:maxLines="1"
+                        android:ellipsize="end"
+                        android:textColor="#B0B0B0"
+                        android:textSize="12sp"
+                        android:text="Nothing playing" />
+
+                    <!-- Wide animated waveform (while playing) over a static
+                         frame (while paused); the provider toggles their
+                         visibility off np_playing. -->
+                    <FrameLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="20dp"
+                        android:layout_marginTop="4dp">
+
+                        <ViewFlipper
+                            android:id="@+id/widget_wave"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:autoStart="true"
+                            android:flipInterval="120"
+                            android:measureAllChildren="true">
+                            <ImageView android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:scaleType="fitStart"
+                                android:src="@drawable/widget_wave_1"
+                                android:contentDescription="Playing" />
+                            <ImageView android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:scaleType="fitStart" android:src="@drawable/widget_wave_2" />
+                            <ImageView android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:scaleType="fitStart" android:src="@drawable/widget_wave_3" />
+                            <ImageView android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:scaleType="fitStart" android:src="@drawable/widget_wave_4" />
+                            <ImageView android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:scaleType="fitStart" android:src="@drawable/widget_wave_5" />
+                            <ImageView android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:scaleType="fitStart" android:src="@drawable/widget_wave_6" />
+                            <ImageView android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:scaleType="fitStart" android:src="@drawable/widget_wave_7" />
+                            <ImageView android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:scaleType="fitStart" android:src="@drawable/widget_wave_8" />
+                        </ViewFlipper>
+
+                        <ImageView
+                            android:id="@+id/widget_wave_static"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="fitStart"
+                            android:visibility="gone"
+                            android:src="@drawable/widget_wave_3"
+                            android:contentDescription="Paused" />
+                    </FrameLayout>
+                </LinearLayout>
+
+                <ImageButton
+                    android:id="@+id/widget_prev"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@android:color/transparent"
+                    android:scaleType="fitCenter"
+                    android:padding="7dp"
+                    android:src="@drawable/widget_ic_previous"
+                    android:contentDescription="Previous" />
+
+                <ImageButton
+                    android:id="@+id/widget_play_pause"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="4dp"
+                    android:background="@drawable/widget_play_circle"
+                    android:scaleType="fitCenter"
+                    android:padding="11dp"
+                    android:src="@drawable/widget_ic_play"
+                    android:contentDescription="Play/Pause" />
+
+                <ImageButton
+                    android:id="@+id/widget_next"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@android:color/transparent"
+                    android:scaleType="fitCenter"
+                    android:padding="7dp"
+                    android:src="@drawable/widget_ic_next"
+                    android:contentDescription="Next" />
+            </LinearLayout>
+
+            <!-- Progress spans the full column width — under the transport to
+                 the right edge, like the concept. -->
+            <ProgressBar
+                android:id="@+id/widget_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:layout_marginTop="6dp"
+                android:max="1000"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_progress" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/widget_time_pos"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="start"
+                    android:textColor="#B0B0B0"
+                    android:textSize="10sp"
+                    android:text="0:00" />
+
+                <TextView
+                    android:id="@+id/widget_time_dur"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:textColor="#B0B0B0"
+                    android:textSize="10sp"
+                    android:text="0:00" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

@@ -419,7 +419,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
             overflow: TextOverflow.ellipsis,
             style: isCurrent
                 ? const TextStyle(
-                    color: heerrGreen,
+                    color: heerrMagenta,
                     fontWeight: FontWeight.w600,
                   )
                 : null,
@@ -466,7 +466,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
     bool containerMarked,
   ) {
     if (isCurrent) {
-      return const Icon(Icons.play_arrow, color: heerrGreen);
+      return const Icon(Icons.play_arrow, color: heerrMagenta);
     }
     if (offline == null) {
       if (containerMarked) {

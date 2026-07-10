@@ -26,6 +26,7 @@ import '../../providers/library/library_playlists.dart';
 import '../../providers/library/library_search_query.dart';
 import '../../providers/library/playlist_mutations.dart';
 import '../../router.dart';
+import '../../theme.dart';
 import '../../widgets/add_to_playlist_sheet.dart';
 import '../../widgets/download_to_playlist_sheet.dart';
 import '../../widgets/empty_state.dart';

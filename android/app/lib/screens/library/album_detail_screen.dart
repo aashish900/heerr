@@ -155,7 +155,7 @@ class _Body extends ConsumerWidget {
           leading: Text(
             s.track == null ? '' : '${s.track}',
             style: Theme.of(c).textTheme.bodyMedium?.copyWith(
-                  color: isCurrent ? heerrGreen : null,
+                  color: isCurrent ? heerrMagenta : null,
                   fontWeight: isCurrent ? FontWeight.w600 : null,
                 ),
           ),
@@ -165,7 +165,7 @@ class _Body extends ConsumerWidget {
             overflow: TextOverflow.ellipsis,
             style: isCurrent
                 ? const TextStyle(
-                    color: heerrGreen,
+                    color: heerrMagenta,
                     fontWeight: FontWeight.w600,
                   )
                 : null,
@@ -211,7 +211,7 @@ class _Body extends ConsumerWidget {
     bool containerMarked,
   ) {
     if (isCurrent) {
-      return const Icon(Icons.play_arrow, color: heerrGreen);
+      return const Icon(Icons.play_arrow, color: heerrMagenta);
     }
     if (offline == null) {
       if (containerMarked) {

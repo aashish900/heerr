@@ -41,11 +41,11 @@ Auth: `Authorization: Bearer <raw-token>`. The token is minted on the backend vi
 | JSON | freezed + json_serializable | Immutable models, codegen `fromJson`/`toJson`/`copyWith`. |
 | Token storage | flutter_secure_storage | Android EncryptedSharedPreferences. Token authorises downloads — won't sit in plaintext prefs. |
 | Navigation | go_router | Declarative, Flutter-team-supported. |
-| Theme | Material 3, dark, seed `#1DB954` | Spotify aesthetic on a dark surface. No light mode in v1. |
+| Theme | Material 3, dark, gradient brand palette | Magenta→purple→violet gradient identity on near-black. No light mode in v1. |
 
 ## Aesthetic
 
-Spotify-influenced black + neon green. Material 3 with `ColorScheme.fromSeed(Color(0xFF1DB954), brightness: Brightness.dark)`. Single dark theme — no light variant in v1.
+heerr brand gradient: magenta `#F533C8` → purple `#A93CF2` → violet `#6F4BF5` on near-black `#0A0A0A`. Material 3 with a hand-built raw `ColorScheme` (not `fromSeed`) in `lib/theme.dart` — primary magenta, explicit neutral `surfaceContainer*` grey ladder, black text on the bright accents. The gradient itself (`heerrGradient`) appears only on hero accents (play button, selected nav icon, scrubber active track, primary CTA, avatar rings); everything else uses solid magenta. Replaced the original Spotify-green seed (`#1DB954`) in the 2026-07 gradient redesign. Single dark theme — no light variant in v1.
 
 ## Screens (MVP set)
 

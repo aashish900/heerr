@@ -847,3 +847,38 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Trade-off:** After an edit the library shows stale metadata / cover until Navidrome's next scan (~1 min) — the same accepted lag as Phase W deletes; the success snackbar says so. And because the cover id is unchanged, a re-fetch between the edit and the rescan can momentarily re-cache the *old* art; it self-corrects on the next fetch after the rescan.
 
 **Reference:** `android/app/lib/{providers/library/{library_edit,song_cover_image_picker}.dart, services/backend_service.dart, api/endpoints.dart, screens/library/edit_song_metadata_screen.dart, widgets/add_to_playlist_sheet.dart}`. Backend side: `PATCH /api/v1/library/song` (backend `docs/DECISIONLOG.md` 2026-07-06, ROADMAP Phase O). Milestones Y1–Y2.
+
+## 2026-07-10 — Gradient "hero" home-screen widget + live 1s progress ticker
+
+**Context:** The gradient redesign (parts 1–4: theme + Settings + Home + Library/Downloads) moved the app off Spotify green. The user provided concept art for the home-screen widget with an idle state ("Start listening to your music" + gradient heerr logo) and a playing state (album art + gradient waveform + progress + gradient-circle play), inside a gradient border. Three widgets already exist (`NowPlayingWidgetProvider` 4×1 with art; `BarWidgetProvider` 3×1/4×1 with waveform+progress; `PillWidgetProvider` 2×1) sharing one `np_*` home_widget contract, but none combines art + waveform + progress, and the concept is a 2-row tile.
+
+**Decision:** Add a **new 4×2 `HeroWidgetProvider`** that IS the concept (both states in one layout, toggled off `np_has_track`); **recolor the shared green drawables to the magenta→violet gradient** (benefits Bar + Pill for free); and add a **live 1-second position ticker** so the progress bar + `m:ss` timestamps advance smoothly while playing.
+
+**Why:**
+- **New widget, not a resize of an existing one** — the concept needs 2 rows; reshaping a 1-row widget the user may have placed is more disruptive than adding a new tile they can choose. The three existing widgets stay (just recolored).
+- **Shared transport row in the layout** (control ids appear once) with the play-disc background swapped by the provider — avoids duplicate-id ambiguity in RemoteViews across the idle/playing groups.
+- **Recolor via shared drawables** (`widget_wave_1..8`, `widget_progress`, `widget_ic_album`) — one edit brands every widget; keeps the gradient border + play circle as hero-only accents.
+- **Live ticker** was the user's explicit choice over the battery-safe snap-on-transport default. Implemented as a keep-alive `Timer.periodic(1s)` reading `PlaybackState.position` (audio_service extrapolates it) and calling a lightweight `pushPosition` (position key only, no tint/art re-resolution). Ticks only while the app process is alive — a killed app freezes the widget at the last position (no background isolate; consistent with the existing "updates only while alive" widget posture).
+
+**Alternatives considered:**
+- **Redesign the primary 4×1 tile into the concept** — rejected: changes an existing widget's shape/size.
+- **Recolor-only, no new tile** — rejected: no single existing widget shows art+waveform+progress together like the concept.
+- **Snap-on-transport progress (no ticker)** — the battery-safe default; the user chose live ticking for the smoother concept feel. Trade-off accepted: ~1 widget redraw/sec while playing and app-alive.
+- **Real audio-amplitude waveform** — not possible in RemoteViews (no custom canvas); the cycling `ViewFlipper` of gradient frames is the only motion a widget can express (decorative).
+
+**Reference:** `android/app/android/app/src/main/{res/layout/hero_widget.xml, res/xml/hero_widget_info.xml, kotlin/com/aashish/heerr/HeroWidgetProvider.kt, AndroidManifest.xml, res/drawable/widget_{gradient_border,play_circle,logo_gradient,wave_1..8,progress,ic_album}.xml}`; `android/app/lib/widget/{now_playing_widget.dart, now_playing_widget_provider.dart}`; test `android/app/test/widget/now_playing_widget_updater_test.dart`. CHANGELOG 2026-07-10 (part 5).
+
+## 2026-07-10 — Retire classic/bar/pill widgets; hero is the only home-screen widget
+
+**Context:** Post-part-5 review flagged that the live 1s ticker's `pushPosition` called `HomeWidgetClientImpl.update()`, which looped over all four registered widget names (`NowPlayingWidgetProvider`, `BarWidgetProvider`, `PillWidgetProvider`, `HeroWidgetProvider`) every second while playing — redundant RemoteViews re-inflation (and ViewFlipper waveform resets) for three widgets the redesign no longer needs, now that the hero tile alone matches the brand concept and combines what the other three did separately (art + waveform + progress).
+
+**Decision:** Delete the three legacy widgets (Kotlin providers, layouts, `*_widget_info.xml`, manifest receivers, and their exclusive drawables) and make `HeroWidgetProvider` the only home-screen widget. `HomeWidgetClientImpl.update()` now targets `kHeroWidgetName` directly (no loop).
+
+**Why:** Simplicity — one widget to reason about, test-drive (well, smoke-test), and keep in sync with the `np_*` contract. The user confirmed this explicitly rather than keeping the legacy tiles around "for users who already added them" — there is no released version with widgets yet (still on `redesign/gradient-theme`, unreleased), so there's no migration concern.
+
+**Alternatives considered:**
+- **Keep all four, just fix the ticker to target hero only.** Rejected per explicit user instruction — the hero tile supersedes the other three for this app's design language; no reason to maintain four RemoteViews layouts against one data contract going forward.
+
+**Trade-off:** Users lose the option of a slim 1-row or 2x1 tile; only the 4x2 hero is available. Acceptable pre-release.
+
+**Reference:** `android/app/android/app/src/main/AndroidManifest.xml`; deleted files listed in CHANGELOG 2026-07-10 (part 6); `android/app/lib/widget/now_playing_widget.dart`.

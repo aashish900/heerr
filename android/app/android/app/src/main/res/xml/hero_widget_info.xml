@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AppWidgetProviderInfo for the 4x1 "hero" Now Playing widget: full-height
+     album art + title/artist + animated gradient waveform + progress +
+     transport, with an idle "Start listening" state. Default 4x1 (minHeight
+     40dp = 1 row on the launcher grid), horizontally resizable. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="40dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/hero_widget"
+    android:previewLayout="@layout/hero_widget"
+    android:resizeMode="horizontal"
+    android:widgetCategory="home_screen" />

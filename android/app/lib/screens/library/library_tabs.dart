@@ -128,10 +128,22 @@ class _PlaylistsTab extends ConsumerWidget {
         ref.watch(libraryPlaylistsProvider);
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => unawaited(_onCreatePressed(context, ref)),
-        icon: const Icon(Icons.add),
-        label: const Text('New playlist'),
+      // Gradient CTA per the redesign: the FAB itself is transparent/flat and
+      // the magenta→violet gradient comes from the wrapping box (FABs can't
+      // take a gradient directly). Radius matches the M3 extended-FAB shape.
+      floatingActionButton: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: heerrGradient,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: FloatingActionButton.extended(
+          onPressed: () => unawaited(_onCreatePressed(context, ref)),
+          backgroundColor: Colors.transparent,
+          foregroundColor: Colors.black,
+          elevation: 0,
+          icon: const Icon(Icons.add),
+          label: const Text('New playlist'),
+        ),
       ),
       body: async.when(
         loading: () => const SkeletonList(count: 6),

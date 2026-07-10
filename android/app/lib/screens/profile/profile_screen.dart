@@ -15,7 +15,9 @@ import '../../providers/profiles/profile_image_picker.dart';
 import '../../providers/profiles/profile_meta.dart';
 import '../../providers/profiles/profile_registry.dart';
 import '../../router.dart';
+import '../../theme.dart';
 import '../../utils/word_limit.dart';
+import '../../widgets/gradient_button.dart';
 
 enum _ProfileMenuAction { editServerDetails }
 
@@ -177,12 +179,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               key: const Key('profile-avatar'),
               customBorder: const CircleBorder(),
               onTap: () => _showPhotoSheet(avatar != null),
-              child: CircleAvatar(
-                radius: 56,
-                foregroundImage: avatar != null ? FileImage(avatar) : null,
-                child: avatar == null
-                    ? const Icon(Icons.person_outline, size: 56)
-                    : null,
+              // Gradient ring around the avatar, per the redesign reference:
+              // outer gradient circle → thin black gap → the photo itself.
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: const BoxDecoration(
+                  gradient: heerrGradient,
+                  shape: BoxShape.circle,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: const BoxDecoration(
+                    color: heerrBlack,
+                    shape: BoxShape.circle,
+                  ),
+                  child: CircleAvatar(
+                    radius: 56,
+                    foregroundImage:
+                        avatar != null ? FileImage(avatar) : null,
+                    child: avatar == null
+                        ? const Icon(Icons.person_outline, size: 56)
+                        : null,
+                  ),
+                ),
               ),
             ),
           ),
@@ -235,7 +254,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          FilledButton(
+          GradientButton(
             key: const Key('profile-save'),
             onPressed: _save,
             child: const Text('Save'),

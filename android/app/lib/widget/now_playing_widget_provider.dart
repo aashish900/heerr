@@ -24,16 +24,44 @@ NowPlayingWidgetUpdater nowPlayingWidget(NowPlayingWidgetRef ref) {
     artCache: WidgetArtCacheImpl(),
   );
 
+  // Live 1 s progress ticker: while a track is playing, push the extrapolated
+  // position every second so the hero/bar progress bar + m:ss timestamps
+  // advance smoothly (the full `push` only fires on transport changes). Reads
+  // `PlaybackState.position`, which audio_service extrapolates from its last
+  // update time, so no per-tick handler call is needed beyond the read. Only
+  // runs while the app process is alive; a killed app freezes the widget at the
+  // last-pushed position (documented trade-off — no background isolate).
+  Timer? ticker;
+  void stopTicker() {
+    ticker?.cancel();
+    ticker = null;
+  }
+
+  void startTicker() {
+    if (ticker != null) return;
+    ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      final Duration position =
+          ref.read(audioHandlerProvider).playbackState.value.position;
+      unawaited(updater.pushPosition(position));
+    });
+  }
+
   ref.listen<AsyncValue<PlayerSnapshot>>(
     playerSnapshotProvider,
     (AsyncValue<PlayerSnapshot>? _, AsyncValue<PlayerSnapshot> next) {
       final PlayerSnapshot? snapshot = next.valueOrNull;
-      if (snapshot != null) {
-        unawaited(updater.push(snapshot));
+      if (snapshot == null) return;
+      unawaited(updater.push(snapshot));
+      if (snapshot.isPlaying) {
+        startTicker();
+      } else {
+        stopTicker();
       }
     },
     fireImmediately: true,
   );
+
+  ref.onDispose(stopTicker);
 
   return updater;
 }

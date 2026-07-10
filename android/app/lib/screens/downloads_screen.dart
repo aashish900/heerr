@@ -15,6 +15,7 @@ import '../providers/library/library_delete.dart';
 import '../providers/library/library_playlist.dart';
 import '../router.dart';
 import '../widgets/error_snackbar.dart';
+import '../widgets/gradient_icon.dart';
 import '../widgets/library_cover_art.dart';
 import '../widgets/library_result_tile.dart';
 
@@ -398,7 +399,7 @@ class _EmptyView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(icon, size: 64, color: cs.onSurfaceVariant),
+            GradientIcon(child: Icon(icon, size: 64)),
             const SizedBox(height: 16),
             Text(
               message,
