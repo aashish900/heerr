@@ -12,6 +12,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.widget.RemoteViews
 import java.io.File
+import java.util.Locale
 import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetProvider
 
@@ -143,7 +144,7 @@ class HeroWidgetProvider : HomeWidgetProvider() {
     private fun formatTime(ms: Long): String {
         if (ms <= 0L) return "0:00"
         val totalSec = ms / 1000
-        return "%d:%02d".format(totalSec / 60, totalSec % 60)
+        return String.format(Locale.US, "%d:%02d", totalSec / 60, totalSec % 60)
     }
 
     /**
