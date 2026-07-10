@@ -2407,3 +2407,11 @@ On-device smoke showed the 4x2 tile with big empty bands and an inset thumbnail;
 - **`res/drawable/widget_wave_1..8.xml`** — regenerated wide: 21 bars / 110x24 viewport (was 5 bars / 26x24) so the waveform spans the text column like the concept; same stepped magenta→violet tinting, sine-sampled with advancing phase.
 - **`AndroidManifest.xml`** — receiver comment 4x2→4x1.
 - Verification: release build (`--build-number=120`) installed on the Pixel 7. NOTE: a previously-placed widget instance keeps its old 4x2 cell size — the user must remove + re-add the widget after this update; launcher provider-info caching may additionally need a launcher restart.
+
+## 2026-07-10 — Library "New playlist" FAB gets the brand gradient (part 9)
+
+On-device review: the Playlists tab's extended FAB rendered solid magenta (the theme's `floatingActionButtonTheme`), not the gradient a primary CTA should carry per the redesign rule.
+
+- **`lib/screens/library/library_tabs.dart`** — the `FloatingActionButton.extended` is now transparent/flat (elevation 0, black foreground) inside a `DecoratedBox` with `heerrGradient` at 16dp radius (matching the M3 extended-FAB shape); FABs can't take a gradient directly.
+- **`lib/screens/library/library_screen.dart`** — added the `theme.dart` import (library_tabs.dart is a `part of` it).
+- `flutter analyze` clean; 776/776 tests green (`find.byType(FloatingActionButton)` still matches — the FAB is wrapped, not replaced). Release build `--build-number=121` installed on the Pixel 7.
