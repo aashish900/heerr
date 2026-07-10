@@ -4,16 +4,20 @@
        - hero_idle_group   : gradient heerr logo + "Start listening…" prompt
                              + flat white transport.
        - hero_playing_group: full-height album art flush against the left edge
-                             (left corners rounded natively by the provider) +
-                             title/artist + wide animated gradient waveform +
-                             a progress bar spanning under the transport to the
-                             right edge with m:ss times at both ends + gradient
-                             play disc.
+                             (left corners rounded natively by the provider,
+                             right edge alpha-faded into the tile so there's
+                             no hard border) + title/artist + wide animated
+                             gradient waveform + a tap-to-seek progress bar
+                             spanning under the transport to the right edge
+                             with m:ss times at both ends + gradient play disc.
      Matches the redesign concept art (idle top / playing bottom). The play /
      prev / next control ids appear once per state group here — unlike the old
      4x2 layout there is no shared transport row, because the playing state's
      transport sits inside its own column structure; the provider wires the
-     PendingIntents on both sets. Uses only RemoteViews-whitelisted classes
+     PendingIntents on both sets. The progress row stacks 10 empty tap zones
+     (widget_seek_0..9) over the ProgressBar — RemoteViews forbids drag
+     gestures, so each tap seeks to its zone's midpoint via
+     WidgetSeekReceiver. Uses only RemoteViews-whitelisted classes
      (LinearLayout / FrameLayout / ViewFlipper / ImageView / ImageButton /
      TextView / ProgressBar) — never a bare <View>. Field ids must match
      HeroWidgetProvider.kt. -->
@@ -118,7 +122,7 @@
              provider rounds the bitmap's left corners to hug the border. -->
         <ImageView
             android:id="@+id/widget_art"
-            android:layout_width="96dp"
+            android:layout_width="112dp"
             android:layout_height="match_parent"
             android:scaleType="centerCrop"
             android:src="@drawable/widget_ic_album"
@@ -130,7 +134,7 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center_vertical"
-            android:paddingStart="12dp"
+            android:paddingStart="0dp"
             android:paddingEnd="12dp"
             android:paddingTop="6dp"
             android:paddingBottom="6dp">
@@ -258,16 +262,60 @@
             </LinearLayout>
 
             <!-- Progress spans the full column width — under the transport to
-                 the right edge, like the concept. -->
-            <ProgressBar
-                android:id="@+id/widget_progress"
-                style="?android:attr/progressBarStyleHorizontal"
+                 the right edge, like the concept. 10 empty tap zones stack on
+                 top so the user can tap-to-seek (RemoteViews can't drag). -->
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="4dp"
-                android:layout_marginTop="6dp"
-                android:max="1000"
-                android:progress="0"
-                android:progressDrawable="@drawable/widget_progress" />
+                android:layout_height="16dp"
+                android:layout_marginTop="2dp">
+
+                <ProgressBar
+                    android:id="@+id/widget_progress"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="4dp"
+                    android:layout_gravity="center_vertical"
+                    android:max="1000"
+                    android:progress="0"
+                    android:progressDrawable="@drawable/widget_progress" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal"
+                    android:baselineAligned="false">
+                    <FrameLayout android:id="@+id/widget_seek_0"
+                        android:layout_width="0dp" android:layout_height="match_parent"
+                        android:layout_weight="1" />
+                    <FrameLayout android:id="@+id/widget_seek_1"
+                        android:layout_width="0dp" android:layout_height="match_parent"
+                        android:layout_weight="1" />
+                    <FrameLayout android:id="@+id/widget_seek_2"
+                        android:layout_width="0dp" android:layout_height="match_parent"
+                        android:layout_weight="1" />
+                    <FrameLayout android:id="@+id/widget_seek_3"
+                        android:layout_width="0dp" android:layout_height="match_parent"
+                        android:layout_weight="1" />
+                    <FrameLayout android:id="@+id/widget_seek_4"
+                        android:layout_width="0dp" android:layout_height="match_parent"
+                        android:layout_weight="1" />
+                    <FrameLayout android:id="@+id/widget_seek_5"
+                        android:layout_width="0dp" android:layout_height="match_parent"
+                        android:layout_weight="1" />
+                    <FrameLayout android:id="@+id/widget_seek_6"
+                        android:layout_width="0dp" android:layout_height="match_parent"
+                        android:layout_weight="1" />
+                    <FrameLayout android:id="@+id/widget_seek_7"
+                        android:layout_width="0dp" android:layout_height="match_parent"
+                        android:layout_weight="1" />
+                    <FrameLayout android:id="@+id/widget_seek_8"
+                        android:layout_width="0dp" android:layout_height="match_parent"
+                        android:layout_weight="1" />
+                    <FrameLayout android:id="@+id/widget_seek_9"
+                        android:layout_width="0dp" android:layout_height="match_parent"
+                        android:layout_weight="1" />
+                </LinearLayout>
+            </FrameLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"

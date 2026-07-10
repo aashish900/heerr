@@ -96,6 +96,14 @@
                 android:resource="@xml/hero_widget_info" />
         </receiver>
 
+        <!-- Hero-widget tap-to-seek: progress-bar tap zones broadcast a 0..1
+             fraction here; scaled by np_duration_ms and forwarded to the
+             audio_service MediaSession as seekTo. Explicit-component
+             broadcast, so no intent-filter and not exported. -->
+        <receiver
+            android:name=".WidgetSeekReceiver"
+            android:exported="false" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

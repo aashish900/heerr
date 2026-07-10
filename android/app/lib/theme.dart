@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'widgets/gradient_tab_indicator.dart';
+
 const Color heerrMagenta = Color(0xFFF533C8);
 const Color heerrPurple = Color(0xFFA93CF2);
 const Color heerrViolet = Color(0xFF6F4BF5);
@@ -104,8 +106,10 @@ ThemeData heerrDarkTheme() {
     tabBarTheme: const TabBarThemeData(
       labelColor: heerrMagenta,
       unselectedLabelColor: Color(0xFF808080),
-      indicatorColor: heerrMagenta,
-      dividerColor: Colors.transparent,
+      indicator: GradientTabIndicator(),
+      indicatorSize: TabBarIndicatorSize.label,
+      dividerColor: Color(0xFF2E2E2E),
+      dividerHeight: 1,
     ),
     chipTheme: ChipThemeData(
       backgroundColor: const Color(0xFF1A1A1A),

@@ -882,3 +882,19 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Trade-off:** Users lose the option of a slim 1-row or 2x1 tile; only the 4x2 hero is available. Acceptable pre-release.
 
 **Reference:** `android/app/android/app/src/main/AndroidManifest.xml`; deleted files listed in CHANGELOG 2026-07-10 (part 6); `android/app/lib/widget/now_playing_widget.dart`.
+
+## 2026-07-10 — Tap-to-seek instead of a draggable slider on the hero widget
+
+**Context:** User asked for the hero widget's progress bar to be seekable, referencing the concept art's draggable slider. Android `RemoteViews` (the API home-screen widgets are built on) forbids attaching touch/drag gesture handlers to any child view — only `setOnClickPendingIntent` is available, so a real drag-to-seek slider is not implementable in a widget.
+
+**Decision:** Approximate seek with 10 equal-width invisible tap zones stacked over the progress bar (`widget_seek_0..9` in `hero_widget.xml`). Tapping a zone broadcasts a 0..1 fraction to a new `WidgetSeekReceiver`, which reads `np_duration_ms` and calls `seekTo` on the live `MediaSession` via a short-lived `MediaBrowserCompat` connection to audio_service's `AudioService` (its session fields are package-private on 0.18.18, so a browser connection is the only way in).
+
+**Why:** User explicitly chose this over dropping seek entirely or replacing it with ±10s jump buttons, after being told drag is impossible in RemoteViews. 10 zones give ~10% seek granularity — coarse but usable for a home-screen tile; full-precision seek remains one tap away via the existing body-tap-to-open-app affordance.
+
+**Alternatives considered:**
+- **Skip seek entirely.** Rejected — user wants some seek capability on the widget itself, not just via opening the app.
+- **±10s jump buttons instead of positional seek.** Rejected — doesn't match the "let the user seek the progress slider" request; positional tap zones are closer to that intent even though a true drag isn't possible.
+
+**Trade-off:** 16dp-tall tap zones are below the 48dp touch-target guideline, and 10-zone granularity means seeks land within ~10% of the intended spot — acceptable given RemoteViews' hard ceiling on interactivity. A cold-started `AudioService` (app killed, stale widget) makes the first tap a no-op seek on an empty session rather than an error.
+
+**Reference:** `android/app/android/app/src/main/kotlin/com/aashish/heerr/{HeroWidgetProvider.kt, WidgetSeekReceiver.kt}`, `res/layout/hero_widget.xml`, `AndroidManifest.xml`, `build.gradle.kts`. CHANGELOG 2026-07-10 ("Widget polish").

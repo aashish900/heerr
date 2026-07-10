@@ -1,26 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- heerr "H + waveform" mark for the hero widget's idle state. Two bold side
-     bars (the H uprights) with five waveform bars between them, tinted along
-     the magenta->violet gradient (left->right) as stepped solid strokes — no
-     SVG source exists (only assets/icon.png), so the mark is drawn fresh as a
-     vector. -->
+<!-- heerr "H + waveform" mark for the hero widget's idle state. Matches the
+     concept art: two thick rounded uprights (magenta left, violet right)
+     joined by short horizontal connector dashes, with 7 magenta waveform
+     bars of varying height between them — no SVG source exists (only
+     assets/icon.png), so the mark is drawn fresh as a vector. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="46dp"
     android:height="40dp"
     android:viewportWidth="46"
     android:viewportHeight="40">
-    <path android:strokeColor="#F533C8" android:strokeWidth="8"
-        android:strokeLineCap="round" android:pathData="M5,8 L5,32" />
-    <path android:strokeColor="#DB36D8" android:strokeWidth="3"
-        android:strokeLineCap="round" android:pathData="M14,13 L14,27" />
-    <path android:strokeColor="#C139E4" android:strokeWidth="3"
-        android:strokeLineCap="round" android:pathData="M20,9 L20,31" />
-    <path android:strokeColor="#A63CF0" android:strokeWidth="3"
-        android:strokeLineCap="round" android:pathData="M26,15 L26,25" />
-    <path android:strokeColor="#8A42F2" android:strokeWidth="3"
-        android:strokeLineCap="round" android:pathData="M32,11 L32,29" />
-    <path android:strokeColor="#7A47F4" android:strokeWidth="3"
-        android:strokeLineCap="round" android:pathData="M38,14 L38,26" />
-    <path android:strokeColor="#6F4BF5" android:strokeWidth="8"
-        android:strokeLineCap="round" android:pathData="M41,8 L41,32" />
+    <!-- Left upright: magenta. -->
+    <path android:strokeColor="#F533C8" android:strokeWidth="7"
+        android:strokeLineCap="round" android:pathData="M4.5,7 L4.5,33" />
+    <!-- Right upright: violet. -->
+    <path android:strokeColor="#6F4BF5" android:strokeWidth="7"
+        android:strokeLineCap="round" android:pathData="M41.5,7 L41.5,33" />
+    <!-- Connector dashes (audio-jack "H" crossbar stubs). -->
+    <path android:strokeColor="#F533C8" android:strokeWidth="2.5"
+        android:strokeLineCap="round" android:pathData="M9.5,20 L12.5,20" />
+    <path android:strokeColor="#6F4BF5" android:strokeWidth="2.5"
+        android:strokeLineCap="round" android:pathData="M33.5,20 L36.5,20" />
+    <!-- 7 waveform bars, all magenta. -->
+    <path android:strokeColor="#F533C8" android:strokeWidth="2.5"
+        android:strokeLineCap="round" android:pathData="M14.5,15 L14.5,25" />
+    <path android:strokeColor="#F533C8" android:strokeWidth="2.5"
+        android:strokeLineCap="round" android:pathData="M17.5,11 L17.5,29" />
+    <path android:strokeColor="#F533C8" android:strokeWidth="2.5"
+        android:strokeLineCap="round" android:pathData="M20.5,8 L20.5,32" />
+    <path android:strokeColor="#F533C8" android:strokeWidth="2.5"
+        android:strokeLineCap="round" android:pathData="M23.5,13 L23.5,27" />
+    <path android:strokeColor="#F533C8" android:strokeWidth="2.5"
+        android:strokeLineCap="round" android:pathData="M26.5,9 L26.5,31" />
+    <path android:strokeColor="#F533C8" android:strokeWidth="2.5"
+        android:strokeLineCap="round" android:pathData="M29.5,14 L29.5,26" />
+    <path android:strokeColor="#F533C8" android:strokeWidth="2.5"
+        android:strokeLineCap="round" android:pathData="M32.5,11 L32.5,29" />
 </vector>

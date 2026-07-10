@@ -2422,3 +2422,19 @@ CI flagged `now_playing_persistence_test.dart`'s "debounced save fires once for 
 
 - **`lib/player/now_playing_persistence.dart`** — added `_pendingWrite`, a chained `Future` serializing all writes through a new `_enqueueWrite()` helper; both the debounce-timer callback and `flush()` now go through it instead of calling `_writeSnapshot()` directly, so a `flush()` call always waits for any in-flight debounced save instead of racing it.
 - `flutter test test/player/` — 75/75 green.
+
+## 2026-07-10 — Widget polish: art fade, tap-to-seek, redrawn logo/waveform, gradient tab indicator
+
+User compared the shipped hero widget and Library tab bar against the original concept art and flagged 5 mismatches (see `android/docs/PLAN.md` for the design). Fixed all five.
+
+- **`lib/widgets/gradient_tab_indicator.dart`** (new) — `GradientTabIndicator extends Decoration`, paints a rounded 3dp `heerrGradient` bar under the selected tab label.
+- **`lib/theme.dart`** — `TabBarThemeData.indicatorColor` replaced with `indicator: GradientTabIndicator()`, `indicatorSize: TabBarIndicatorSize.label`, `dividerColor: Color(0xFF2E2E2E)` + `dividerHeight: 1` (the thin line extending past the gradient bar, per the reference screenshot).
+- **`test/widgets/gradient_tab_indicator_test.dart`** (new) — theme wiring assertion + a widget test tapping between tabs with the real theme, asserting no paint exceptions.
+- **`android/app/src/main/kotlin/com/aashish/heerr/HeroWidgetProvider.kt`** — `buildArtBitmap()` now alpha-fades the right 35% of the cropped cover (`LinearGradient` WHITE→TRANSPARENT masked in with `PorterDuff.Mode.DST_IN`) so art blends into the tile instead of a hard border; `ART_WIDTH_DP` 96→112dp to compensate. Added `seekIntent()` + a loop over 10 `SEEK_ZONE_IDS` wiring tap-to-seek `PendingIntent`s (distinct requestCodes, base 100) onto the progress-bar overlay. Hoisted `HOME_WIDGET_PREFS` to a top-level `internal const` shared with the new receiver.
+- **`android/app/src/main/kotlin/com/aashish/heerr/WidgetSeekReceiver.kt`** (new) — `BroadcastReceiver` for `ACTION_WIDGET_SEEK`; reads `np_duration_ms`, connects a short-lived `MediaBrowserCompat` to audio_service's `AudioService` (no static session hook exists on 0.18.18), then calls `MediaControllerCompat.transportControls.seekTo()`.
+- **`android/app/src/main/res/layout/hero_widget.xml`** — `widget_art` width 96dp→112dp, content column `paddingStart` 12dp→0dp; the bare `ProgressBar` row replaced with a 16dp `FrameLayout` stacking the 4dp bar plus a 10-zone `LinearLayout` of empty `FrameLayout` tap targets (`widget_seek_0..9`).
+- **`android/app/src/main/res/drawable/widget_logo_gradient.xml`** — redrawn: solid magenta/violet uprights + 2 connector dashes + 7 magenta waveform bars, matching the reference idle mark (was a stepped 7-color gradient).
+- **`android/app/tool/gen_widget_wave.py`** (new, committed) — generates `widget_wave_1..8.xml`: 36 thin baseline-aligned bars in a 3-cluster Gaussian envelope, 8-frame travelling-wave modulation, `heerrGradient`-lerped tint (was 21 sine-sampled bars).
+- **`android/app/src/main/AndroidManifest.xml`** — registered `.WidgetSeekReceiver` (`exported="false"`, explicit-component broadcast, no intent-filter).
+- **`android/app/build.gradle.kts`** — added `implementation("androidx.media:media:1.7.0")` (compile-time visibility for `MediaBrowserCompat`/`MediaControllerCompat`; already on the runtime classpath via audio_service).
+- Verification: `flutter test` 778/778 green (776 prior + 2 new), `flutter analyze` clean, `flutter build apk --debug` succeeds. Native visuals/seek not yet smoke-tested on device.

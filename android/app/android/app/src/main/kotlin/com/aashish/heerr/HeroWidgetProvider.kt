@@ -9,10 +9,15 @@ import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Path
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.RectF
+import android.graphics.Shader
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
@@ -22,6 +27,9 @@ import java.util.Locale
 import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetProvider
 
+/** home_widget plugin's SharedPreferences file (HomeWidgetPlugin.PREFERENCES); shared with WidgetSeekReceiver. */
+internal const val HOME_WIDGET_PREFS = "HomeWidgetPreferences"
+
 /**
  * 4x1 "hero" Now Playing widget — the app's only home-screen widget.
  *
@@ -30,14 +38,17 @@ import es.antonborri.home_widget.HomeWidgetProvider
  *  - **idle**   : gradient heerr logo + "Start listening to your music" +
  *                 flat white transport.
  *  - **playing**: full-height album art flush against the left edge (left
- *                 corners rounded natively below — RemoteViews can't clip) +
- *                 title/artist + wide animated gradient waveform + progress
- *                 bar spanning to the right edge + m:ss times + gradient
- *                 play disc.
+ *                 corners rounded natively below — RemoteViews can't clip —
+ *                 and its right edge alpha-faded into the tile so there's no
+ *                 hard border) + title/artist + wide animated gradient
+ *                 waveform + a tap-to-seek progress bar spanning to the right
+ *                 edge + m:ss times + gradient play disc.
  * Each state group carries its own transport ids (no duplicate-id ambiguity);
  * all buttons broadcast ACTION_MEDIA_BUTTON to audio_service's
- * MediaButtonReceiver (drives the LIVE MediaSession); the body tap opens the
- * app. Layout uses only RemoteViews-whitelisted views.
+ * MediaButtonReceiver (drives the LIVE MediaSession); the progress bar is
+ * overlaid with tap zones broadcasting to [WidgetSeekReceiver] (RemoteViews
+ * can't host a drag gesture); the body tap opens the app. Layout uses only
+ * RemoteViews-whitelisted views.
  */
 class HeroWidgetProvider : HomeWidgetProvider() {
 
@@ -110,6 +121,13 @@ class HeroWidgetProvider : HomeWidgetProvider() {
                 views.setTextViewText(R.id.widget_time_pos, formatTime(positionMs))
                 views.setTextViewText(R.id.widget_time_dur, formatTime(durationMs))
 
+                // Tap-to-seek: 10 equal-width invisible zones over the
+                // progress bar. RemoteViews can't drag a slider, so each tap
+                // jumps to the midpoint of its zone via WidgetSeekReceiver.
+                for ((i, id) in SEEK_ZONE_IDS.withIndex()) {
+                    views.setOnClickPendingIntent(id, seekIntent(context, i))
+                }
+
                 // Waveform "sync": animate (ViewFlipper) only while playing, else
                 // freeze on a static frame. No live-amplitude API on a widget.
                 views.setViewVisibility(
@@ -174,8 +192,10 @@ class HeroWidgetProvider : HomeWidgetProvider() {
     /**
      * Decodes [path] and center-crops it into a [widthDp] x [heightDp] bitmap
      * whose LEFT corners are rounded to sit flush inside the tile's gradient
-     * border. Output density is capped at 2x so the RemoteViews bitmap payload
-     * stays well under the Binder transaction limit (~250x300 px, ~0.3 MB).
+     * border, and whose right [FADE_FRACTION] alpha-fades to transparent so
+     * it blends into the tile background instead of showing a hard edge.
+     * Output density is capped at 2x so the RemoteViews bitmap payload stays
+     * well under the Binder transaction limit (~224x212 px, ~0.19 MB).
      */
     private fun buildArtBitmap(
         context: Context,
@@ -210,6 +230,20 @@ class HeroWidgetProvider : HomeWidgetProvider() {
             postTranslate(dx, dy)
         }
         canvas.drawBitmap(src, matrix, Paint(Paint.FILTER_BITMAP_FLAG))
+
+        // Alpha-fade the right edge into the tile so art blends into the
+        // widget body instead of a hard border (DST_IN masks existing pixels
+        // by the gradient's alpha, opaque white -> fully transparent).
+        val fadeStart = outW * (1f - FADE_FRACTION)
+        val fade = Paint().apply {
+            shader = LinearGradient(
+                fadeStart, 0f, outW.toFloat(), 0f,
+                Color.WHITE, Color.TRANSPARENT, Shader.TileMode.CLAMP,
+            )
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+        }
+        canvas.drawRect(fadeStart, 0f, outW.toFloat(), outH.toFloat(), fade)
+
         return out
     }
 
@@ -231,6 +265,26 @@ class HeroWidgetProvider : HomeWidgetProvider() {
         return BitmapFactory.decodeFile(path, opts)
     }
 
+    /** Broadcasts a seek to the midpoint of zone [index] out of [SEEK_ZONE_IDS]. */
+    private fun seekIntent(context: Context, index: Int): PendingIntent {
+        val intent = Intent(context, WidgetSeekReceiver::class.java).apply {
+            action = WidgetSeekReceiver.ACTION_WIDGET_SEEK
+            putExtra(
+                WidgetSeekReceiver.EXTRA_SEEK_FRACTION,
+                (index + 0.5f) / SEEK_ZONE_IDS.size,
+            )
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            // Distinct requestCode per zone (extras don't participate in
+            // Intent.filterEquals); offset clear of mediaButtonIntent's raw
+            // keycode requestCodes.
+            WidgetSeekReceiver.REQUEST_BASE + index,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
     private fun mediaButtonIntent(context: Context, keyCode: Int): PendingIntent {
         val intent = Intent(Intent.ACTION_MEDIA_BUTTON).apply {
             component = ComponentName(
@@ -249,12 +303,19 @@ class HeroWidgetProvider : HomeWidgetProvider() {
 
     private companion object {
         const val MAX_ART_PX = 512
-        const val ART_WIDTH_DP = 96
+        const val ART_WIDTH_DP = 112
         /** Matches widget_gradient_border's inner-rect radius (26dp). */
         const val CORNER_DP = 26
         const val BORDER_DP = 2
         const val FALLBACK_HEIGHT_DP = 110
-        /** home_widget plugin's SharedPreferences file (HomeWidgetPlugin.PREFERENCES). */
-        const val HOME_WIDGET_PREFS = "HomeWidgetPreferences"
+        /** Right fraction of the art bitmap that alpha-fades to transparent. */
+        const val FADE_FRACTION = 0.35f
+        /** Progress-bar tap-to-seek zone ids, left to right; see hero_widget.xml. */
+        val SEEK_ZONE_IDS = intArrayOf(
+            R.id.widget_seek_0, R.id.widget_seek_1, R.id.widget_seek_2,
+            R.id.widget_seek_3, R.id.widget_seek_4, R.id.widget_seek_5,
+            R.id.widget_seek_6, R.id.widget_seek_7, R.id.widget_seek_8,
+            R.id.widget_seek_9,
+        )
     }
 }

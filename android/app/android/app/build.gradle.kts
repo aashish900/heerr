@@ -73,6 +73,14 @@ kotlin {
     }
 }
 
+dependencies {
+    // MediaBrowserCompat/MediaControllerCompat for WidgetSeekReceiver's
+    // tap-to-seek. Already on the runtime classpath via audio_service's own
+    // (implementation-scoped) dependency on this artifact; declared here for
+    // compile-time visibility in this module only.
+    implementation("androidx.media:media:1.7.0")
+}
+
 flutter {
     source = "../.."
 }
