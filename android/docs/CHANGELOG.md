@@ -2396,3 +2396,14 @@ Full-branch review of redesign parts 1–6. Code was clean; the drift found was 
 - **`test/screens/home/home_screen_test.dart`**, **`test/widgets/home_recommendation_card_test.dart`** — both `_wrap` harnesses built a private `ColorScheme.fromSeed(#1DB954)` theme; now use the real `heerrDarkTheme()` so widget tests exercise the shipped theme.
 - **`lib/screens/player/now_playing_transport.dart`** — comment fix: the gradient play circle's glyph is black (matches `onPrimary`), not white as the comment claimed.
 - `flutter analyze` clean; 776/776 tests green.
+
+## 2026-07-10 — Hero widget reworked 4x2 → 4x1 to match the concept art (part 8)
+
+On-device smoke showed the 4x2 tile with big empty bands and an inset thumbnail; the concept is a single-row bar with edge-to-edge art. Native-only rework.
+
+- **`res/xml/hero_widget_info.xml`** — `targetCellHeight` 2→1, `minHeight` 110dp→40dp (40dp is what maps to 1 launcher row), `resizeMode` horizontal-only.
+- **`res/layout/hero_widget.xml`** — rewritten: FrameLayout root (2dp border inset) holding the two full-bleed state groups. Playing state: full-height 96dp-wide cover flush left → column of [title/artist/wide waveform + transport row] → progress bar + m:ss times spanning under the transport to the right edge (as in the concept). Idle state now carries its own transport ids (`widget_idle_prev/play/next`) — no shared transport row anymore.
+- **`kotlin/.../HeroWidgetProvider.kt`** — new `buildArtBitmap()`: center-crops the cover to the art view's real aspect (height read from `getAppWidgetOptions` `OPTION_APPWIDGET_MAX_HEIGHT`, fallback 110dp) and rounds the LEFT corners (26dp, matching the border's inner radius) natively, since RemoteViews can't clip; density capped at 2x to keep the bitmap under the Binder limit. `onAppWidgetOptionsChanged` override redraws on resize. Wires PendingIntents for both state groups' transports; the play-disc background is now static in the layout (idle has its own flat buttons, so the `setBackgroundResource` swap is gone). `MAX_ART_PX` 192→512 (source decode cap before the crop).
+- **`res/drawable/widget_wave_1..8.xml`** — regenerated wide: 21 bars / 110x24 viewport (was 5 bars / 26x24) so the waveform spans the text column like the concept; same stepped magenta→violet tinting, sine-sampled with advancing phase.
+- **`AndroidManifest.xml`** — receiver comment 4x2→4x1.
+- Verification: release build (`--build-number=120`) installed on the Pixel 7. NOTE: a previously-placed widget instance keeps its old 4x2 cell size — the user must remove + re-add the widget after this update; launcher provider-info caching may additionally need a launcher restart.

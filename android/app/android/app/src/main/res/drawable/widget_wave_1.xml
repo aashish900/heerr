@@ -1,23 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Music-waveform frame 1/8. Five bars centred on y=12 (both top and bottom
-     move). The eight frames are a sine wave sampled at advancing phase, so
-     cycling them in a ViewFlipper reads as a smooth travelling wave. Bars are
-     tinted along the heerr magenta->violet gradient (left->right) so the wave
-     matches the brand. RemoteViews can't host a custom view, so animation =
-     flipping vectors. -->
+<!-- Music-waveform frame 1/8. 21 bars centred on y=12 spanning the 4x1
+     hero widget's text column. The eight frames are a sine wave sampled at an
+     advancing phase, so cycling them in a ViewFlipper reads as a smooth
+     travelling wave. Bars are tinted along the heerr magenta->violet gradient
+     (left->right). RemoteViews can't host a custom view, so animation =
+     flipping vectors. Regenerated wide (was 5 bars / 26x24) for the 4x1
+     redesign. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="30dp"
+    android:width="110dp"
     android:height="24dp"
-    android:viewportWidth="26"
+    android:viewportWidth="110"
     android:viewportHeight="24">
     <path android:strokeColor="#F533C8" android:strokeWidth="3"
-        android:strokeLineCap="round" android:pathData="M3,6 L3,18" />
-    <path android:strokeColor="#CE38DD" android:strokeWidth="3"
-        android:strokeLineCap="round" android:pathData="M8,2 L8,22" />
+        android:strokeLineCap="round" android:pathData="M3.5,7 L3.5,17" />
+    <path android:strokeColor="#ED34CC" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M8.7,3.2 L8.7,20.8" />
+    <path android:strokeColor="#E635D0" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M13.8,5 L13.8,19" />
+    <path android:strokeColor="#DE36D5" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M18.9,5.7 L18.9,18.3" />
+    <path android:strokeColor="#D737D9" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M24.1,8.6 L24.1,15.4" />
+    <path android:strokeColor="#CF38DD" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M29.2,10.4 L29.2,13.6" />
+    <path android:strokeColor="#C738E1" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M34.4,7.7 L34.4,16.3" />
+    <path android:strokeColor="#C039E5" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M39.5,5.2 L39.5,18.8" />
+    <path android:strokeColor="#B83AEA" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M44.7,4.7 L44.7,19.3" />
+    <path android:strokeColor="#B13BEE" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M49.9,3.6 L49.9,20.4" />
     <path android:strokeColor="#A93CF2" android:strokeWidth="3"
-        android:strokeLineCap="round" android:pathData="M13,3.5 L13,20.5" />
-    <path android:strokeColor="#8A43F0" android:strokeWidth="3"
-        android:strokeLineCap="round" android:pathData="M18,8.5 L18,15.5" />
+        android:strokeLineCap="round" android:pathData="M55,8.1 L55,15.9" />
+    <path android:strokeColor="#A33EF2" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M60.1,10.4 L60.1,13.6" />
+    <path android:strokeColor="#9D3FF3" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M65.3,8.6 L65.3,15.4" />
+    <path android:strokeColor="#9840F3" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M70.5,7.7 L70.5,16.3" />
+    <path android:strokeColor="#9242F3" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M75.6,4.5 L75.6,19.5" />
+    <path android:strokeColor="#8C44F4" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M80.8,2.7 L80.8,21.3" />
+    <path android:strokeColor="#8645F4" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M85.9,7.2 L85.9,16.8" />
+    <path android:strokeColor="#8046F4" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M91,9.1 L91,14.9" />
+    <path android:strokeColor="#7B48F4" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M96.2,9.5 L96.2,14.5" />
+    <path android:strokeColor="#754AF5" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M101.3,9.8 L101.3,14.2" />
     <path android:strokeColor="#6F4BF5" android:strokeWidth="3"
-        android:strokeLineCap="round" android:pathData="M23,10 L23,14" />
+        android:strokeLineCap="round" android:pathData="M106.5,4.9 L106.5,19.1" />
 </vector>

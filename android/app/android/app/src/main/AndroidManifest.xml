@@ -78,7 +78,7 @@
             </intent-filter>
         </receiver>
 
-        <!-- #20: Now Playing home-screen widget — the 4x2 "hero" tile: album
+        <!-- #20: Now Playing home-screen widget — the 4x1 "hero" tile: album
              art + title/artist + animated gradient waveform + progress +
              m:ss times + transport, with an idle "Start listening" state.
              Display state is pushed from Dart via the home_widget package;

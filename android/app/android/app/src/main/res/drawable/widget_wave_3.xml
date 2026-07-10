@@ -1,18 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Music-waveform frame 3/8. See widget_wave_1.xml. -->
+<!-- Music-waveform frame 3/8. 21 bars centred on y=12 spanning the 4x1
+     hero widget's text column. The eight frames are a sine wave sampled at an
+     advancing phase, so cycling them in a ViewFlipper reads as a smooth
+     travelling wave. Bars are tinted along the heerr magenta->violet gradient
+     (left->right). RemoteViews can't host a custom view, so animation =
+     flipping vectors. Regenerated wide (was 5 bars / 26x24) for the 4x1
+     redesign. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="30dp"
+    android:width="110dp"
     android:height="24dp"
-    android:viewportWidth="26"
+    android:viewportWidth="110"
     android:viewportHeight="24">
     <path android:strokeColor="#F533C8" android:strokeWidth="3"
-        android:strokeLineCap="round" android:pathData="M3,2 L3,22" />
-    <path android:strokeColor="#CE38DD" android:strokeWidth="3"
-        android:strokeLineCap="round" android:pathData="M8,5 L8,19" />
+        android:strokeLineCap="round" android:pathData="M3.5,4.1 L3.5,19.9" />
+    <path android:strokeColor="#ED34CC" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M8.7,5.6 L8.7,18.4" />
+    <path android:strokeColor="#E635D0" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M13.8,7 L13.8,17" />
+    <path android:strokeColor="#DE36D5" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M18.9,10.4 L18.9,13.6" />
+    <path android:strokeColor="#D737D9" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M24.1,9.6 L24.1,14.4" />
+    <path android:strokeColor="#CF38DD" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M29.2,5.6 L29.2,18.4" />
+    <path android:strokeColor="#C738E1" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M34.4,5.1 L34.4,18.9" />
+    <path android:strokeColor="#C039E5" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M39.5,3.6 L39.5,20.4" />
+    <path android:strokeColor="#B83AEA" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M44.7,5.9 L44.7,18.1" />
+    <path android:strokeColor="#B13BEE" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M49.9,10.4 L49.9,13.6" />
     <path android:strokeColor="#A93CF2" android:strokeWidth="3"
-        android:strokeLineCap="round" android:pathData="M13,9 L13,15" />
-    <path android:strokeColor="#8A43F0" android:strokeWidth="3"
-        android:strokeLineCap="round" android:pathData="M18,9 L18,15" />
+        android:strokeLineCap="round" android:pathData="M55,9.5 L55,14.5" />
+    <path android:strokeColor="#A33EF2" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M60.1,8 L60.1,16" />
+    <path android:strokeColor="#9D3FF3" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M65.3,6.2 L65.3,17.8" />
+    <path android:strokeColor="#9840F3" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M70.5,2.5 L70.5,21.5" />
+    <path android:strokeColor="#9242F3" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M75.6,5.3 L75.6,18.7" />
+    <path android:strokeColor="#8C44F4" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M80.8,9 L80.8,15" />
+    <path android:strokeColor="#8645F4" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M85.9,9.1 L85.9,14.9" />
+    <path android:strokeColor="#8046F4" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M91,10.2 L91,13.8" />
+    <path android:strokeColor="#7B48F4" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M96.2,7 L96.2,17" />
+    <path android:strokeColor="#754AF5" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M101.3,2.8 L101.3,21.2" />
     <path android:strokeColor="#6F4BF5" android:strokeWidth="3"
-        android:strokeLineCap="round" android:pathData="M23,5 L23,19" />
+        android:strokeLineCap="round" android:pathData="M106.5,5 L106.5,19" />
 </vector>
