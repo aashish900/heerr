@@ -102,7 +102,7 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color colour = degraded ? Colors.amber : heerrGreen;
+    final Color colour = degraded ? Colors.amber : heerrMagenta;
     return Chip(
       key: Key(degraded ? 'engine-chip-degraded' : 'engine-chip-ok'),
       avatar: Icon(

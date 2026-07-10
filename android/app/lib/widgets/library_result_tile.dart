@@ -68,7 +68,7 @@ class LibraryResultTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final Widget? trailing;
     if (isCurrentlyPlaying) {
-      trailing = const Icon(Icons.play_arrow, color: heerrGreen);
+      trailing = const Icon(Icons.play_arrow, color: heerrMagenta);
     } else if (onMarkToggle != null) {
       trailing = IconButton(
         icon: DownloadIcon(filled: isMarkedForOffline),
@@ -143,7 +143,7 @@ class LibraryResultTile extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: isCurrentlyPlaying
-            ? const TextStyle(color: heerrGreen, fontWeight: FontWeight.w600)
+            ? const TextStyle(color: heerrMagenta, fontWeight: FontWeight.w600)
             : null,
       ),
       subtitle: subtitleWithProgress,

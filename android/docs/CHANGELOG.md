@@ -2328,3 +2328,16 @@ Delete from device / server / both verified on the Pixel against the home server
 - **`lib/screens/library/playlist_detail_screen.dart`** — per-song pending badge `Icons.download_for_offline_outlined` and downloaded badge `Icons.download_done` replaced with `DownloadIcon`.
 - **`test/widgets/library_result_tile_test.dart`** — updated finders from `find.byIcon(Icons.download_*)` to `find.byType(DownloadIcon)` / `find.byWidgetPredicate`.
 - **`test/widgets/result_tile_test.dart`** — same finder updates; import added. 774 tests green.
+
+## 2026-07-10 — Redesign: gradient magenta/purple theme (move off Spotify green)
+
+Part 1 of the app-wide visual redesign toward the magenta→purple→violet brand identity (matches the new app icon). Theme + gradient accents only; per-screen layout passes follow.
+
+- **`lib/theme.dart`** — palette swapped from Spotify green to `heerrMagenta #F533C8` (primary), `heerrPurple #A93CF2` (secondary), `heerrViolet #6F4BF5` (tertiary); background deepened to `#0A0A0A`. New `heerrGradient` `LinearGradient` (magenta→purple→violet, topLeft→bottomRight). `onPrimary`/`onSecondary`/`onError` are black (contrast on the bright fills, ~7:1). Added themed `SliderTheme`, `SwitchTheme`, `ChipTheme`, `ProgressIndicatorTheme`, `DividerTheme`, `ListTileTheme`, `FloatingActionButtonTheme`, `TextButtonTheme`, `ElevatedButtonTheme`. Deleted the dead `heerrGreen`/`heerrGolden` aliases (zero references remained).
+- **New `lib/widgets/gradient_icon.dart`** — `ShaderMask` wrapper that gradient-tints any glyph (Icon or SVG) via `heerrGradient`.
+- **New `lib/widgets/gradient_button.dart`** — full-width gradient pill CTA (disabled → grey), the redesign's primary button.
+- **`lib/router.dart`** — selected bottom-nav icon wrapped in `GradientIcon` (active tab sweeps the gradient; unselected stay grey).
+- **`lib/screens/player/now_playing_transport.dart`** — play/pause is now a gradient circle with a black glyph; scrubber's played portion painted with the gradient via a custom `_GradientSliderTrackShape`; shuffle/repeat gradient-tinted when active (`_transportGlyph` helper).
+- **`lib/screens/profile/profile_screen.dart`** — Save button → `GradientButton`; avatar wrapped in a gradient ring (gradient circle → black gap → photo).
+- Solid-magenta call sites updated off the legacy green: `album_detail_screen`, `playlist_detail_screen`, `queue_screen`, `now_playing_lyrics`, `library_result_tile`, `mini_player` (fallback tint → `heerrPurple`), `download_icon`, `settings_recommendations`.
+- `flutter analyze` clean; 774/774 tests green.

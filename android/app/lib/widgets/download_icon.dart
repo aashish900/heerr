@@ -4,7 +4,7 @@ import '../theme.dart';
 
 /// Download icon rendered from a PNG asset, colourised via [BlendMode.srcIn].
 ///
-/// [filled] = true  → heerr-green tint (active / marked / already downloaded).
+/// [filled] = true  → heerr-magenta tint (active / marked / already downloaded).
 /// [filled] = false → [color] tint, defaulting to [IconTheme] colour → white.
 ///
 /// Behaves like a regular [Icon] in any context that sets [IconTheme]
@@ -24,7 +24,7 @@ class DownloadIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Color c = filled
-        ? heerrGreen
+        ? heerrMagenta
         : (color ?? IconTheme.of(context).color ?? Colors.white);
     return Image.asset(
       'assets/icons/download_file.png',

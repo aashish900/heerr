@@ -227,7 +227,7 @@ class _SyncedLyricsPreview extends StatelessWidget {
               lines[i].value,
               style: base?.copyWith(
                 color: i == current
-                    ? heerrGreen
+                    ? heerrMagenta
                     : foreground.withValues(alpha: 0.55),
                 fontWeight: i == current ? FontWeight.w700 : FontWeight.w500,
               ),
@@ -317,7 +317,7 @@ class _SyncedLyricsState extends State<_SyncedLyrics> {
               widget.lines[i].value,
               style: base?.copyWith(
                 color: i == current
-                    ? heerrGreen
+                    ? heerrMagenta
                     : i < current
                         ? widget.foreground
                         : widget.foreground.withValues(alpha: 0.4),

@@ -27,7 +27,7 @@ MiniPlayerPaletteExtractor miniPlayerPaletteExtractorOverride =
 /// Tap on the play/pause button → call handler.play() / handler.pause().
 ///
 /// Background colour is the dominant colour of the current cover at 75%
-/// alpha; falls back to [heerrGolden] while extraction is pending or fails.
+/// alpha; falls back to [heerrPurple] while extraction is pending or fails.
 class MiniPlayer extends ConsumerStatefulWidget {
   const MiniPlayer({super.key});
 
@@ -64,7 +64,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
     }
 
     _maybeRefreshTint(item.artUri);
-    final Color bg = (_tintColor ?? heerrGolden).withValues(alpha: 0.55);
+    final Color bg = (_tintColor ?? heerrPurple).withValues(alpha: 0.55);
 
     return Padding(
       // 99% width → 0.5% margin on each side. Tiny vertical gap so the pill

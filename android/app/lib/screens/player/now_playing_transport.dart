@@ -24,21 +24,26 @@ class _Scrubber extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Column(
         children: <Widget>[
-          Slider(
-            value: max <= 0 ? 0 : clampedPos,
-            max: max <= 0 ? 1 : max,
-            onChangeStart: max <= 0
-                ? null
-                : (double v) =>
-                    onSeekStart(Duration(milliseconds: v.toInt())),
-            onChanged: max <= 0
-                ? null
-                : (double v) =>
-                    onSeekUpdate(Duration(milliseconds: v.toInt())),
-            onChangeEnd: max <= 0
-                ? null
-                : (double v) =>
-                    onSeekEnd(Duration(milliseconds: v.toInt())),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackShape: const _GradientSliderTrackShape(),
+            ),
+            child: Slider(
+              value: max <= 0 ? 0 : clampedPos,
+              max: max <= 0 ? 1 : max,
+              onChangeStart: max <= 0
+                  ? null
+                  : (double v) =>
+                      onSeekStart(Duration(milliseconds: v.toInt())),
+              onChanged: max <= 0
+                  ? null
+                  : (double v) =>
+                      onSeekUpdate(Duration(milliseconds: v.toInt())),
+              onChangeEnd: max <= 0
+                  ? null
+                  : (double v) =>
+                      onSeekEnd(Duration(milliseconds: v.toInt())),
+            ),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -63,6 +68,77 @@ class _Scrubber extends StatelessWidget {
     final int s = total % 60;
     return '$m:${s.toString().padLeft(2, '0')}';
   }
+}
+
+/// Slider track shape whose active (played) portion is painted with the heerr
+/// magenta→purple→violet [heerrGradient] instead of a flat colour. The inactive
+/// portion stays solid. LTR-only (the app ships no RTL locales).
+class _GradientSliderTrackShape extends RoundedRectSliderTrackShape {
+  const _GradientSliderTrackShape();
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset offset, {
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required Animation<double> enableAnimation,
+    required TextDirection textDirection,
+    required Offset thumbCenter,
+    Offset? secondaryOffset,
+    bool isDiscrete = false,
+    bool isEnabled = false,
+    double additionalActiveTrackHeight = 2,
+  }) {
+    final Rect trackRect = getPreferredRect(
+      parentBox: parentBox,
+      offset: offset,
+      sliderTheme: sliderTheme,
+      isEnabled: isEnabled,
+      isDiscrete: isDiscrete,
+    );
+    final Radius radius = Radius.circular(trackRect.height / 2);
+
+    final Paint inactivePaint = Paint()
+      ..color = sliderTheme.inactiveTrackColor ?? const Color(0xFF2E2E2E);
+    context.canvas.drawRRect(
+      RRect.fromRectAndRadius(trackRect, radius),
+      inactivePaint,
+    );
+
+    final Rect activeRect = Rect.fromLTRB(
+      trackRect.left,
+      trackRect.top,
+      thumbCenter.dx.clamp(trackRect.left, trackRect.right),
+      trackRect.bottom,
+    );
+    final Paint activePaint = Paint()
+      ..shader = heerrGradient.createShader(trackRect);
+    context.canvas.drawRRect(
+      RRect.fromRectAndRadius(activeRect, radius),
+      activePaint,
+    );
+  }
+}
+
+/// A transport glyph (shuffle / repeat) rendered from a bundled SVG. When
+/// [active] it takes the magenta→purple→violet [heerrGradient] via
+/// [GradientIcon]; otherwise it renders solid in [inactiveColor].
+Widget _transportGlyph(
+  String asset, {
+  required bool active,
+  required Color inactiveColor,
+}) {
+  final Widget svg = SvgPicture.asset(
+    asset,
+    width: 26,
+    height: 26,
+    colorFilter: ColorFilter.mode(
+      active ? Colors.white : inactiveColor,
+      BlendMode.srcIn,
+    ),
+  );
+  return active ? GradientIcon(child: svg) : svg;
 }
 
 class _Transport extends ConsumerWidget {
@@ -98,14 +174,10 @@ class _Transport extends ConsumerWidget {
         IconButton(
           key: const Key('now-playing-shuffle'),
           tooltip: shuffleOn ? 'Shuffle on' : 'Shuffle off',
-          icon: SvgPicture.asset(
+          icon: _transportGlyph(
             'assets/icons/shuffle.svg',
-            width: 26,
-            height: 26,
-            colorFilter: ColorFilter.mode(
-              shuffleOn ? cs.primary : cs.onSurfaceVariant,
-              BlendMode.srcIn,
-            ),
+            active: shuffleOn,
+            inactiveColor: cs.onSurfaceVariant,
           ),
           onPressed: () {
             final HeerrAudioHandler h = ref.read(audioHandlerProvider);
@@ -120,27 +192,30 @@ class _Transport extends ConsumerWidget {
           icon: const Icon(Icons.skip_previous_rounded),
           onPressed: () => ref.read(audioHandlerProvider).skipToPrevious(),
         ),
-        // Big filled circle (white in the dark theme) with a plain glyph,
-        // matching the reference layout.
-        IconButton.filled(
-          iconSize: 40,
-          tooltip: playing ? 'Pause' : 'Play',
-          style: IconButton.styleFrom(
-            backgroundColor: cs.onSurface,
-            foregroundColor: cs.surface,
+        // Big gradient circle (magenta→purple→violet) with a white glyph —
+        // the app's primary action, matching the reference layout.
+        DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: heerrGradient,
+            shape: BoxShape.circle,
+          ),
+          child: IconButton(
+            iconSize: 40,
+            tooltip: playing ? 'Pause' : 'Play',
+            color: Colors.black,
             padding: const EdgeInsets.all(12),
+            icon: Icon(
+              playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+            ),
+            onPressed: () {
+              final HeerrAudioHandler h = ref.read(audioHandlerProvider);
+              if (playing) {
+                h.pause();
+              } else {
+                h.play();
+              }
+            },
           ),
-          icon: Icon(
-            playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-          ),
-          onPressed: () {
-            final HeerrAudioHandler h = ref.read(audioHandlerProvider);
-            if (playing) {
-              h.pause();
-            } else {
-              h.play();
-            }
-          },
         ),
         IconButton(
           iconSize: 36,
@@ -157,16 +232,12 @@ class _Transport extends ConsumerWidget {
               : repeatOn
                   ? 'Repeat all'
                   : 'Repeat off',
-          icon: SvgPicture.asset(
+          icon: _transportGlyph(
             repeatMode == AudioServiceRepeatMode.one
                 ? 'assets/icons/repeat_one.svg'
                 : 'assets/icons/repeat.svg',
-            width: 26,
-            height: 26,
-            colorFilter: ColorFilter.mode(
-              repeatOn ? cs.primary : cs.onSurfaceVariant,
-              BlendMode.srcIn,
-            ),
+            active: repeatOn,
+            inactiveColor: cs.onSurfaceVariant,
           ),
           onPressed: () => ref
               .read(audioHandlerProvider)

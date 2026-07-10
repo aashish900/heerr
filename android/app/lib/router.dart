@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import 'widgets/download_icon.dart';
+import 'widgets/gradient_icon.dart';
 
 import 'app/lifecycle_coordinator.dart';
 import 'providers/library/library_search_query.dart';
@@ -338,7 +339,9 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
                 for (final _NavTab t in _tabs)
                   NavigationDestination(
                     icon: _iconFor(context, t, selected: false),
-                    selectedIcon: _iconFor(context, t, selected: true),
+                    selectedIcon: GradientIcon(
+                      child: _iconFor(context, t, selected: true),
+                    ),
                     label: t.label,
                   ),
               ],

@@ -133,7 +133,7 @@ class _JobTile extends ConsumerWidget {
     final String? name = job.displayName;
     final bool hasName = name != null && name.isNotEmpty;
     return ListTile(
-      tileColor: _isActive ? heerrGreen.withValues(alpha: 0.15) : null,
+      tileColor: _isActive ? heerrMagenta.withValues(alpha: 0.12) : null,
       title: Text(
         hasName ? name : job.sourceUrl,
         maxLines: 1,

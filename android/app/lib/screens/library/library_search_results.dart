@@ -75,7 +75,7 @@ class _CombinedResultsBody extends ConsumerWidget {
       ytmManualTriggerProvider.select((Set<String> s) => s.contains(query)),
     );
 
-    // K-polish: heerrGreen indicator for the song row whose subsonicId
+    // K-polish: heerrMagenta indicator for the song row whose subsonicId
     // matches the active MediaItem. Null when nothing is playing.
     final String? currentSubsonicId =
         ref.watch(currentMediaItemProvider).valueOrNull?.extras?['subsonicId']
