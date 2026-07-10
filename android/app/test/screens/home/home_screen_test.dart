@@ -13,6 +13,7 @@ import 'package:heerr/providers/home/home_providers.dart';
 import 'package:heerr/providers/profiles/profile_meta.dart';
 import 'package:heerr/providers/recommendations.dart';
 import 'package:heerr/screens/home/home_screen.dart';
+import 'package:heerr/theme.dart';
 import 'package:heerr/widgets/home_grid_tile.dart';
 import 'package:heerr/widgets/home_section.dart';
 
@@ -65,14 +66,7 @@ Widget _wrap({required List<Override> overrides}) {
   return ProviderScope(
     overrides: overrides,
     child: MaterialApp.router(
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1DB954),
-          brightness: Brightness.dark,
-        ),
-      ),
+      theme: heerrDarkTheme(),
       routerConfig: _testRouter(),
     ),
   );

@@ -192,7 +192,7 @@ class _Transport extends ConsumerWidget {
           icon: const Icon(Icons.skip_previous_rounded),
           onPressed: () => ref.read(audioHandlerProvider).skipToPrevious(),
         ),
-        // Big gradient circle (magenta→purple→violet) with a white glyph —
+        // Big gradient circle (magenta→purple→violet) with a black glyph —
         // the app's primary action, matching the reference layout.
         DecoratedBox(
           decoration: const BoxDecoration(

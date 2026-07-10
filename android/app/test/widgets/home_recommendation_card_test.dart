@@ -6,6 +6,7 @@ import 'package:heerr/models/download_response.dart';
 import 'package:heerr/models/enums.dart';
 import 'package:heerr/models/recommended_track.dart';
 import 'package:heerr/providers/download.dart';
+import 'package:heerr/theme.dart';
 import 'package:heerr/widgets/home_recommendation_card.dart';
 
 class _RecordingDispatcher extends DownloadDispatcher {
@@ -34,14 +35,7 @@ Widget _wrap({required Widget child, List<Override> overrides = const []}) {
   return ProviderScope(
     overrides: overrides,
     child: MaterialApp(
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1DB954),
-          brightness: Brightness.dark,
-        ),
-      ),
+      theme: heerrDarkTheme(),
       home: Scaffold(body: SingleChildScrollView(child: child)),
     ),
   );

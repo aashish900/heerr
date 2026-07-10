@@ -2386,3 +2386,13 @@ Review follow-up to part 5: keep only the new 4x2 hero widget, and stop the live
 - `proguard-rules.pro` comment updated (`NowPlayingWidgetProvider` → `HeroWidgetProvider`); no rule change (the `-keep` was already package-wide).
 - `flutter analyze` clean; 776/776 tests green (no test referenced the removed constants). `flutter build apk --debug` succeeds with the resources/receivers removed.
 - **`kotlin/com/aashish/heerr/HeroWidgetProvider.kt`**: `formatTime()` now formats with `Locale.US` instead of the default locale, so the `m:ss` timestamps always render Latin digits regardless of device locale (was flagged in review — `String.format` with no explicit locale can render localized digit glyphs, e.g. Arabic-Indic, under some locales).
+
+## 2026-07-10 — Redesign review sweep: stale-doc + test-harness cleanup (part 7)
+
+Full-branch review of redesign parts 1–6. Code was clean; the drift found was in docs and test scaffolding still referencing the retired Spotify-green theme (staleness rule: docs updated same turn as discovered).
+
+- **`android/CLAUDE.md`** — locked-stack "Theme" line updated: `ColorScheme.fromSeed(#1DB954)` → hand-built raw `ColorScheme` (magenta primary + `heerrGradient` hero accents).
+- **`android/docs/CONTEXT.md`** — stack-table Theme row + "Aesthetic" section rewritten for the gradient identity (magenta `#F533C8` → purple `#A93CF2` → violet `#6F4BF5` on `#0A0A0A`), noting the raw-ColorScheme approach and the gradient-on-hero-accents rule.
+- **`test/screens/home/home_screen_test.dart`**, **`test/widgets/home_recommendation_card_test.dart`** — both `_wrap` harnesses built a private `ColorScheme.fromSeed(#1DB954)` theme; now use the real `heerrDarkTheme()` so widget tests exercise the shipped theme.
+- **`lib/screens/player/now_playing_transport.dart`** — comment fix: the gradient play circle's glyph is black (matches `onPrimary`), not white as the comment claimed.
+- `flutter analyze` clean; 776/776 tests green.
