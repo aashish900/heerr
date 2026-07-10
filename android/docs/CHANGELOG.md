@@ -2357,3 +2357,11 @@ Third per-screen pass. Home layout already matched the reference mock (greeting 
 - **`lib/theme.dart`** — explicit neutral dark-grey `surfaceContainer*` ladder (Lowest `#0D0D0D` → Highest `#222222`). The raw `ColorScheme` was falling back to M3's purple-tinted defaults for `surfaceContainerHigh`; now grid tiles / cards (High `#1C1C1C`) and the search pill (Highest `#222222`) read as flat neutral greys like the mock.
 - **`lib/screens/home/home_screen.dart`** — AppBar profile avatar (`_ProfileAvatarButton`) wrapped in a gradient ring (gradient circle → black gap → avatar), consistent with the Profile screen. Imports `theme.dart`.
 - `flutter analyze` clean; 774/774 tests green (avatar test targets the `home-profile-avatar` key, unchanged).
+
+## 2026-07-10 — Redesign: Library + Downloads (gradient theme, part 4)
+
+Fourth per-screen pass. Both screens are tab-based; a shared TabBar theme + the Downloads empty-state icon bring them in line with the mock.
+
+- **`lib/theme.dart`** — new `TabBarThemeData`: selected label + underline indicator `heerrMagenta`, unselected label `#808080`, transparent divider. Covers both the Library (Artists/Albums/Playlists) and Downloads (Albums/Playlists/Songs) tab bars — previously the selected label fell back to white (M3 `onSurface` default).
+- **`lib/screens/downloads_screen.dart`** — empty-state icon (`album_outlined` concentric-ring vinyl, etc.) now rendered via `GradientIcon` (magenta→violet) instead of flat grey, matching the mock's coloured empty-state focal icon. Imports `gradient_icon.dart`. Message text stays grey.
+- `flutter analyze` clean; 774/774 tests green (`find.byIcon` still matches — the Icon stays as GradientIcon's child).

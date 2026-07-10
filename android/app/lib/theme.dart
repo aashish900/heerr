@@ -101,6 +101,12 @@ ThemeData heerrDarkTheme() {
     progressIndicatorTheme: const ProgressIndicatorThemeData(
       color: heerrMagenta,
     ),
+    tabBarTheme: const TabBarThemeData(
+      labelColor: heerrMagenta,
+      unselectedLabelColor: Color(0xFF808080),
+      indicatorColor: heerrMagenta,
+      dividerColor: Colors.transparent,
+    ),
     chipTheme: ChipThemeData(
       backgroundColor: const Color(0xFF1A1A1A),
       selectedColor: heerrMagenta.withValues(alpha: 0.2),
