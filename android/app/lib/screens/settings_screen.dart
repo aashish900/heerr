@@ -55,18 +55,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // Profiles (the primary credential surface) stays open by default;
           // the heavier Offline + Recommendations sections start collapsed.
           _CollapsibleSection(
-            leading: Icon(Icons.people_outline),
+            leading: Icon(Icons.people_outline, color: heerrMagenta),
             title: 'Profiles',
             initiallyExpanded: true,
             child: ProfilesSection(),
           ),
           _CollapsibleSection(
-            leading: DownloadIcon(filled: false),
+            leading: DownloadIcon(filled: false, color: heerrMagenta),
             title: 'Offline downloads',
             child: _OfflineSection(),
           ),
           _CollapsibleSection(
-            leading: Icon(Icons.recommend_outlined),
+            leading: Icon(Icons.recommend_outlined, color: heerrMagenta),
             title: 'Recommendations',
             child: _RecommendationsSection(),
           ),
@@ -90,7 +90,7 @@ class _AppVersionTile extends ConsumerWidget {
     if (version == null) return const SizedBox.shrink();
     return ListTile(
       key: const Key('settings-app-version'),
-      leading: const Icon(Icons.info_outline),
+      leading: const Icon(Icons.info_outline, color: heerrMagenta),
       title: const Text(
         'App version',
         style: TextStyle(fontWeight: FontWeight.w600),

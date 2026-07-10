@@ -2341,3 +2341,11 @@ Part 1 of the app-wide visual redesign toward the magenta→purple→violet bran
 - **`lib/screens/profile/profile_screen.dart`** — Save button → `GradientButton`; avatar wrapped in a gradient ring (gradient circle → black gap → photo).
 - Solid-magenta call sites updated off the legacy green: `album_detail_screen`, `playlist_detail_screen`, `queue_screen`, `now_playing_lyrics`, `library_result_tile`, `mini_player` (fallback tint → `heerrPurple`), `download_icon`, `settings_recommendations`.
 - `flutter analyze` clean; 774/774 tests green.
+
+## 2026-07-10 — Redesign: Settings screen (gradient theme, part 2)
+
+Second per-screen pass of the redesign. Settings now matches the reference mock.
+
+- **`lib/screens/settings_screen.dart`** — section leading icons tinted `heerrMagenta` (Profiles people, Offline downloads, Recommendations, App-version info) instead of the default grey.
+- **`lib/screens/settings/profiles_section.dart`** — active-profile row now renders as a rounded magenta-tinted pill (tint bumped 0.08→0.12) with magenta title + person icon; "Add profile" icon tinted magenta. Non-active rows unchanged. Imports `theme.dart`.
+- `flutter analyze` clean; 774/774 tests green (profiles-section test asserts only `ListTile.selected`, untouched).
