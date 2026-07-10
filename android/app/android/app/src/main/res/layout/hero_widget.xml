@@ -74,7 +74,7 @@
                 android:ellipsize="end"
                 android:textColor="#B0B0B0"
                 android:textSize="12sp"
-                android:text="Start listening to your music" />
+                android:text="Start listening\nto your music" />
         </LinearLayout>
 
         <ImageButton

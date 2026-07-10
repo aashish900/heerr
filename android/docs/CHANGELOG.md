@@ -2473,3 +2473,9 @@ User review of the previous widget-polish commit flagged two remaining mismatche
 ## 2026-07-11 — Home Screen redesign plan: Part B (adaptive art-driven theming)
 
 - **`android/docs/HOMESCREEN.md`** — added Part B (§7, tasks B1–B4) after user review: per-song adaptive theming of the hero card + MiniPlayer. Artwork is never recolored; instead — shared cached palette provider (promoting the existing `dominantColorFor` / `palette_generator` path), 18% brand-blend of the extracted color for accents (waveform tint, play-button glow), blurred-art backdrop under a darkening gradient on the hero card, 400 ms animated tint transitions on track change. Amended Task 7 so the MiniPlayer palette infrastructure is kept (not deleted) for B1 to build on. Docs only.
+
+## 2026-07-11 — Follow-up 3: fix idle-prompt line break in the hero widget
+
+- **`android/app/android/app/src/main/res/layout/hero_widget.xml`** — the idle prompt `TextView` (`android:text="Start listening to your music"`) had no explicit break, so RemoteViews' text layout wrapped it unevenly instead of matching the reference's clean two-line split. Inserted a literal `\n` so the text is `"Start listening\nto your music"`.
+- **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.7.3 → 4.7.4 for the wording-wrap fix, per the version-sync convention.
+- Verification: `flutter test` 778/778 green, `flutter analyze` clean. Native XML-only change — no new Dart tests; gated by `flutter build apk --debug` + on-device smoke.
