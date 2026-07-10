@@ -2415,3 +2415,10 @@ On-device review: the Playlists tab's extended FAB rendered solid magenta (the t
 - **`lib/screens/library/library_tabs.dart`** — the `FloatingActionButton.extended` is now transparent/flat (elevation 0, black foreground) inside a `DecoratedBox` with `heerrGradient` at 16dp radius (matching the M3 extended-FAB shape); FABs can't take a gradient directly.
 - **`lib/screens/library/library_screen.dart`** — added the `theme.dart` import (library_tabs.dart is a `part of` it).
 - `flutter analyze` clean; 776/776 tests green (`find.byType(FloatingActionButton)` still matches — the FAB is wrapped, not replaced). Release build `--build-number=121` installed on the Pixel 7.
+
+## 2026-07-10 — Fix concurrent-save race in NowPlayingPersistence
+
+CI flagged `now_playing_persistence_test.dart`'s "debounced save fires once for a burst of trigger events" test failing with `PathNotFoundException` on `NowPlayingStore.save`'s tmp-file rename. Root cause: `NowPlayingStore.save` (`now_playing_store.dart:43-48`) always writes to the same fixed `${_file.path}.tmp`, and `NowPlayingPersistence.flush()` could fire a second `_writeSnapshot()` concurrently with an already-in-flight debounced one (`_debounceTimer?.cancel()` is a no-op once the timer has fired) — two overlapping `save()` calls race the shared `.tmp` path, and the loser's `rename()` throws once the winner's rename has already removed it.
+
+- **`lib/player/now_playing_persistence.dart`** — added `_pendingWrite`, a chained `Future` serializing all writes through a new `_enqueueWrite()` helper; both the debounce-timer callback and `flush()` now go through it instead of calling `_writeSnapshot()` directly, so a `flush()` call always waits for any in-flight debounced save instead of racing it.
+- `flutter test test/player/` — 75/75 green.

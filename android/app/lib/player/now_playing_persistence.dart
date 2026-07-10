@@ -58,6 +58,11 @@ class NowPlayingPersistence {
   Timer? _debounceTimer;
   NowPlayingSnapshotBuilder? _build;
   bool _disposed = false;
+  // Chains writes so a debounce fire that's already in flight can never
+  // overlap a `flush()` (or another fire) on the same tmp-file path in
+  // `NowPlayingStore.save` — concurrent `save()` calls race the shared
+  // `.tmp` rename and throw PathNotFoundException.
+  Future<void> _pendingWrite = Future<void>.value();
 
   /// Wire to a change-trigger [trigger] + the snapshot [build] closure.
   /// Each event on [trigger] schedules a debounced save; [flush] uses
@@ -78,7 +83,7 @@ class NowPlayingPersistence {
     if (_disposed) return;
     _debounceTimer?.cancel();
     _debounceTimer = Timer(_debounce, () {
-      unawaited(_writeSnapshot());
+      unawaited(_enqueueWrite());
     });
   }
 
@@ -88,7 +93,15 @@ class NowPlayingPersistence {
   Future<void> flush() async {
     if (_disposed) return;
     _debounceTimer?.cancel();
-    await _writeSnapshot();
+    await _enqueueWrite();
+  }
+
+  /// Serializes writes behind [_pendingWrite] so a debounce fire already
+  /// in flight can't overlap a `flush()` call.
+  Future<void> _enqueueWrite() {
+    final Future<void> next = _pendingWrite.then((_) => _writeSnapshot());
+    _pendingWrite = next;
+    return next;
   }
 
   Future<void> _writeSnapshot() async {
