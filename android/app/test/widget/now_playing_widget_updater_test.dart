@@ -217,4 +217,26 @@ void main() {
       verify(() => client.saveString(kNpKeyArtPath, '')).called(1);
     });
   });
+
+  group('NowPlayingWidgetUpdater.pushPosition (live 1s ticker)', () {
+    test('writes only the position key + triggers a redraw', () async {
+      await updater.pushPosition(const Duration(minutes: 1, seconds: 5));
+
+      verify(() => client.saveString(kNpKeyPositionMs, '65000')).called(1);
+      verify(() => client.update()).called(1);
+      // Lightweight: no per-track fields re-written on a tick.
+      verifyNever(() => client.saveBool(any(), any()));
+      verifyNever(() => client.saveString(kNpKeyTitle, any()));
+      verifyNever(() => client.saveString(kNpKeyArtPath, any()));
+    });
+
+    test('a client error never throws out of pushPosition', () async {
+      when(() => client.update()).thenThrow(Exception('platform missing'));
+
+      await expectLater(
+        updater.pushPosition(const Duration(seconds: 1)),
+        completes,
+      );
+    });
+  });
 }

@@ -119,6 +119,20 @@
                 android:resource="@xml/pill_widget_info" />
         </receiver>
 
+        <!-- 4x2 "hero" Now Playing widget: album art + title/artist + animated
+             gradient waveform + progress + m:ss times + transport, with an idle
+             "Start listening" state. Shares the same data contract. -->
+        <receiver
+            android:name=".HeroWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/hero_widget_info" />
+        </receiver>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

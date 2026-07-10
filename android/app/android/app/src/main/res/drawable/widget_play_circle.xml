@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gradient play disc — background of the hero widget's play/pause button in
+     the playing state (concept's magenta->violet circle behind the white
+     glyph). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <gradient
+        android:startColor="#F533C8"
+        android:centerColor="#A93CF2"
+        android:endColor="#6F4BF5"
+        android:angle="315" />
+</shape>

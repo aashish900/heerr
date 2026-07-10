@@ -5,14 +5,14 @@
     android:height="24dp"
     android:viewportWidth="26"
     android:viewportHeight="24">
-    <path android:strokeColor="#1DB954" android:strokeWidth="3"
+    <path android:strokeColor="#F533C8" android:strokeWidth="3"
         android:strokeLineCap="round" android:pathData="M3,3 L3,21" />
-    <path android:strokeColor="#1DB954" android:strokeWidth="3"
+    <path android:strokeColor="#CE38DD" android:strokeWidth="3"
         android:strokeLineCap="round" android:pathData="M8,2.5 L8,21.5" />
-    <path android:strokeColor="#1DB954" android:strokeWidth="3"
+    <path android:strokeColor="#A93CF2" android:strokeWidth="3"
         android:strokeLineCap="round" android:pathData="M13,6.5 L13,17.5" />
-    <path android:strokeColor="#1DB954" android:strokeWidth="3"
+    <path android:strokeColor="#8A43F0" android:strokeWidth="3"
         android:strokeLineCap="round" android:pathData="M18,10 L18,14" />
-    <path android:strokeColor="#1DB954" android:strokeWidth="3"
+    <path android:strokeColor="#6F4BF5" android:strokeWidth="3"
         android:strokeLineCap="round" android:pathData="M23,8 L23,16" />
 </vector>

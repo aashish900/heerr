@@ -43,6 +43,10 @@ const String kBarWidgetName = 'BarWidgetProvider';
 /// Chubby 2x1 "pill" widget (circular cover art + title/artist + waveform).
 const String kPillWidgetName = 'PillWidgetProvider';
 
+/// 4x2 "hero" widget (album art + title/artist + gradient waveform +
+/// progress + m:ss times + transport, with an idle "Start listening" state).
+const String kHeroWidgetName = 'HeroWidgetProvider';
+
 const String kNpKeyHasTrack = 'np_has_track';
 const String kNpKeyTitle = 'np_title';
 const String kNpKeyArtist = 'np_artist';
@@ -152,13 +156,14 @@ class HomeWidgetClientImpl implements HomeWidgetClient {
 
   @override
   Future<void> update() async {
-    // Redraw all three home-screen widgets; any not added by the user is a
-    // harmless no-op. They share the same `np_*` data, so a single push feeds
-    // whichever tiles are on the home screen.
+    // Redraw all home-screen widgets; any not added by the user is a harmless
+    // no-op. They share the same `np_*` data, so a single push feeds whichever
+    // tiles are on the home screen.
     for (final String name in const <String>[
       kNowPlayingWidgetName,
       kBarWidgetName,
       kPillWidgetName,
+      kHeroWidgetName,
     ]) {
       await HomeWidget.updateWidget(name: name, androidName: name);
     }
@@ -219,6 +224,23 @@ class NowPlayingWidgetUpdater {
       await _client.update();
     } catch (e, st) {
       debugPrint('now_playing_widget: push failed: $e');
+      debugPrintStack(stackTrace: st);
+    }
+  }
+
+  /// Lightweight position-only push for the live 1 s progress ticker. Writes
+  /// just [kNpKeyPositionMs] and redraws — no tint/art re-resolution — so the
+  /// hero/bar progress advances each second without the per-track work [push]
+  /// does. Callers should only tick while a track is playing.
+  Future<void> pushPosition(Duration position) async {
+    try {
+      await _client.saveString(
+        kNpKeyPositionMs,
+        position.inMilliseconds.toString(),
+      );
+      await _client.update();
+    } catch (e, st) {
+      debugPrint('now_playing_widget: pushPosition failed: $e');
       debugPrintStack(stackTrace: st);
     }
   }
