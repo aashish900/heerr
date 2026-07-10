@@ -13,6 +13,7 @@ import '../../providers/profiles/profile_avatar.dart';
 import '../../providers/profiles/profile_meta.dart';
 import '../../providers/recommendations.dart';
 import '../../router.dart' show Routes;
+import '../../theme.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_snackbar.dart';
 import '../../widgets/recommendations_refresh_button.dart';
@@ -115,12 +116,28 @@ class _ProfileAvatarButton extends ConsumerWidget {
       key: const Key('home-profile-avatar'),
       tooltip: 'Profile',
       onPressed: () => context.push(Routes.profile),
-      icon: CircleAvatar(
-        radius: 15,
-        foregroundImage: avatar != null ? FileImage(avatar) : null,
-        child: avatar == null
-            ? const Icon(Icons.person_outline, size: 18)
-            : null,
+      // Gradient ring around the avatar — the brand accent, consistent with
+      // the full Profile screen's avatar treatment.
+      icon: Container(
+        padding: const EdgeInsets.all(2),
+        decoration: const BoxDecoration(
+          gradient: heerrGradient,
+          shape: BoxShape.circle,
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(1.5),
+          decoration: const BoxDecoration(
+            color: heerrBlack,
+            shape: BoxShape.circle,
+          ),
+          child: CircleAvatar(
+            radius: 14,
+            foregroundImage: avatar != null ? FileImage(avatar) : null,
+            child: avatar == null
+                ? const Icon(Icons.person_outline, size: 16)
+                : null,
+          ),
+        ),
       ),
     );
   }

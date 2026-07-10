@@ -24,7 +24,15 @@ ThemeData heerrDarkTheme() {
     onError: Colors.black,
     surface: heerrBlack,
     onSurface: Colors.white,
-    surfaceContainerHighest: Color(0xFF1A1A1A),
+    // Neutral dark-grey elevation ladder (darkest → lightest). Explicit so
+    // the near-black theme doesn't fall back to M3's purple-tinted defaults;
+    // grid tiles / cards (High) and the search pill (Highest) read as flat
+    // neutral greys, matching the redesign reference.
+    surfaceContainerLowest: Color(0xFF0D0D0D),
+    surfaceContainerLow: Color(0xFF121212),
+    surfaceContainer: Color(0xFF161616),
+    surfaceContainerHigh: Color(0xFF1C1C1C),
+    surfaceContainerHighest: Color(0xFF222222),
     onSurfaceVariant: Color(0xFFB0B0B0),
     outline: Color(0xFF2E2E2E),
   );

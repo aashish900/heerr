@@ -2349,3 +2349,11 @@ Second per-screen pass of the redesign. Settings now matches the reference mock.
 - **`lib/screens/settings_screen.dart`** — section leading icons tinted `heerrMagenta` (Profiles people, Offline downloads, Recommendations, App-version info) instead of the default grey.
 - **`lib/screens/settings/profiles_section.dart`** — active-profile row now renders as a rounded magenta-tinted pill (tint bumped 0.08→0.12) with magenta title + person icon; "Add profile" icon tinted magenta. Non-active rows unchanged. Imports `theme.dart`.
 - `flutter analyze` clean; 774/774 tests green (profiles-section test asserts only `ListTile.selected`, untouched).
+
+## 2026-07-10 — Redesign: Home screen (gradient theme, part 3)
+
+Third per-screen pass. Home layout already matched the reference mock (greeting + search pill + quick-access grid + horizontal sections); this pass tightens the surfaces + adds the brand avatar ring.
+
+- **`lib/theme.dart`** — explicit neutral dark-grey `surfaceContainer*` ladder (Lowest `#0D0D0D` → Highest `#222222`). The raw `ColorScheme` was falling back to M3's purple-tinted defaults for `surfaceContainerHigh`; now grid tiles / cards (High `#1C1C1C`) and the search pill (Highest `#222222`) read as flat neutral greys like the mock.
+- **`lib/screens/home/home_screen.dart`** — AppBar profile avatar (`_ProfileAvatarButton`) wrapped in a gradient ring (gradient circle → black gap → avatar), consistent with the Profile screen. Imports `theme.dart`.
+- `flutter analyze` clean; 774/774 tests green (avatar test targets the `home-profile-avatar` key, unchanged).
