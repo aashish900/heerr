@@ -479,68 +479,141 @@ class _PlaylistsTab extends ConsumerWidget {
     }
   }
 
+  /// How many playlist cards the 2-column grid shows between the Favorites
+  /// and Create cards (mockup: 3 rows of cards total).
+  static const int _kGridCap = 6;
+
+  String? _rowSubtitle(Playlist p) {
+    final String joined = <String?>[
+      if (p.owner != null) 'by ${p.owner}',
+      if (p.songCount != null) '${p.songCount} songs',
+    ].whereType<String>().join(' • ');
+    return joined.isEmpty ? null : joined;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<List<Playlist>> async =
-        ref.watch(libraryPlaylistsProvider);
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      // Gradient CTA per the redesign: the FAB itself is transparent/flat and
-      // the magenta→violet gradient comes from the wrapping box (FABs can't
-      // take a gradient directly). Radius matches the M3 extended-FAB shape.
-      floatingActionButton: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: heerrGradient,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: FloatingActionButton.extended(
-          onPressed: () => unawaited(_onCreatePressed(context, ref)),
-          backgroundColor: Colors.transparent,
-          foregroundColor: Colors.black,
-          elevation: 0,
-          icon: const Icon(Icons.add),
-          label: const Text('New playlist'),
-        ),
+        ref.watch(sortedLibraryPlaylistsProvider);
+    return async.when(
+      loading: () => const SkeletonList(count: 6),
+      error: (Object e, _) => Center(
+        child: Text(e is ApiError ? e.message : 'Error: $e'),
       ),
-      body: async.when(
-        loading: () => const SkeletonList(count: 6),
-        error: (Object e, _) => Center(
-          child: Text(e is ApiError ? e.message : 'Error: $e'),
-        ),
-        data: (List<Playlist> playlists) {
-          final Set<String> markedPlaylists = ref
-                  .watch(offlineManifestProvider)
-                  .valueOrNull
-                  ?.markedPlaylists ??
-              const <String>{};
-          // Total = N playlists + 1 trailing "For You →" entry point.
-          return ListView.builder(
-            itemCount: playlists.length + 1,
-            itemBuilder: (BuildContext c, int i) {
-              if (i == playlists.length) {
-                return ListTile(
-                  key: const Key('library-for-you-entry'),
-                  leading: const Icon(Icons.recommend_outlined),
-                  title: const Text('For You'),
-                  subtitle: const Text('Recommendations from your listening'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push(Routes.libraryRecommendations),
-                );
-              }
-              final Playlist p = playlists[i];
-              return LibraryResultTile(
-                title: p.name,
-                subtitle: p.songCount == null ? null : '${p.songCount} songs',
-                coverArtId: p.coverArt,
-                trailingPlay: true,
-                isMarkedForOffline: markedPlaylists.contains(p.id),
-                onPlay: () => playPlaylistFromSubsonic(ref, context, p.id),
-                onTap: () => context.push(Routes.libraryPlaylist(p.id)),
-              );
-            },
-          );
-        },
-      ),
+      data: (List<Playlist> playlists) {
+        final Set<String> markedPlaylists = ref
+                .watch(offlineManifestProvider)
+                .valueOrNull
+                ?.markedPlaylists ??
+            const <String>{};
+        final int? favoritesCount =
+            ref.watch(starredSongsProvider).valueOrNull?.length;
+        final int cardCount = playlists.length > _kGridCap
+            ? _kGridCap
+            : playlists.length;
+        return CustomScrollView(
+          slivers: <Widget>[
+            const SliverToBoxAdapter(
+              child: SizedBox(
+                height: 56,
+                child: LibraryFilterChips(tab: LibraryTab.playlists),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              sliver: SliverGrid(
+                gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 1.05,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (BuildContext c, int i) {
+                    // Cell order: Favorites, playlist cards, Create.
+                    if (i == 0) {
+                      return FavoritesGridCard(
+                        songCount: favoritesCount,
+                        onTap: () =>
+                            context.push(Routes.libraryFavorites),
+                      );
+                    }
+                    if (i == cardCount + 1) {
+                      return CreatePlaylistGridCard(
+                        onTap: () =>
+                            unawaited(_onCreatePressed(context, ref)),
+                      );
+                    }
+                    final Playlist p = playlists[i - 1];
+                    return PlaylistGridCard(
+                      playlist: p,
+                      onTap: () =>
+                          context.push(Routes.libraryPlaylist(p.id)),
+                    );
+                  },
+                  childCount: cardCount + 2,
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(
+              child: _ListSectionHeader(label: 'Playlists'),
+            ),
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (BuildContext c, int i) {
+                  // Row order: Favorites, playlists, trailing For You.
+                  if (i == 0) {
+                    return ListTile(
+                      key: const Key('library-favorites-row'),
+                      leading: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: heerrGradient,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.favorite,
+                            color: Colors.black54),
+                      ),
+                      title: const Text('Favorites'),
+                      subtitle: favoritesCount == null
+                          ? null
+                          : Text('$favoritesCount songs'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => context.push(Routes.libraryFavorites),
+                    );
+                  }
+                  if (i == playlists.length + 1) {
+                    return ListTile(
+                      key: const Key('library-for-you-entry'),
+                      leading: const Icon(Icons.recommend_outlined),
+                      title: const Text('For You'),
+                      subtitle:
+                          const Text('Recommendations from your listening'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () =>
+                          context.push(Routes.libraryRecommendations),
+                    );
+                  }
+                  final Playlist p = playlists[i - 1];
+                  return LibraryResultTile(
+                    title: p.name,
+                    subtitle: _rowSubtitle(p),
+                    coverArtId: p.coverArt,
+                    trailingPlay: true,
+                    isMarkedForOffline: markedPlaylists.contains(p.id),
+                    onPlay: () =>
+                        playPlaylistFromSubsonic(ref, context, p.id),
+                    onTap: () => context.push(Routes.libraryPlaylist(p.id)),
+                  );
+                },
+                childCount: playlists.length + 2,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

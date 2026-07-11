@@ -20,6 +20,7 @@ import 'package:heerr/providers/library/library_playlists.dart';
 import 'package:heerr/providers/library/library_search.dart';
 import 'package:heerr/providers/library/most_played_artists.dart';
 import 'package:heerr/providers/library/playlist_mutations.dart';
+import 'package:heerr/providers/library/starred_songs.dart';
 import 'package:heerr/providers/queue.dart';
 import 'package:heerr/providers/search.dart';
 import 'package:heerr/providers/secure_storage.dart';
@@ -144,6 +145,11 @@ List<Override> _defaultsExcept(
     mostPlayedArtistsProvider.overrideWith(
       (Ref<AsyncValue<List<MostPlayedArtist>>> ref) async => mostPlayed,
     ),
+    // Favorites card/row count — stubbed empty so the Playlists tab never
+    // fires a real getStarred2 fetch in tests.
+    starredSongsProvider.overrideWith(
+      (Ref<AsyncValue<List<Song>>> ref) async => const <Song>[],
+    ),
   ];
 }
 
@@ -193,9 +199,9 @@ void main() {
         child: const MaterialApp(home: LibraryScreen(initialTabIndex: 2)),
       ));
       await tester.pumpAndSettle();
-      // The Playlists tab always renders the For You entry.
+      // The Playlists tab always renders the Favorites card first.
       expect(
-          find.byKey(const Key('library-for-you-entry')), findsOneWidget);
+          find.byKey(const Key('favorites-grid-card')), findsOneWidget);
     });
   });
 
@@ -395,27 +401,42 @@ void main() {
   });
 
   group('Playlists sub-tab', () {
-    testWidgets('swiping to Playlists shows the data list',
+    Future<void> goToPlaylists(WidgetTester tester) async {
+      await tester.tap(find.descendant(
+        of: find.byType(TabBar),
+        matching: find.text('Playlists'),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('shows Favorites card, playlist card and full-list row (X6)',
         (WidgetTester tester) async {
       const Playlist playlist = Playlist(
         id: 'pl-1',
         name: 'Morning',
         songCount: 12,
+        owner: 'aashish',
       );
       await tester.pumpWidget(_wrap(_defaultsExcept(
         playlists:
             _playlistsValue(const AsyncData<List<Playlist>>(<Playlist>[playlist])),
       )));
       await tester.pumpAndSettle();
+      await goToPlaylists(tester);
 
-      await tester.tap(find.descendant(
-        of: find.byType(TabBar),
-        matching: find.text('Playlists'),
-      ));
-      await tester.pumpAndSettle();
-
+      // Grid: Favorites card first, then the playlist card.
+      expect(find.byKey(const Key('favorites-grid-card')), findsOneWidget);
+      expect(
+          find.byKey(const Key('playlist-grid-card-pl-1')), findsOneWidget);
       expect(find.text('Morning'), findsOneWidget);
-      expect(find.text('12 songs'), findsOneWidget);
+      expect(find.text('by aashish'), findsOneWidget);
+
+      // Full-list section below the grid — scroll down to it.
+      await tester.drag(
+          find.byType(CustomScrollView), const Offset(0, -700));
+      await tester.pumpAndSettle();
+      expect(find.text('by aashish • 12 songs'), findsOneWidget);
+      expect(find.byKey(const Key('library-favorites-row')), findsOneWidget);
     });
 
     testWidgets(
@@ -426,40 +447,37 @@ void main() {
               _playlistsValue(const AsyncData<List<Playlist>>(<Playlist>[])),
         )));
         await tester.pumpAndSettle();
-        await tester.tap(find.descendant(
-          of: find.byType(TabBar),
-          matching: find.text('Playlists'),
-        ));
-        await tester.pumpAndSettle();
+        await goToPlaylists(tester);
         // M2 empty state replaced by always-visible For You entry — N3
         // makes recommendations reachable even before the user has any
-        // playlists.
+        // playlists. X6 keeps it as the list tail; scroll past the card
+        // grid to reach it.
+        await tester.drag(
+            find.byType(CustomScrollView), const Offset(0, -700));
+        await tester.pumpAndSettle();
         expect(find.byKey(const Key('library-for-you-entry')),
             findsOneWidget);
       },
     );
 
     testWidgets(
-      'FAB is rendered on the Playlists sub-tab',
+      'Create Playlist card replaces the FAB (X6)',
       (WidgetTester tester) async {
         await tester.pumpWidget(_wrap(_defaultsExcept(
           playlists:
               _playlistsValue(const AsyncData<List<Playlist>>(<Playlist>[])),
         )));
         await tester.pumpAndSettle();
-        await tester.tap(find.descendant(
-          of: find.byType(TabBar),
-          matching: find.text('Playlists'),
-        ));
-        await tester.pumpAndSettle();
+        await goToPlaylists(tester);
 
-        expect(find.byType(FloatingActionButton), findsOneWidget);
-        expect(find.text('New playlist'), findsOneWidget);
+        expect(find.byType(FloatingActionButton), findsNothing);
+        expect(find.byKey(const Key('create-playlist-card')), findsOneWidget);
+        expect(find.text('Create Playlist'), findsOneWidget);
       },
     );
 
     testWidgets(
-      'tapping FAB + entering name calls createPlaylist once with the name',
+      'tapping the Create card + entering name calls createPlaylist once',
       (WidgetTester tester) async {
         _StubPlaylistMutations.reset();
         addTearDown(_StubPlaylistMutations.reset);
@@ -475,14 +493,10 @@ void main() {
           ],
         ));
         await tester.pumpAndSettle();
-        await tester.tap(find.descendant(
-          of: find.byType(TabBar),
-          matching: find.text('Playlists'),
-        ));
-        await tester.pumpAndSettle();
+        await goToPlaylists(tester);
 
-        // Open the dialog via the FAB.
-        await tester.tap(find.byType(FloatingActionButton));
+        // Open the dialog via the Create Playlist grid card.
+        await tester.tap(find.byKey(const Key('create-playlist-card')));
         await tester.pumpAndSettle();
 
         // Enter a name with surrounding whitespace to also assert the

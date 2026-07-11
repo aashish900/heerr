@@ -3,10 +3,12 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../models/subsonic/album.dart';
 import '../../models/subsonic/artist.dart';
 import '../../models/subsonic/artist_index.dart';
+import '../../models/subsonic/playlist.dart';
 import '../../offline/offline_manifest.dart';
 import 'library_albums.dart';
 import 'library_artists.dart';
 import 'library_filters.dart';
+import 'library_playlists.dart';
 
 part 'library_views.g.dart';
 
@@ -66,6 +68,27 @@ Future<List<Artist>> sortedLibraryArtists(SortedLibraryArtistsRef ref) async {
         .where((Artist a) =>
             manifest.markedArtists.contains(a.id) ||
             artistsWithMarkedAlbums.contains(a.id))
+        .toList();
+  }
+  return out;
+}
+
+/// The Playlists tab's view (X6): the playlists fetch sorted per the chip,
+/// optionally filtered to offline-marked playlists.
+@riverpod
+Future<List<Playlist>> sortedLibraryPlaylists(
+    SortedLibraryPlaylistsRef ref) async {
+  final List<Playlist> playlists =
+      await ref.watch(libraryPlaylistsProvider.future);
+  final PlaylistSort sort = ref.watch(playlistSortNotifierProvider);
+  final bool downloadedOnly =
+      ref.watch(downloadedOnlyNotifierProvider(LibraryTab.playlists));
+  List<Playlist> out = sortPlaylists(playlists, sort);
+  if (downloadedOnly) {
+    final OfflineManifest manifest =
+        await ref.watch(offlineManifestProvider.future);
+    out = out
+        .where((Playlist p) => manifest.markedPlaylists.contains(p.id))
         .toList();
   }
   return out;

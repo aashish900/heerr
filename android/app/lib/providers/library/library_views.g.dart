@@ -57,5 +57,28 @@ final sortedLibraryArtistsProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef SortedLibraryArtistsRef = AutoDisposeFutureProviderRef<List<Artist>>;
+String _$sortedLibraryPlaylistsHash() =>
+    r'ed6b60d0023ca423be7826f9625146546753fecf';
+
+/// The Playlists tab's view (X6): the playlists fetch sorted per the chip,
+/// optionally filtered to offline-marked playlists.
+///
+/// Copied from [sortedLibraryPlaylists].
+@ProviderFor(sortedLibraryPlaylists)
+final sortedLibraryPlaylistsProvider =
+    AutoDisposeFutureProvider<List<Playlist>>.internal(
+      sortedLibraryPlaylists,
+      name: r'sortedLibraryPlaylistsProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$sortedLibraryPlaylistsHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef SortedLibraryPlaylistsRef =
+    AutoDisposeFutureProviderRef<List<Playlist>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
