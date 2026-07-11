@@ -138,14 +138,101 @@ List<Override> _defaultsExcept({Override? artists, Override? albums, Override? p
 }
 
 void main() {
-  group('Artists tab (default)', () {
+  group('X1 header + tabs', () {
+    testWidgets('browse mode renders the branded header and headline',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(_defaultsExcept()));
+      await tester.pumpAndSettle();
+      expect(find.text('Your Library'), findsOneWidget);
+      // Shared header: profile avatar + queue shortcut + search action.
+      expect(find.byKey(const Key('home-profile-avatar')), findsOneWidget);
+      expect(find.byIcon(Icons.queue_music_outlined), findsWidgets);
+      expect(find.byIcon(Icons.search), findsOneWidget);
+      // No legacy plain title.
+      expect(find.text('Library'), findsNothing);
+    });
+
+    testWidgets('tab order is Albums / Artists / Playlists',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(_defaultsExcept()));
+      await tester.pumpAndSettle();
+      final TabBar bar = tester.widget<TabBar>(find.byType(TabBar));
+      expect(bar.tabs, hasLength(3));
+      // Label order inside the TabBar.
+      final Finder labels = find.descendant(
+        of: find.byType(TabBar),
+        matching: find.byType(Text),
+      );
+      final List<String> texts = tester
+          .widgetList<Text>(labels)
+          .map((Text t) => t.data)
+          .whereType<String>()
+          .toList();
+      expect(texts, <String>['Albums', 'Artists', 'Playlists']);
+    });
+
+    testWidgets('initialTabIndex: 2 opens the Playlists tab',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(ProviderScope(
+        overrides: <Override>[
+          secureStorageProvider.overrideWithValue(_NoopStorage()),
+          queueProvider.overrideWith(_StubQueue.new),
+          searchDebounceProvider.overrideWithValue(Duration.zero),
+          ..._defaultsExcept(),
+        ],
+        child: const MaterialApp(home: LibraryScreen(initialTabIndex: 2)),
+      ));
+      await tester.pumpAndSettle();
+      // The Playlists tab always renders the For You entry.
+      expect(
+          find.byKey(const Key('library-for-you-entry')), findsOneWidget);
+    });
+  });
+
+  group('Albums tab (default)', () {
     testWidgets('loading → SkeletonList', (WidgetTester tester) async {
       await tester.pumpWidget(_wrap(_defaultsExcept(
-        artists: _artistsValue(const AsyncLoading<List<ArtistIndex>>()),
+        albums: _albumsValue(const AsyncLoading<List<Album>>()),
       )));
       await tester.pump();
       expect(find.byType(SkeletonList), findsOneWidget);
     });
+
+    testWidgets('default tab shows the albums data list',
+        (WidgetTester tester) async {
+      const Album album = Album(
+        id: 'al-1',
+        name: 'Currents',
+        artist: 'Tame Impala',
+        coverArt: 'al-1',
+      );
+      await tester.pumpWidget(_wrap(_defaultsExcept(
+        albums: _albumsValue(const AsyncData<List<Album>>(<Album>[album])),
+      )));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Currents'), findsOneWidget);
+      expect(find.text('Tame Impala'), findsOneWidget);
+    });
+
+    testWidgets('Albums empty → EmptyState "No albums yet"',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(_defaultsExcept(
+        albums: _albumsValue(const AsyncData<List<Album>>(<Album>[])),
+      )));
+      await tester.pumpAndSettle();
+      expect(find.text('No albums yet'), findsOneWidget);
+    });
+  });
+
+  group('Artists sub-tab', () {
+    Future<void> goToArtists(WidgetTester tester) async {
+      await tester.tap(find.descendant(
+        of: find.byType(TabBar),
+        matching: find.text('Artists'),
+      ));
+      await tester.pumpAndSettle();
+    }
 
     testWidgets('empty library → EmptyState "No artists yet"',
         (WidgetTester tester) async {
@@ -154,6 +241,7 @@ void main() {
             _artistsValue(const AsyncData<List<ArtistIndex>>(<ArtistIndex>[])),
       )));
       await tester.pumpAndSettle();
+      await goToArtists(tester);
       expect(find.byType(EmptyState), findsOneWidget);
       expect(find.text('No artists yet'), findsOneWidget);
     });
@@ -171,6 +259,7 @@ void main() {
             const AsyncData<List<ArtistIndex>>(<ArtistIndex>[aIndex])),
       )));
       await tester.pumpAndSettle();
+      await goToArtists(tester);
       expect(find.text('T'), findsOneWidget);
       expect(find.text('Tame Impala'), findsOneWidget);
       expect(find.byType(LibraryResultTile), findsOneWidget);
@@ -184,46 +273,8 @@ void main() {
         ),
       )));
       await tester.pumpAndSettle();
+      await goToArtists(tester);
       expect(find.textContaining('Error'), findsOneWidget);
-    });
-  });
-
-  group('Albums sub-tab', () {
-    testWidgets('swiping to Albums shows the data list',
-        (WidgetTester tester) async {
-      const Album album = Album(
-        id: 'al-1',
-        name: 'Currents',
-        artist: 'Tame Impala',
-        coverArt: 'al-1',
-      );
-      await tester.pumpWidget(_wrap(_defaultsExcept(
-        albums: _albumsValue(const AsyncData<List<Album>>(<Album>[album])),
-      )));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.descendant(
-        of: find.byType(TabBar),
-        matching: find.text('Albums'),
-      ));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Currents'), findsOneWidget);
-      expect(find.text('Tame Impala'), findsOneWidget);
-    });
-
-    testWidgets('Albums empty → EmptyState "No albums yet"',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(_defaultsExcept(
-        albums: _albumsValue(const AsyncData<List<Album>>(<Album>[])),
-      )));
-      await tester.pumpAndSettle();
-      await tester.tap(find.descendant(
-        of: find.byType(TabBar),
-        matching: find.text('Albums'),
-      ));
-      await tester.pumpAndSettle();
-      expect(find.text('No albums yet'), findsOneWidget);
     });
   });
 
@@ -338,15 +389,15 @@ void main() {
         await tester.pumpWidget(_wrap(_defaultsExcept()));
         await tester.pumpAndSettle();
 
-        // Idle Library shows the AppBar "Library" title.
-        expect(find.text('Library'), findsOneWidget);
+        // Idle Library shows the "Your Library" headline.
+        expect(find.text('Your Library'), findsOneWidget);
         expect(find.byType(TextField), findsNothing);
 
         await tester.tap(find.byIcon(Icons.search));
         await tester.pumpAndSettle();
 
-        // The TextField has replaced the title; the AppBar title text is gone.
-        expect(find.text('Library'), findsNothing);
+        // The TextField has replaced the browse UI; the headline is gone.
+        expect(find.text('Your Library'), findsNothing);
         expect(find.byType(TextField), findsOneWidget);
         // Initial empty-query placeholder.
         expect(find.text('Search your library'), findsOneWidget);
@@ -522,7 +573,7 @@ void main() {
 
         // Back to browse mode.
         expect(find.byType(TextField), findsNothing);
-        expect(find.text('Library'), findsOneWidget);
+        expect(find.text('Your Library'), findsOneWidget);
       },
     );
   });

@@ -28,6 +28,8 @@ import '../../providers/library/playlist_mutations.dart';
 import '../../router.dart';
 import '../../theme.dart';
 import '../../widgets/add_to_playlist_sheet.dart';
+import '../../widgets/branded_header.dart';
+import '../../widgets/gradient_tab_indicator.dart';
 import '../../widgets/download_to_playlist_sheet.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_snackbar.dart';
@@ -41,17 +43,19 @@ import '../../widgets/skeleton.dart';
 part 'library_search_results.dart';
 part 'library_tabs.dart';
 
-/// Library tab — when idle, shows a `TabBar` of Artists / Albums / Playlists
-/// driven by Subsonic. When the user enters search mode (search icon in the
-/// AppBar), the tab UI is hidden and the combined-search results render:
-/// "In your library" (Subsonic search3) above "On YouTube Music" (heerr
-/// backend search, auto-fired on empty library or manually).
+/// Library tab — 2026-07 redesign (docs/LIBRARYSCREEN.md). When idle, shows
+/// the shared branded header, a "Your Library" headline and segmented tabs
+/// of Albums / Artists / Playlists driven by Subsonic. When the user enters
+/// search mode (search icon in the AppBar), the tab UI is hidden and the
+/// combined-search results render: "In your library" (Subsonic search3)
+/// above "On YouTube Music" (heerr backend search, auto-fired on empty
+/// library or manually).
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({this.initialTabIndex = 0, super.key});
 
-  /// Which sub-tab (0=Artists, 1=Albums, 2=Playlists) to open on. Set via
-  /// the `/library?tab=` query param (Phase Z Profile "Playlists" deep
-  /// link) — see `_tabIndexFor` in router.dart.
+  /// Which sub-tab (0=Albums, 1=Artists, 2=Playlists — X1 mockup order) to
+  /// open on. Set via the `/library?tab=` query param (Phase Z Profile
+  /// "Playlists" deep link) — see `_tabIndexFor` in router.dart.
   final int initialTabIndex;
 
   @override
@@ -131,8 +135,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       length: 3,
       initialIndex: widget.initialTabIndex,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Library'),
+        appBar: BrandedAppBar(
+          compactGreeting: true,
           actions: <Widget>[
             IconButton(
               icon: const Icon(Icons.search),
@@ -140,22 +144,93 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               onPressed: _enterSearch,
             ),
           ],
-          bottom: const TabBar(
-            tabs: <Tab>[
-              Tab(text: 'Artists'),
-              Tab(text: 'Albums'),
-              Tab(text: 'Playlists'),
-            ],
-          ),
         ),
-        body: const TabBarView(
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            _ArtistsTab(),
-            _AlbumsTab(),
-            _PlaylistsTab(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Text(
+                'Your Library',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+            ),
+            const _LibrarySegmentedTabs(),
+            const Expanded(
+              child: TabBarView(
+                children: <Widget>[
+                  _AlbumsTab(),
+                  _ArtistsTab(),
+                  _PlaylistsTab(),
+                ],
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Segmented tab row per the mockup: icon + label per tab, active tab in
+/// magenta over the gradient underline indicator (shared with the detail
+/// screens' TabBar styling).
+class _LibrarySegmentedTabs extends StatelessWidget {
+  const _LibrarySegmentedTabs();
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return TabBar(
+      indicator: const GradientTabIndicator(),
+      indicatorSize: TabBarIndicatorSize.tab,
+      dividerColor: Colors.transparent,
+      labelColor: heerrMagenta,
+      unselectedLabelColor: cs.onSurfaceVariant,
+      tabs: const <Tab>[
+        Tab(
+          height: 46,
+          child: _SegmentedTabLabel(
+            icon: Icons.album_outlined,
+            label: 'Albums',
+          ),
+        ),
+        Tab(
+          height: 46,
+          child: _SegmentedTabLabel(
+            icon: Icons.person_outline,
+            label: 'Artists',
+          ),
+        ),
+        Tab(
+          height: 46,
+          child: _SegmentedTabLabel(
+            icon: Icons.queue_music_outlined,
+            label: 'Playlists',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SegmentedTabLabel extends StatelessWidget {
+  const _SegmentedTabLabel({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Icon(icon, size: 18),
+        const SizedBox(width: 6),
+        Text(label),
+      ],
     );
   }
 }

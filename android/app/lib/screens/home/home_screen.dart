@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,25 +8,17 @@ import '../../models/subsonic/album.dart';
 import '../../player/player_provider.dart';
 import '../../providers/home/home_providers.dart';
 import '../../providers/library/library_search_query.dart';
-import '../../providers/profiles/profile_avatar.dart';
-import '../../providers/profiles/profile_meta.dart';
 import '../../router.dart' show Routes;
+import '../../widgets/branded_header.dart';
 import '../../widgets/empty_state.dart';
-import '../../widgets/heerr_logo.dart';
-import '../../widgets/profile_avatar_ring.dart';
 import 'continue_listening_card.dart';
 import 'quick_access_row.dart';
 import 'recently_added_section.dart';
 
-/// Time-of-day greeting helper. Visible for tests.
-/// - 5..11  → "Good morning"
-/// - 12..17 → "Good afternoon"
-/// - else   → "Good evening"
-String greetingForHour(int hour) {
-  if (hour >= 5 && hour <= 11) return 'Good morning';
-  if (hour >= 12 && hour <= 17) return 'Good afternoon';
-  return 'Good evening';
-}
+// X1 moved the header trio (greetingForHour, the avatar button, the greeting
+// block) into the shared BrandedAppBar module; re-export the helper so
+// existing imports/tests keep resolving it from here.
+export '../../widgets/branded_header.dart' show greetingForHour;
 
 /// Home screen — 2026-07 redesign (docs/HOMESCREEN.md).
 ///
@@ -59,84 +50,11 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(
-        title: const HeerrLogo(),
-        centerTitle: false,
-        actions: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.queue_music_outlined),
-            tooltip: 'Queue',
-            onPressed: () => context.go(Routes.queue),
-          ),
-          const _ProfileAvatarButton(),
-        ],
-      ),
+      appBar: const BrandedAppBar(),
       body: RefreshIndicator(
         onRefresh: () => _refresh(ref),
         child: const _HomeBody(),
       ),
-    );
-  }
-}
-
-/// Profile entry point (#37): a small circular avatar in the Home AppBar —
-/// the profile picture when one is set, a person glyph otherwise. Taps push
-/// the full-screen `/profile` page.
-class _ProfileAvatarButton extends ConsumerWidget {
-  const _ProfileAvatarButton();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final File? avatar = ref.watch(profileAvatarProvider).valueOrNull;
-    return IconButton(
-      key: const Key('home-profile-avatar'),
-      tooltip: 'Profile',
-      onPressed: () => context.push(Routes.profile),
-      // Gradient ring around the avatar — the brand accent, consistent with
-      // the full Profile screen's avatar treatment (shared ProfileAvatarRing).
-      icon: ProfileAvatarRing(
-        avatar: avatar,
-        radius: 14,
-        ringPadding: 2,
-        gapPadding: 1.5,
-      ),
-    );
-  }
-}
-
-/// Two-line greeting block under the search bar (mockup zone 3).
-/// Line 1: time-of-day greeting in small grey. Line 2: the profile nickname
-/// large + a waving-hand emoji (UI copy from the mockup — the no-emoji rule
-/// covers code/commits, not user-facing strings). Without a nickname the
-/// greeting itself renders as the single large line, no emoji.
-class _GreetingBlock extends ConsumerWidget {
-  const _GreetingBlock();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final String? nickname =
-        ref.watch(profileMetaNotifierProvider).valueOrNull?.nickname;
-    final String greeting = greetingForHour(DateTime.now().hour);
-    final TextTheme tt = Theme.of(context).textTheme;
-    final ColorScheme cs = Theme.of(context).colorScheme;
-
-    final TextStyle? bigStyle =
-        tt.headlineMedium?.copyWith(fontWeight: FontWeight.w800);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: nickname == null
-          ? Text(greeting, style: bigStyle)
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  '$greeting,',
-                  style: tt.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
-                ),
-                Text('$nickname \u{1F44B}', style: bigStyle),
-              ],
-            ),
     );
   }
 }
@@ -223,7 +141,7 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
       padding: const EdgeInsets.only(bottom: 24),
       children: <Widget>[
         const _HomeSearchBar(),
-        const _GreetingBlock(),
+        const GreetingBlock(),
         const ContinueListeningCard(),
         const QuickAccessRow(),
         if (libraryEmpty && playerIdle)

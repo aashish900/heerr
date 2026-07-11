@@ -64,11 +64,11 @@ class Routes {
 }
 
 /// Maps the `/library?tab=` query param to [LibraryScreen]'s tab order
-/// (Artists / Albums / Playlists). Unknown or missing values default to the
-/// Artists tab (index 0) — the screen's historical default.
+/// (Albums / Artists / Playlists — X1 mockup order). Unknown or missing
+/// values default to the Albums tab (index 0), the redesign's first tab.
 int _tabIndexFor(String? tab) {
   switch (tab) {
-    case 'albums':
+    case 'artists':
       return 1;
     case 'playlists':
       return 2;
