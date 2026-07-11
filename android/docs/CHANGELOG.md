@@ -2564,3 +2564,8 @@ User review of the previous widget-polish commit flagged two remaining mismatche
 - **`docs/CONTEXT.md`** — Aesthetic section extended with the per-song adaptive tinting + new Home composition and screens.
 - **`docs/HOMESCREEN.md`** — status flipped to IMPLEMENTED with commit range.
 - `graphify update .` run at repo root.
+
+## 2026-07-11 — Version bump to 4.8.0 (Home Screen redesign release)
+
+- **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.7.4 → 4.8.0 per the version-sync convention. Minor bump (not patch): the Home Screen redesign replaces the layout, adds two screens (Favorites, Recently Added), and introduces per-song adaptive theming. Android-side only; backend bumped for sync.
+- Tagged `v4.8.0`.
