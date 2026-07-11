@@ -2555,3 +2555,12 @@ User review of the previous widget-polish commit flagged two remaining mismatche
 - **`lib/widgets/mini_player.dart`** — switched to the shared `AnimatedTint`.
 - **`test/screens/home/continue_listening_card_test.dart`** — 3 new tests: blended tint + single extraction per URI, backdrop presence with art, no-backdrop + fallback tint without art.
 - Verification: `flutter analyze` clean, `flutter test` 805/805 green.
+
+## 2026-07-11 — Home redesign part 8: final gates + docs flush
+
+- `flutter analyze` clean; `flutter test` 805/805 green; `flutter build apk --debug` succeeds.
+- **On-device smoke pending** — no device attached this session. Checklist for the next device session: cold start with a restored queue → hero card shows the last track paused, resumes on tap; empty-library profile → "Nothing here yet"; Tailscale off → network-error body + auto-retry; scroll Home while playing (blur jank check — `RepaintBoundary` already in place, `cacheWidth` downsample is the escape hatch); rapid track skips → tint cross-fades without flashing.
+- **`docs/DECISIONLOG.md`** — two entries: "adapt chrome around original artwork, never recolor" + the implementation record.
+- **`docs/CONTEXT.md`** — Aesthetic section extended with the per-song adaptive tinting + new Home composition and screens.
+- **`docs/HOMESCREEN.md`** — status flipped to IMPLEMENTED with commit range.
+- `graphify update .` run at repo root.

@@ -1,6 +1,6 @@
 # HOMESCREEN.md — Home Screen redesign plan
 
-Status: **PLANNED** (not started). Written 2026-07-11 against `main` @ `783e8fe`.
+Status: **IMPLEMENTED** 2026-07-11 on branch `redesign/home-screen` (commits `bf1ccdf`..`301a2b0`) — all of Part A (tasks 1–7) + Part B (B1–B3). Remaining: on-device smoke (task 8 item 2 / B4 item 2 — no device attached during implementation). Deferred items live in DEBT.md. Written 2026-07-11 against `main` @ `783e8fe`.
 Structure: **Part A** (§4, tasks 1–8) = the mockup layout. **Part B** (§7, tasks B1–B4) = adaptive art-driven theming of the hero card + MiniPlayer. Part B depends on Part A tasks 2 and 7 having landed.
 Reference mockup: `/Users/E1621/Documents/Personal/Android/Home Screen.png` (outside the repo — copy into `android/docs/assets/` if it should be versioned).
 

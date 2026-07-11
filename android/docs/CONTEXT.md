@@ -47,6 +47,8 @@ Auth: `Authorization: Bearer <raw-token>`. The token is minted on the backend vi
 
 heerr brand gradient: magenta `#F533C8` → purple `#A93CF2` → violet `#6F4BF5` on near-black `#0A0A0A`. Material 3 with a hand-built raw `ColorScheme` (not `fromSeed`) in `lib/theme.dart` — primary magenta, explicit neutral `surfaceContainer*` grey ladder, black text on the bright accents. The gradient itself (`heerrGradient`) appears only on hero accents (play button, selected nav icon, scrubber active track, primary CTA, avatar rings); everything else uses solid magenta. Replaced the original Spotify-green seed (`#1DB954`) in the 2026-07 gradient redesign. Single dark theme — no light variant in v1.
 
+Since the 2026-07-11 Home redesign the Now Playing chrome (Home hero card + MiniPlayer) also tints per-song: the cover's dominant colour (cached per URI via `artPaletteProvider`) is blended 18% toward brand magenta (`brandBlend`) and applied to waveforms/glows, cross-faded 400 ms on track change. Artwork is never recolored (DECISIONLOG 2026-07-11). The Home screen itself is: branded header, search pill, greeting block, Continue Listening hero card, Quick Access shortcut row, Recently Added list — plus Favorites (`/library/favorites`) and Recently Added (`/library/recently-added`) screens.
+
 ## Screens (MVP set)
 
 1. **Settings** — paste backend URL + bearer token; "Test connection" button hits `/health`.
