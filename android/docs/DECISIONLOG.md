@@ -1026,3 +1026,17 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Why:** These are all "make it actually match the reference image" fixes surfaced by direct visual comparison, not new feature work — no HOMESCREEN.md scope change.
 
 **Reference:** `lib/screens/home/continue_listening_card.dart`, `lib/utils/palette.dart`.
+
+## 2026-07-11 — Home-screen App Widget: dropped gradient border; Flutter waveform matches the widget's baseline anchoring (fix round 3)
+
+**Context:** User asked to (1) remove the gradient border from the home-screen App Widget (`HeroWidgetProvider`/`hero_widget.xml`) and (2) fix the MiniPlayer's waveform so it matches the widget's own waveform, which it was nominally already supposed to mirror (per the fix-round-1 decision "reusing the home-screen widget's look").
+
+**Decision:**
+1. Widget border: `widget_gradient_border.xml` (2dp magenta→violet rim over a 2dp-inset dark interior, `layer-list` trick) replaced by `widget_background.xml` — a single solid `#0A0A0A` rounded rect, no border. `hero_widget.xml`'s root `FrameLayout` drops `android:padding="2dp"` (no longer needed without the inset). `HeroWidgetProvider.kt`: `CORNER_DP` 26 → 28 (art's rounded corners now match the tile's own un-inset radius) and `BORDER_DP` removed along with the `- 2 * BORDER_DP` height adjustment (the art bitmap now uses the widget's full reported height, since there's no more 2dp top/bottom padding to subtract).
+2. Comparing `tool/gen_widget_wave.py` (the widget's waveform generator) against `WaveformStrip._WaveformPainter.paint`: the widget's 36 bars are **baseline-anchored** — each bar's path runs from a computed top down to a fixed `BASELINE_Y` (bottom), so short bars barely rise off the floor and tall bars reach up. The Flutter `WaveformStrip` instead centered every bar vertically (`top = (size.height - px) / 2`), which reads as a symmetric two-sided equalizer — a different silhouette from the widget's rising-bars look. Fixed: bars now anchor to `size.height` (bottom) and grow upward, matching the widget. This is shared by both `MiniPlayer` and `ContinueListeningCard` (same `WaveformStrip`), consistent with the "reuse the widget's look" intent recorded in fix round 1 — not scoped to only the MiniPlayer.
+
+**Why:** Both are literal visual-parity asks against an existing native reference (the widget), not new design decisions — the widget itself is the source of truth.
+
+**Not changed:** the per-bar height *distribution* (deterministic LCG random, uniform-ish across the strip) still differs from the widget's fixed 3-cluster Gaussian envelope (tall groups separated by near-baseline dots) — only the anchoring/orientation was fixed. Revisit if closer fidelity is wanted; would need to touch `WaveformStrip.barHeights`, which three existing unit tests pin to a `[0.15, 1.0]` range.
+
+**Reference:** `android/app/android/app/src/main/res/drawable/widget_background.xml` (new), `widget_gradient_border.xml` (deleted), `hero_widget.xml`, `HeroWidgetProvider.kt`, `lib/widgets/waveform_strip.dart`, `tool/gen_widget_wave.py`.

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Rounded near-black tile, no border — replaces widget_gradient_border
+     per user review (the 2dp magenta->violet rim read as too busy). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#0A0A0A" />
+    <corners android:radius="28dp" />
+</shape>

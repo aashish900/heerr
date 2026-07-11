@@ -2609,3 +2609,14 @@ User review flagged four more issues:
 
 - **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.8.1 → 4.8.2 per the version-sync convention, covering "fix round 2" (progress-bar zero-height bug, hero-card mockup restyle, +15% art width, Favorites repointed to the real Favourites playlist). Android-side only; backend bumped for sync.
 - Tagged `v4.8.2`.
+
+## 2026-07-11 — Fix round 3: widget border removed, waveform matches the widget
+
+- **Home-screen App Widget: gradient border removed.** `widget_gradient_border.xml` (2dp magenta→violet rim, layer-list trick) replaced by `widget_background.xml` — a plain solid rounded tile, no border. `hero_widget.xml` drops the now-unneeded 2dp padding; `HeroWidgetProvider.kt` updated (`CORNER_DP` 26→28, `BORDER_DP` + its height subtraction removed) so the album art still fills the tile edge-to-edge correctly.
+- **Flutter waveform now matches the widget's waveform.** `tool/gen_widget_wave.py` (the widget's waveform generator) draws all bars **baseline-anchored** — rising from the bottom edge. `WaveformStrip`'s painter was instead centering every bar vertically (symmetric two-sided look) — a different silhouette from the widget it was meant to echo. Fixed: bars now anchor to the bottom and grow up, in both the MiniPlayer and the Continue Listening hero card (same shared `WaveformStrip`). Per-bar height *distribution* (deterministic random vs. the widget's fixed 3-cluster envelope) is unchanged — only the anchor/orientation.
+- Verification: `flutter analyze` clean, `flutter test` 811/811 green, `flutter build apk --debug` succeeds (exercises the Kotlin/XML widget changes, which aren't covered by `flutter test`).
+
+## 2026-07-11 — Version bump to 4.8.3 (fix-round-3 release)
+
+- **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.8.2 → 4.8.3 per the version-sync convention, covering "fix round 3" (widget gradient border removed, MiniPlayer/hero-card waveform baseline-anchored to match the widget). Android-side only; backend bumped for sync.
+- Tagged `v4.8.3`.
