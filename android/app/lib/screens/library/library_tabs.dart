@@ -50,44 +50,136 @@ class _ArtistsTab extends ConsumerWidget {
 class _AlbumsTab extends ConsumerWidget {
   const _AlbumsTab();
 
+  /// How many albums the top grid shows (3 columns × 3 rows, mockup). The
+  /// "Albums ›" list below always carries the full library.
+  static const int _kGridCap = 9;
+
+  String _rowSubtitle(Album a) {
+    return <String?>[
+      a.artist,
+      a.year?.toString(),
+      if (a.songCount != null) '${a.songCount} songs',
+    ].whereType<String>().join(' • ');
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<List<Album>> async = ref.watch(libraryAlbumsProvider);
+    final AsyncValue<List<Album>> async =
+        ref.watch(sortedLibraryAlbumsProvider);
     return async.when(
       loading: () => const SkeletonList(count: 6),
       error: (Object e, _) => Center(
         child: Text(e is ApiError ? e.message : 'Error: $e'),
       ),
       data: (List<Album> albums) {
-        if (albums.isEmpty) {
-          return const EmptyState(
-            icon: Icons.album_outlined,
-            title: 'No albums yet',
-            subtitle:
-                'Library is empty. Download something via the queue or search.',
-          );
-        }
+        final bool downloadedOnly = ref
+            .watch(downloadedOnlyNotifierProvider(LibraryTab.albums));
         final Set<String> markedAlbums = ref
                 .watch(offlineManifestProvider)
                 .valueOrNull
                 ?.markedAlbums ??
             const <String>{};
-        return ListView.builder(
-          itemCount: albums.length,
-          itemBuilder: (BuildContext c, int i) {
-            final Album a = albums[i];
-            return LibraryResultTile(
-              title: a.name,
-              subtitle: a.artist,
-              coverArtId: a.coverArt,
-              trailingPlay: true,
-              isMarkedForOffline: markedAlbums.contains(a.id),
-              onPlay: () => playAlbumFromSubsonic(ref, context, a.id),
-              onTap: () => context.push(Routes.libraryAlbum(a.id)),
-            );
-          },
+        return CustomScrollView(
+          slivers: <Widget>[
+            const SliverToBoxAdapter(
+              child: LibraryFilterChips(tab: LibraryTab.albums),
+            ),
+            if (albums.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: downloadedOnly
+                    ? const EmptyState(
+                        icon: Icons.download_done_outlined,
+                        title: 'No downloaded albums',
+                        subtitle:
+                            'Mark an album for offline to see it here.',
+                      )
+                    : const EmptyState(
+                        icon: Icons.album_outlined,
+                        title: 'No albums yet',
+                        subtitle:
+                            'Library is empty. Download something via the '
+                            'queue or search.',
+                      ),
+              )
+            else ...<Widget>[
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                sliver: SliverGrid(
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.64,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (BuildContext c, int i) {
+                      final Album a = albums[i];
+                      return AlbumGridCard(
+                        album: a,
+                        downloaded: markedAlbums.contains(a.id),
+                        onTap: () =>
+                            context.push(Routes.libraryAlbum(a.id)),
+                      );
+                    },
+                    childCount:
+                        albums.length > _kGridCap ? _kGridCap : albums.length,
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(
+                child: _ListSectionHeader(label: 'Albums'),
+              ),
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (BuildContext c, int i) {
+                    final Album a = albums[i];
+                    return LibraryResultTile(
+                      title: a.name,
+                      subtitle: _rowSubtitle(a),
+                      coverArtId: a.coverArt,
+                      trailingPlay: true,
+                      isMarkedForOffline: markedAlbums.contains(a.id),
+                      onPlay: () =>
+                          playAlbumFromSubsonic(ref, context, a.id),
+                      onTap: () => context.push(Routes.libraryAlbum(a.id)),
+                    );
+                  },
+                  childCount: albums.length,
+                ),
+              ),
+            ],
+          ],
         );
       },
+    );
+  }
+}
+
+/// "Albums ›" / "Playlists ›" style section header between the grid and the
+/// full list (X3/X6).
+class _ListSectionHeader extends StatelessWidget {
+  const _ListSectionHeader({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Row(
+        children: <Widget>[
+          Text(
+            label,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(width: 2),
+          const Icon(Icons.chevron_right, size: 20),
+        ],
+      ),
     );
   }
 }

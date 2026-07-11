@@ -20,16 +20,18 @@ import '../../player/player_provider.dart';
 import '../../providers/download.dart';
 import '../../providers/download_to_playlist.dart';
 import '../../providers/library/combined_search.dart';
-import '../../providers/library/library_albums.dart';
 import '../../providers/library/library_artists.dart';
+import '../../providers/library/library_filters.dart';
 import '../../providers/library/library_playlists.dart';
 import '../../providers/library/library_search_query.dart';
+import '../../providers/library/library_views.dart';
 import '../../providers/library/playlist_mutations.dart';
 import '../../router.dart';
 import '../../theme.dart';
 import '../../widgets/add_to_playlist_sheet.dart';
 import '../../widgets/branded_header.dart';
 import '../../widgets/gradient_tab_indicator.dart';
+import '../../widgets/library_filter_chips.dart';
 import '../../widgets/download_to_playlist_sheet.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_snackbar.dart';
@@ -37,6 +39,7 @@ import '../../widgets/library_result_tile.dart';
 import '../../widgets/playlist_dialogs.dart';
 import '../../widgets/result_tile.dart';
 import '../../widgets/skeleton.dart';
+import 'album_grid_card.dart';
 
 // A17: search-mode + browse-tab private widgets live in sibling part files to
 // keep this screen file readable. They share this library's imports + privacy.

@@ -22,6 +22,7 @@ import 'package:heerr/providers/library/playlist_mutations.dart';
 import 'package:heerr/providers/queue.dart';
 import 'package:heerr/providers/search.dart';
 import 'package:heerr/providers/secure_storage.dart';
+import 'package:heerr/screens/library/album_grid_card.dart';
 import 'package:heerr/screens/library/library_screen.dart';
 import 'package:heerr/widgets/empty_state.dart';
 import 'package:heerr/widgets/library_result_tile.dart';
@@ -198,21 +199,54 @@ void main() {
       expect(find.byType(SkeletonList), findsOneWidget);
     });
 
-    testWidgets('default tab shows the albums data list',
+    testWidgets('default tab shows the grid card + full-list row (X3)',
         (WidgetTester tester) async {
       const Album album = Album(
         id: 'al-1',
         name: 'Currents',
         artist: 'Tame Impala',
         coverArt: 'al-1',
+        year: 2015,
+        songCount: 13,
       );
       await tester.pumpWidget(_wrap(_defaultsExcept(
         albums: _albumsValue(const AsyncData<List<Album>>(<Album>[album])),
       )));
       await tester.pumpAndSettle();
 
+      // Grid card renders above the fold, with the chip row.
+      expect(find.byType(AlbumGridCard), findsOneWidget);
       expect(find.text('Currents'), findsOneWidget);
-      expect(find.text('Tame Impala'), findsOneWidget);
+      expect(find.text('Recently Added'), findsOneWidget);
+      expect(find.text('Downloaded'), findsOneWidget);
+
+      // The full-list section sits below the grid — scroll it into view.
+      await tester.drag(
+          find.byType(CustomScrollView), const Offset(0, -600));
+      await tester.pumpAndSettle();
+      // List row subtitle joins artist • year • songs.
+      expect(find.text('Tame Impala • 2015 • 13 songs'), findsOneWidget);
+    });
+
+    testWidgets('grid caps at 9 cards; list carries all albums (X3)',
+        (WidgetTester tester) async {
+      final List<Album> albums = List<Album>.generate(
+        12,
+        (int i) => Album(id: 'al-$i', name: 'Album $i'),
+      );
+      await tester.pumpWidget(_wrap(_defaultsExcept(
+        albums: _albumsValue(AsyncData<List<Album>>(albums)),
+      )));
+      await tester.pumpAndSettle();
+
+      // Grid children are built lazily, but the delegate's childCount is
+      // the contract — read it off the SliverGrid.
+      final SliverGrid grid =
+          tester.widget<SliverGrid>(find.byType(SliverGrid, skipOffstage: false));
+      expect(grid.delegate.estimatedChildCount, 9);
+      final SliverList list =
+          tester.widget<SliverList>(find.byType(SliverList, skipOffstage: false));
+      expect(list.delegate.estimatedChildCount, 12);
     });
 
     testWidgets('Albums empty → EmptyState "No albums yet"',
