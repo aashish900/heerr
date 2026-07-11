@@ -339,8 +339,17 @@ class _ProgressBar extends StatelessWidget {
                 Align(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(3),
+                    // width: double.infinity forces the track to claim the
+                    // full bar width. Without it, this SizedBox only
+                    // constrains height — its Stack child then shrinks to
+                    // its widest *sized* non-positioned child (the
+                    // FractionallySizedBox fill, which is only
+                    // `progress * trackWidth` wide), and the outer Align
+                    // centres that shrunken track instead of the fill
+                    // starting flush with the bar's left edge.
                     child: SizedBox(
                       height: 5,
+                      width: double.infinity,
                       child: Stack(
                         children: <Widget>[
                           const Positioned.fill(

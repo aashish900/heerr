@@ -130,6 +130,32 @@ void main() {
     expect(fill.widthFactor, closeTo(0.5, 0.001));
   });
 
+  testWidgets(
+      'regression: progress track spans the full bar width and starts at '
+      'the left edge, not centred',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(
+      snapshot: _snap(
+        item: _item(duration: const Duration(minutes: 2)),
+        position: const Duration(seconds: 36), // 30% progress
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final Rect barRect = tester
+        .getRect(find.byKey(const Key('continue-listening-seek-area')));
+    final Rect fillRect = tester
+        .getRect(find.byKey(const Key('continue-listening-progress')));
+
+    // The fill must start flush with the bar's left edge — if the track's
+    // Stack shrinks to the fill's own (progress-fraction) width instead of
+    // the full bar width, the whole track gets centred by its parent Align
+    // and the fill appears to start partway across the bar instead of at
+    // the left edge.
+    expect(fillRect.left, closeTo(barRect.left, 1.0));
+    expect(fillRect.width, closeTo(barRect.width * 0.3, 1.0));
+  });
+
   testWidgets('null duration renders --:-- and zero progress (no crash)',
       (WidgetTester tester) async {
     await tester.pumpWidget(_wrap(
