@@ -37,6 +37,27 @@ Future<List<Album>> homeMostPlayed(HomeMostPlayedRef ref) async {
   return service.getAlbumList(type: 'frequent', size: _kHomeAlbumSectionSize);
 }
 
+/// Recently-added albums (`getAlbumList2.view?type=newest` — Subsonic
+/// "newest" = most recently *added*, distinct from `recent` = recently
+/// *played*). Powers the Home screen's "Recently Added" vertical section
+/// (redesign — HOMESCREEN.md task 4).
+@riverpod
+Future<List<Album>> homeNewest(HomeNewestRef ref) async {
+  final SubsonicLibraryService service =
+      await ref.watch(subsonicLibraryServiceProvider.future);
+  return service.getAlbumList(type: 'newest', size: _kHomeAlbumSectionSize);
+}
+
+/// Full recently-added list for the "See all" screen. Separate provider
+/// (not a rerun of [homeNewest]) so the Home section's 8-row fetch and the
+/// screen's 50-row fetch cache independently.
+@riverpod
+Future<List<Album>> recentlyAddedFull(RecentlyAddedFullRef ref) async {
+  final SubsonicLibraryService service =
+      await ref.watch(subsonicLibraryServiceProvider.future);
+  return service.getAlbumList(type: 'newest', size: 50);
+}
+
 /// Random songs from the library (`getRandomSongs.view`). Used as the
 /// universal fallback when backend recommendations come back empty, and as a
 /// fill-in for the quick-access grid when "recently played" is empty.

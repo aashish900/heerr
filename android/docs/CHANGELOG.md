@@ -2505,3 +2505,13 @@ User review of the previous widget-polish commit flagged two remaining mismatche
 - **`test/screens/home/quick_access_row_test.dart`** (new) — 8 tests: header + 4 cards render, no Edit, count/singular/error subtitles, all four navigation targets.
 - **`test/screens/home/home_screen_test.dart`** — 3 legacy-section tests now scroll before asserting (the new rows push "Most played" / "Picked for you" below the built viewport).
 - Verification: `flutter analyze` clean, `flutter test` 796/796 green.
+
+## 2026-07-11 — Home redesign part 4: Recently Added section + See-all screen
+
+- **`lib/providers/home/home_providers.dart`** — `homeNewestProvider` (`getAlbumList2 type=newest`, size 8 — recently *added*, vs the existing `recent` = recently *played*) + `recentlyAddedFullProvider` (size 50, separate provider so the two fetches cache independently). Codegen re-run.
+- **`lib/screens/home/recently_added_section.dart`** (new) — `RecentlyAddedSection`: header + "See all" TextButton → `/library/recently-added`; first 5 albums as plain rows in the parent ListView (no nested scrollable). `RecentlyAddedRow` (56px `LibraryCoverArt`, bold title, grey artist, tap → album detail) is public and shared with the screen. Kebab menu deferred (DEBT). Loading → 3 SkeletonTiles; error/empty → hidden.
+- **`lib/screens/library/recently_added_screen.dart`** (new) — `RecentlyAddedScreen`: AppBar list of the full 50, pull-to-refresh via `ref.invalidate`, error state with Retry.
+- **`lib/router.dart`** — nested `recently-added` GoRoute under `/library` (Library tab stays selected via the existing `startsWith` index rule).
+- **`lib/screens/home/home_screen.dart`** — section inserted after Quick Access.
+- **`test/screens/home/recently_added_test.dart`** (new) — 8 tests: section render cap (5 rows), empty/error hidden, row tap → album, See all → screen, screen list/error-retry/pull-to-refresh.
+- Verification: `flutter analyze` clean, `flutter test` 804/804 green.

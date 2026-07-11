@@ -24,6 +24,7 @@ import '../../widgets/home_section.dart';
 import '../../widgets/skeleton.dart';
 import 'continue_listening_card.dart';
 import 'quick_access_row.dart';
+import 'recently_added_section.dart';
 
 /// Time-of-day greeting helper. Visible for tests.
 /// - 5..11  → "Good morning"
@@ -271,6 +272,7 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
         _GreetingBlock(),
         ContinueListeningCard(),
         QuickAccessRow(),
+        RecentlyAddedSection(),
         _QuickAccessGrid(),
         _JumpBackInSection(),
         _MostPlayedSection(),

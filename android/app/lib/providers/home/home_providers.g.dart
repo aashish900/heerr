@@ -46,6 +46,50 @@ final homeMostPlayedProvider = AutoDisposeFutureProvider<List<Album>>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef HomeMostPlayedRef = AutoDisposeFutureProviderRef<List<Album>>;
+String _$homeNewestHash() => r'69a3cf9146eb5eb9e573f49c832648a5a1a23ff3';
+
+/// Recently-added albums (`getAlbumList2.view?type=newest` — Subsonic
+/// "newest" = most recently *added*, distinct from `recent` = recently
+/// *played*). Powers the Home screen's "Recently Added" vertical section
+/// (redesign — HOMESCREEN.md task 4).
+///
+/// Copied from [homeNewest].
+@ProviderFor(homeNewest)
+final homeNewestProvider = AutoDisposeFutureProvider<List<Album>>.internal(
+  homeNewest,
+  name: r'homeNewestProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$homeNewestHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef HomeNewestRef = AutoDisposeFutureProviderRef<List<Album>>;
+String _$recentlyAddedFullHash() => r'1387272ee13674b8026012e40b3f8d7fb3ae9da1';
+
+/// Full recently-added list for the "See all" screen. Separate provider
+/// (not a rerun of [homeNewest]) so the Home section's 8-row fetch and the
+/// screen's 50-row fetch cache independently.
+///
+/// Copied from [recentlyAddedFull].
+@ProviderFor(recentlyAddedFull)
+final recentlyAddedFullProvider =
+    AutoDisposeFutureProvider<List<Album>>.internal(
+      recentlyAddedFull,
+      name: r'recentlyAddedFullProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$recentlyAddedFullHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef RecentlyAddedFullRef = AutoDisposeFutureProviderRef<List<Album>>;
 String _$homeRandomSongsHash() => r'c94555a3bda9d6fbae4b3dfe3649068612f1e8c7';
 
 /// Random songs from the library (`getRandomSongs.view`). Used as the

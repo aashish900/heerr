@@ -6,7 +6,7 @@ part of 'now_playing_widget_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$nowPlayingWidgetHash() => r'679922f0dfce1a5ce881ad13aa169befbba126a0';
+String _$nowPlayingWidgetHash() => r'e196501b3ef4938ccb83714079b1163a109a1b16';
 
 /// #20: keep-alive side-effect provider that mirrors the live player state
 /// onto the home-screen widget. Watched by `HeerrApp` purely for the

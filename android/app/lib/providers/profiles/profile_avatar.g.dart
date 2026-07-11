@@ -26,7 +26,7 @@ final avatarsDirProvider = FutureProvider<Directory>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef AvatarsDirRef = FutureProviderRef<Directory>;
-String _$profileAvatarHash() => r'd89f19d62ce463ea7787b219e8bb9d5595f36d12';
+String _$profileAvatarHash() => r'0bad882895d22c293d4b7ced429575da12c75f14';
 
 /// The active profile's avatar file, or null when none is set (#37).
 ///
