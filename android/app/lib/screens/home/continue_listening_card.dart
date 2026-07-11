@@ -98,8 +98,14 @@ class _ContinueListeningCardState
             child: InkWell(
               key: const Key('continue-listening-card'),
               onTap: () => context.push('/player'),
-              child: Stack(
-                children: <Widget>[
+              // Fixed height: the card sits in Home's ListView, where
+              // children get unbounded height — the stretch-Row inside
+              // this Stack must have a bound or layout blows up (which
+              // killed everything below the card when a track was live).
+              child: SizedBox(
+                height: 212,
+                child: Stack(
+                  children: <Widget>[
                   // B2 backdrop: the cover blurred + stretched across the
                   // whole card. ImageFiltered (not BackdropFilter) — only
                   // the image itself needs blurring, which is the cheaper
@@ -161,6 +167,7 @@ class _ContinueListeningCardState
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
                               const _Badge(),
@@ -232,6 +239,7 @@ class _ContinueListeningCardState
                     ],
                   ),
                 ],
+                ),
               ),
             ),
           ),

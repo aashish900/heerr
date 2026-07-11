@@ -342,7 +342,8 @@ class _HomeSearchBar extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Material(
         color: colors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(28),
+        // Mockup: squarish pill with gently curved corners, not a stadium.
+        borderRadius: BorderRadius.circular(14),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: () {

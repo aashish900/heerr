@@ -67,16 +67,14 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
       tint: tint,
       builder: (BuildContext context, Color tint) => Padding(
       padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
-      // Thin gradient border, same shell technique as the Home hero card.
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: heerrGradient,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        padding: const EdgeInsets.all(1.2),
-        child: Material(
-          color: cs.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(14.8),
+      // Mockup: the bar sits on a dark card with a very thin, barely
+      // visible grey hairline — no gradient border here.
+      child: Material(
+          color: cs.surfaceContainerLow,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: cs.outline, width: 0.8),
+          ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: () => context.push('/player'),
@@ -141,10 +139,13 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
                         const SizedBox(width: 8),
                         SizedBox(
                           width: 90,
+                          // Brand-gradient equalizer, moving while playing —
+                          // same look as the home-screen widget's waveform.
                           child: WaveformStrip(
                             height: 20,
-                            color: tint,
+                            gradient: heerrGradient,
                             seed: item.title.hashCode,
+                            animate: s.isPlaying,
                           ),
                         ),
                       ],
@@ -158,7 +159,6 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
             ),
           ),
         ),
-      ),
       ),
     );
   }

@@ -85,9 +85,17 @@ void main() {
         _snapshot(item: _item(), playing: true),
       ),
     ));
-    await tester.pumpAndSettle();
+    // While playing the waveform animates forever — pump fixed frames
+    // instead of pumpAndSettle.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.byIcon(Icons.pause), findsOneWidget);
     expect(find.byIcon(Icons.play_arrow), findsNothing);
+
+    // The waveform must be animating (equalizer motion) while playing.
+    final WaveformStrip strip =
+        tester.widget<WaveformStrip>(find.byType(WaveformStrip));
+    expect(strip.animate, isTrue);
   });
 
   testWidgets('tap on the bar pushes /player',
@@ -149,9 +157,22 @@ void main() {
     expect(find.byType(IconButton), findsNothing);
   });
 
+  // The play-circle glow is the tint consumer post-restyle (the waveform is
+  // brand-gradient per the mockup). Fish its BoxShadow out of the gradient
+  // circle Container.
+  Color glowColor(WidgetTester tester) {
+    final Container circle = tester.widget<Container>(find.byWidgetPredicate(
+        (Widget w) =>
+            w is Container &&
+            w.decoration is BoxDecoration &&
+            (w.decoration! as BoxDecoration).shape == BoxShape.circle &&
+            (w.decoration! as BoxDecoration).gradient == heerrGradient));
+    return (circle.decoration! as BoxDecoration).boxShadow!.first.color;
+  }
+
   testWidgets(
-      'Part B: waveform tint is the brand-blended extracted cover colour',
-      (WidgetTester tester) async {
+      'Part B: play-glow tint is the brand-blended extracted cover colour; '
+      'waveform stays brand gradient', (WidgetTester tester) async {
     const Color extracted = Color(0xFF2266AA);
     dominantColorForOverride = (Uri? _) async => extracted;
     addTearDown(() => dominantColorForOverride = dominantColorFor);
@@ -169,7 +190,12 @@ void main() {
 
     final WaveformStrip strip =
         tester.widget<WaveformStrip>(find.byType(WaveformStrip));
-    expect(strip.color, brandBlend(extracted));
+    expect(strip.gradient, heerrGradient);
+    expect(strip.animate, isFalse, reason: 'paused → static bars');
+    expect(
+      glowColor(tester).toARGB32(),
+      brandBlend(extracted).withValues(alpha: 0.25).toARGB32(),
+    );
   });
 
   testWidgets('Part B: extraction failure falls back to blended heerrPurple',
@@ -187,9 +213,24 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    final WaveformStrip strip =
-        tester.widget<WaveformStrip>(find.byType(WaveformStrip));
-    expect(strip.color, brandBlend(heerrPurple));
+    expect(
+      glowColor(tester).toARGB32(),
+      brandBlend(heerrPurple).withValues(alpha: 0.25).toARGB32(),
+    );
+  });
+
+  testWidgets('restyle: subtle grey hairline border, no gradient shell',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(
+      snapshot: AsyncData<PlayerSnapshot>(_snapshot(item: _item())),
+    ));
+    await tester.pumpAndSettle();
+
+    final Material card = tester.widget<Material>(find.byWidgetPredicate(
+        (Widget w) => w is Material && w.shape is RoundedRectangleBorder));
+    final RoundedRectangleBorder shape = card.shape! as RoundedRectangleBorder;
+    expect(shape.side.width, lessThan(1.0));
+    expect(shape.side.color, isNot(heerrMagenta));
   });
 
   testWidgets('hidden when snapshot stream is still loading',

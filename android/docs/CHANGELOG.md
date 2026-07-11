@@ -2569,3 +2569,14 @@ User review of the previous widget-polish commit flagged two remaining mismatche
 
 - **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.7.4 → 4.8.0 per the version-sync convention. Minor bump (not patch): the Home Screen redesign replaces the layout, adds two screens (Favorites, Recently Added), and introduces per-song adaptive theming. Android-side only; backend bumped for sync.
 - Tagged `v4.8.0`.
+
+## 2026-07-11 — Home redesign fix round 1: layout bug + mockup fidelity (user review)
+
+User review of v4.8.0 flagged four issues:
+
+- **Home sections vanished while a track was live (bug).** The hero card's `Row(crossAxisAlignment: stretch)` sits in a Stack that gets **unbounded height inside Home's ListView**; with a current MediaItem the card mounted, layout threw, and everything below it (Quick Access, Recently Added) failed to render. Widget tests missed it because they pumped the card inside a bounded Scaffold body. Fix: card content wrapped in `SizedBox(height: 212)`; inner column centered. Regression test added that pumps the full HomeScreen with a live snapshot and asserts hero + both sections render (`test/screens/home/home_screen_test.dart`).
+- **Search pill too round.** `_HomeSearchBar` radius 28 → 14 (mockup: squarish with gently curved corners). Only occurrence in the app — Library search is an inline AppBar field.
+- **MiniPlayer waveform wrong colour + static.** `WaveformStrip` gained `gradient` (shader paint) and `animate` (equalizer breathing via a repeating 1.2 s AnimationController, phase-shifted per bar — the home-screen widget's look). MiniPlayer waveform now `heerrGradient` + animates only while playing (a repeating animation must not run while paused — also keeps `pumpAndSettle` usable in tests). The per-song tint remains on the play-circle glow.
+- **MiniPlayer border too loud.** Gradient border shell replaced with `surfaceContainerLow` card + 0.8dp `outline`-grey hairline (`RoundedRectangleBorder.side`), per the mockup.
+- Tests: mini-player Part B assertions repointed (waveform → gradient check; tint → glow BoxShadow colour), playing-state test switched to fixed pumps, new hairline-border test.
+- Verification: `flutter analyze` clean, `flutter test` 807/807 green.
