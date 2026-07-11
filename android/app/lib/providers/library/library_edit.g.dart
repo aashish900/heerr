@@ -6,7 +6,7 @@ part of 'library_edit.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$libraryEditHash() => r'3ed72535fa754aaddf1008233735b881225f8343';
+String _$libraryEditHash() => r'39b38f136912c812f5af5087b1a81f5d0c64efa6';
 
 /// Y1 (#44): server-side song metadata editing. Same shape as [LibraryDelete]:
 /// [editSong] drives the backend multipart `PATCH /library/song` through

@@ -5,6 +5,7 @@ import '../../services/backend_service.dart';
 import '../downloaded_songs.dart';
 import '../home/home_providers.dart';
 import 'library_album.dart';
+import 'starred_songs.dart';
 import 'library_albums.dart';
 import 'library_artists.dart';
 import 'library_search.dart';
@@ -45,8 +46,9 @@ class LibraryDelete extends _$LibraryDelete {
     final String? albumId = song.albumId;
     if (albumId != null) ref.invalidate(libraryAlbumProvider(albumId));
     ref.invalidate(downloadedSongsProvider);
-    ref.invalidate(homeRecentProvider);
-    ref.invalidate(homeMostPlayedProvider);
-    ref.invalidate(homeRandomSongsProvider);
+    // Home redesign: see the matching invalidation set in library_edit.dart.
+    ref.invalidate(homeNewestProvider);
+    ref.invalidate(recentlyAddedFullProvider);
+    ref.invalidate(starredSongsProvider);
   }
 }

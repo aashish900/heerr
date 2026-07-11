@@ -2523,3 +2523,13 @@ User review of the previous widget-polish commit flagged two remaining mismatche
 - **`lib/router.dart`** — nested `favorites` GoRoute under `/library`; the Quick Access Favorites card's target now resolves.
 - **`test/screens/library/favorites_screen_test.dart`** (new) — 4 tests: rows + actions render, empty state, error + Retry re-fetch, pull-to-refresh.
 - Verification: `flutter analyze` clean, `flutter test` 808/808 green.
+
+## 2026-07-11 — Home redesign part 6: final body assembly + legacy-section cleanup
+
+- **`lib/screens/home/home_screen.dart`** — final body: search bar → greeting → Continue Listening → Quick Access → Recently Added (or the "Nothing here yet" `EmptyState` when newest is empty AND the player is idle). Removed `_QuickAccessGrid`, `_RecommendationGridFallback`, `_JumpBackInSection`, `_MostPlayedSection`, `_RecommendationsSection`, and the mount-time `refreshIfStale()` (the lifecycle coordinator already fires it on resume — `lifecycle_coordinator.dart:110` — and the Recommendations screen refreshes itself). `HomeScreen` simplified to a `ConsumerWidget`. Auto-retry + network-error body rewired to `homeNewestProvider` as the single network signal.
+- **`lib/providers/home/home_providers.dart`** — deleted `homeRecent`, `homeMostPlayed`, `homeRandomSongs`, `homeRecommendations` + the `HomeRecommendations` typedef (no consumers post-redesign). Kept `homeNewest` + `recentlyAddedFull`.
+- **`lib/providers/library/library_edit.dart`, `library_delete.dart`** — post-mutation invalidations repointed from the deleted providers to `homeNewest` + `recentlyAddedFull` + `starredSongs`.
+- **`lib/widgets/home_grid_tile.dart`, `lib/widgets/home_section.dart`** — deleted (Home-only). `home_recommendation_card.dart` + `recommendations_refresh_button.dart` kept — still used by the Recommendations screen.
+- **`test/screens/home/home_screen_test.dart`** — rewritten for the new contract (13 legacy tests removed; error/retry/pull-refresh retimed to `homeNewestProvider`; empty-state asserts on the section *widget*, since the Quick Access card also carries the "Recently Added" label). **`test/providers/home/home_providers_test.dart`** — rewritten for the two surviving providers.
+- **`docs/DEBT.md`** — Quick Access Edit + row kebab deferrals logged.
+- Verification: `flutter analyze` clean, `flutter test` 795/795 green (808 → 795 = removed legacy-section tests).

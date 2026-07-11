@@ -239,3 +239,8 @@ Cover **colour** tint added back as the cheap version of the original "bonus":
 per track while the app is alive; the tile keeps the last colour when the
 process is dead. A draggable seek bar is intentionally not attempted (not
 reliably supported in home-screen widgets); tapping the tile opens the app.
+
+## Home redesign deferrals (2026-07-11, HOMESCREEN.md)
+
+- **Quick Access "Edit"** — the mockup shows an Edit action implying user-reorderable/hideable shortcut cards. Shipped as a static 4-card row; customization (persisted order/visibility + edit mode UI) deferred.
+- **Recently-Added row kebab menu** — the mockup shows a per-row overflow menu. Rows currently tap through to the album detail; an album-level action sheet (play / shuffle / download) is deferred.
