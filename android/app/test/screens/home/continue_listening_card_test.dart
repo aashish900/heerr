@@ -9,6 +9,7 @@ import 'package:heerr/player/heerr_audio_handler.dart';
 import 'package:heerr/player/player_provider.dart';
 import 'package:heerr/screens/home/continue_listening_card.dart';
 import 'package:heerr/theme.dart';
+import 'package:heerr/utils/palette.dart';
 import 'package:heerr/widgets/waveform_strip.dart';
 
 class _StubHandler extends Mock implements HeerrAudioHandler {}
@@ -165,6 +166,63 @@ void main() {
     await tester.tap(find.text('Starboy'));
     await tester.pumpAndSettle();
     expect(find.text('NOW_PLAYING_SCREEN'), findsOneWidget);
+  });
+
+  group('Part B adaptive theming', () {
+    tearDown(() {
+      dominantColorForOverride = dominantColorFor;
+    });
+
+    MediaItem itemWithArt() => MediaItem(
+          id: 'http://stream/1',
+          title: 'Starboy',
+          artist: 'The Weeknd',
+          duration: const Duration(minutes: 3, seconds: 50),
+          artUri: Uri.parse('http://navi.test/cover/1'),
+        );
+
+    testWidgets('waveform + glows take the brand-blended extracted colour',
+        (WidgetTester tester) async {
+      const Color extracted = Color(0xFF2266AA);
+      int calls = 0;
+      dominantColorForOverride = (Uri? _) async {
+        calls++;
+        return extracted;
+      };
+      await tester.pumpWidget(_wrap(
+        snapshot: _snap(item: itemWithArt()),
+      ));
+      await tester.pumpAndSettle();
+
+      final WaveformStrip strip =
+          tester.widget<WaveformStrip>(find.byType(WaveformStrip));
+      expect(strip.color, brandBlend(extracted));
+      expect(calls, 1, reason: 'one extraction per unique cover URI');
+    });
+
+    testWidgets('blurred backdrop renders when the item has art',
+        (WidgetTester tester) async {
+      dominantColorForOverride = (Uri? _) async => null;
+      await tester.pumpWidget(_wrap(
+        snapshot: _snap(item: itemWithArt()),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ImageFiltered), findsOneWidget);
+    });
+
+    testWidgets('no backdrop and fallback tint without art',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(
+        snapshot: _snap(item: _item()), // no artUri
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ImageFiltered), findsNothing);
+      final WaveformStrip strip =
+          tester.widget<WaveformStrip>(find.byType(WaveformStrip));
+      expect(strip.color, brandBlend(heerrPurple));
+    });
   });
 
   group('WaveformStrip.barHeights', () {

@@ -8,6 +8,7 @@ import '../player/player_provider.dart';
 import '../providers/player/art_palette.dart';
 import '../theme.dart';
 import '../utils/palette.dart';
+import 'animated_tint.dart';
 import 'preview_badge.dart';
 import 'waveform_strip.dart';
 
@@ -62,7 +63,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
     final Color tint = brandBlend(_lastExtracted ?? heerrPurple);
     final ColorScheme cs = Theme.of(context).colorScheme;
 
-    return _AnimatedTint(
+    return AnimatedTint(
       tint: tint,
       builder: (BuildContext context, Color tint) => Padding(
       padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
@@ -159,25 +160,6 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
         ),
       ),
       ),
-    );
-  }
-}
-
-/// Cross-fades [tint] changes over [kTintTransition] so a track skip glides
-/// the accent colour to the next cover's tint instead of snapping (B3).
-class _AnimatedTint extends StatelessWidget {
-  const _AnimatedTint({required this.tint, required this.builder});
-
-  final Color tint;
-  final Widget Function(BuildContext context, Color tint) builder;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<Color?>(
-      tween: ColorTween(end: tint),
-      duration: kTintTransition,
-      builder: (BuildContext context, Color? animated, _) =>
-          builder(context, animated ?? tint),
     );
   }
 }

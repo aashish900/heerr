@@ -2547,3 +2547,11 @@ User review of the previous widget-polish commit flagged two remaining mismatche
 - **`lib/widgets/mini_player.dart`** — migrated off the private `_maybeRefreshTint` state + `miniPlayerPaletteExtractorOverride` seam (deleted) onto the provider. Tint = `brandBlend(extracted ?? heerrPurple)` on waveform + play-glow; last-known tint held during a new track's extraction; `_AnimatedTint` (TweenAnimationBuilder) cross-fades tint changes over 400 ms.
 - **`test/utils/palette_test.dart`** (new) — brandBlend lerp/no-op (quantized ARGB compare), per-URI cache count, null propagation. **`test/widgets/mini_player_test.dart`** — tint plumbing via the new seam + fallback test.
 - Verification: `flutter analyze` clean, full suite green.
+
+## 2026-07-11 — Home redesign part B2: hero card adaptive backdrop + accents
+
+- **`lib/widgets/animated_tint.dart`** (new) — `AnimatedTint` extracted from the MiniPlayer's private helper; shared 400 ms tint cross-fade.
+- **`lib/screens/home/continue_listening_card.dart`** — Part B visuals: blurred cover backdrop (`ImageFiltered` at sigma 24 inside a `RepaintBoundary`, only the image blurred — cheaper than `BackdropFilter`), left→right darkening gradient (black 0.35 → `heerrBlack` 0.88) for text contrast, `brandBlend` tint on the waveform + neon glows behind the sharp art (0.25) and play button (0.35). Progress fill stays `heerrGradient` (brand anchor). Last-known tint held during a new track's extraction; artwork itself never recoloured.
+- **`lib/widgets/mini_player.dart`** — switched to the shared `AnimatedTint`.
+- **`test/screens/home/continue_listening_card_test.dart`** — 3 new tests: blended tint + single extraction per URI, backdrop presence with art, no-backdrop + fallback tint without art.
+- Verification: `flutter analyze` clean, `flutter test` 805/805 green.
