@@ -137,18 +137,17 @@ void main() {
     waveformSeekBarAnimateEnabled = true;
   });
 
-  testWidgets('overflow menu exposes an "Add to playlist" item',
+  testWidgets('action pill exposes an "Add to playlist" slot',
       (WidgetTester tester) async {
     await tester.pumpWidget(_wrap());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('now-playing-overflow')));
-    await tester.pumpAndSettle();
-
     expect(find.byKey(const Key('now-playing-add-to-playlist')), findsOneWidget);
     expect(find.text('Add to playlist'), findsOneWidget);
-    // Sleep timer still present alongside it.
-    expect(find.text('Sleep timer'), findsOneWidget);
+    // Other pill slots present alongside it.
+    expect(find.byKey(const Key('now-playing-queue-button')), findsOneWidget);
+    expect(find.byKey(const Key('now-playing-pill-lyrics')), findsOneWidget);
+    expect(find.byKey(const Key('now-playing-pill-timer')), findsOneWidget);
   });
 
   testWidgets('tapping "Add to playlist" opens the AddToPlaylistSheet',
@@ -156,14 +155,15 @@ void main() {
     await tester.pumpWidget(_wrap());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('now-playing-overflow')));
-    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('now-playing-add-to-playlist')),
+    );
     await tester.tap(find.byKey(const Key('now-playing-add-to-playlist')));
     await tester.pumpAndSettle();
 
     // Sheet for the single playing track.
     expect(find.text('Add 1 song to playlist'), findsOneWidget);
-    await tester.tap(find.text('Add to playlist'));
+    await tester.tap(find.byKey(const Key('add-to-playlist-expand')));
     await tester.pumpAndSettle();
     expect(find.text('Create new playlist…'), findsOneWidget);
   });
@@ -176,8 +176,9 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('now-playing-overflow')));
-    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('now-playing-add-to-playlist')),
+    );
     await tester.tap(find.byKey(const Key('now-playing-add-to-playlist')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));

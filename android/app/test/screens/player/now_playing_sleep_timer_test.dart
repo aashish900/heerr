@@ -168,14 +168,13 @@ void main() {
   });
 
   testWidgets(
-      'overflow → Sleep timer opens the bottom sheet with the preset list',
+      'Timer pill slot opens the bottom sheet with the preset list',
       (WidgetTester tester) async {
     await tester.pumpWidget(_wrap());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('now-playing-overflow')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Sleep timer'));
+    await tester.ensureVisible(find.byKey(const Key('now-playing-pill-timer')));
+    await tester.tap(find.byKey(const Key('now-playing-pill-timer')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('sleep-timer-15')), findsOneWidget);
@@ -192,9 +191,8 @@ void main() {
     await tester.pumpWidget(_wrap());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('now-playing-overflow')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Sleep timer'));
+    await tester.ensureVisible(find.byKey(const Key('now-playing-pill-timer')));
+    await tester.tap(find.byKey(const Key('now-playing-pill-timer')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('sleep-timer-15')));
     await tester.pumpAndSettle();
@@ -212,9 +210,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('now-playing-sleep-chip')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('now-playing-overflow')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Sleep timer'));
+    // Timer is armed, so the pill slot itself is the chip — tap it directly.
+    await tester.ensureVisible(find.byKey(const Key('now-playing-sleep-chip')));
+    await tester.tap(find.byKey(const Key('now-playing-sleep-chip')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('sleep-timer-off')), findsOneWidget);

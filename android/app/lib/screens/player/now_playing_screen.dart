@@ -33,6 +33,7 @@ import '../../widgets/waveform_seek_bar.dart';
 part 'now_playing_lyrics.dart';
 part 'now_playing_transport.dart';
 part 'now_playing_sleep_timer.dart';
+part 'now_playing_action_pill.dart';
 
 /// Injection point for tests — swap `dominantColorFor` with a deterministic
 /// fake so widget tests don't hit the network or palette_generator decode path.
@@ -224,15 +225,7 @@ class _FavouriteButton extends ConsumerWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({
-    required this.sleepRemaining,
-    required this.onSleepTap,
-    required this.onAddToPlaylist,
-  });
-
-  final Duration? sleepRemaining;
-  final VoidCallback onSleepTap;
-  final VoidCallback onAddToPlaylist;
+  const _Header();
 
   @override
   Widget build(BuildContext context) {
@@ -259,55 +252,12 @@ class _Header extends StatelessWidget {
                   ?.copyWith(letterSpacing: 1.5, color: Colors.white70),
             ),
           ),
-          if (sleepRemaining != null) ...<Widget>[
-            _SleepCountdownChip(remaining: sleepRemaining!),
-            const SizedBox(width: 8),
-          ],
           // NOWPLAYING.md §2.3: disabled placeholder — no output-routing
           // feature exists yet; visual parity with the mockup only.
           const GlassIconButton(
             icon: Icons.speaker_outlined,
             tooltip: 'Audio device',
             onPressed: null,
-          ),
-          const SizedBox(width: 8),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.06),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
-            ),
-            child: PopupMenuButton<String>(
-              key: const Key('now-playing-overflow'),
-              tooltip: 'More',
-              icon: const Icon(Icons.more_vert, color: Colors.white),
-              onSelected: (String v) {
-                if (v == 'sleep') {
-                  onSleepTap();
-                } else if (v == 'add_to_playlist') {
-                  onAddToPlaylist();
-                }
-              },
-              itemBuilder: (BuildContext _) => const <PopupMenuEntry<String>>[
-                PopupMenuItem<String>(
-                  key: Key('now-playing-add-to-playlist'),
-                  value: 'add_to_playlist',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.playlist_add),
-                    title: Text('Add to playlist'),
-                  ),
-                ),
-                PopupMenuItem<String>(
-                  value: 'sleep',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(Icons.bedtime_outlined),
-                    title: Text('Sleep timer'),
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -351,13 +301,9 @@ class _Body extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          SafeArea(
+          const SafeArea(
             bottom: false,
-            child: _Header(
-              sleepRemaining: sleepRemaining,
-              onSleepTap: onSleepTap,
-              onAddToPlaylist: onAddToPlaylist,
-            ),
+            child: _Header(),
           ),
           _HeroArt(
             artUri: item.artUri,
@@ -417,7 +363,13 @@ class _Body extends ConsumerWidget {
             repeatMode: snapshot.state.repeatMode,
             shuffleMode: snapshot.state.shuffleMode,
           ),
-          _BottomActionsRow(onQueueTap: onQueueTap),
+          _ActionPill(
+            onQueueTap: onQueueTap,
+            onLyricsTap: () => _ExpandedLyricsSheet.show(context, tintColor),
+            onTimerTap: onSleepTap,
+            onAddToPlaylistTap: onAddToPlaylist,
+            sleepRemaining: sleepRemaining,
+          ),
           _LyricsSection(
             songId: item.extras?['subsonicId'] as String?,
             artist: item.artist ?? '',

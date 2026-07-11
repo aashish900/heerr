@@ -179,4 +179,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('now-playing-lyrics-sheet')), findsNothing);
   });
+
+  // NP7 — the action pill's Lyrics slot is a second entry point to the same
+  // expanded sheet as the card's own expand icon.
+  testWidgets('action pill Lyrics slot also opens the full-screen sheet',
+      (WidgetTester tester) async {
+    final _FakeAdapter adapter = _FakeAdapter((_) => _json(_syncedBody));
+    await tester.pumpWidget(_wrap(
+      snapshot: _snap(item: _item(), position: const Duration(seconds: 6)),
+      adapter: adapter,
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(
+      find.byKey(const Key('now-playing-pill-lyrics')),
+    );
+    await tester.tap(find.byKey(const Key('now-playing-pill-lyrics')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('now-playing-lyrics-sheet')), findsOneWidget);
+  });
 }

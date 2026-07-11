@@ -1152,3 +1152,27 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Trade-off:** The button trends toward the mockup's *intent* (an on-art download affordance) rather than its literal behavior (a single-song toggle). If single-song ad-hoc downloads are wanted later, this is a new feature with its own ADR, not a NOWPLAYING follow-up.
 
 **Reference:** `android/app/lib/screens/player/now_playing_screen.dart` (`_HeroArtDownloadButton`), `android/docs/NOWPLAYING.md` §2.4.
+
+## 2026-07-11 — Now Playing NP7: 4-slot action pill, Equalizer dropped, header overflow consolidated
+
+**Context:** NOWPLAYING.md §2.2 flagged the mockup's 5th pill slot (Equalizer) as needing either a system-EQ intent (`android.media.action.DISPLAY_AUDIO_EFFECT_CONTROL_PANEL`) or being dropped. The app has no in-app equalizer feature and no existing platform-channel wiring for the system EQ activity. Separately, NP2 had left the header's overflow (`PopupMenuButton` with "Add to playlist" + "Sleep timer") and the bottom row's Queue button as three separate access points for what the mockup shows as one unified pill.
+
+**Decision:**
+1. **Equalizer slot dropped.** Ship a 4-slot pill: Queue / Lyrics / Timer / Add to playlist. No system-EQ intent wiring added.
+2. **Header kebab (`now-playing-overflow`) removed entirely** — "Add to playlist" and "Sleep timer" both move into the pill as first-class slots, consolidating what NP2 left split across three surfaces (header kebab, header sleep chip, bottom-row queue button) into one.
+3. **Timer slot reuses `_SleepCountdownChip` verbatim when armed** (same widget, key `now-playing-sleep-chip`, same tap-to-reopen-sheet behavior) rather than duplicating the MM:SS formatting logic; shows a plain "Timer" icon+label slot when idle.
+4. **"Add to playlist" is a direct slot, not a single-item overflow menu.** With Sleep timer given its own dedicated Timer slot, the old kebab's remaining content was one item — wrapping that in a `PopupMenuButton` would be exactly the kind of premature-abstraction ceremony the project avoids (`CLAUDE.md` §"no unnecessary abstractions"). The Queue button keeps its existing key (`now-playing-queue-button`) since it's a straight relocation from the deleted `_BottomActionsRow`.
+
+**Why:**
+- **System EQ intent is real added scope** (new platform-channel dependency, needs `androidAudioSessionId` plumbing through `just_audio`, and a fallback story for devices with no EQ activity) disproportionate to a redesign task — same reasoning already applied to NP2's `playContext` deferral and NP3's on-art download button.
+- **One overflow surface, not three.** The mockup's intent is a single unified action row; NP2's interim header kebab + bottom row was always described there as a placeholder pending this consolidation.
+- **Reusing `_SleepCountdownChip` outright** means zero new formatting code and zero new test surface for the countdown display — only the mount point moved.
+
+**Alternatives considered:**
+- **Wire the system EQ intent.** Rejected per above; revisit as its own feature/ADR if requested.
+- **Keep a "More" menu wrapping just Add-to-playlist.** Rejected — a one-item popup is ceremony without benefit once Timer has its own slot.
+- **Leave the header kebab in place alongside the new pill (redundant access).** Rejected: two paths to the same two actions is confusing, and the plan explicitly calls for single-sourcing overflow once the pill exists.
+
+**Trade-off:** Three widget tests (`now_playing_add_to_playlist_test.dart` ×3, `now_playing_sleep_timer_test.dart` ×3) that opened the sheet/menu via `now-playing-overflow` were rewritten to tap the pill slots directly — an intentional, planned key-contract change for this task, not an accidental regression (`CLAUDE.md` ground rule 0 permits touching existing keys when the task itself requires it).
+
+**Reference:** `android/app/lib/screens/player/{now_playing_screen.dart, now_playing_action_pill.dart, now_playing_transport.dart}`, `android/docs/NOWPLAYING.md` §2.2.
