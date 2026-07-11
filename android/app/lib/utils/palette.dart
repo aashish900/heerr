@@ -9,9 +9,6 @@ import '../theme.dart';
 /// Fraction to lerp an extracted cover colour toward the brand magenta.
 const double kBrandBlend = 0.18;
 
-/// Blur sigma for the hero card's stretched-art backdrop.
-const double kArtBackdropBlur = 24.0;
-
 /// Accent-colour cross-fade on track change.
 const Duration kTintTransition = Duration(milliseconds: 400);
 

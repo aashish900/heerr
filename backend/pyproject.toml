@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "heerr-backend"
-version = "4.8.1"
+version = "4.8.2"
 description = "heerr — music request app backend (FastAPI + spotDL)"
 authors = ["Aashish Agarwal <asag5462@gmail.com>"]
 package-mode = false

@@ -998,3 +998,31 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Alternatives considered:** documented per-task in HOMESCREEN.md and the scoping entry.
 
 **Reference:** commits `bf1ccdf`..`301a2b0` on `redesign/home-screen`; CHANGELOG 2026-07-11 parts 1–7, B1+B3, B2. On-device smoke (G-gate) pending — no device attached this session.
+
+## 2026-07-11 — Favorites Quick Access repointed to the real Favourites playlist (fix round 2)
+
+**Context:** User reported the Favorites Quick Access card led to a blank/empty page. Investigation found the Home redesign's `FavoritesScreen` (task 5, prior entry) was built over `getStarred2.view` (Subsonic star primitive) — but an earlier ADR ("Subsonic star primitive for Favourites", above) had already rejected that exact approach for this exact reason: starred items don't open as a playable list in Navidrome, so a user whose favorites live in the `Favourites` playlist (the app's existing heart-icon mechanism, `PlaylistMutations.toggleFavourite` / `favouritesPlaylistProvider`) saw nothing, since they'd never used the separate star feature.
+
+**Decision:** `FavoritesScreen` now resolves `favouritesPlaylistProvider` (existing provider, unchanged) and delegates to the existing `PlaylistDetailScreen(playlistId: ...)` for the data/list/play UI, instead of hand-rolling a starred-song list. Empty state (`null` playlist — not lazy-created yet) still renders `EmptyState`, copy changed from "Star songs..." to "Heart songs to collect them here." to match the actual mechanism. `starredSongsProvider` / `getStarred2.view` is untouched — it's still correctly used by `seedCollectionProvider` (N2 recommendations seeding), just no longer misapplied to the Favorites screen.
+
+**Why:** Reuses the fully-featured, already-tested `PlaylistDetailScreen` (play/edit/reorder/delete) instead of maintaining a second, thinner song-list UI — and fixes the actual bug (wrong data source) rather than fixing symptoms in the hand-rolled list.
+
+**Alternatives considered:**
+- **Keep the star-based list, just make sure it's non-empty.** Rejected — doesn't fix the mismatch between "what the user calls Favorites" (the playlist, maintained by the heart icon everywhere else in the app) and "what this screen reads" (stars, a separate/unused mechanism in this app).
+
+**Reference:** `lib/screens/library/favorites_screen.dart`, `lib/providers/library/favourites.dart` (pre-existing), `lib/screens/library/playlist_detail_screen.dart`.
+
+## 2026-07-11 — Continue Listening hero card restyle to match the mockup (fix round 2)
+
+**Context:** User review of the hero card against `Home Screen.png` found four concrete mismatches, confirmed via `AskUserQuestion`: the card border, the full-card blurred-art backdrop, the play button, and the progress bar.
+
+**Decision:**
+1. Card border: 1.5px `heerrGradient` ring → single-colour `heerrMagenta` hairline (`BorderSide`, ~0.5 alpha) — matches the mockup's subtle single-hue outline.
+2. Dropped the Part B full-card blurred-art backdrop (`ImageFiltered` + darkening `LinearGradient` bled across the whole card). The mockup's text half is plain solid black; the backdrop made the card's overall color shift per song, which read as a mismatch from the source. Per-song adaptive tinting is **not** removed — the waveform and both glow `BoxShadow`s (art tile + play button) still take `brandBlend(extracted colour)`, cross-faded via `AnimatedTint`. Only the full-bleed backdrop layer is gone. `kArtBackdropBlur` removed from `lib/utils/palette.dart` (dead after this).
+3. Play button: solid `heerrGradient`-filled disc with a black icon → thin outlined ring (`Border.all(color: tint)`) with a transparent center and a `ShaderMask`-gradient icon — matches the mockup's ring-button look.
+4. Progress bar: added a round gradient knob (`Positioned` circle, `Key('continue-listening-progress-knob')`) at the current-position fraction. Indicative only — seeking still lives on `/player` (unchanged from the original Task 2 decision); the knob doesn't add drag-to-seek on Home.
+5. Album art tile width: 140 → 161 (+15%), per explicit user request — separate from the mockup-matching pass above.
+
+**Why:** These are all "make it actually match the reference image" fixes surfaced by direct visual comparison, not new feature work — no HOMESCREEN.md scope change.
+
+**Reference:** `lib/screens/home/continue_listening_card.dart`, `lib/utils/palette.dart`.

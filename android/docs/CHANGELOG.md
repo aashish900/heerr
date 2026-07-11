@@ -2585,3 +2585,27 @@ User review of v4.8.0 flagged four issues:
 
 - **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.8.0 → 4.8.1 per the version-sync convention, covering the "fix round 1" commit (unbounded hero-card layout bug, search-pill radius, animated gradient waveform, subtle minibar border). Android-side only; backend bumped for sync.
 - Tagged `v4.8.1`.
+
+## 2026-07-11 — Fix: hero-card waveform was static (never wired `animate`)
+
+User reported the Continue Listening card's waveform doesn't move. Root cause: `ContinueListeningCard` (`android/app/lib/screens/home/continue_listening_card.dart`) builds its `WaveformStrip` without passing `animate:`, so it always fell back to the `false` default — unlike the MiniPlayer, which was correctly wired to `s.isPlaying` in the fix-round-1 pass. Fix: added `animate: s.isPlaying` to the card's `WaveformStrip`.
+
+- New regression test (`test/screens/home/continue_listening_card_test.dart`): "waveform animates while playing, static when paused" — asserts `WaveformStrip.animate` flips both ways across a play/pause transition.
+- While writing that test, an unrelated test-harness gotcha surfaced: driving a play→pause transition by calling `pumpWidget` twice with two separate `Stream.value()` `ProviderScope` overrides doesn't reliably rebuild an already-instantiated Riverpod provider — `pumpAndSettle` hung waiting on a `WaveformStrip` animation that was never told to stop, because the second override never actually took effect. This doesn't happen in production (a single `audio_service` stream subscription persists and emits repeatedly). Fixed the test by feeding a shared `StreamController` into one long-lived `ProviderScope`/override (`_wrapStream` helper) and emitting both snapshots into it — the same shape the MiniPlayer test already avoided by never testing this transition.
+- Verification: `flutter analyze` clean, `flutter test` 808/808 green (isolated `now_playing_persistence_test.dart` flake under full-suite parallelism reran green standalone — unrelated to this change).
+
+## 2026-07-11 — Fix round 2: progress bar, card mockup fidelity, Favorites routing
+
+User review flagged four more issues:
+
+- **Hero-card progress bar invisible while playing (bug, actually always broken).** `_ProgressBar`'s `FractionallySizedBox` set `widthFactor` but not `heightFactor`; with no `heightFactor` its height derives from its child, and the child `DecoratedBox` had no `child:` — so the gradient fill rendered at **zero height**, always, regardless of play state (confirmed via a widget-test `Rect` probe: `top == bottom`). Fixed by adding `heightFactor: 1.0`.
+- **Continue Listening card mismatched the mockup.** Four confirmed diffs, all fixed (`lib/screens/home/continue_listening_card.dart`): the 1.5px `heerrGradient` border ring → a single-colour `heerrMagenta` hairline; the Part B full-card blurred-art backdrop (bled across the whole card, shifting its color per song) removed — text half is plain black again, matching the source (per-song tint stays on the waveform + glows, just not the backdrop); the solid gradient-filled play disc → a thin outlined ring with a `ShaderMask`-gradient icon; a round gradient knob added to the progress bar at the current position (indicative only — seeking still lives on `/player`). `kArtBackdropBlur` removed from `lib/utils/palette.dart` (dead after the backdrop removal).
+- **Album art tile enlarged 140px → 161px** (+15%, explicit user request).
+- **Favorites Quick Access led to a blank page (bug).** `FavoritesScreen` was built over `getStarred2.view` (Subsonic star primitive) during the redesign — but an earlier ADR ("Subsonic star primitive for Favourites", DECISIONLOG) had already rejected that exact source for this exact reason: starred items aren't a playable list in Navidrome. Users who favorite songs via the app's existing heart icon (`PlaylistMutations.toggleFavourite`, the `Favourites` playlist) saw an empty screen because they'd never used the separate, unrelated star feature. Fixed: `FavoritesScreen` now resolves `favouritesPlaylistProvider` (pre-existing) and delegates to the existing `PlaylistDetailScreen` for the list/play UI instead of a hand-rolled starred-song list. `starredSongsProvider` is untouched — still correctly used by `seedCollectionProvider` (N2 recommendation seeding), just no longer misapplied here.
+- Tests: `continue_listening_card_test.dart` — new regression tests for the border colour, ring play button, progress knob, art-tile width; Part B "blurred backdrop" test removed (no backdrop left to test), "no backdrop and fallback tint" retitled and kept (tint-without-art path still exists via the glows). `favorites_screen_test.dart` rewritten around `favouritesPlaylistProvider` + `libraryPlaylistProvider`, delegating render assertions to `PlaylistDetailScreen`'s own content.
+- Verification: `flutter analyze` clean, `flutter test` 811/811 green.
+
+## 2026-07-11 — Version bump to 4.8.2 (fix-round-2 release)
+
+- **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.8.1 → 4.8.2 per the version-sync convention, covering "fix round 2" (progress-bar zero-height bug, hero-card mockup restyle, +15% art width, Favorites repointed to the real Favourites playlist). Android-side only; backend bumped for sync.
+- Tagged `v4.8.2`.
