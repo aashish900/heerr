@@ -21,6 +21,7 @@ import 'screens/library/favorites_screen.dart';
 import 'screens/library/recently_added_screen.dart';
 import 'screens/player/now_playing_screen.dart';
 import 'screens/profile/edit_server_details_screen.dart';
+import 'screens/profile/profile_edit_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/queue_screen.dart';
 import 'screens/recommendations_screen.dart';
@@ -38,6 +39,7 @@ class Routes {
   static const String settings = '/settings';
   static const String login = '/login';
   static const String profile = '/profile';
+  static const String profileEdit = '/profile/edit';
   static const String editServerDetails = '/edit-server-details';
 
   // Library detail (Subsonic via Navidrome). Nested under the library
@@ -186,11 +188,20 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
         builder: (BuildContext context, GoRouterState state) =>
             const NowPlayingScreen(),
       ),
-      // Profile page (#37) — top-level full-screen push, like Now Playing.
+      // Profile page (#37, Phase Z redesign) — top-level full-screen push,
+      // like Now Playing. The display screen lives at /profile; the edit
+      // form is nested at /profile/edit behind the avatar pencil badge.
       GoRoute(
         path: Routes.profile,
         builder: (BuildContext context, GoRouterState state) =>
             const ProfileScreen(),
+        routes: <RouteBase>[
+          GoRoute(
+            path: 'edit',
+            builder: (BuildContext context, GoRouterState state) =>
+                const ProfileEditScreen(),
+          ),
+        ],
       ),
       // Edit server details — reached from the profiles list 3-dot menu.
       // Optional ?profileId= selects which profile to edit; falls back to
