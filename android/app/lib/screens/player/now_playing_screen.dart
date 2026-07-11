@@ -204,12 +204,10 @@ class _FavouriteButton extends ConsumerWidget {
     final Set<String> favIds =
         ref.watch(favouriteSongIdsProvider).valueOrNull ?? const <String>{};
     final bool isFav = favIds.contains(song.id);
-    return IconButton(
+    return GlassIconButton(
       tooltip: isFav ? 'Remove from Favourites' : 'Add to Favourites',
-      icon: Icon(
-        isFav ? Icons.favorite : Icons.favorite_border,
-        color: isFav ? Colors.redAccent : null,
-      ),
+      icon: isFav ? Icons.favorite : Icons.favorite_border,
+      iconColor: isFav ? heerrMagenta : null,
       onPressed: () async {
         try {
           await ref
@@ -380,15 +378,21 @@ class _Body extends ConsumerWidget {
                       ],
                       Text(
                         item.title,
-                        style: Theme.of(context).textTheme.titleLarge,
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                       if (item.artist != null) ...<Widget>[
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Text(
                           item.artist!,
-                          style: Theme.of(context).textTheme.bodyMedium,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyLarge
+                              ?.copyWith(color: Colors.white70),
                         ),
                       ],
                     ],

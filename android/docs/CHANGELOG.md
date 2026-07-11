@@ -2702,3 +2702,10 @@ User review flagged four more issues:
 - Test-seam plumbing: `heroArtFloatEnabled` reset alongside `paletteExtractorOverride` in all six existing `test/screens/player/*_test.dart` files' `setUp`/`tearDown` (every one of them now renders `_HeroArt` via the shared screen).
 - New `test/screens/player/now_playing_hero_art_test.dart` (7 tests) covering all five download-button states + the 28dp radius. New `test/widgets/glass_icon_button_test.dart` cases for `iconColor`.
 - Verification: `flutter analyze` clean; `flutter test` 908/908.
+
+## 2026-07-11 — Now Playing redesign NP4 — title hierarchy + glass favourite
+
+- `screens/player/now_playing_screen.dart` (`_Body`): title bumped `titleLarge` → `headlineMedium` w800; artist bumped `bodyMedium` → `bodyLarge`, explicit `Colors.white70` (dimmed).
+- `_FavouriteButton`: rebuilt on `GlassIconButton` (was a plain `IconButton`); filled heart now `heerrMagenta` (was `Colors.redAccent`) for brand consistency with the rest of the glass chrome. Toggle path (`playlistMutationsProvider.toggleFavourite` + `showApiError`) unchanged.
+- New `test/screens/player/now_playing_title_test.dart` (3 tests): title weight/artist colour, default outline heart, favourited → magenta-filled heart (via a direct `favouriteSongIdsProvider` override rather than fighting the Subsonic playlist-lookup chain).
+- Verification: `flutter analyze` clean; `flutter test` 911/911.
