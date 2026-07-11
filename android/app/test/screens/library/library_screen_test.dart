@@ -244,9 +244,49 @@ void main() {
       final SliverGrid grid =
           tester.widget<SliverGrid>(find.byType(SliverGrid, skipOffstage: false));
       expect(grid.delegate.estimatedChildCount, 9);
-      final SliverList list =
-          tester.widget<SliverList>(find.byType(SliverList, skipOffstage: false));
+      final SliverFixedExtentList list = tester.widget<SliverFixedExtentList>(
+          find.byType(SliverFixedExtentList, skipOffstage: false));
       expect(list.delegate.estimatedChildCount, 12);
+    });
+
+    testWidgets(
+        'A–Z sort shows the alphabet scrubber; scrubbing jumps the list (X4)',
+        (WidgetTester tester) async {
+      final List<Album> albums = List<Album>.generate(
+        30,
+        (int i) =>
+            Album(id: 'al-$i', name: '${String.fromCharCode(65 + (i % 26))}lbum $i'),
+      );
+      await tester.pumpWidget(_wrap(_defaultsExcept(
+        albums: _albumsValue(AsyncData<List<Album>>(albums)),
+      )));
+      await tester.pumpAndSettle();
+
+      // Default sort (Recently Added) → no scrubber.
+      expect(find.byKey(const Key('alphabet-scrubber')), findsNothing);
+
+      // Switch to A–Z via the sort chip.
+      await tester.tap(find.byKey(const Key('library-sort-chip')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('A–Z').last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('alphabet-scrubber')), findsOneWidget);
+
+      // Scrub near the bottom → the scroll view jumps well past the top.
+      final ScrollableState scrollable = tester.state<ScrollableState>(
+        find
+            .descendant(
+              of: find.byType(CustomScrollView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      final Offset bottom = tester
+          .getBottomLeft(find.byKey(const Key('alphabet-scrubber')))
+          .translate(10, -2);
+      await tester.tapAt(bottom);
+      await tester.pumpAndSettle();
+      expect(scrollable.position.pixels, greaterThan(0));
     });
 
     testWidgets('Albums empty → EmptyState "No albums yet"',

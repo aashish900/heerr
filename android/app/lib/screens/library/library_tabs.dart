@@ -47,12 +47,32 @@ class _ArtistsTab extends ConsumerWidget {
   }
 }
 
-class _AlbumsTab extends ConsumerWidget {
+class _AlbumsTab extends ConsumerStatefulWidget {
   const _AlbumsTab();
 
+  @override
+  ConsumerState<_AlbumsTab> createState() => _AlbumsTabState();
+}
+
+class _AlbumsTabState extends ConsumerState<_AlbumsTab> {
   /// How many albums the top grid shows (3 columns × 3 rows, mockup). The
   /// "Albums ›" list below always carries the full library.
   static const int _kGridCap = 9;
+
+  // Fixed extents so the X4 scrubber can compute jump offsets exactly:
+  // list rows use SliverFixedExtentList, the chip row + section header are
+  // pinned to these heights via SizedBox.
+  static const double _kRowExtent = 72;
+  static const double _kChipRowExtent = 56;
+  static const double _kHeaderExtent = 44;
+
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   String _rowSubtitle(Album a) {
     return <String?>[
@@ -62,8 +82,34 @@ class _AlbumsTab extends ConsumerWidget {
     ].whereType<String>().join(' • ');
   }
 
+  /// Height of the grid block (padding included) for the given tab width —
+  /// mirrors the SliverGrid geometry below so scrub jumps land on rows.
+  double _gridExtent(double width, int albumCount) {
+    final int shown = albumCount > _kGridCap ? _kGridCap : albumCount;
+    final int rows = (shown + 2) ~/ 3;
+    if (rows == 0) return 0;
+    final double cellWidth = (width - 32 - 24) / 3;
+    final double cellHeight = cellWidth / 0.64;
+    return rows * cellHeight + (rows - 1) * 12 + 8;
+  }
+
+  void _scrubTo(String letter, List<Album> albums, double width) {
+    final int? index = scrubTargetIndex(
+      albums.map((Album a) => a.name).toList(),
+      letter,
+    );
+    if (index == null || !_scrollController.hasClients) return;
+    final double target = _kChipRowExtent +
+        _gridExtent(width, albums.length) +
+        _kHeaderExtent +
+        index * _kRowExtent;
+    _scrollController.jumpTo(
+      target.clamp(0, _scrollController.position.maxScrollExtent),
+    );
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final AsyncValue<List<Album>> async =
         ref.watch(sortedLibraryAlbumsProvider);
     return async.when(
@@ -72,6 +118,7 @@ class _AlbumsTab extends ConsumerWidget {
         child: Text(e is ApiError ? e.message : 'Error: $e'),
       ),
       data: (List<Album> albums) {
+        final AlbumSort sort = ref.watch(albumSortNotifierProvider);
         final bool downloadedOnly = ref
             .watch(downloadedOnlyNotifierProvider(LibraryTab.albums));
         final Set<String> markedAlbums = ref
@@ -79,78 +126,111 @@ class _AlbumsTab extends ConsumerWidget {
                 .valueOrNull
                 ?.markedAlbums ??
             const <String>{};
-        return CustomScrollView(
-          slivers: <Widget>[
-            const SliverToBoxAdapter(
-              child: LibraryFilterChips(tab: LibraryTab.albums),
-            ),
-            if (albums.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: downloadedOnly
-                    ? const EmptyState(
-                        icon: Icons.download_done_outlined,
-                        title: 'No downloaded albums',
-                        subtitle:
-                            'Mark an album for offline to see it here.',
-                      )
-                    : const EmptyState(
-                        icon: Icons.album_outlined,
-                        title: 'No albums yet',
-                        subtitle:
-                            'Library is empty. Download something via the '
-                            'queue or search.',
+        return LayoutBuilder(
+          builder: (BuildContext c, BoxConstraints constraints) {
+            final Widget scrollView = CustomScrollView(
+              controller: _scrollController,
+              slivers: <Widget>[
+                const SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: _kChipRowExtent,
+                    child: LibraryFilterChips(tab: LibraryTab.albums),
+                  ),
+                ),
+                if (albums.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: downloadedOnly
+                        ? const EmptyState(
+                            icon: Icons.download_done_outlined,
+                            title: 'No downloaded albums',
+                            subtitle:
+                                'Mark an album for offline to see it here.',
+                          )
+                        : const EmptyState(
+                            icon: Icons.album_outlined,
+                            title: 'No albums yet',
+                            subtitle:
+                                'Library is empty. Download something via '
+                                'the queue or search.',
+                          ),
+                  )
+                else ...<Widget>[
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    sliver: SliverGrid(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 0.64,
                       ),
-              )
-            else ...<Widget>[
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                sliver: SliverGrid(
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 0.64,
+                      delegate: SliverChildBuilderDelegate(
+                        (BuildContext c, int i) {
+                          final Album a = albums[i];
+                          return AlbumGridCard(
+                            album: a,
+                            downloaded: markedAlbums.contains(a.id),
+                            onTap: () =>
+                                context.push(Routes.libraryAlbum(a.id)),
+                          );
+                        },
+                        childCount: albums.length > _kGridCap
+                            ? _kGridCap
+                            : albums.length,
+                      ),
+                    ),
                   ),
-                  delegate: SliverChildBuilderDelegate(
-                    (BuildContext c, int i) {
-                      final Album a = albums[i];
-                      return AlbumGridCard(
-                        album: a,
-                        downloaded: markedAlbums.contains(a.id),
-                        onTap: () =>
-                            context.push(Routes.libraryAlbum(a.id)),
-                      );
-                    },
-                    childCount:
-                        albums.length > _kGridCap ? _kGridCap : albums.length,
+                  const SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: _kHeaderExtent,
+                      child: _ListSectionHeader(label: 'Albums'),
+                    ),
+                  ),
+                  SliverFixedExtentList(
+                    itemExtent: _kRowExtent,
+                    delegate: SliverChildBuilderDelegate(
+                      (BuildContext c, int i) {
+                        final Album a = albums[i];
+                        return LibraryResultTile(
+                          title: a.name,
+                          subtitle: _rowSubtitle(a),
+                          coverArtId: a.coverArt,
+                          trailingPlay: true,
+                          isMarkedForOffline: markedAlbums.contains(a.id),
+                          onPlay: () =>
+                              playAlbumFromSubsonic(ref, context, a.id),
+                          onTap: () =>
+                              context.push(Routes.libraryAlbum(a.id)),
+                        );
+                      },
+                      childCount: albums.length,
+                    ),
+                  ),
+                ],
+              ],
+            );
+            // The A–Z scrubber only makes sense over an alphabetical list.
+            if (sort != AlbumSort.alphabetical || albums.isEmpty) {
+              return scrollView;
+            }
+            return Stack(
+              children: <Widget>[
+                scrollView,
+                Positioned(
+                  right: 0,
+                  top: _kChipRowExtent,
+                  bottom: 8,
+                  width: 22,
+                  child: AlphabetScrubber(
+                    onLetter: (String letter) =>
+                        _scrubTo(letter, albums, constraints.maxWidth),
                   ),
                 ),
-              ),
-              const SliverToBoxAdapter(
-                child: _ListSectionHeader(label: 'Albums'),
-              ),
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (BuildContext c, int i) {
-                    final Album a = albums[i];
-                    return LibraryResultTile(
-                      title: a.name,
-                      subtitle: _rowSubtitle(a),
-                      coverArtId: a.coverArt,
-                      trailingPlay: true,
-                      isMarkedForOffline: markedAlbums.contains(a.id),
-                      onPlay: () =>
-                          playAlbumFromSubsonic(ref, context, a.id),
-                      onTap: () => context.push(Routes.libraryAlbum(a.id)),
-                    );
-                  },
-                  childCount: albums.length,
-                ),
-              ),
-            ],
-          ],
+              ],
+            );
+          },
         );
       },
     );

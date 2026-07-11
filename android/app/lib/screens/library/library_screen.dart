@@ -29,6 +29,7 @@ import '../../providers/library/playlist_mutations.dart';
 import '../../router.dart';
 import '../../theme.dart';
 import '../../widgets/add_to_playlist_sheet.dart';
+import '../../widgets/alphabet_scrubber.dart';
 import '../../widgets/branded_header.dart';
 import '../../widgets/gradient_tab_indicator.dart';
 import '../../widgets/library_filter_chips.dart';
