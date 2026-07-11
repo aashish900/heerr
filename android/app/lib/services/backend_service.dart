@@ -151,6 +151,17 @@ class BackendService {
       (dynamic data) => JobView.fromJson(data as Map<String, dynamic>),
     );
   }
+
+  /// `POST /auth/logout` (Phase Z) → revokes the current bearer token
+  /// server-side. Callers treat this as best-effort: the local sign-out
+  /// (`ProfileRegistry.setActive(null)`) must proceed even when the
+  /// backend is unreachable, so failures here are the caller's to swallow.
+  Future<void> logout() {
+    return apiCall<void>(
+      () => _dio.post<dynamic>(Endpoints.authLogout),
+      (dynamic data) {},
+    );
+  }
 }
 
 /// Async provider so the service is built once the bearer-auth [Dio] is ready.

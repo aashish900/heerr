@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:heerr/api/api_error.dart';
 import 'package:heerr/models/profile.dart';
 import 'package:heerr/models/profile_meta.dart';
 import 'package:heerr/models/subsonic/album.dart';
@@ -18,7 +20,10 @@ import 'package:heerr/providers/library/library_playlists.dart';
 import 'package:heerr/providers/prefs_storage.dart';
 import 'package:heerr/providers/profiles/active_profile.dart';
 import 'package:heerr/providers/profiles/profile_avatar.dart';
+import 'package:heerr/providers/profiles/profile_registry.dart';
+import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/screens/profile/profile_screen.dart';
+import 'package:heerr/services/backend_service.dart';
 
 class _FakePrefs implements PrefsStorage {
   final Map<String, String> store = <String, String>{};
@@ -28,6 +33,29 @@ class _FakePrefs implements PrefsStorage {
   Future<void> write(String key, String value) async => store[key] = value;
   @override
   Future<void> delete(String key) async => store.remove(key);
+}
+
+class _FakeSecureStorage implements SecureStorage {
+  final Map<String, String> store = <String, String>{};
+  @override
+  Future<String?> read(String key) async => store[key];
+  @override
+  Future<void> write(String key, String value) async => store[key] = value;
+  @override
+  Future<void> delete(String key) async => store.remove(key);
+}
+
+class _RecordingBackendService extends BackendService {
+  _RecordingBackendService({this.throwOnLogout = false}) : super(Dio());
+
+  final bool throwOnLogout;
+  int logoutCalls = 0;
+
+  @override
+  Future<void> logout() async {
+    logoutCalls++;
+    if (throwOnLogout) throw const NetworkError();
+  }
 }
 
 Profile _profile() => Profile(
@@ -47,12 +75,18 @@ void main() {
   setUp(() => tmp = Directory.systemTemp.createTempSync('profile_display'));
   tearDown(() => tmp.deleteSync(recursive: true));
 
-  Widget wrap({ProfileMeta? meta, Profile? profile}) {
+  Widget wrap({
+    ProfileMeta? meta,
+    Profile? profile,
+    _FakeSecureStorage? secure,
+    _RecordingBackendService? backend,
+  }) {
     final _FakePrefs prefs = _FakePrefs();
     final Profile p = profile ?? _profile();
     if (meta != null) {
       prefs.store['profile_meta_${p.id}'] = jsonEncode(meta.toJson());
     }
+    final _FakeSecureStorage kv = secure ?? _FakeSecureStorage();
     // A minimal router so the pencil badge's push target is assertable
     // without booting the whole app router.
     final GoRouter router = GoRouter(
@@ -91,13 +125,23 @@ void main() {
           builder: (BuildContext context, GoRouterState state) =>
               const Scaffold(body: Text('DOWNLOADS_SCREEN')),
         ),
+        GoRoute(
+          path: '/settings',
+          builder: (BuildContext context, GoRouterState state) =>
+              const Scaffold(body: Text('SETTINGS_SCREEN')),
+        ),
       ],
     );
     return ProviderScope(
       overrides: <Override>[
         prefsStorageProvider.overrideWithValue(prefs),
+        secureStorageProvider.overrideWith((Ref<SecureStorage> _) => kv),
         activeProfileProvider.overrideWithValue(p),
         avatarsDirProvider.overrideWith((_) async => tmp),
+        backendServiceProvider.overrideWith(
+          (BackendServiceRef ref) async =>
+              backend ?? _RecordingBackendService(),
+        ),
         libraryPlaylistsProvider.overrideWith(
           (LibraryPlaylistsRef ref) async => <Playlist>[
             const Playlist(id: '1', name: 'A'),
@@ -229,6 +273,110 @@ void main() {
     await tester.tap(find.byKey(const Key('profile-row-playlists')));
     await tester.pumpAndSettle();
     expect(find.text('LIBRARY_SCREEN tab=playlists'), findsOneWidget);
+  });
+
+  testWidgets('Settings card goes to /settings', (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+        find.byKey(const Key('profile-row-settings')), 300,
+        scrollable: find.byType(Scrollable).first);
+    // Scroll a bit further so the row clears the pinned AppBar — otherwise
+    // "just barely visible" can still land under it and the tap misses.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -80));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('profile-row-settings')));
+    await tester.pumpAndSettle();
+    expect(find.text('SETTINGS_SCREEN'), findsOneWidget);
+  });
+
+  testWidgets('Help & Support opens a dialog with Tailscale guidance',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+        find.byKey(const Key('profile-row-help')), 300,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byKey(const Key('profile-row-help')));
+    await tester.pumpAndSettle();
+    expect(find.text('Help & Support'), findsNWidgets(2)); // row + dialog title
+    expect(find.textContaining('Tailscale'), findsOneWidget);
+  });
+
+  testWidgets('About heerr opens a dialog showing the app version',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+        find.byKey(const Key('profile-row-about')), 300,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byKey(const Key('profile-row-about')));
+    await tester.pumpAndSettle();
+    expect(find.text('About heerr'), findsNWidgets(2)); // row + dialog title
+  });
+
+  testWidgets('Log Out cancel dismisses without calling the backend',
+      (WidgetTester tester) async {
+    final _RecordingBackendService backend = _RecordingBackendService();
+    await tester.pumpWidget(wrap(backend: backend));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+        find.byKey(const Key('profile-logout')), 300,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byKey(const Key('profile-logout')));
+    await tester.pumpAndSettle();
+    expect(find.text('Log out?'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(backend.logoutCalls, 0);
+    expect(find.text('Log out?'), findsNothing); // dialog dismissed
+    expect(find.byKey(const Key('profile-logout')), findsOneWidget);
+  });
+
+  testWidgets(
+      'Log Out confirm calls the backend then clears the active profile pointer',
+      (WidgetTester tester) async {
+    final _FakeSecureStorage kv = _FakeSecureStorage();
+    kv.store[kActiveProfileIdKey] = 'p1';
+    final _RecordingBackendService backend = _RecordingBackendService();
+    await tester.pumpWidget(wrap(secure: kv, backend: backend));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+        find.byKey(const Key('profile-logout')), 300,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byKey(const Key('profile-logout')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Log out'));
+    await tester.pumpAndSettle();
+
+    expect(backend.logoutCalls, 1);
+    expect(kv.store.containsKey(kActiveProfileIdKey), isFalse);
+  });
+
+  testWidgets(
+      'Log Out confirm still clears the active profile when the backend call fails',
+      (WidgetTester tester) async {
+    final _FakeSecureStorage kv = _FakeSecureStorage();
+    kv.store[kActiveProfileIdKey] = 'p1';
+    final _RecordingBackendService backend =
+        _RecordingBackendService(throwOnLogout: true);
+    await tester.pumpWidget(wrap(secure: kv, backend: backend));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+        find.byKey(const Key('profile-logout')), 300,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byKey(const Key('profile-logout')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Log out'));
+    await tester.pumpAndSettle();
+
+    expect(backend.logoutCalls, 1);
+    expect(kv.store.containsKey(kActiveProfileIdKey), isFalse);
   });
 
   testWidgets('signed-out (null profile) renders an empty scaffold',

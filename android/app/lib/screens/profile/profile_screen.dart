@@ -9,9 +9,13 @@ import '../../models/profile_meta.dart';
 import '../../providers/profiles/active_profile.dart';
 import '../../providers/profiles/profile_avatar.dart';
 import '../../providers/profiles/profile_meta.dart';
+import '../../providers/profiles/profile_registry.dart';
 import '../../providers/profiles/profile_stats.dart';
+import '../../providers/app_version.dart';
 import '../../router.dart';
+import '../../services/backend_service.dart';
 import '../../theme.dart';
+import '../../widgets/heerr_logo.dart';
 
 /// Display-first profile page (Phase Z redesign). Shows the gradient-ring
 /// avatar with an edit-pencil badge, the display name, `@navidromeUsername`
@@ -69,10 +73,96 @@ class ProfileScreen extends ConsumerWidget {
             label: 'Playlists',
             onTap: () => context.go(Routes.libraryPlaylistsTab),
           ),
+          const SizedBox(height: 20),
+          const _SectionHeader('Settings'),
+          const SizedBox(height: 8),
+          _ProfileActionCard(
+            key: const Key('profile-row-settings'),
+            icon: Icons.settings_outlined,
+            iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            label: 'Settings',
+            onTap: () => context.go(Routes.settings),
+          ),
+          _ProfileActionCard(
+            key: const Key('profile-row-help'),
+            icon: Icons.help_outline,
+            iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            label: 'Help & Support',
+            onTap: () => _showHelpDialog(context),
+          ),
+          _ProfileActionCard(
+            key: const Key('profile-row-about'),
+            icon: Icons.info_outline,
+            iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            label: 'About heerr',
+            onTap: () => _showAboutDialog(context, ref),
+          ),
+          const SizedBox(height: 20),
+          _LogOutButton(onConfirmed: () => _logOut(context, ref)),
         ],
       ),
     );
   }
+}
+
+void _showHelpDialog(BuildContext context) {
+  showDialog<void>(
+    context: context,
+    builder: (BuildContext dialogContext) => AlertDialog(
+      title: const Text('Help & Support'),
+      content: const Text(
+        'heerr is a self-hosted app — issues and questions go through the '
+        'project repository. If playback or search stops working, first '
+        'check that this device is connected to Tailscale and the backend '
+        'server is reachable.',
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
+}
+
+void _showAboutDialog(BuildContext context, WidgetRef ref) {
+  final String? version = ref.read(appVersionProvider).valueOrNull;
+  showDialog<void>(
+    context: context,
+    builder: (BuildContext dialogContext) => AlertDialog(
+      title: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          HeerrLogo(markSize: 28),
+          SizedBox(width: 12),
+          Text('About heerr'),
+        ],
+      ),
+      content: Text(version == null ? 'Version unavailable' : 'Version $version'),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Best-effort remote token revoke, then local sign-out. The remote call
+/// must never block the local sign-out — an unreachable backend is a
+/// common reason someone wants to log out and try a different profile.
+Future<void> _logOut(BuildContext context, WidgetRef ref) async {
+  try {
+    final BackendService service = await ref.read(backendServiceProvider.future);
+    await service.logout();
+  } catch (_) {
+    // Best-effort — proceed to local sign-out regardless.
+  }
+  await ref.read(profileRegistryProvider.notifier).setActive(null);
+  // The router's refreshListenable redirects to /login the instant the
+  // active profile goes null — no manual navigation needed here.
 }
 
 /// Avatar (gradient ring + pencil badge) beside name / handle / bio.
@@ -269,20 +359,22 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-/// One rounded, full-width row card — used for the "My Music" section
-/// (magenta outlined icons, per the mockup). Reused for the "Settings"
-/// section at Z4 with a neutral icon tint.
+/// One rounded, full-width row card — used for both the "My Music" section
+/// (magenta outlined icons, per the mockup, the default) and the
+/// "Settings" section (neutral grey/white icon tint).
 class _ProfileActionCard extends StatelessWidget {
   const _ProfileActionCard({
     required this.icon,
     required this.label,
     required this.onTap,
+    this.iconColor = heerrMagenta,
     super.key,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final Color iconColor;
 
   @override
   Widget build(BuildContext context) {
@@ -299,7 +391,7 @@ class _ProfileActionCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: <Widget>[
-                Icon(icon, color: heerrMagenta, size: 22),
+                Icon(icon, color: iconColor, size: 22),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Text(
@@ -312,6 +404,55 @@ class _ProfileActionCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Full-width outlined Log Out button (magenta icon + text + hairline
+/// border, per the mockup). Confirms via an [AlertDialog] before invoking
+/// [onConfirmed] — sign-out is disruptive enough to warrant a guard against
+/// an accidental tap.
+class _LogOutButton extends StatelessWidget {
+  const _LogOutButton({required this.onConfirmed});
+
+  final VoidCallback onConfirmed;
+
+  Future<void> _confirm(BuildContext context) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text("You'll need to sign back in to use heerr."),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Log out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) onConfirmed();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        key: const Key('profile-logout'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: heerrMagenta,
+          side: const BorderSide(color: heerrMagenta, width: 1),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+        ),
+        onPressed: () => _confirm(context),
+        icon: const Icon(Icons.logout, color: heerrMagenta),
+        label: const Text('Log Out'),
       ),
     );
   }
