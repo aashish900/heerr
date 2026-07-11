@@ -1,6 +1,32 @@
 import 'package:flutter/widgets.dart';
 import 'package:palette_generator/palette_generator.dart';
 
+import '../theme.dart';
+
+/// Part B adaptive-theming constants (HOMESCREEN.md §7) — single source of
+/// truth for the art-driven chrome on the hero card + MiniPlayer.
+///
+/// Fraction to lerp an extracted cover colour toward the brand magenta.
+const double kBrandBlend = 0.18;
+
+/// Blur sigma for the hero card's stretched-art backdrop.
+const double kArtBackdropBlur = 24.0;
+
+/// Accent-colour cross-fade on track change.
+const Duration kTintTransition = Duration(milliseconds: 400);
+
+/// Blend an extracted cover colour toward the brand palette so every
+/// album's accent "feels heerr" without touching the artwork itself.
+Color brandBlend(Color extracted) =>
+    Color.lerp(extracted, heerrMagenta, kBrandBlend)!;
+
+/// Module-scope test seam for [dominantColorFor] consumers that go through
+/// `artPaletteProvider` — swap with a deterministic fake so widget tests
+/// don't hit the network / `palette_generator`. (Not `@visibleForTesting`:
+/// the provider reads it in production as its default implementation.)
+Future<Color?> Function(Uri? artUri) dominantColorForOverride =
+    dominantColorFor;
+
 /// Extract a tasteful tint colour from the cover art at [artUri]. Returns
 /// `null` when:
 ///   * [artUri] is null,

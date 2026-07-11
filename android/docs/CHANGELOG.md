@@ -2539,3 +2539,11 @@ User review of the previous widget-polish commit flagged two remaining mismatche
 - **`lib/widgets/mini_player.dart`** — restyled to the new design language: `surfaceContainerHigh` card (radius 16) with the thin gradient border (replacing the dominant-color-tinted background), 44px rounded cover thumb, decorative `WaveformStrip` (90px, hidden under 360dp available width via LayoutBuilder), 40px gradient play/pause circle with a soft tint glow (replacing the plain IconButton). Height 56 → 64; side margins 6px (was `FractionallySizedBox(0.99)`). The palette extraction (`dominantColorFor` + `miniPlayerPaletteExtractorOverride` seam) is **kept** and now tints the waveform + glow — Part B migrates it to the shared cached palette provider.
 - **`test/widgets/mini_player_test.dart`** — all 8 behavior tests pass unchanged; added a redesign contract test (WaveformStrip present, gradient circle instead of IconButton).
 - Verification: `flutter analyze` clean, `flutter test` 796/796 green.
+
+## 2026-07-11 — Home redesign part B1+B3: shared palette provider + MiniPlayer adaptive accents
+
+- **`lib/utils/palette.dart`** — Part B constants (`kBrandBlend` 0.18, `kArtBackdropBlur` 24, `kTintTransition` 400 ms), `brandBlend()` (lerp extracted → `heerrMagenta`), and the `dominantColorForOverride` module seam (prod default = real extractor).
+- **`lib/providers/player/art_palette.dart`** (new) — `artPaletteProvider`: keep-alive family keyed by art-URI string; one palette extraction per unique cover per session. Family keying structurally removes the stale-response race the MiniPlayer guarded by hand.
+- **`lib/widgets/mini_player.dart`** — migrated off the private `_maybeRefreshTint` state + `miniPlayerPaletteExtractorOverride` seam (deleted) onto the provider. Tint = `brandBlend(extracted ?? heerrPurple)` on waveform + play-glow; last-known tint held during a new track's extraction; `_AnimatedTint` (TweenAnimationBuilder) cross-fades tint changes over 400 ms.
+- **`test/utils/palette_test.dart`** (new) — brandBlend lerp/no-op (quantized ARGB compare), per-URI cache count, null propagation. **`test/widgets/mini_player_test.dart`** — tint plumbing via the new seam + fallback test.
+- Verification: `flutter analyze` clean, full suite green.

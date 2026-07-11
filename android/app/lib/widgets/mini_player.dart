@@ -5,18 +5,11 @@ import 'package:go_router/go_router.dart';
 
 import '../player/heerr_audio_handler.dart';
 import '../player/player_provider.dart';
+import '../providers/player/art_palette.dart';
 import '../theme.dart';
 import '../utils/palette.dart';
 import 'preview_badge.dart';
 import 'waveform_strip.dart';
-
-/// Test seam — swap with a deterministic fake (e.g. `(_) async => null`) so
-/// widget tests don't hit the network and don't depend on `palette_generator`.
-typedef MiniPlayerPaletteExtractor = Future<Color?> Function(Uri? artUri);
-
-@visibleForTesting
-MiniPlayerPaletteExtractor miniPlayerPaletteExtractorOverride =
-    dominantColorFor;
 
 /// Persistent media bar mounted above the bottom NavigationBar in
 /// `_ShellScaffold`. Watches [playerSnapshotProvider]; renders only when the
@@ -40,22 +33,10 @@ class MiniPlayer extends ConsumerStatefulWidget {
 }
 
 class _MiniPlayerState extends ConsumerState<MiniPlayer> {
-  Uri? _tintArtUri;
-  Color? _tintColor;
-
-  void _maybeRefreshTint(Uri? artUri) {
-    if (artUri == _tintArtUri) return;
-    _tintArtUri = artUri;
-    final Uri? captured = artUri;
-    miniPlayerPaletteExtractorOverride(captured).then((Color? c) {
-      if (!mounted) return;
-      // Stale-response guard: another item may have started while we were
-      // extracting; only apply this colour if the current artUri still
-      // matches the one we kicked off the extraction for.
-      if (_tintArtUri != captured) return;
-      setState(() => _tintColor = c);
-    });
-  }
+  // Last successfully extracted colour — keeps the previous tint on screen
+  // while the palette future for a new track is still resolving, so track
+  // skips cross-fade instead of flashing the fallback (Part B, B3).
+  Color? _lastExtracted;
 
   @override
   Widget build(BuildContext context) {
@@ -67,11 +48,23 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
       return const SizedBox.shrink();
     }
 
-    _maybeRefreshTint(item.artUri);
-    final Color tint = _tintColor ?? heerrMagenta;
+    // B1: shared cached palette provider (keyed by art URI — the family
+    // makes stale-response clobbering structurally impossible).
+    final Uri? artUri = item.artUri;
+    final AsyncValue<Color?>? palette = artUri == null
+        ? null
+        : ref.watch(artPaletteProvider(artUri.toString()));
+    if (palette != null && palette.hasValue) {
+      _lastExtracted = palette.value;
+    } else if (artUri == null) {
+      _lastExtracted = null;
+    }
+    final Color tint = brandBlend(_lastExtracted ?? heerrPurple);
     final ColorScheme cs = Theme.of(context).colorScheme;
 
-    return Padding(
+    return _AnimatedTint(
+      tint: tint,
+      builder: (BuildContext context, Color tint) => Padding(
       padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
       // Thin gradient border, same shell technique as the Home hero card.
       child: Container(
@@ -165,6 +158,26 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
           ),
         ),
       ),
+      ),
+    );
+  }
+}
+
+/// Cross-fades [tint] changes over [kTintTransition] so a track skip glides
+/// the accent colour to the next cover's tint instead of snapping (B3).
+class _AnimatedTint extends StatelessWidget {
+  const _AnimatedTint({required this.tint, required this.builder});
+
+  final Color tint;
+  final Widget Function(BuildContext context, Color tint) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<Color?>(
+      tween: ColorTween(end: tint),
+      duration: kTintTransition,
+      builder: (BuildContext context, Color? animated, _) =>
+          builder(context, animated ?? tint),
     );
   }
 }
