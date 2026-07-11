@@ -2580,3 +2580,8 @@ User review of v4.8.0 flagged four issues:
 - **MiniPlayer border too loud.** Gradient border shell replaced with `surfaceContainerLow` card + 0.8dp `outline`-grey hairline (`RoundedRectangleBorder.side`), per the mockup.
 - Tests: mini-player Part B assertions repointed (waveform → gradient check; tint → glow BoxShadow colour), playing-state test switched to fixed pumps, new hairline-border test.
 - Verification: `flutter analyze` clean, `flutter test` 807/807 green.
+
+## 2026-07-11 — Version bump to 4.8.1 (redesign fix-round release)
+
+- **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.8.0 → 4.8.1 per the version-sync convention, covering the "fix round 1" commit (unbounded hero-card layout bug, search-pill radius, animated gradient waveform, subtle minibar border). Android-side only; backend bumped for sync.
+- Tagged `v4.8.1`.
