@@ -209,4 +209,33 @@ void main() {
     await tester.pumpAndSettle();
     verify(() => handler.setShuffleMode(AudioServiceShuffleMode.none)).called(1);
   });
+
+  // NP6 — tap-scale press feedback wraps every transport button without
+  // disturbing its own tap handling.
+  testWidgets('pressing the shuffle button scales it down, releasing restores it',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(_snap(), handler));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('now-playing-shuffle')));
+
+    final Finder scaleFinder = find.ancestor(
+      of: find.byKey(const Key('now-playing-shuffle')),
+      matching: find.byType(AnimatedScale),
+    );
+    expect(tester.widget<AnimatedScale>(scaleFinder).scale, 1.0);
+
+    final TestGesture gesture = await tester.startGesture(
+      tester.getCenter(find.byKey(const Key('now-playing-shuffle'))),
+    );
+    await tester.pump();
+    expect(tester.widget<AnimatedScale>(scaleFinder).scale, 0.92);
+
+    await gesture.up();
+    await tester.pump();
+    expect(tester.widget<AnimatedScale>(scaleFinder).scale, 1.0);
+
+    // The wrapped IconButton's own tap handling still fires normally.
+    await tester.pumpAndSettle();
+    verify(() => handler.setShuffleMode(AudioServiceShuffleMode.all)).called(1);
+  });
 }

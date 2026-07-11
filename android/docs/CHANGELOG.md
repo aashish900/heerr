@@ -2716,3 +2716,10 @@ User review flagged four more issues:
 - `screens/player/now_playing_transport.dart`: `_Scrubber` is now a thin wrapper over `WaveformSeekBar` (keeps its name/call shape so `_Body`'s call site only needed two new params: `playing`, `seed: item.title.hashCode`). Deleted `_GradientSliderTrackShape` (no longer referenced) and the `Slider`/`SliderTheme` import usage.
 - New `test/widgets/waveform_seek_bar_test.dart` (6 tests: labels, slider semantics, tap-seeks, drag-then-commit, zero-duration disables gestures, animate-flag doesn't hang pumpAndSettle). `now_playing_screen_test.dart`'s old `Slider`-typed assertion replaced with a `WaveformSeekBar` + label assertion.
 - Verification: `flutter analyze` clean; `flutter test` 917/917.
+
+## 2026-07-11 — Now Playing redesign NP6 — transport polish + tap-scale
+
+- `screens/player/now_playing_transport.dart` (`_Transport`): all handler wiring, keys, and mode-cycling logic unchanged — visual only. New `_TapScale` wrapper (scales pressed buttons to 0.92 over 100ms via `AnimatedScale`, observed through `Listener` rather than a `GestureDetector` so it never joins the gesture arena or interferes with the wrapped `IconButton`'s own tap handling) applied to all five transport buttons. Play/pause circle bumped 40dp → 44dp icon (~72dp overall) and gained a soft `heerrMagenta` glow shadow.
+- `_BottomActionsRow` (queue trigger) is untouched — its removal is deferred to NP7, which is when the glass action pill actually gains the Queue slot; deleting it now (per the plan's literal NP6 task list) would leave Queue with no access point for one commit.
+- New test in `now_playing_modes_test.dart`: pressing the shuffle button scales it to 0.92, releasing restores 1.0, and the wrapped button's own `setShuffleMode` call still fires normally.
+- Verification: `flutter analyze` clean; `flutter test` 918/918.
