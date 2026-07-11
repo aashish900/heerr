@@ -22,6 +22,7 @@ import '../../utils/palette.dart';
 import '../../widgets/add_to_playlist_sheet.dart';
 import '../../widgets/error_snackbar.dart';
 import '../../widgets/gradient_icon.dart';
+import '../../widgets/now_playing_background.dart';
 import '../../widgets/preview_badge.dart';
 
 part 'now_playing_lyrics.dart';
@@ -157,8 +158,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             return const Center(child: Text('Nothing is playing.'));
           }
           _maybeRefreshTint(item.artUri);
-          return _TintedBackground(
-            color: _tintColor,
+          return NowPlayingBackground(
+            artUri: item.artUri,
+            tintColor: _tintColor,
             child: _Body(
               snapshot: s,
               tintColor: _tintColor,
@@ -206,37 +208,6 @@ class _FavouriteButton extends ConsumerWidget {
           showApiError(context, e);
         }
       },
-    );
-  }
-}
-
-/// Vertical gradient from [color] (top) to the M3 surface (bottom).
-/// Null [color] → no gradient, raw child returned.
-class _TintedBackground extends StatelessWidget {
-  const _TintedBackground({required this.color, required this.child});
-
-  final Color? color;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color? c = color;
-    if (c == null) return child;
-    final ColorScheme cs = Theme.of(context).colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[
-            c.withValues(alpha: 0.85),
-            c.withValues(alpha: 0.35),
-            cs.surface,
-          ],
-          stops: const <double>[0.0, 0.45, 0.9],
-        ),
-      ),
-      child: child,
     );
   }
 }

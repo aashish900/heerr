@@ -2674,3 +2674,14 @@ User review flagged four more issues:
 
 - **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.9.0 → 4.10.0 per the version-sync convention, covering the Phase X Library screen redesign (X1–X7). Android-side only; backend bumped for sync.
 - `android/docs/LIBRARYSCREEN.md` status flipped to IMPLEMENTED; deferrals logged in `DEBT.md`.
+
+## 2026-07-11 — Now Playing redesign plan (NOWPLAYING.md, docs only)
+
+- New `android/docs/NOWPLAYING.md` — implementation plan for the Now Playing screen redesign (phase prefix NP, tasks NP1–NP11): blurred-art immersive background, glass header with "Playing from" context, glowing hero art with on-art download, waveform seek bar replacing the Material `Slider`, transport polish, glass action pill, lyrics peek-sheet restyle, sectioned queue sheet, stretch swipe-up lyrics-takeover interaction, docs + version-bump task. Reference mockup: `/Users/E1621/Documents/Personal/Android/Now Playing.png` (not yet versioned in-repo). §2 lists eight open decisions awaiting user confirmation before implementation. No code changed.
+
+## 2026-07-11 — Now Playing redesign NP1 — immersive blurred-art background
+
+- New `lib/widgets/now_playing_background.dart` (`NowPlayingBackground`): full-bleed heavily-blurred (`ImageFilter.blur` sigma 40, decoded at `cacheWidth: 64`) artwork behind a black scrim, radial vignette, and an optional soft brand-blended glow (`brandBlend()` from `utils/palette.dart`) reused via the existing `AnimatedTint` widget. The blurred-art layer cross-fades on art-URI change via `AnimatedSwitcher` keyed on the URI, using the same 400 ms `kTintTransition` the palette tint already uses. Null artUri falls back to the plain `colorScheme.surface`.
+- `screens/player/now_playing_screen.dart`: `_TintedBackground` (flat top-to-bottom `LinearGradient`) deleted; `NowPlayingScreen.build` now wraps `_Body` in `NowPlayingBackground`, passing the current `MediaItem.artUri` and the existing `_tintColor` palette state straight through — the `_maybeRefreshTint` / `paletteExtractorOverride` test seam is untouched.
+- New `test/widgets/now_playing_background_test.dart` (4 tests): null-art/null-tint fallback, glow layer present only when a tint is supplied, keyed blurred-art subtree renders, and switching art URIs swaps the keyed subtree. Uses a bounded `pump()` loop instead of `pumpAndSettle` for the art-URI cases — `Image.network` never resolves under `flutter_tester` (same constraint noted in `library_cover_art_test.dart`).
+- Verification: `flutter analyze` clean; `flutter test` 895/895 (891 → 895, +4 new).
