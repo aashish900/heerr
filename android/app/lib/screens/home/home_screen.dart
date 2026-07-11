@@ -22,6 +22,7 @@ import '../../widgets/home_grid_tile.dart';
 import '../../widgets/home_recommendation_card.dart';
 import '../../widgets/home_section.dart';
 import '../../widgets/skeleton.dart';
+import 'continue_listening_card.dart';
 
 /// Time-of-day greeting helper. Visible for tests.
 /// - 5..11  → "Good morning"
@@ -267,6 +268,7 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
       children: const <Widget>[
         _HomeSearchBar(),
         _GreetingBlock(),
+        ContinueListeningCard(),
         _QuickAccessGrid(),
         _JumpBackInSection(),
         _MostPlayedSection(),

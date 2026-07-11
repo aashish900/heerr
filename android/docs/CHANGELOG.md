@@ -2488,3 +2488,11 @@ User review of the previous widget-polish commit flagged two remaining mismatche
 - **`test/screens/home/home_screen_test.dart`** — AppBar/greeting assertions rewritten for the new contract (logo in the title slot, greeting text found in the body, two-line nickname block).
 - **`test/router_test.dart`** — "we're on Home" assertions switched from greeting-text matching to a `_expectOnHome` helper that checks the AppBar title is a `HeerrLogo`.
 - Verification: `flutter analyze` clean, `flutter test` 778/778 green.
+
+## 2026-07-11 — Home redesign part 2: Continue Listening hero card + WaveformStrip
+
+- **`lib/widgets/waveform_strip.dart`** (new) — `WaveformStrip`: decorative static waveform (CustomPaint, rounded bars). Bar heights are deterministic per `seed` via an LCG (stable across SDK versions); `barHeights()` exposed for tests. Not a progress indicator.
+- **`lib/screens/home/continue_listening_card.dart`** (new) — `ContinueListeningCard`: hero card driven by `playerSnapshotProvider` (cold-start restore already surfaces the last-played track paused — no direct NowPlayingStore read). Gradient-border card, cover art left (140px, stretch), right column: CONTINUE LISTENING pill, title, artist, waveform (seeded by title), static gradient progress bar + m:ss / m:ss times (no per-second ticker; progress snaps on transport events), 52px gradient play/pause circle. Card tap → `/player`; hidden when nothing is queued / stream loading / no handler override.
+- **`lib/screens/home/home_screen.dart`** — card inserted into the body after `_GreetingBlock`.
+- **`test/screens/home/continue_listening_card_test.dart`** (new) — 10 tests: hidden-when-empty, content render, progress fraction, null-duration guard (`--:--`, zero fill), play/pause via mocktail `HeerrAudioHandler` stub, tap-through to /player, `barHeights` determinism/range.
+- Verification: `flutter analyze` clean, `flutter test` 788/788 green.
