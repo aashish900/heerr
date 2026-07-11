@@ -8,6 +8,13 @@ import 'package:go_router/go_router.dart';
 
 import 'package:heerr/models/profile.dart';
 import 'package:heerr/models/profile_meta.dart';
+import 'package:heerr/models/subsonic/album.dart';
+import 'package:heerr/models/subsonic/artist.dart';
+import 'package:heerr/models/subsonic/artist_index.dart';
+import 'package:heerr/models/subsonic/playlist.dart';
+import 'package:heerr/providers/library/library_albums.dart';
+import 'package:heerr/providers/library/library_artists.dart';
+import 'package:heerr/providers/library/library_playlists.dart';
 import 'package:heerr/providers/prefs_storage.dart';
 import 'package:heerr/providers/profiles/active_profile.dart';
 import 'package:heerr/providers/profiles/profile_avatar.dart';
@@ -70,6 +77,23 @@ void main() {
         prefsStorageProvider.overrideWithValue(prefs),
         activeProfileProvider.overrideWithValue(p),
         avatarsDirProvider.overrideWith((_) async => tmp),
+        libraryPlaylistsProvider.overrideWith(
+          (LibraryPlaylistsRef ref) async => <Playlist>[
+            const Playlist(id: '1', name: 'A'),
+          ],
+        ),
+        libraryAlbumsProvider.overrideWith(
+          (LibraryAlbumsRef ref) async => <Album>[
+            const Album(id: '1', name: 'Al1', songCount: 12),
+          ],
+        ),
+        libraryArtistsProvider.overrideWith(
+          (LibraryArtistsRef ref) async => <ArtistIndex>[
+            const ArtistIndex(name: 'A', artist: <Artist>[
+              Artist(id: '1', name: 'Artist One'),
+            ]),
+          ],
+        ),
       ],
       child: MaterialApp.router(routerConfig: router),
     );
@@ -123,6 +147,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('EDIT_SCREEN'), findsOneWidget);
+  });
+
+  testWidgets('stats row renders playlist/song/album/artist counts',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
+
+    expect(find.text('1'), findsNWidgets(3)); // playlists, albums, artists
+    expect(find.text('12'), findsOneWidget); // songs
+    expect(find.text('Playlists'), findsOneWidget);
+    expect(find.text('Songs'), findsOneWidget);
+    expect(find.text('Albums'), findsOneWidget);
+    expect(find.text('Artists'), findsOneWidget);
   });
 
   testWidgets('signed-out (null profile) renders an empty scaffold',

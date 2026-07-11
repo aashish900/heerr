@@ -9,6 +9,7 @@ import '../../models/profile_meta.dart';
 import '../../providers/profiles/active_profile.dart';
 import '../../providers/profiles/profile_avatar.dart';
 import '../../providers/profiles/profile_meta.dart';
+import '../../providers/profiles/profile_stats.dart';
 import '../../router.dart';
 import '../../theme.dart';
 
@@ -39,6 +40,8 @@ class ProfileScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: <Widget>[
           _ProfileHeader(profile: profile, avatar: avatar, meta: meta),
+          const SizedBox(height: 24),
+          const _StatsRow(),
         ],
       ),
     );
@@ -154,6 +157,91 @@ class _ProfileHeader extends StatelessWidget {
             ],
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// Four-column stats row: Playlists / Songs / Albums / Artists, separated
+/// by thin dividers. Stats are nice-to-have, never worth an error surface —
+/// same posture as `_AppVersionTile` in settings_screen.dart: skeleton dash
+/// while loading or on error, no snackbar/retry affordance.
+class _StatsRow extends ConsumerWidget {
+  const _StatsRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ProfileStats? stats = ref.watch(profileStatsProvider).valueOrNull;
+
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: _StatColumn(
+            key: const Key('profile-stat-playlists'),
+            count: stats?.playlists,
+            label: 'Playlists',
+          ),
+        ),
+        const _StatDivider(),
+        Expanded(
+          child: _StatColumn(
+            key: const Key('profile-stat-songs'),
+            count: stats?.songs,
+            label: 'Songs',
+          ),
+        ),
+        const _StatDivider(),
+        Expanded(
+          child: _StatColumn(
+            key: const Key('profile-stat-albums'),
+            count: stats?.albums,
+            label: 'Albums',
+          ),
+        ),
+        const _StatDivider(),
+        Expanded(
+          child: _StatColumn(
+            key: const Key('profile-stat-artists'),
+            count: stats?.artists,
+            label: 'Artists',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatDivider extends StatelessWidget {
+  const _StatDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 32,
+      color: Theme.of(context).colorScheme.outlineVariant,
+    );
+  }
+}
+
+class _StatColumn extends StatelessWidget {
+  const _StatColumn({super.key, required this.count, required this.label});
+
+  final int? count;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme text = Theme.of(context).textTheme;
+    final Color grey = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Column(
+      children: <Widget>[
+        Text(
+          count == null ? '—' : formatStatCount(count!),
+          style: text.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 2),
+        Text(label, style: text.bodySmall?.copyWith(color: grey)),
       ],
     );
   }
