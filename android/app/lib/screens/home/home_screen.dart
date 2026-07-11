@@ -16,6 +16,7 @@ import '../../router.dart' show Routes;
 import '../../theme.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_snackbar.dart';
+import '../../widgets/heerr_logo.dart';
 import '../../widgets/recommendations_refresh_button.dart';
 import '../../widgets/home_grid_tile.dart';
 import '../../widgets/home_recommendation_card.dart';
@@ -77,15 +78,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // #37: personalise the greeting with the profile nickname when set.
-    final String? nickname =
-        ref.watch(profileMetaNotifierProvider).valueOrNull?.nickname;
-    final String greeting = nickname == null
-        ? greetingForHour(DateTime.now().hour)
-        : '${greetingForHour(DateTime.now().hour)}, $nickname';
     return Scaffold(
       appBar: AppBar(
-        title: Text(greeting),
+        // Redesign task 1: the AppBar carries the brand mark; the greeting
+        // lives in the body (_GreetingBlock) per the mockup.
+        title: const HeerrLogo(),
+        centerTitle: false,
         actions: <Widget>[
           IconButton(
             icon: const Icon(Icons.queue_music_outlined),
@@ -139,6 +137,43 @@ class _ProfileAvatarButton extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Two-line greeting block under the search bar (mockup zone 3).
+/// Line 1: time-of-day greeting in small grey. Line 2: the profile nickname
+/// large + a waving-hand emoji (UI copy from the mockup — the no-emoji rule
+/// covers code/commits, not user-facing strings). Without a nickname the
+/// greeting itself renders as the single large line, no emoji.
+class _GreetingBlock extends ConsumerWidget {
+  const _GreetingBlock();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final String? nickname =
+        ref.watch(profileMetaNotifierProvider).valueOrNull?.nickname;
+    final String greeting = greetingForHour(DateTime.now().hour);
+    final TextTheme tt = Theme.of(context).textTheme;
+    final ColorScheme cs = Theme.of(context).colorScheme;
+
+    final TextStyle? bigStyle =
+        tt.headlineMedium?.copyWith(fontWeight: FontWeight.w800);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: nickname == null
+          ? Text(greeting, style: bigStyle)
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  '$greeting,',
+                  style: tt.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
+                ),
+                Text('$nickname \u{1F44B}', style: bigStyle),
+              ],
+            ),
     );
   }
 }
@@ -231,6 +266,7 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
       padding: const EdgeInsets.only(bottom: 24),
       children: const <Widget>[
         _HomeSearchBar(),
+        _GreetingBlock(),
         _QuickAccessGrid(),
         _JumpBackInSection(),
         _MostPlayedSection(),

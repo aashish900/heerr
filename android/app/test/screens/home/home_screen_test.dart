@@ -14,6 +14,7 @@ import 'package:heerr/providers/profiles/profile_meta.dart';
 import 'package:heerr/providers/recommendations.dart';
 import 'package:heerr/screens/home/home_screen.dart';
 import 'package:heerr/theme.dart';
+import 'package:heerr/widgets/heerr_logo.dart';
 import 'package:heerr/widgets/home_grid_tile.dart';
 import 'package:heerr/widgets/home_section.dart';
 
@@ -85,7 +86,8 @@ class _StubMeta extends ProfileMetaNotifier {
 }
 
 void main() {
-  testWidgets('renders greeting in AppBar', (WidgetTester tester) async {
+  testWidgets('AppBar shows the brand logo; greeting renders in the body',
+      (WidgetTester tester) async {
     await tester.pumpWidget(_wrap(overrides: <Override>[
       homeRecentProvider.overrideWith((_) async => <Album>[]),
       homeMostPlayedProvider.overrideWith((_) async => <Album>[]),
@@ -99,13 +101,19 @@ void main() {
     ]));
     await tester.pumpAndSettle();
 
+    // AppBar title is the logo row (mark + wordmark), not a greeting.
     final AppBar bar = tester.widget<AppBar>(find.byType(AppBar));
-    final Text title = bar.title! as Text;
-    expect(
-      <String>['Good morning', 'Good afternoon', 'Good evening'],
-      contains(title.data!),
-    );
+    expect(bar.title, isA<HeerrLogo>());
+    expect(find.text('heerr'), findsOneWidget);
     expect(find.byTooltip('Queue'), findsOneWidget);
+
+    // Greeting moved into the body.
+    final Finder greeting = find.byWidgetPredicate((Widget w) =>
+        w is Text &&
+        w.data != null &&
+        w.data!.startsWith('Good ') &&
+        !w.data!.contains('heerr'));
+    expect(greeting, findsOneWidget);
   });
 
   testWidgets(
@@ -367,7 +375,7 @@ void main() {
       expect(find.text('Profile page'), findsOneWidget);
     });
 
-    testWidgets('greeting appends the nickname when one is set',
+    testWidgets('greeting block shows two lines with the nickname',
         (WidgetTester tester) async {
       await tester.pumpWidget(_wrap(overrides: <Override>[
         ...emptyHome(),
@@ -375,12 +383,17 @@ void main() {
       ]));
       await tester.pumpAndSettle();
 
-      final AppBar bar = tester.widget<AppBar>(find.byType(AppBar));
-      final String title = (bar.title! as Text).data!;
-      expect(title, endsWith(', Al'));
+      // Line 1: "<greeting>," — line 2: "<nickname> <wave>".
+      final Finder line1 = find.byWidgetPredicate((Widget w) =>
+          w is Text &&
+          w.data != null &&
+          w.data!.startsWith('Good ') &&
+          w.data!.endsWith(','));
+      expect(line1, findsOneWidget);
+      expect(find.text('Al \u{1F44B}'), findsOneWidget);
     });
 
-    testWidgets('greeting stays plain without a nickname',
+    testWidgets('greeting block is a single plain line without a nickname',
         (WidgetTester tester) async {
       await tester.pumpWidget(_wrap(overrides: <Override>[
         ...emptyHome(),
@@ -388,12 +401,13 @@ void main() {
       ]));
       await tester.pumpAndSettle();
 
-      final AppBar bar = tester.widget<AppBar>(find.byType(AppBar));
-      final String title = (bar.title! as Text).data!;
-      expect(
-        <String>['Good morning', 'Good afternoon', 'Good evening'],
-        contains(title),
-      );
+      final Finder greeting = find.byWidgetPredicate((Widget w) =>
+          w is Text &&
+          w.data != null &&
+          <String>['Good morning', 'Good afternoon', 'Good evening']
+              .contains(w.data));
+      expect(greeting, findsOneWidget);
+      expect(find.textContaining('\u{1F44B}'), findsNothing);
     });
   });
 

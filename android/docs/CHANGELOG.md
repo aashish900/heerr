@@ -2479,3 +2479,12 @@ User review of the previous widget-polish commit flagged two remaining mismatche
 - **`android/app/android/app/src/main/res/layout/hero_widget.xml`** — the idle prompt `TextView` (`android:text="Start listening to your music"`) had no explicit break, so RemoteViews' text layout wrapped it unevenly instead of matching the reference's clean two-line split. Inserted a literal `\n` so the text is `"Start listening\nto your music"`.
 - **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.7.3 → 4.7.4 for the wording-wrap fix, per the version-sync convention.
 - Verification: `flutter test` 778/778 green, `flutter analyze` clean. Native XML-only change — no new Dart tests; gated by `flutter build apk --debug` + on-device smoke.
+
+## 2026-07-11 — Home redesign part 1: branded header + greeting block
+
+- **`lib/widgets/heerr_logo.dart`** (new) — `HeerrLogo`: app-icon mark (32px, rounded, from `assets/icon.png`) + "heerr" wordmark row for the Home AppBar. `errorBuilder` falls back to a fixed-size music glyph so an asset failure can't inject a `RenderErrorBox` into the AppBar.
+- **`pubspec.yaml`** — declared `assets/icon.png` as a runtime asset (it was previously only the launcher-icon source; `Image.asset` failed in tests until declared).
+- **`lib/screens/home/home_screen.dart`** — AppBar title switched from the time-of-day greeting to `HeerrLogo` (left-aligned); greeting moved into the body as `_GreetingBlock` under the search bar: small grey "<greeting>," line + large bold "<nickname> 👋" when a nickname is set, single large greeting line (no emoji) otherwise.
+- **`test/screens/home/home_screen_test.dart`** — AppBar/greeting assertions rewritten for the new contract (logo in the title slot, greeting text found in the body, two-line nickname block).
+- **`test/router_test.dart`** — "we're on Home" assertions switched from greeting-text matching to a `_expectOnHome` helper that checks the AppBar title is a `HeerrLogo`.
+- Verification: `flutter analyze` clean, `flutter test` 778/778 green.

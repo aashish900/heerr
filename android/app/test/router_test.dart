@@ -14,6 +14,7 @@ import 'package:heerr/router.dart';
 import 'package:heerr/screens/auth/login_screen.dart';
 import 'package:heerr/screens/home/home_screen.dart';
 import 'package:heerr/theme.dart';
+import 'package:heerr/widgets/heerr_logo.dart';
 
 import 'support/cred_test_support.dart';
 
@@ -52,6 +53,14 @@ String _activeTitle(WidgetTester tester) {
   return title.data!;
 }
 
+/// Home no longer titles its AppBar with the greeting — the redesign puts
+/// the brand logo there (HOMESCREEN.md task 1). "We're on Home" is asserted
+/// via the logo widget in the AppBar title slot.
+void _expectOnHome(WidgetTester tester, {String? reason}) {
+  final AppBar bar = tester.widget<AppBar>(find.byType(AppBar));
+  expect(bar.title, isA<HeerrLogo>(), reason: reason);
+}
+
 void main() {
   testWidgets('boots on the Home route by default', (
     WidgetTester tester,
@@ -59,13 +68,9 @@ void main() {
     await tester.pumpWidget(_bootApp());
     await tester.pumpAndSettle();
 
-    // Home screen renders a time-of-day greeting in the AppBar title.
-    final String title = _activeTitle(tester);
-    expect(
-      <String>['Good morning', 'Good afternoon', 'Good evening'],
-      contains(title),
-      reason: 'expected the Home screen greeting in the AppBar title',
-    );
+    // Home screen renders the brand logo in the AppBar title.
+    _expectOnHome(tester,
+        reason: 'expected the Home screen logo in the AppBar title');
   });
 
   testWidgets('bottom nav has Home, Library, Downloads, Settings tabs', (
@@ -176,10 +181,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(
-      <String>['Good morning', 'Good afternoon', 'Good evening'],
-      contains(_activeTitle(tester)),
-    );
+    _expectOnHome(tester);
   });
 
   testWidgets('uses Material 3 dark theme', (WidgetTester tester) async {
@@ -288,11 +290,7 @@ void main() {
       final bool handled = await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(handled, isTrue, reason: 'shell should consume back off-Home');
-      expect(
-        <String>['Good morning', 'Good afternoon', 'Good evening'],
-        contains(_activeTitle(tester)),
-        reason: 'back from Settings should land on Home',
-      );
+      _expectOnHome(tester, reason: 'back from Settings should land on Home');
     });
 
     testWidgets('system back on Home is not consumed (app would exit)', (

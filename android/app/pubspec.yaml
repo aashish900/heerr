@@ -113,6 +113,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/
+    - assets/icon.png
 
 flutter_launcher_icons:
   image_path: "assets/icon_legacy.png"
