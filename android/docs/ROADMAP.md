@@ -4,7 +4,7 @@ Track progress through the Android client build. Each milestone = one git commit
 
 See `DECISIONLOG.md` for the *what*; this file is the *how* / *when*.
 
-**Status (2026-07-11):** Phases A–Y complete. Phase Y (edit song metadata — title/album/artist + cover art, issue #44) shipped 2026-07-06 at `v4.6.2`; `v4.7.0` (2026-07-10) is the app-wide gradient redesign — magenta→purple→violet theme across every screen + the new 4x2 gradient hero home-screen widget (replaces the classic/bar/pill widgets); `v4.7.1` (2026-07-10) polishes the hero widget (album-art fade, tap-to-seek, redrawn logo/waveform) and adds the gradient Library tab indicator; `v4.7.2` (2026-07-10) fixes the widget idle icon to use the real app-icon mark and corrects the tab indicator's fade extension; `v4.7.3` (2026-07-11) removes a leftover ghost ring from the widget icon, enlarges it 20%, and makes the tab indicator's faint line span the full selected tab; `v4.7.4` (2026-07-11) fixes the idle-state prompt's line break so "Start listening" / "to your music" wrap as in the reference instead of an uneven mid-word split; `v4.8.0` (2026-07-11) is the Home Screen redesign (HOMESCREEN.md) — branded header, Continue Listening hero card, Quick Access row, Recently Added section + see-all screen, Favorites screen, MiniPlayer restyle, and per-song adaptive art theming (Part B); `v4.8.1` (2026-07-11) fixes a layout bug where the hero card's unbounded-height Row killed every section below it while a track was live, squares off the search pill's corner radius, makes the MiniPlayer waveform an animated brand-gradient equalizer (reusing the home-screen widget's look), and softens the MiniPlayer border to a thin grey hairline; `v4.8.2` (2026-07-11) fixes the hero card's progress-bar fill (zero-height bug, always broken), restyles the card to match the mockup (hairline border, no full-card art backdrop, outlined play ring, progress knob, +15% art width), and repoints Favorites from the Subsonic star primitive to the real Favourites playlist; `v4.8.3` (2026-07-11) removes the home-screen App Widget's gradient border and fixes the Flutter waveform (MiniPlayer + hero card) to anchor bars at the baseline, matching the widget's own waveform look; `v4.8.4` (2026-07-11) fades the hero card's album-art edge into the card background (mirroring the widget's own art fade) and makes the hero card's progress bar tap/drag-seekable instead of display-only; `v4.8.5` (2026-07-11) fixes the hero card's progress bar rendering centred instead of left-anchored, and merges `redesign/home-screen` into `main`.
+**Status (2026-07-11):** Phases A–Y complete. Phase Y (edit song metadata — title/album/artist + cover art, issue #44) shipped 2026-07-06 at `v4.6.2`; `v4.7.0` (2026-07-10) is the app-wide gradient redesign — magenta→purple→violet theme across every screen + the new 4x2 gradient hero home-screen widget (replaces the classic/bar/pill widgets); `v4.7.1` (2026-07-10) polishes the hero widget (album-art fade, tap-to-seek, redrawn logo/waveform) and adds the gradient Library tab indicator; `v4.7.2` (2026-07-10) fixes the widget idle icon to use the real app-icon mark and corrects the tab indicator's fade extension; `v4.7.3` (2026-07-11) removes a leftover ghost ring from the widget icon, enlarges it 20%, and makes the tab indicator's faint line span the full selected tab; `v4.7.4` (2026-07-11) fixes the idle-state prompt's line break so "Start listening" / "to your music" wrap as in the reference instead of an uneven mid-word split; `v4.8.0` (2026-07-11) is the Home Screen redesign (HOMESCREEN.md) — branded header, Continue Listening hero card, Quick Access row, Recently Added section + see-all screen, Favorites screen, MiniPlayer restyle, and per-song adaptive art theming (Part B); `v4.8.1` (2026-07-11) fixes a layout bug where the hero card's unbounded-height Row killed every section below it while a track was live, squares off the search pill's corner radius, makes the MiniPlayer waveform an animated brand-gradient equalizer (reusing the home-screen widget's look), and softens the MiniPlayer border to a thin grey hairline; `v4.8.2` (2026-07-11) fixes the hero card's progress-bar fill (zero-height bug, always broken), restyles the card to match the mockup (hairline border, no full-card art backdrop, outlined play ring, progress knob, +15% art width), and repoints Favorites from the Subsonic star primitive to the real Favourites playlist; `v4.8.3` (2026-07-11) removes the home-screen App Widget's gradient border and fixes the Flutter waveform (MiniPlayer + hero card) to anchor bars at the baseline, matching the widget's own waveform look; `v4.8.4` (2026-07-11) fades the hero card's album-art edge into the card background (mirroring the widget's own art fade) and makes the hero card's progress bar tap/drag-seekable instead of display-only; `v4.8.5` (2026-07-11) fixes the hero card's progress bar rendering centred instead of left-anchored, and merges `redesign/home-screen` into `main`; `v4.9.0` (2026-07-11) is the Profile screen redesign (Phase Z) — display/edit split (`/profile` display screen, `/profile/edit` form), server-derived Playlists/Songs/Albums/Artists stats row, "My Music" quick-links (Liked Songs, Downloaded, Recently Played, Playlists) with a new recently-played screen, "Settings" section with About/Help dialogs and a log-out flow, and a Settings-tab profile card entry point alongside the existing Home avatar.
 
 **Conventions:**
 - TDD by default (CLAUDE.md §2) — widget tests / unit tests written first, land in the same commit as code.
@@ -811,6 +811,42 @@ Fires only when the shell route is the top route (pushed detail screens pop them
 
 ---
 
+## Phase Z — Profile screen redesign (v4.9.0)
+
+**Architecture note:** A mockup (`Profile Screen.png`) redesigns `/profile` from a plain edit form into a display-first page: gradient-ring avatar, name/@handle/bio, a Playlists/Songs/Albums/Artists stats row, "My Music" quick-link cards, a "Settings" section, and Log Out. Pure-Android slice — the one new wire dependency (`POST /auth/logout`) already exists on the backend (`backend/app/api/v1/auth.py`). heerr Radio and Followed Artists rows are deferred per user decision. See `DECISIONLOG.md` 2026-07-11 ("Phase Z") for full rationale.
+
+### [x] Z1. Display/edit split — `/profile` display screen + `/profile/edit` form
+**Files:** new `lib/screens/profile/profile_edit_screen.dart` (`ProfileEditScreen`, former `profile_screen.dart` content; post-save `pop()`s instead of routing Home); rewrote `lib/screens/profile/profile_screen.dart` as the display screen (avatar + pencil badge both push `/profile/edit`, name/@handle/bio); `router.dart` (`Routes.profileEdit`, nested route). Tests migrated wholesale to `profile_edit_screen_test.dart`; new `profile_screen_test.dart`; `router_test.dart` coverage.
+**Test gate:** `flutter analyze` clean; `flutter test` 823/823 green.
+**Commit:** `feat(flutter): profile redesign Z1 — display screen shell + edit form moved to /profile/edit`
+
+### [x] Z2. Stats provider + stats row
+**Files:** new `lib/providers/profiles/profile_stats.dart` (`profileStatsProvider`, `formatStatCount`) summing `libraryPlaylistsProvider` / `libraryAlbumsProvider` / `libraryArtistsProvider` — no new endpoints. Profile screen renders the 4-column row.
+**Test gate:** provider + widget tests; `flutter test` 828/828 green.
+**Commit:** `feat(flutter): profile redesign Z2 — server-derived stats row (playlists/songs/albums/artists)`
+
+### [x] Z3. "My Music" cards + Recently Played screen + Playlists deep link
+**Files:** new `recentlyPlayedProvider` (`home_providers.dart`, `type=recent`), `lib/screens/library/recently_played_screen.dart` (clone of `RecentlyAddedScreen`) at `/library/recently-played`; `LibraryScreen.initialTabIndex` + router `_tabIndexFor` for `/library?tab=`; profile screen's "My Music" section (Liked Songs / Downloaded / Recently Played / Playlists).
+**Test gate:** card-tap routing, recently-played screen states, router tab-param mapping; `flutter test` 837/837 green.
+**Commit:** `feat(flutter): profile redesign Z3 — My Music cards + recently-played screen + library tab deep link`
+
+### [x] Z4. "Settings" cards + About/Help dialogs + Log Out
+**Files:** `Endpoints.authLogout` + `BackendService.logout()` (`POST /auth/logout`, best-effort); profile screen's Settings section (Settings / Help & Support / About heerr) + confirm-gated Log Out (`logout()` then `profileRegistryProvider.notifier.setActive(null)` — not `removeProfile`; router redirect handles `/login`).
+**Test gate:** `BackendService.logout` transport tests; widget tests for cancel/confirm + dialogs; `flutter test` 846/846 green.
+**Commit:** `feat(flutter): profile redesign Z4 — settings cards, about/help dialogs, log out flow`
+
+### [x] Z5. Settings-tab profile card
+**Files:** new `lib/widgets/profile_avatar_ring.dart` (`ProfileAvatarRing`, extracted from three near-duplicate ring implementations — Home header, Profile display, new Settings card); new `lib/screens/settings/profile_card.dart` (`ProfileCard`) inserted atop `settings_screen.dart`.
+**Test gate:** `flutter test` 849/849 green.
+**Commit:** `feat(flutter): profile redesign Z5 — settings-tab profile card entry point`
+
+### [x] Z6. Docs + version bump 4.9.0
+**Files:** `DECISIONLOG.md` ADR, `CHANGELOG.md` entries, this ROADMAP section + status line, version bump (`android/app/pubspec.yaml`, `backend/pyproject.toml`, `backend/app/main.py`, both ROADMAP status lines).
+**Done when:** `flutter analyze` clean, full `flutter test` suite green, `v4.9.0` tagged.
+**Commit:** `docs(flutter): profile redesign Z6 — ADR, changelog, roadmap + version bump to 4.9.0`
+
+---
+
 ## Cross-cutting reminders
 
 - **`flutter analyze` green before declaring any milestone done.**
@@ -847,7 +883,7 @@ Items scheduled into v1.5.0 (Phase P) or v2.0.0 (Phase Q) are no longer here —
 
 ## Roadmap complete when
 
-1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5, P1–P4, Q1–Q4, R1, S1–S11, T1–T5, U1, V1, W1).
+1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5, P1–P4, Q1–Q4, R1, S1–S11, T1–T5, U1, V1, W1, Y1–Y2, Z1–Z6).
 2. Every test gate green at its milestone.
 3. G1, K2, L6, M5, N5, O5, P4, Q4, R1, S11, and T5 manual smokes verified on-device.
 4. CHANGELOG entries exist for each milestone group.
