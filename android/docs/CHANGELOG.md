@@ -2639,3 +2639,9 @@ User review flagged four more issues:
 - **Fix:** added `width: double.infinity` to the track's `SizedBox`, forcing it (and the `Stack` inside) to claim the full bar width regardless of `progress`, so the fill is sized relative to the true full width and starts at the left edge.
 - Tests: new pixel-position regression test asserting the fill's rendered `Rect.left` matches the seek area's left edge (not centred) and its width is `progress * barWidth` in **actual rendered pixels**, not just the `FractionallySizedBox.widthFactor` property (which was already correct and didn't catch this class of bug).
 - Verification: `flutter analyze` clean, `flutter test` 816/816 green.
+
+## 2026-07-11 — Version bump to 4.8.5 + merge redesign/home-screen into main
+
+- **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.8.4 → 4.8.5 per the version-sync convention, covering the hero-card progress-bar centring fix. Android-side only; backend bumped for sync.
+- `redesign/home-screen` merged into `main` — closes out the Home Screen redesign (HOMESCREEN.md Part A + Part B) and all five user-review fix rounds (v4.8.1–v4.8.5).
+- Tagged `v4.8.5`.
