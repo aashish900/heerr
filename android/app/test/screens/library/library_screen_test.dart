@@ -18,6 +18,7 @@ import 'package:heerr/providers/library/library_albums.dart';
 import 'package:heerr/providers/library/library_artists.dart';
 import 'package:heerr/providers/library/library_playlists.dart';
 import 'package:heerr/providers/library/library_search.dart';
+import 'package:heerr/providers/library/most_played_artists.dart';
 import 'package:heerr/providers/library/playlist_mutations.dart';
 import 'package:heerr/providers/queue.dart';
 import 'package:heerr/providers/search.dart';
@@ -25,7 +26,6 @@ import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/screens/library/album_grid_card.dart';
 import 'package:heerr/screens/library/library_screen.dart';
 import 'package:heerr/widgets/empty_state.dart';
-import 'package:heerr/widgets/library_result_tile.dart';
 import 'package:heerr/widgets/result_tile.dart';
 import 'package:heerr/widgets/skeleton.dart';
 
@@ -129,12 +129,21 @@ Widget _wrap(List<Override> overrides) {
 }
 
 // Defaults: empty-data on the two non-focal tabs so they don't trip up
-// rendering when widgets-under-test build the focal tab only.
-List<Override> _defaultsExcept({Override? artists, Override? albums, Override? playlists}) {
+// rendering when widgets-under-test build the focal tab only. The
+// most-played rail defaults to empty so the Artists tab never fans out a
+// real frequent-albums fetch in tests.
+List<Override> _defaultsExcept(
+    {Override? artists,
+    Override? albums,
+    Override? playlists,
+    List<MostPlayedArtist> mostPlayed = const <MostPlayedArtist>[]}) {
   return <Override>[
     artists ?? _artistsValue(const AsyncData<List<ArtistIndex>>(<ArtistIndex>[])),
     albums ?? _albumsValue(const AsyncData<List<Album>>(<Album>[])),
     playlists ?? _playlistsValue(const AsyncData<List<Playlist>>(<Playlist>[])),
+    mostPlayedArtistsProvider.overrideWith(
+      (Ref<AsyncValue<List<MostPlayedArtist>>> ref) async => mostPlayed,
+    ),
   ];
 }
 
@@ -320,8 +329,39 @@ void main() {
       expect(find.text('No artists yet'), findsOneWidget);
     });
 
-    testWidgets('data → renders artist tiles grouped by letter',
+    testWidgets('data → flattened rows with album counts + scrubber (X5)',
         (WidgetTester tester) async {
+      const List<ArtistIndex> indices = <ArtistIndex>[
+        ArtistIndex(name: 'T', artist: <Artist>[
+          Artist(id: 'ar-1', name: 'Tame Impala', albumCount: 4),
+        ]),
+        ArtistIndex(name: 'A', artist: <Artist>[
+          Artist(id: 'ar-2', name: 'Adele', albumCount: 2),
+        ]),
+      ];
+      await tester.pumpWidget(_wrap(_defaultsExcept(
+        artists: _artistsValue(
+            const AsyncData<List<ArtistIndex>>(indices)),
+      )));
+      await tester.pumpAndSettle();
+      await goToArtists(tester);
+      expect(find.text('Tame Impala'), findsOneWidget);
+      expect(find.text('4 albums'), findsOneWidget);
+      // Flattened A–Z: Adele's row is above Tame Impala's.
+      expect(
+        tester.getTopLeft(find.text('Adele')).dy,
+        lessThan(tester.getTopLeft(find.text('Tame Impala')).dy),
+      );
+      // A–Z is the default artist sort → scrubber visible.
+      expect(find.byKey(const Key('alphabet-scrubber')), findsOneWidget);
+    });
+
+    testWidgets('most played rail renders entries with play badges (X5)',
+        (WidgetTester tester) async {
+      const List<MostPlayedArtist> rail = <MostPlayedArtist>[
+        MostPlayedArtist(
+            artistId: 'ar-w', name: 'The Weeknd', topAlbumId: 'al-1'),
+      ];
       const ArtistIndex aIndex = ArtistIndex(
         name: 'T',
         artist: <Artist>[
@@ -331,12 +371,14 @@ void main() {
       await tester.pumpWidget(_wrap(_defaultsExcept(
         artists: _artistsValue(
             const AsyncData<List<ArtistIndex>>(<ArtistIndex>[aIndex])),
+        mostPlayed: rail,
       )));
       await tester.pumpAndSettle();
       await goToArtists(tester);
-      expect(find.text('T'), findsOneWidget);
-      expect(find.text('Tame Impala'), findsOneWidget);
-      expect(find.byType(LibraryResultTile), findsOneWidget);
+      expect(find.text('Most Played Artists'), findsOneWidget);
+      expect(find.text('The Weeknd'), findsOneWidget);
+      expect(
+          find.byKey(const Key('most-played-play-ar-w')), findsOneWidget);
     });
 
     testWidgets('error → renders error message',

@@ -4,45 +4,230 @@ part of 'library_screen.dart';
 // Browse mode (idle Library tab — unchanged from I1)
 // ---------------------------------------------------------------------------
 
-class _ArtistsTab extends ConsumerWidget {
+class _ArtistsTab extends ConsumerStatefulWidget {
   const _ArtistsTab();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<List<ArtistIndex>> async =
-        ref.watch(libraryArtistsProvider);
+  ConsumerState<_ArtistsTab> createState() => _ArtistsTabState();
+}
+
+class _ArtistsTabState extends ConsumerState<_ArtistsTab> {
+  static const double _kRowExtent = 72;
+  static const double _kChipRowExtent = 56;
+
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrubTo(String letter, List<Artist> artists) {
+    final int? index = scrubTargetIndex(
+      artists.map((Artist a) => a.name).toList(),
+      letter,
+    );
+    if (index == null || !_scrollController.hasClients) return;
+    final double target = _kChipRowExtent + index * _kRowExtent;
+    _scrollController.jumpTo(
+      target.clamp(0, _scrollController.position.maxScrollExtent),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final AsyncValue<List<Artist>> async =
+        ref.watch(sortedLibraryArtistsProvider);
     return async.when(
       loading: () => const SkeletonList(count: 6),
       error: (Object e, _) => Center(
         child: Text(e is ApiError ? e.message : 'Error: $e'),
       ),
-      data: (List<ArtistIndex> indices) {
-        if (indices.isEmpty ||
-            indices.every((ArtistIndex i) => i.artist.isEmpty)) {
-          return const EmptyState(
-            icon: Icons.person_outline,
-            title: 'No artists yet',
-            subtitle:
-                'Library is empty. Download something via the queue or search.',
-          );
-        }
-        return ListView(
-          children: <Widget>[
-            for (final ArtistIndex group in indices) ...<Widget>[
-              if (group.artist.isNotEmpty) _SectionHeader(label: group.name),
-              for (final Artist a in group.artist)
-                LibraryResultTile(
-                  title: a.name,
-                  subtitle: a.albumCount == null
-                      ? null
-                      : '${a.albumCount} albums',
-                  coverArtId: a.coverArt,
-                  onTap: () => context.push(Routes.libraryArtist(a.id)),
+      data: (List<Artist> artists) {
+        final ArtistSort sort = ref.watch(artistSortNotifierProvider);
+        final bool downloadedOnly = ref
+            .watch(downloadedOnlyNotifierProvider(LibraryTab.artists));
+        final Widget scrollView = CustomScrollView(
+          controller: _scrollController,
+          slivers: <Widget>[
+            const SliverToBoxAdapter(
+              child: SizedBox(
+                height: _kChipRowExtent,
+                child: LibraryFilterChips(tab: LibraryTab.artists),
+              ),
+            ),
+            if (artists.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: downloadedOnly
+                    ? const EmptyState(
+                        icon: Icons.download_done_outlined,
+                        title: 'No downloaded artists',
+                        subtitle:
+                            'Mark an album or artist for offline to see it '
+                            'here.',
+                      )
+                    : const EmptyState(
+                        icon: Icons.person_outline,
+                        title: 'No artists yet',
+                        subtitle:
+                            'Library is empty. Download something via the '
+                            'queue or search.',
+                      ),
+              )
+            else ...<Widget>[
+              SliverFixedExtentList(
+                itemExtent: _kRowExtent,
+                delegate: SliverChildBuilderDelegate(
+                  (BuildContext c, int i) {
+                    final Artist a = artists[i];
+                    return _ArtistRow(artist: a);
+                  },
+                  childCount: artists.length,
                 ),
+              ),
+              const SliverToBoxAdapter(child: _MostPlayedArtistsRail()),
             ],
           ],
         );
+        // Scrub math assumes ascending alphabetical order.
+        if (sort != ArtistSort.aToZ || artists.isEmpty) return scrollView;
+        return Stack(
+          children: <Widget>[
+            scrollView,
+            Positioned(
+              right: 0,
+              top: _kChipRowExtent,
+              bottom: 8,
+              width: 22,
+              child: AlphabetScrubber(
+                onLetter: (String letter) => _scrubTo(letter, artists),
+              ),
+            ),
+          ],
+        );
       },
+    );
+  }
+}
+
+/// One Artists-tab row (X5): circular avatar, name, album count.
+class _ArtistRow extends StatelessWidget {
+  const _ArtistRow({required this.artist});
+
+  final Artist artist;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: ClipOval(
+        child: LibraryCoverArt(
+          coverArtId: artist.coverArt,
+          size: 44,
+          borderRadius: 22,
+        ),
+      ),
+      title: Text(artist.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: artist.albumCount == null
+          ? null
+          : Text('${artist.albumCount} albums'),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => context.push(Routes.libraryArtist(artist.id)),
+    );
+  }
+}
+
+/// "Most Played Artists" horizontal rail below the artist list (X5).
+/// Hidden while loading, on error, and when the server has no play history
+/// yet — the rail is a bonus surface, never a blocker.
+class _MostPlayedArtistsRail extends ConsumerWidget {
+  const _MostPlayedArtistsRail();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final List<MostPlayedArtist> entries =
+        ref.watch(mostPlayedArtistsProvider).valueOrNull ??
+            const <MostPlayedArtist>[];
+    if (entries.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const _SectionHeader(label: 'Most Played Artists'),
+        SizedBox(
+          height: 124,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: entries.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 16),
+            itemBuilder: (BuildContext c, int i) =>
+                _MostPlayedArtistCard(entry: entries[i]),
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+}
+
+class _MostPlayedArtistCard extends ConsumerWidget {
+  const _MostPlayedArtistCard({required this.entry});
+
+  final MostPlayedArtist entry;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return InkWell(
+      onTap: () => context.push(Routes.libraryArtist(entry.artistId)),
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: 84,
+        child: Column(
+          children: <Widget>[
+            Stack(
+              children: <Widget>[
+                ClipOval(
+                  child: LibraryCoverArt(
+                    coverArtId: entry.coverArt,
+                    size: 76,
+                    borderRadius: 38,
+                  ),
+                ),
+                // Gradient play badge — plays the artist's most-played
+                // album (the rail entry's source album).
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: InkWell(
+                    key: Key('most-played-play-${entry.artistId}'),
+                    customBorder: const CircleBorder(),
+                    onTap: () => playAlbumFromSubsonic(
+                        ref, context, entry.topAlbumId),
+                    child: Container(
+                      width: 26,
+                      height: 26,
+                      decoration: const BoxDecoration(
+                        gradient: heerrGradient,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.play_arrow,
+                          size: 18, color: Colors.black),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              entry.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
