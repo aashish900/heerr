@@ -2533,3 +2533,9 @@ User review of the previous widget-polish commit flagged two remaining mismatche
 - **`test/screens/home/home_screen_test.dart`** — rewritten for the new contract (13 legacy tests removed; error/retry/pull-refresh retimed to `homeNewestProvider`; empty-state asserts on the section *widget*, since the Quick Access card also carries the "Recently Added" label). **`test/providers/home/home_providers_test.dart`** — rewritten for the two surviving providers.
 - **`docs/DEBT.md`** — Quick Access Edit + row kebab deferrals logged.
 - Verification: `flutter analyze` clean, `flutter test` 795/795 green (808 → 795 = removed legacy-section tests).
+
+## 2026-07-11 — Home redesign part 7: MiniPlayer restyle
+
+- **`lib/widgets/mini_player.dart`** — restyled to the new design language: `surfaceContainerHigh` card (radius 16) with the thin gradient border (replacing the dominant-color-tinted background), 44px rounded cover thumb, decorative `WaveformStrip` (90px, hidden under 360dp available width via LayoutBuilder), 40px gradient play/pause circle with a soft tint glow (replacing the plain IconButton). Height 56 → 64; side margins 6px (was `FractionallySizedBox(0.99)`). The palette extraction (`dominantColorFor` + `miniPlayerPaletteExtractorOverride` seam) is **kept** and now tints the waveform + glow — Part B migrates it to the shared cached palette provider.
+- **`test/widgets/mini_player_test.dart`** — all 8 behavior tests pass unchanged; added a redesign contract test (WaveformStrip present, gradient circle instead of IconButton).
+- Verification: `flutter analyze` clean, `flutter test` 796/796 green.
