@@ -16,6 +16,7 @@ import '../../router.dart';
 import '../../services/backend_service.dart';
 import '../../theme.dart';
 import '../../widgets/heerr_logo.dart';
+import '../../widgets/profile_avatar_ring.dart';
 
 /// Display-first profile page (Phase Z redesign). Shows the gradient-ring
 /// avatar with an edit-pencil badge, the display name, `@navidromeUsername`
@@ -189,34 +190,11 @@ class _ProfileHeader extends StatelessWidget {
         Stack(
           clipBehavior: Clip.none,
           children: <Widget>[
-            // Same ring stack as the edit form: gradient circle → thin
-            // black gap → the photo.
             InkWell(
               key: const Key('profile-avatar'),
               customBorder: const CircleBorder(),
               onTap: () => context.push(Routes.profileEdit),
-              child: Container(
-                padding: const EdgeInsets.all(3),
-                decoration: const BoxDecoration(
-                  gradient: heerrGradient,
-                  shape: BoxShape.circle,
-                ),
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: const BoxDecoration(
-                    color: heerrBlack,
-                    shape: BoxShape.circle,
-                  ),
-                  child: CircleAvatar(
-                    radius: 44,
-                    foregroundImage:
-                        avatar != null ? FileImage(avatar!) : null,
-                    child: avatar == null
-                        ? const Icon(Icons.person_outline, size: 44)
-                        : null,
-                  ),
-                ),
-              ),
+              child: ProfileAvatarRing(avatar: avatar, radius: 44),
             ),
             // Edit-pencil badge overlapping the avatar's bottom-right,
             // per the mockup.

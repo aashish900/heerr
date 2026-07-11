@@ -12,9 +12,9 @@ import '../../providers/library/library_search_query.dart';
 import '../../providers/profiles/profile_avatar.dart';
 import '../../providers/profiles/profile_meta.dart';
 import '../../router.dart' show Routes;
-import '../../theme.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/heerr_logo.dart';
+import '../../widgets/profile_avatar_ring.dart';
 import 'continue_listening_card.dart';
 import 'quick_access_row.dart';
 import 'recently_added_section.dart';
@@ -93,27 +93,12 @@ class _ProfileAvatarButton extends ConsumerWidget {
       tooltip: 'Profile',
       onPressed: () => context.push(Routes.profile),
       // Gradient ring around the avatar — the brand accent, consistent with
-      // the full Profile screen's avatar treatment.
-      icon: Container(
-        padding: const EdgeInsets.all(2),
-        decoration: const BoxDecoration(
-          gradient: heerrGradient,
-          shape: BoxShape.circle,
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(1.5),
-          decoration: const BoxDecoration(
-            color: heerrBlack,
-            shape: BoxShape.circle,
-          ),
-          child: CircleAvatar(
-            radius: 14,
-            foregroundImage: avatar != null ? FileImage(avatar) : null,
-            child: avatar == null
-                ? const Icon(Icons.person_outline, size: 16)
-                : null,
-          ),
-        ),
+      // the full Profile screen's avatar treatment (shared ProfileAvatarRing).
+      icon: ProfileAvatarRing(
+        avatar: avatar,
+        radius: 14,
+        ringPadding: 2,
+        gapPadding: 1.5,
       ),
     );
   }
