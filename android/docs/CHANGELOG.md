@@ -2627,3 +2627,8 @@ User review flagged four more issues:
 - **Progress bar is now actually seekable, not just a display.** The bar previously only rendered position — the class doc even said "seeking lives on /player." Added a `GestureDetector` (`onTapDown` + `onHorizontalDragStart/Update`) over the bar area (`Key('continue-listening-seek-area')`) that converts the tap/drag x-offset into a fraction and calls `HeerrAudioHandler.seek(...)`; disabled (no gesture) when duration is unknown. The gesture detector is nested inside the card's outer `InkWell` (which navigates to `/player` on tap) — Flutter's gesture-arena resolves nested tap/drag conflicts in favour of the innermost recognizer, so seeking on the bar no longer also navigates.
 - Tests: `continue_listening_card_test.dart` — new `fix round 4` group: art fade asserts a `ShaderMask` with `BlendMode.dstIn` exists; tap-to-seek and drag-to-seek assert `handler.seek(...)` is called with a duration derived from the gesture position; a regression test asserts tapping the seek area does not also push `/player`.
 - Verification: `flutter analyze` clean, `flutter test` 815/815 green.
+
+## 2026-07-11 — Version bump to 4.8.4 (fix-round-4 release)
+
+- **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.8.3 → 4.8.4 per the version-sync convention, covering "fix round 4" (hero card album-art edge fade, tap/drag-to-seek progress bar). Android-side only; backend bumped for sync.
+- Tagged `v4.8.4`.
