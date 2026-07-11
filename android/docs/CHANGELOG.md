@@ -2479,3 +2479,93 @@ User review of the previous widget-polish commit flagged two remaining mismatche
 - **`android/app/android/app/src/main/res/layout/hero_widget.xml`** — the idle prompt `TextView` (`android:text="Start listening to your music"`) had no explicit break, so RemoteViews' text layout wrapped it unevenly instead of matching the reference's clean two-line split. Inserted a literal `\n` so the text is `"Start listening\nto your music"`.
 - **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.7.3 → 4.7.4 for the wording-wrap fix, per the version-sync convention.
 - Verification: `flutter test` 778/778 green, `flutter analyze` clean. Native XML-only change — no new Dart tests; gated by `flutter build apk --debug` + on-device smoke.
+
+## 2026-07-11 — Home redesign part 1: branded header + greeting block
+
+- **`lib/widgets/heerr_logo.dart`** (new) — `HeerrLogo`: app-icon mark (32px, rounded, from `assets/icon.png`) + "heerr" wordmark row for the Home AppBar. `errorBuilder` falls back to a fixed-size music glyph so an asset failure can't inject a `RenderErrorBox` into the AppBar.
+- **`pubspec.yaml`** — declared `assets/icon.png` as a runtime asset (it was previously only the launcher-icon source; `Image.asset` failed in tests until declared).
+- **`lib/screens/home/home_screen.dart`** — AppBar title switched from the time-of-day greeting to `HeerrLogo` (left-aligned); greeting moved into the body as `_GreetingBlock` under the search bar: small grey "<greeting>," line + large bold "<nickname> 👋" when a nickname is set, single large greeting line (no emoji) otherwise.
+- **`test/screens/home/home_screen_test.dart`** — AppBar/greeting assertions rewritten for the new contract (logo in the title slot, greeting text found in the body, two-line nickname block).
+- **`test/router_test.dart`** — "we're on Home" assertions switched from greeting-text matching to a `_expectOnHome` helper that checks the AppBar title is a `HeerrLogo`.
+- Verification: `flutter analyze` clean, `flutter test` 778/778 green.
+
+## 2026-07-11 — Home redesign part 2: Continue Listening hero card + WaveformStrip
+
+- **`lib/widgets/waveform_strip.dart`** (new) — `WaveformStrip`: decorative static waveform (CustomPaint, rounded bars). Bar heights are deterministic per `seed` via an LCG (stable across SDK versions); `barHeights()` exposed for tests. Not a progress indicator.
+- **`lib/screens/home/continue_listening_card.dart`** (new) — `ContinueListeningCard`: hero card driven by `playerSnapshotProvider` (cold-start restore already surfaces the last-played track paused — no direct NowPlayingStore read). Gradient-border card, cover art left (140px, stretch), right column: CONTINUE LISTENING pill, title, artist, waveform (seeded by title), static gradient progress bar + m:ss / m:ss times (no per-second ticker; progress snaps on transport events), 52px gradient play/pause circle. Card tap → `/player`; hidden when nothing is queued / stream loading / no handler override.
+- **`lib/screens/home/home_screen.dart`** — card inserted into the body after `_GreetingBlock`.
+- **`test/screens/home/continue_listening_card_test.dart`** (new) — 10 tests: hidden-when-empty, content render, progress fraction, null-duration guard (`--:--`, zero fill), play/pause via mocktail `HeerrAudioHandler` stub, tap-through to /player, `barHeights` determinism/range.
+- Verification: `flutter analyze` clean, `flutter test` 788/788 green.
+
+## 2026-07-11 — Home redesign part 3: Quick Access shortcut row
+
+- **`lib/screens/home/quick_access_row.dart`** (new) — `QuickAccessRow`: "Quick Access" header + horizontally scrollable row of 4 static 150×110 outlined cards with gradient-tinted icons: For You → `/library/recommendations`, Favorites → `/library/favorites` (screen lands in part 5), Offline → `/downloads` with a live "N songs" count from `downloadedSongsProvider` (falls back to "Downloads" while loading/on error — local disk state, not network), Recently Added → `/library/recently-added` (screen lands in part 4). No "Edit" affordance — deferred per DECISIONLOG 2026-07-11.
+- **`lib/router.dart`** — `Routes.libraryFavorites` + `Routes.libraryRecentlyAdded` constants added (GoRoutes register in parts 4/5).
+- **`lib/screens/home/home_screen.dart`** — row inserted after the hero card.
+- **`test/screens/home/quick_access_row_test.dart`** (new) — 8 tests: header + 4 cards render, no Edit, count/singular/error subtitles, all four navigation targets.
+- **`test/screens/home/home_screen_test.dart`** — 3 legacy-section tests now scroll before asserting (the new rows push "Most played" / "Picked for you" below the built viewport).
+- Verification: `flutter analyze` clean, `flutter test` 796/796 green.
+
+## 2026-07-11 — Home redesign part 4: Recently Added section + See-all screen
+
+- **`lib/providers/home/home_providers.dart`** — `homeNewestProvider` (`getAlbumList2 type=newest`, size 8 — recently *added*, vs the existing `recent` = recently *played*) + `recentlyAddedFullProvider` (size 50, separate provider so the two fetches cache independently). Codegen re-run.
+- **`lib/screens/home/recently_added_section.dart`** (new) — `RecentlyAddedSection`: header + "See all" TextButton → `/library/recently-added`; first 5 albums as plain rows in the parent ListView (no nested scrollable). `RecentlyAddedRow` (56px `LibraryCoverArt`, bold title, grey artist, tap → album detail) is public and shared with the screen. Kebab menu deferred (DEBT). Loading → 3 SkeletonTiles; error/empty → hidden.
+- **`lib/screens/library/recently_added_screen.dart`** (new) — `RecentlyAddedScreen`: AppBar list of the full 50, pull-to-refresh via `ref.invalidate`, error state with Retry.
+- **`lib/router.dart`** — nested `recently-added` GoRoute under `/library` (Library tab stays selected via the existing `startsWith` index rule).
+- **`lib/screens/home/home_screen.dart`** — section inserted after Quick Access.
+- **`test/screens/home/recently_added_test.dart`** (new) — 8 tests: section render cap (5 rows), empty/error hidden, row tap → album, See all → screen, screen list/error-retry/pull-to-refresh.
+- Verification: `flutter analyze` clean, `flutter test` 804/804 green.
+
+## 2026-07-11 — Home redesign part 5: Favorites screen
+
+- **`lib/providers/library/starred_songs.dart`** (new) — `starredSongsProvider` over the existing `SubsonicLibraryService.getStarredSongs()` (`getStarred2.view`). Codegen re-run.
+- **`lib/screens/library/favorites_screen.dart`** (new) — `FavoritesScreen`: starred songs as ListTiles reusing `LibraryCoverArt` + `SongRowActions` (find-similar / edit / delete hooks); tap plays via the shared `playAllSongsFromSubsonic` path — no new playback entry point. Loading skeletons, error + Retry, `EmptyState` ("No favorites yet"), pull-to-refresh.
+- **`lib/router.dart`** — nested `favorites` GoRoute under `/library`; the Quick Access Favorites card's target now resolves.
+- **`test/screens/library/favorites_screen_test.dart`** (new) — 4 tests: rows + actions render, empty state, error + Retry re-fetch, pull-to-refresh.
+- Verification: `flutter analyze` clean, `flutter test` 808/808 green.
+
+## 2026-07-11 — Home redesign part 6: final body assembly + legacy-section cleanup
+
+- **`lib/screens/home/home_screen.dart`** — final body: search bar → greeting → Continue Listening → Quick Access → Recently Added (or the "Nothing here yet" `EmptyState` when newest is empty AND the player is idle). Removed `_QuickAccessGrid`, `_RecommendationGridFallback`, `_JumpBackInSection`, `_MostPlayedSection`, `_RecommendationsSection`, and the mount-time `refreshIfStale()` (the lifecycle coordinator already fires it on resume — `lifecycle_coordinator.dart:110` — and the Recommendations screen refreshes itself). `HomeScreen` simplified to a `ConsumerWidget`. Auto-retry + network-error body rewired to `homeNewestProvider` as the single network signal.
+- **`lib/providers/home/home_providers.dart`** — deleted `homeRecent`, `homeMostPlayed`, `homeRandomSongs`, `homeRecommendations` + the `HomeRecommendations` typedef (no consumers post-redesign). Kept `homeNewest` + `recentlyAddedFull`.
+- **`lib/providers/library/library_edit.dart`, `library_delete.dart`** — post-mutation invalidations repointed from the deleted providers to `homeNewest` + `recentlyAddedFull` + `starredSongs`.
+- **`lib/widgets/home_grid_tile.dart`, `lib/widgets/home_section.dart`** — deleted (Home-only). `home_recommendation_card.dart` + `recommendations_refresh_button.dart` kept — still used by the Recommendations screen.
+- **`test/screens/home/home_screen_test.dart`** — rewritten for the new contract (13 legacy tests removed; error/retry/pull-refresh retimed to `homeNewestProvider`; empty-state asserts on the section *widget*, since the Quick Access card also carries the "Recently Added" label). **`test/providers/home/home_providers_test.dart`** — rewritten for the two surviving providers.
+- **`docs/DEBT.md`** — Quick Access Edit + row kebab deferrals logged.
+- Verification: `flutter analyze` clean, `flutter test` 795/795 green (808 → 795 = removed legacy-section tests).
+
+## 2026-07-11 — Home redesign part 7: MiniPlayer restyle
+
+- **`lib/widgets/mini_player.dart`** — restyled to the new design language: `surfaceContainerHigh` card (radius 16) with the thin gradient border (replacing the dominant-color-tinted background), 44px rounded cover thumb, decorative `WaveformStrip` (90px, hidden under 360dp available width via LayoutBuilder), 40px gradient play/pause circle with a soft tint glow (replacing the plain IconButton). Height 56 → 64; side margins 6px (was `FractionallySizedBox(0.99)`). The palette extraction (`dominantColorFor` + `miniPlayerPaletteExtractorOverride` seam) is **kept** and now tints the waveform + glow — Part B migrates it to the shared cached palette provider.
+- **`test/widgets/mini_player_test.dart`** — all 8 behavior tests pass unchanged; added a redesign contract test (WaveformStrip present, gradient circle instead of IconButton).
+- Verification: `flutter analyze` clean, `flutter test` 796/796 green.
+
+## 2026-07-11 — Home redesign part B1+B3: shared palette provider + MiniPlayer adaptive accents
+
+- **`lib/utils/palette.dart`** — Part B constants (`kBrandBlend` 0.18, `kArtBackdropBlur` 24, `kTintTransition` 400 ms), `brandBlend()` (lerp extracted → `heerrMagenta`), and the `dominantColorForOverride` module seam (prod default = real extractor).
+- **`lib/providers/player/art_palette.dart`** (new) — `artPaletteProvider`: keep-alive family keyed by art-URI string; one palette extraction per unique cover per session. Family keying structurally removes the stale-response race the MiniPlayer guarded by hand.
+- **`lib/widgets/mini_player.dart`** — migrated off the private `_maybeRefreshTint` state + `miniPlayerPaletteExtractorOverride` seam (deleted) onto the provider. Tint = `brandBlend(extracted ?? heerrPurple)` on waveform + play-glow; last-known tint held during a new track's extraction; `_AnimatedTint` (TweenAnimationBuilder) cross-fades tint changes over 400 ms.
+- **`test/utils/palette_test.dart`** (new) — brandBlend lerp/no-op (quantized ARGB compare), per-URI cache count, null propagation. **`test/widgets/mini_player_test.dart`** — tint plumbing via the new seam + fallback test.
+- Verification: `flutter analyze` clean, full suite green.
+
+## 2026-07-11 — Home redesign part B2: hero card adaptive backdrop + accents
+
+- **`lib/widgets/animated_tint.dart`** (new) — `AnimatedTint` extracted from the MiniPlayer's private helper; shared 400 ms tint cross-fade.
+- **`lib/screens/home/continue_listening_card.dart`** — Part B visuals: blurred cover backdrop (`ImageFiltered` at sigma 24 inside a `RepaintBoundary`, only the image blurred — cheaper than `BackdropFilter`), left→right darkening gradient (black 0.35 → `heerrBlack` 0.88) for text contrast, `brandBlend` tint on the waveform + neon glows behind the sharp art (0.25) and play button (0.35). Progress fill stays `heerrGradient` (brand anchor). Last-known tint held during a new track's extraction; artwork itself never recoloured.
+- **`lib/widgets/mini_player.dart`** — switched to the shared `AnimatedTint`.
+- **`test/screens/home/continue_listening_card_test.dart`** — 3 new tests: blended tint + single extraction per URI, backdrop presence with art, no-backdrop + fallback tint without art.
+- Verification: `flutter analyze` clean, `flutter test` 805/805 green.
+
+## 2026-07-11 — Home redesign part 8: final gates + docs flush
+
+- `flutter analyze` clean; `flutter test` 805/805 green; `flutter build apk --debug` succeeds.
+- **On-device smoke pending** — no device attached this session. Checklist for the next device session: cold start with a restored queue → hero card shows the last track paused, resumes on tap; empty-library profile → "Nothing here yet"; Tailscale off → network-error body + auto-retry; scroll Home while playing (blur jank check — `RepaintBoundary` already in place, `cacheWidth` downsample is the escape hatch); rapid track skips → tint cross-fades without flashing.
+- **`docs/DECISIONLOG.md`** — two entries: "adapt chrome around original artwork, never recolor" + the implementation record.
+- **`docs/CONTEXT.md`** — Aesthetic section extended with the per-song adaptive tinting + new Home composition and screens.
+- **`docs/HOMESCREEN.md`** — status flipped to IMPLEMENTED with commit range.
+- `graphify update .` run at repo root.
+
+## 2026-07-11 — Version bump to 4.8.0 (Home Screen redesign release)
+
+- **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.7.4 → 4.8.0 per the version-sync convention. Minor bump (not patch): the Home Screen redesign replaces the layout, adds two screens (Favorites, Recently Added), and introduces per-song adaptive theming. Android-side only; backend bumped for sync.
+- Tagged `v4.8.0`.

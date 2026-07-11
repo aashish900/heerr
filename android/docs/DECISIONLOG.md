@@ -968,3 +968,33 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **Measure the label text width via `TextPainter` inside the indicator.** Rejected — adds a text-layout dependency inside a `Decoration`, coupling it to the app's specific `Tab` text styling; a fixed fraction is simpler and visually close enough for this app's short tab labels ("Artists"/"Albums"/"Playlists").
 
 **Reference:** `android/app/lib/widgets/gradient_tab_indicator.dart`, `android/app/lib/theme.dart`. CHANGELOG 2026-07-11.
+
+## 2026-07-11 — Adaptive theming: adapt the chrome around original artwork, never recolor it
+
+**Context:** The Home redesign mockup (`Home Screen.png`) shows the Starboy cover recolored magenta/purple to sit inside the heerr palette. Question: should the app modify album artwork to match the brand?
+
+**Decision:** Never. Artwork always renders original. Instead the surrounding chrome adapts per song: `artPaletteProvider` (keep-alive family keyed by art URI) extracts the cover's dominant colour once per session; `brandBlend()` lerps it 18% toward `heerrMagenta`; the hero card renders a blurred copy of the cover as its backdrop under a darkening gradient; the waveform and glows take the blended tint, cross-faded 400 ms on track change (`AnimatedTint`). The progress fill and play-circle fill keep the pure brand gradient as identity anchors.
+
+**Why:** Users know their covers; a recolored version reads as a rendering bug and destroys cover identity. Adapting the chrome gives every song a unique feel while the brand stays consistent — and it's cache-friendly (one palette extraction per cover per session, vs. per-cover image processing).
+
+**Alternatives considered:**
+- **Actually recolor covers (as the mockup illustrates).** Rejected — the mockup recolor was illustration, confirmed by the user.
+- **Per-song tint on everything including the progress bar / play fill.** Rejected — the brand identity washes out when every accent chases the artwork.
+- **`BackdropFilter` for the hero blur.** Rejected — blurs the whole layer stack via saveLayer; `ImageFiltered` on just the image is the cheaper path.
+
+**Reference:** `lib/utils/palette.dart`, `lib/providers/player/art_palette.dart`, `lib/widgets/animated_tint.dart`, `lib/screens/home/continue_listening_card.dart`, `lib/widgets/mini_player.dart`. HOMESCREEN.md §7.
+
+## 2026-07-11 — Home Screen redesign implemented (parts 1–7 + B1–B3)
+
+**Context:** Execution of the plan scoped in the 2026-07-11 "Home Screen redesign scoping" entry (see HOMESCREEN.md for the full task breakdown).
+
+**Decision:** Shipped on branch `redesign/home-screen` as 9 commits: branded header + body greeting; Continue Listening hero card (`playerSnapshotProvider`-driven, no per-second ticker on Home); Quick Access row (For You / Favorites / Offline-with-count / Recently Added); Recently Added section + `/library/recently-added` see-all screen (`getAlbumList2 type=newest`); Favorites screen over `getStarred2`; legacy sections and their providers deleted (`homeRecent`, `homeMostPlayed`, `homeRandomSongs`, `homeRecommendations`) with mutation invalidations repointed to `homeNewest`/`recentlyAddedFull`/`starredSongs`; MiniPlayer restyled to the gradient-card language; adaptive art-driven theming per the entry above.
+
+**Why (notable implementation calls):**
+- `homeNewestProvider` is Home's single network signal — the auto-retry loop and error body key off it alone (hero is player-local, Quick Access is disk-local).
+- Home's mount-time `refreshIfStale()` was dropped: the lifecycle coordinator already fires it on resume (`lifecycle_coordinator.dart:110`) and the Recommendations screen refreshes itself.
+- `assets/icon.png` had to be declared as a runtime asset (it was only the launcher-icon source); `HeerrLogo` guards with an errorBuilder so an asset failure can't inject a RenderErrorBox into the AppBar.
+
+**Alternatives considered:** documented per-task in HOMESCREEN.md and the scoping entry.
+
+**Reference:** commits `bf1ccdf`..`301a2b0` on `redesign/home-screen`; CHANGELOG 2026-07-11 parts 1–7, B1+B3, B2. On-device smoke (G-gate) pending — no device attached this session.

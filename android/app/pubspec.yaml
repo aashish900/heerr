@@ -2,7 +2,7 @@ name: heerr
 description: heerr Android client — thin REST client for the heerr FastAPI backend.
 publish_to: 'none'
 
-version: 4.7.4
+version: 4.8.0
 
 environment:
   sdk: ^3.12.0
@@ -113,6 +113,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/
+    - assets/icon.png
 
 flutter_launcher_icons:
   image_path: "assets/icon_legacy.png"

@@ -10,6 +10,7 @@ import '../../services/backend_service.dart';
 import '../downloaded_songs.dart';
 import '../home/home_providers.dart';
 import '../server_creds.dart';
+import 'starred_songs.dart';
 import 'library_album.dart';
 import 'library_albums.dart';
 import 'library_artists.dart';
@@ -78,9 +79,11 @@ class LibraryEdit extends _$LibraryEdit {
     final String? albumId = song.albumId;
     if (albumId != null) ref.invalidate(libraryAlbumProvider(albumId));
     ref.invalidate(downloadedSongsProvider);
-    ref.invalidate(homeRecentProvider);
-    ref.invalidate(homeMostPlayedProvider);
-    ref.invalidate(homeRandomSongsProvider);
+    // Home redesign: the newest-albums section (and its See-all screen) +
+    // Favorites replace the old recent/frequent/random Home providers.
+    ref.invalidate(homeNewestProvider);
+    ref.invalidate(recentlyAddedFullProvider);
+    ref.invalidate(starredSongsProvider);
   }
 
   /// Drop the cached cover JPG for the song's `coverArt` id and clear the

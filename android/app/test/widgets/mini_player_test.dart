@@ -8,7 +8,10 @@ import 'package:go_router/go_router.dart';
 
 import 'package:heerr/player/heerr_audio_handler.dart';
 import 'package:heerr/player/player_provider.dart';
+import 'package:heerr/theme.dart';
+import 'package:heerr/utils/palette.dart';
 import 'package:heerr/widgets/mini_player.dart';
+import 'package:heerr/widgets/waveform_strip.dart';
 
 PlayerSnapshot _snapshot({MediaItem? item, bool playing = false}) {
   return PlayerSnapshot(
@@ -122,6 +125,71 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.text('Preview'), findsNothing);
+  });
+
+  testWidgets(
+      'redesign: renders the waveform strip and a gradient play circle',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(
+      snapshot: AsyncData<PlayerSnapshot>(
+        _snapshot(item: _item(), playing: false),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(WaveformStrip), findsOneWidget);
+    // The play/pause control is a gradient-filled circle (HOMESCREEN.md
+    // task 7), not a plain IconButton.
+    final Finder circle = find.byWidgetPredicate((Widget w) =>
+        w is Container &&
+        w.decoration is BoxDecoration &&
+        (w.decoration! as BoxDecoration).shape == BoxShape.circle &&
+        (w.decoration! as BoxDecoration).gradient == heerrGradient);
+    expect(circle, findsOneWidget);
+    expect(find.byType(IconButton), findsNothing);
+  });
+
+  testWidgets(
+      'Part B: waveform tint is the brand-blended extracted cover colour',
+      (WidgetTester tester) async {
+    const Color extracted = Color(0xFF2266AA);
+    dominantColorForOverride = (Uri? _) async => extracted;
+    addTearDown(() => dominantColorForOverride = dominantColorFor);
+
+    final MediaItem item = MediaItem(
+      id: 'http://stream/1',
+      title: 'Tinted',
+      artist: 'Artist',
+      artUri: Uri.parse('http://navi.test/cover/1'),
+    );
+    await tester.pumpWidget(_wrap(
+      snapshot: AsyncData<PlayerSnapshot>(_snapshot(item: item)),
+    ));
+    await tester.pumpAndSettle();
+
+    final WaveformStrip strip =
+        tester.widget<WaveformStrip>(find.byType(WaveformStrip));
+    expect(strip.color, brandBlend(extracted));
+  });
+
+  testWidgets('Part B: extraction failure falls back to blended heerrPurple',
+      (WidgetTester tester) async {
+    dominantColorForOverride = (Uri? _) async => null;
+    addTearDown(() => dominantColorForOverride = dominantColorFor);
+
+    final MediaItem item = MediaItem(
+      id: 'http://stream/1',
+      title: 'NoTint',
+      artUri: Uri.parse('http://navi.test/cover/none'),
+    );
+    await tester.pumpWidget(_wrap(
+      snapshot: AsyncData<PlayerSnapshot>(_snapshot(item: item)),
+    ));
+    await tester.pumpAndSettle();
+
+    final WaveformStrip strip =
+        tester.widget<WaveformStrip>(find.byType(WaveformStrip));
+    expect(strip.color, brandBlend(heerrPurple));
   });
 
   testWidgets('hidden when snapshot stream is still loading',

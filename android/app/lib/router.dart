@@ -17,6 +17,8 @@ import 'screens/library/artist_detail_screen.dart';
 import 'screens/library/library_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/library/playlist_detail_screen.dart';
+import 'screens/library/favorites_screen.dart';
+import 'screens/library/recently_added_screen.dart';
 import 'screens/player/now_playing_screen.dart';
 import 'screens/profile/edit_server_details_screen.dart';
 import 'screens/profile/profile_screen.dart';
@@ -44,6 +46,10 @@ class Routes {
   static String libraryAlbum(String id) => '/library/album/$id';
   static String libraryPlaylist(String id) => '/library/playlist/$id';
   static const String libraryRecommendations = '/library/recommendations';
+  // Home redesign (HOMESCREEN.md tasks 3-5): Quick Access destinations.
+  // Screens register under /library so the Library tab stays selected.
+  static const String libraryFavorites = '/library/favorites';
+  static const String libraryRecentlyAdded = '/library/recently-added';
 
   // Job-detail lands at D3; route shape defined here to lock the URL.
   static String job(String id) => '/job/$id';
@@ -137,6 +143,16 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
                 path: 'recommendations',
                 builder: (BuildContext context, GoRouterState state) =>
                     const RecommendationsScreen(),
+              ),
+              GoRoute(
+                path: 'recently-added',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const RecentlyAddedScreen(),
+              ),
+              GoRoute(
+                path: 'favorites',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const FavoritesScreen(),
               ),
             ],
           ),

@@ -6,7 +6,7 @@ part of 'library_delete.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$libraryDeleteHash() => r'5860b6241b33b98b5d5be0c228555455e66e3b73';
+String _$libraryDeleteHash() => r'b6dd745609fbdf7511ce3223f050248cc4f9cac4';
 
 /// W1 (#41): server-side song deletion. Stateless notifier (same shape as
 /// `PlaylistMutations`): [deleteFromServer] drives the backend

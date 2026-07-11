@@ -1,0 +1,85 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:heerr/models/subsonic/song.dart';
+import 'package:heerr/providers/library/starred_songs.dart';
+import 'package:heerr/screens/library/favorites_screen.dart';
+import 'package:heerr/theme.dart';
+import 'package:heerr/widgets/song_row_actions.dart';
+
+Song _song(int i) => Song(id: 's-$i', title: 'Song $i', artist: 'Artist $i');
+
+Widget _wrap({required List<Override> overrides}) {
+  return ProviderScope(
+    overrides: overrides,
+    child: MaterialApp(
+      theme: heerrDarkTheme(),
+      home: const FavoritesScreen(),
+    ),
+  );
+}
+
+void main() {
+  testWidgets('lists starred songs with row actions',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(overrides: <Override>[
+      starredSongsProvider.overrideWith(
+          (_) async => List<Song>.generate(3, _song)),
+    ]));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Favorites'), findsOneWidget); // AppBar
+    expect(find.text('Song 0'), findsOneWidget);
+    expect(find.text('Artist 0'), findsOneWidget);
+    expect(find.byType(SongRowActions), findsNWidgets(3));
+  });
+
+  testWidgets('empty list renders the empty state',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(overrides: <Override>[
+      starredSongsProvider.overrideWith((_) async => <Song>[]),
+    ]));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No favorites yet'), findsOneWidget);
+    expect(find.text('Star songs to collect them here.'), findsOneWidget);
+  });
+
+  testWidgets('error state shows Retry which re-fetches',
+      (WidgetTester tester) async {
+    int fetches = 0;
+    await tester.pumpWidget(_wrap(overrides: <Override>[
+      starredSongsProvider.overrideWith((_) async {
+        fetches++;
+        throw Exception('net');
+      }),
+    ]));
+    await tester.pumpAndSettle();
+    expect(fetches, 1);
+    expect(find.byKey(const Key('favorites-retry')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('favorites-retry')));
+    await tester.pumpAndSettle();
+    expect(fetches, greaterThanOrEqualTo(2));
+  });
+
+  testWidgets('pull-to-refresh invalidates the provider',
+      (WidgetTester tester) async {
+    int fetches = 0;
+    await tester.pumpWidget(_wrap(overrides: <Override>[
+      starredSongsProvider.overrideWith((_) async {
+        fetches++;
+        return <Song>[_song(1)];
+      }),
+    ]));
+    await tester.pumpAndSettle();
+    expect(fetches, 1);
+
+    final RefreshIndicator indicator =
+        tester.widget<RefreshIndicator>(find.byType(RefreshIndicator));
+    await indicator.onRefresh();
+    await tester.pumpAndSettle();
+    expect(fetches, greaterThanOrEqualTo(2));
+  });
+}
