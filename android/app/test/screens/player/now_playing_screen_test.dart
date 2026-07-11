@@ -19,6 +19,7 @@ import 'package:heerr/player/player_provider.dart';
 import 'package:heerr/providers/queue.dart';
 import 'package:heerr/screens/player/now_playing_screen.dart';
 import 'package:heerr/utils/palette.dart';
+import 'package:heerr/widgets/waveform_seek_bar.dart';
 
 // Static counters so the (transient) provider instance can report into the
 // test without us having to fish it back out via ProviderContainer.
@@ -140,11 +141,13 @@ void main() {
     _resumeCalls = 0;
     paletteExtractorOverride = (Uri? _) async => null; // deterministic, no I/O
     heroArtFloatEnabled = false; // repeating controller never settles
+    waveformSeekBarAnimateEnabled = false;
   });
 
   tearDown(() {
     paletteExtractorOverride = dominantColorFor;
     heroArtFloatEnabled = true;
+    waveformSeekBarAnimateEnabled = true;
   });
 
   testWidgets('"Nothing is playing" when snapshot has no item',
@@ -286,7 +289,7 @@ void main() {
     expect(find.text('Queue is empty.'), findsOneWidget);
   });
 
-  testWidgets('scrubber Slider has max = duration in ms',
+  testWidgets('scrubber shows elapsed/total labels for the item duration',
       (WidgetTester tester) async {
     await tester.pumpWidget(_wrap(
       snapshot: _snap(
@@ -295,8 +298,8 @@ void main() {
       ),
     ));
     await tester.pumpAndSettle();
-    final Slider slider = tester.widget<Slider>(find.byType(Slider));
-    expect(slider.max, 200 * 1000);
+    expect(find.byType(WaveformSeekBar), findsOneWidget);
+    expect(find.text('3:20'), findsOneWidget);
   });
 
   testWidgets('snapshot stream loading → CircularProgressIndicator',

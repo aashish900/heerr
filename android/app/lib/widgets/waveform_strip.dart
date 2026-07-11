@@ -47,8 +47,8 @@ class WaveformStrip extends StatefulWidget {
 
   /// Deterministic bar heights in 0.15..1.0 (fraction of [height]).
   /// LCG (numerical-recipes constants) rather than `Random(seed)` so the
-  /// sequence is stable across Dart SDK versions. Visible for tests.
-  @visibleForTesting
+  /// sequence is stable across Dart SDK versions. Shared with
+  /// `WaveformSeekBar` so both widgets render the same shape per track.
   static List<double> barHeights(int count, int seed) {
     int state = seed & 0x7fffffff;
     final List<double> out = <double>[];

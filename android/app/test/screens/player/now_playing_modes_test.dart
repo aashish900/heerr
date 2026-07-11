@@ -19,6 +19,7 @@ import 'package:heerr/player/player_provider.dart';
 import 'package:heerr/providers/queue.dart';
 import 'package:heerr/screens/player/now_playing_screen.dart';
 import 'package:heerr/utils/palette.dart';
+import 'package:heerr/widgets/waveform_seek_bar.dart';
 
 class _MockHandler extends Mock implements HeerrAudioHandler {}
 
@@ -124,6 +125,7 @@ void main() {
   setUp(() {
     paletteExtractorOverride = (Uri? _) async => null;
     heroArtFloatEnabled = false;
+    waveformSeekBarAnimateEnabled = false;
     handler = _MockHandler();
     when(() => handler.setRepeatMode(any())).thenAnswer((_) async {});
     when(() => handler.setShuffleMode(any())).thenAnswer((_) async {});
@@ -132,6 +134,7 @@ void main() {
   tearDown(() {
     paletteExtractorOverride = dominantColorFor;
     heroArtFloatEnabled = true;
+    waveformSeekBarAnimateEnabled = true;
   });
 
   testWidgets('shuffle + repeat buttons render', (WidgetTester tester) async {

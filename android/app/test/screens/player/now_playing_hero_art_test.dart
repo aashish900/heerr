@@ -22,6 +22,7 @@ import 'package:heerr/screens/player/now_playing_screen.dart';
 import 'package:heerr/services/lyrics_service.dart';
 import 'package:heerr/theme.dart';
 import 'package:heerr/utils/palette.dart';
+import 'package:heerr/widgets/waveform_seek_bar.dart';
 
 /// NOWPLAYING.md NP3 — hero art glow/border + on-art download-state button
 /// (§2.4: reflects the existing per-song manifest state; no per-song
@@ -154,10 +155,12 @@ void main() {
   setUp(() {
     paletteExtractorOverride = (Uri? _) async => null;
     heroArtFloatEnabled = false;
+    waveformSeekBarAnimateEnabled = false;
   });
   tearDown(() {
     paletteExtractorOverride = dominantColorFor;
     heroArtFloatEnabled = true;
+    waveformSeekBarAnimateEnabled = true;
   });
 
   testWidgets('no manifest entry → outlined download icon; tap shows explainer',

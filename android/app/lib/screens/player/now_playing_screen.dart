@@ -28,6 +28,7 @@ import '../../widgets/glass_icon_button.dart';
 import '../../widgets/gradient_icon.dart';
 import '../../widgets/now_playing_background.dart';
 import '../../widgets/preview_badge.dart';
+import '../../widgets/waveform_seek_bar.dart';
 
 part 'now_playing_lyrics.dart';
 part 'now_playing_transport.dart';
@@ -408,6 +409,8 @@ class _Body extends ConsumerWidget {
             onSeekStart: onSeekStart,
             onSeekUpdate: onSeekUpdate,
             onSeekEnd: onSeekEnd,
+            playing: snapshot.isPlaying,
+            seed: item.title.hashCode,
           ),
           _Transport(
             playing: snapshot.isPlaying,

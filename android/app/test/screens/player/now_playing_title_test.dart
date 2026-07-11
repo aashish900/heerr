@@ -21,6 +21,7 @@ import 'package:heerr/screens/player/now_playing_screen.dart';
 import 'package:heerr/services/lyrics_service.dart';
 import 'package:heerr/theme.dart';
 import 'package:heerr/utils/palette.dart';
+import 'package:heerr/widgets/waveform_seek_bar.dart';
 
 /// NOWPLAYING.md NP4 — title hierarchy + glass favourite button.
 class _StubQueue extends Queue {
@@ -120,10 +121,12 @@ void main() {
   setUp(() {
     paletteExtractorOverride = (Uri? _) async => null;
     heroArtFloatEnabled = false;
+    waveformSeekBarAnimateEnabled = false;
   });
   tearDown(() {
     paletteExtractorOverride = dominantColorFor;
     heroArtFloatEnabled = true;
+    waveformSeekBarAnimateEnabled = true;
   });
 
   testWidgets('title renders headlineMedium bold, artist dimmed below it',

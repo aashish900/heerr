@@ -17,6 +17,7 @@ import 'package:heerr/player/player_provider.dart';
 import 'package:heerr/providers/queue.dart';
 import 'package:heerr/screens/player/now_playing_screen.dart';
 import 'package:heerr/utils/palette.dart';
+import 'package:heerr/widgets/waveform_seek_bar.dart';
 
 class _StubQueue extends Queue {
   @override
@@ -124,10 +125,12 @@ void main() {
   setUp(() {
     paletteExtractorOverride = (Uri? _) async => null;
     heroArtFloatEnabled = false;
+    waveformSeekBarAnimateEnabled = false;
   });
   tearDown(() {
     paletteExtractorOverride = dominantColorFor;
     heroArtFloatEnabled = true;
+    waveformSeekBarAnimateEnabled = true;
   });
 
   testWidgets('lyrics render inside a card with an expand affordance',

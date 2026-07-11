@@ -1,5 +1,8 @@
 part of 'now_playing_screen.dart';
 
+/// NOWPLAYING.md NP5 — thin wrapper over [WaveformSeekBar], keeping the
+/// `_Scrubber` name/call shape so `_Body`'s call site didn't need touching
+/// beyond adding [playing] / [seed].
 class _Scrubber extends StatelessWidget {
   const _Scrubber({
     required this.position,
@@ -7,6 +10,8 @@ class _Scrubber extends StatelessWidget {
     required this.onSeekStart,
     required this.onSeekUpdate,
     required this.onSeekEnd,
+    required this.playing,
+    required this.seed,
   });
 
   final Duration position;
@@ -14,109 +19,19 @@ class _Scrubber extends StatelessWidget {
   final ValueChanged<Duration> onSeekStart;
   final ValueChanged<Duration> onSeekUpdate;
   final ValueChanged<Duration> onSeekEnd;
+  final bool playing;
+  final int seed;
 
   @override
   Widget build(BuildContext context) {
-    final double max = duration.inMilliseconds.toDouble();
-    final double clampedPos =
-        position.inMilliseconds.clamp(0, max <= 0 ? 0 : max.toInt()).toDouble();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Column(
-        children: <Widget>[
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackShape: const _GradientSliderTrackShape(),
-            ),
-            child: Slider(
-              value: max <= 0 ? 0 : clampedPos,
-              max: max <= 0 ? 1 : max,
-              onChangeStart: max <= 0
-                  ? null
-                  : (double v) =>
-                      onSeekStart(Duration(milliseconds: v.toInt())),
-              onChanged: max <= 0
-                  ? null
-                  : (double v) =>
-                      onSeekUpdate(Duration(milliseconds: v.toInt())),
-              onChangeEnd: max <= 0
-                  ? null
-                  : (double v) =>
-                      onSeekEnd(Duration(milliseconds: v.toInt())),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: <Widget>[
-                Text(_fmt(position),
-                    style: Theme.of(context).textTheme.bodySmall),
-                Text(_fmt(duration),
-                    style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _fmt(Duration d) {
-    final int total = d.inSeconds;
-    final int m = total ~/ 60;
-    final int s = total % 60;
-    return '$m:${s.toString().padLeft(2, '0')}';
-  }
-}
-
-/// Slider track shape whose active (played) portion is painted with the heerr
-/// magenta→purple→violet [heerrGradient] instead of a flat colour. The inactive
-/// portion stays solid. LTR-only (the app ships no RTL locales).
-class _GradientSliderTrackShape extends RoundedRectSliderTrackShape {
-  const _GradientSliderTrackShape();
-
-  @override
-  void paint(
-    PaintingContext context,
-    Offset offset, {
-    required RenderBox parentBox,
-    required SliderThemeData sliderTheme,
-    required Animation<double> enableAnimation,
-    required TextDirection textDirection,
-    required Offset thumbCenter,
-    Offset? secondaryOffset,
-    bool isDiscrete = false,
-    bool isEnabled = false,
-    double additionalActiveTrackHeight = 2,
-  }) {
-    final Rect trackRect = getPreferredRect(
-      parentBox: parentBox,
-      offset: offset,
-      sliderTheme: sliderTheme,
-      isEnabled: isEnabled,
-      isDiscrete: isDiscrete,
-    );
-    final Radius radius = Radius.circular(trackRect.height / 2);
-
-    final Paint inactivePaint = Paint()
-      ..color = sliderTheme.inactiveTrackColor ?? const Color(0xFF2E2E2E);
-    context.canvas.drawRRect(
-      RRect.fromRectAndRadius(trackRect, radius),
-      inactivePaint,
-    );
-
-    final Rect activeRect = Rect.fromLTRB(
-      trackRect.left,
-      trackRect.top,
-      thumbCenter.dx.clamp(trackRect.left, trackRect.right),
-      trackRect.bottom,
-    );
-    final Paint activePaint = Paint()
-      ..shader = heerrGradient.createShader(trackRect);
-    context.canvas.drawRRect(
-      RRect.fromRectAndRadius(activeRect, radius),
-      activePaint,
+    return WaveformSeekBar(
+      position: position,
+      duration: duration,
+      onSeekStart: onSeekStart,
+      onSeekUpdate: onSeekUpdate,
+      onSeekEnd: onSeekEnd,
+      animate: playing,
+      seed: seed,
     );
   }
 }
