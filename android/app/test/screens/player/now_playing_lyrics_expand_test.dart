@@ -142,8 +142,21 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('now-playing-lyrics-card')), findsOneWidget);
+    final Finder card = find.byKey(const Key('now-playing-lyrics-card'));
+    expect(card, findsOneWidget);
     expect(find.byKey(const Key('now-playing-lyrics-expand')), findsOneWidget);
+    // NP8 — uppercase "LYRICS" section label with a magenta underline
+    // accent inside the card, replacing the old title-case "Lyrics" label.
+    // (The action pill's own "Lyrics" slot, elsewhere on screen, is a
+    // separate label and not scoped by this assertion.)
+    expect(
+      find.descendant(of: card, matching: find.text('LYRICS')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: card, matching: find.text('Lyrics')),
+      findsNothing,
+    );
   });
 
   testWidgets(

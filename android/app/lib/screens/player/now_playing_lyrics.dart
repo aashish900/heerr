@@ -1,9 +1,11 @@
 part of 'now_playing_screen.dart';
 
-/// Lyrics card rendered below the transport controls, tinted
-/// with the album palette colour. Shows a preview window of the lyrics;
-/// tapping the card (or the expand affordance) opens the full-screen
-/// [_ExpandedLyricsSheet].
+/// Lyrics peek sheet docked below the transport controls (NOWPLAYING.md
+/// NP8): a glass card (translucent fill + hairline border) over the
+/// [NowPlayingBackground] rather than a solid palette-tint fill — the tint
+/// now lives only in the active-line accent colour. Shows a preview window
+/// of the lyrics; tapping the card (or the expand affordance) opens the
+/// full-screen [_ExpandedLyricsSheet].
 class _LyricsSection extends StatelessWidget {
   const _LyricsSection({
     required this.songId,
@@ -21,59 +23,87 @@ class _LyricsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme cs = Theme.of(context).colorScheme;
-    final Color bg = tintColor ?? cs.surfaceContainerHighest;
-    final Color fg =
-        ThemeData.estimateBrightnessForColor(bg) == Brightness.dark
-            ? Colors.white
-            : Colors.black87;
+    final Color accent =
+        tintColor != null ? brandBlend(tintColor!) : heerrMagenta;
+    const Color fg = Colors.white;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-      child: Material(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          key: const Key('now-playing-lyrics-card'),
-          onTap: () => _ExpandedLyricsSheet.show(context, tintColor),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 8, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Text(
-                        'Lyrics',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleSmall
-                            ?.copyWith(color: fg, fontWeight: FontWeight.bold),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            key: const Key('now-playing-lyrics-card'),
+            onTap: () => _ExpandedLyricsSheet.show(context, tintColor),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 8, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.24),
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    IconButton(
-                      key: const Key('now-playing-lyrics-expand'),
-                      tooltip: 'Expand lyrics',
-                      icon: Icon(Icons.open_in_full, size: 18, color: fg),
-                      onPressed: () =>
-                          _ExpandedLyricsSheet.show(context, tintColor),
-                    ),
-                  ],
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: _LyricsContent(
-                    songId: songId,
-                    artist: artist,
-                    title: title,
-                    position: position,
-                    expanded: false,
-                    foreground: fg,
                   ),
-                ),
-              ],
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(
+                              'LYRICS',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: fg,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.2,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Container(width: 24, height: 2, color: accent),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        key: const Key('now-playing-lyrics-expand'),
+                        tooltip: 'Expand lyrics',
+                        icon: const Icon(Icons.open_in_full,
+                            size: 18, color: fg),
+                        onPressed: () =>
+                            _ExpandedLyricsSheet.show(context, tintColor),
+                      ),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8, top: 8),
+                    child: _LyricsContent(
+                      songId: songId,
+                      artist: artist,
+                      title: title,
+                      position: position,
+                      expanded: false,
+                      foreground: fg,
+                      accentColor: accent,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -100,6 +130,7 @@ class _LyricsContent extends ConsumerWidget {
     required this.position,
     required this.expanded,
     required this.foreground,
+    required this.accentColor,
   });
 
   final String? songId;
@@ -108,6 +139,11 @@ class _LyricsContent extends ConsumerWidget {
   final Duration position;
   final bool expanded;
   final Color foreground;
+
+  /// Active-line highlight — blended from the palette tint when one exists,
+  /// [heerrMagenta] otherwise (NOWPLAYING.md NP8 §2 — the tint now lives in
+  /// this accent, not the card's background fill).
+  final Color accentColor;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -147,11 +183,13 @@ class _LyricsContent extends ConsumerWidget {
                   lines: lines,
                   position: position,
                   foreground: foreground,
+                  accentColor: accentColor,
                 )
               : _SyncedLyricsPreview(
                   lines: lines,
                   position: position,
                   foreground: foreground,
+                  accentColor: accentColor,
                 );
         }
         if (expanded) {
@@ -201,6 +239,7 @@ class _SyncedLyricsPreview extends StatelessWidget {
     required this.lines,
     required this.position,
     required this.foreground,
+    required this.accentColor,
   });
 
   static const int _windowSize = 5;
@@ -208,6 +247,7 @@ class _SyncedLyricsPreview extends StatelessWidget {
   final List<LyricsLine> lines;
   final Duration position;
   final Color foreground;
+  final Color accentColor;
 
   @override
   Widget build(BuildContext context) {
@@ -215,7 +255,9 @@ class _SyncedLyricsPreview extends StatelessWidget {
     final int start = (current - 1)
         .clamp(0, (lines.length - _windowSize).clamp(0, lines.length));
     final int end = (start + _windowSize).clamp(0, lines.length);
-    final TextStyle? base = Theme.of(context).textTheme.titleMedium;
+    final TextStyle? base = Theme.of(context).textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w700,
+        );
     return Column(
       key: const Key('now-playing-lyrics-synced'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,15 +265,23 @@ class _SyncedLyricsPreview extends StatelessWidget {
         for (int i = start; i < end; i++)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 3),
-            child: Text(
-              lines[i].value,
-              style: base?.copyWith(
-                color: i == current
-                    ? heerrMagenta
-                    : foreground.withValues(alpha: 0.55),
-                fontWeight: i == current ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
+            child: i == current
+                ? ShaderMask(
+                    shaderCallback: (Rect bounds) => LinearGradient(
+                      colors: <Color>[accentColor, Colors.white],
+                    ).createShader(bounds),
+                    child: Text(
+                      lines[i].value,
+                      style: base?.copyWith(color: Colors.white),
+                    ),
+                  )
+                : Text(
+                    lines[i].value,
+                    style: base?.copyWith(
+                      color: foreground.withValues(alpha: 0.55),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
           ),
       ],
     );
@@ -262,11 +312,13 @@ class _SyncedLyrics extends StatefulWidget {
     required this.lines,
     required this.position,
     required this.foreground,
+    required this.accentColor,
   });
 
   final List<LyricsLine> lines;
   final Duration position;
   final Color foreground;
+  final Color accentColor;
 
   @override
   State<_SyncedLyrics> createState() => _SyncedLyricsState();
@@ -313,18 +365,30 @@ class _SyncedLyricsState extends State<_SyncedLyrics> {
           Padding(
             key: _lineKeys[i],
             padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Text(
-              widget.lines[i].value,
-              style: base?.copyWith(
-                color: i == current
-                    ? heerrMagenta
-                    : i < current
-                        ? widget.foreground
-                        : widget.foreground.withValues(alpha: 0.4),
-                fontWeight: FontWeight.w700,
-                height: 1.3,
-              ),
-            ),
+            child: i == current
+                ? ShaderMask(
+                    shaderCallback: (Rect bounds) => LinearGradient(
+                      colors: <Color>[widget.accentColor, Colors.white],
+                    ).createShader(bounds),
+                    child: Text(
+                      widget.lines[i].value,
+                      style: base?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        height: 1.3,
+                      ),
+                    ),
+                  )
+                : Text(
+                    widget.lines[i].value,
+                    style: base?.copyWith(
+                      color: i < current
+                          ? widget.foreground
+                          : widget.foreground.withValues(alpha: 0.4),
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                    ),
+                  ),
           ),
       ],
     );
@@ -378,8 +442,11 @@ class _ExpandedLyricsSheetState extends ConsumerState<_ExpandedLyricsSheet> {
     final Color bg = Color.lerp(
       widget.tintColor ?? cs.surfaceContainerHigh,
       Colors.black,
-      0.45,
+      0.6,
     )!;
+    final Color accent = widget.tintColor != null
+        ? brandBlend(widget.tintColor!)
+        : heerrMagenta;
     final PlayerSnapshot? snap =
         ref.watch(playerSnapshotProvider).valueOrNull;
     final MediaItem? item = snap?.item;
@@ -390,6 +457,9 @@ class _ExpandedLyricsSheetState extends ConsumerState<_ExpandedLyricsSheet> {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+        ),
       ),
       child: SafeArea(
         child: item == null
@@ -458,6 +528,7 @@ class _ExpandedLyricsSheetState extends ConsumerState<_ExpandedLyricsSheet> {
                         position: snap!.state.position,
                         expanded: true,
                         foreground: Colors.white,
+                        accentColor: accent,
                       ),
                     ),
                   ),
