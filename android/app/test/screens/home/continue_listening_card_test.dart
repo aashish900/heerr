@@ -86,6 +86,10 @@ Widget _wrapStream({
 }
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(Duration.zero);
+  });
+
   testWidgets('hidden when the snapshot has no current item',
       (WidgetTester tester) async {
     await tester.pumpWidget(_wrap(snapshot: _snap()));
@@ -314,6 +318,100 @@ void main() {
               w.decoration is BoxDecoration &&
               (w.decoration! as BoxDecoration).boxShadow != null));
       expect(artTile.constraints?.maxWidth, 161);
+    });
+  });
+
+  group('fix round 4 (user review)', () {
+    testWidgets(
+        'album art fades into the card edge (no hard border, like the widget)',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(snapshot: _snap(item: _item())));
+      await tester.pumpAndSettle();
+
+      final Iterable<ShaderMask> masks =
+          tester.widgetList<ShaderMask>(find.byType(ShaderMask));
+      expect(
+        masks.where((ShaderMask m) => m.blendMode == BlendMode.dstIn),
+        isNotEmpty,
+        reason: 'art tile should alpha-fade its right edge, matching the '
+            'home-screen widget (HeroWidgetProvider.kt buildArtBitmap)',
+      );
+    });
+
+    testWidgets('tapping the progress bar seeks to that position',
+        (WidgetTester tester) async {
+      final _StubHandler handler = _StubHandler();
+      when(() => handler.seek(any())).thenAnswer((_) async {});
+      await tester.pumpWidget(_wrap(
+        snapshot: _snap(
+          item: _item(duration: const Duration(minutes: 4)),
+          position: const Duration(minutes: 1),
+        ),
+        handler: handler,
+      ));
+      await tester.pumpAndSettle();
+
+      final Finder area =
+          find.byKey(const Key('continue-listening-seek-area'));
+      final Rect rect = tester.getRect(area);
+      await tester.tapAt(rect.centerLeft + const Offset(4, 0));
+      await tester.pump();
+
+      final Duration captured =
+          verify(() => handler.seek(captureAny())).captured.single as Duration;
+      // Tapped near the left edge of a 4-minute track — should seek well
+      // short of the un-touched position (1:00), proving it used the tap
+      // location, not just re-issuing the current position.
+      expect(captured, lessThan(const Duration(seconds: 30)));
+    });
+
+    testWidgets('dragging the progress bar seeks continuously',
+        (WidgetTester tester) async {
+      final _StubHandler handler = _StubHandler();
+      when(() => handler.seek(any())).thenAnswer((_) async {});
+      await tester.pumpWidget(_wrap(
+        snapshot: _snap(
+          item: _item(duration: const Duration(minutes: 4)),
+          position: Duration.zero,
+        ),
+        handler: handler,
+      ));
+      await tester.pumpAndSettle();
+
+      final Finder area =
+          find.byKey(const Key('continue-listening-seek-area'));
+      final Rect rect = tester.getRect(area);
+      await tester.dragFrom(
+        rect.centerLeft + const Offset(4, 0),
+        Offset(rect.width * 0.75, 0),
+      );
+      await tester.pump();
+
+      final List<Duration> captured =
+          verify(() => handler.seek(captureAny())).captured.cast<Duration>();
+      expect(captured, isNotEmpty);
+      expect(captured.last, greaterThan(const Duration(minutes: 2)));
+    });
+
+    testWidgets('tapping the progress bar does not navigate to /player',
+        (WidgetTester tester) async {
+      final _StubHandler handler = _StubHandler();
+      when(() => handler.seek(any())).thenAnswer((_) async {});
+      await tester.pumpWidget(_wrap(
+        snapshot: _snap(
+          item: _item(duration: const Duration(minutes: 4)),
+          position: const Duration(minutes: 1),
+        ),
+        handler: handler,
+      ));
+      await tester.pumpAndSettle();
+
+      final Finder area =
+          find.byKey(const Key('continue-listening-seek-area'));
+      await tester.tapAt(tester.getRect(area).centerLeft + const Offset(4, 0));
+      await tester.pumpAndSettle();
+
+      expect(find.text('NOW_PLAYING_SCREEN'), findsNothing);
     });
   });
 

@@ -1040,3 +1040,15 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Not changed:** the per-bar height *distribution* (deterministic LCG random, uniform-ish across the strip) still differs from the widget's fixed 3-cluster Gaussian envelope (tall groups separated by near-baseline dots) — only the anchoring/orientation was fixed. Revisit if closer fidelity is wanted; would need to touch `WaveformStrip.barHeights`, which three existing unit tests pin to a `[0.15, 1.0]` range.
 
 **Reference:** `android/app/android/app/src/main/res/drawable/widget_background.xml` (new), `widget_gradient_border.xml` (deleted), `hero_widget.xml`, `HeroWidgetProvider.kt`, `lib/widgets/waveform_strip.dart`, `tool/gen_widget_wave.py`.
+
+## 2026-07-11 — Hero card: art edge fade + real progress seeking (fix round 4)
+
+**Context:** User review flagged two remaining gaps in the Continue Listening hero card: (1) a hard visible border between the album-art tile and the rest of the card — the home-screen widget fades its art into the tile instead — and (2) the progress bar still only displays position; it doesn't let the user seek, despite earlier rounds (fix round 2) explicitly deferring seek to `/player` ("the knob doesn't add drag-to-seek on Home").
+
+**Decision:**
+1. Art edge: ported the widget's own fade technique (`HeroWidgetProvider.kt` `buildArtBitmap`, `DST_IN` alpha gradient over the right `FADE_FRACTION = 0.35` of the bitmap) to Flutter as a `ShaderMask` (`BlendMode.dstIn`, white→transparent `LinearGradient`, stops `[0, 0.65, 1]`) wrapping `_CoverArt`. Reveals the card's `surfaceContainerLow` background through the art's right edge instead of a hard seam — no change to the artwork's own pixels (consistent with the standing Part B rule "the artwork is never recoloured").
+2. Progress bar: reversed the fix-round-2 decision to keep seeking `/player`-only. Added a `GestureDetector` (tap + horizontal drag) directly over the bar, converting gesture x-position into a seek fraction and calling `HeerrAudioHandler.seek(...)`. It's nested inside the card's outer `InkWell` (tap-to-open-`/player`); relies on Flutter's gesture-arena resolving nested tap/drag conflicts toward the innermost recognizer, verified by a regression test that taps the bar and asserts no navigation occurred.
+
+**Why:** Both were "the card still doesn't match/behave like the reference" gaps identified by the user testing the running app, not new scope.
+
+**Reference:** `lib/screens/home/continue_listening_card.dart`, `android/app/android/app/src/main/kotlin/com/aashish/heerr/HeroWidgetProvider.kt`.

@@ -30,8 +30,9 @@ import '../../widgets/waveform_strip.dart';
 /// dropped per user review as a visual mismatch from the source.
 ///
 /// The progress display is static per snapshot emission (play/pause/seek/
-/// track change) — deliberately no per-second ticker on Home. Seeking lives
-/// on /player; tapping the card goes there.
+/// track change) — deliberately no per-second ticker on Home. The bar
+/// itself is tap/drag-seekable (mirrors /player's scrubber); tapping
+/// elsewhere on the card still opens /player.
 class ContinueListeningCard extends ConsumerStatefulWidget {
   const ContinueListeningCard({super.key});
 
@@ -122,7 +123,25 @@ class _ContinueListeningCardState
                         ),
                       ],
                     ),
-                    child: _CoverArt(artUri: artUri),
+                    // Alpha-fade the art's right edge into the card
+                    // background instead of a hard seam — mirrors the
+                    // home-screen widget's own art treatment
+                    // (HeroWidgetProvider.kt buildArtBitmap, FADE_FRACTION
+                    // 0.35).
+                    child: ShaderMask(
+                      blendMode: BlendMode.dstIn,
+                      shaderCallback: (Rect bounds) => const LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: <Color>[
+                          Colors.white,
+                          Colors.white,
+                          Colors.transparent,
+                        ],
+                        stops: <double>[0.0, 0.65, 1.0],
+                      ).createShader(bounds),
+                      child: _CoverArt(artUri: artUri),
+                    ),
                   ),
                   Expanded(
                     child: Padding(
@@ -165,7 +184,21 @@ class _ContinueListeningCardState
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: <Widget>[
-                                    _ProgressBar(progress: progress),
+                                    _ProgressBar(
+                                      progress: progress,
+                                      onSeek: duration == null ||
+                                              duration.inMilliseconds == 0
+                                          ? null
+                                          : (double fraction) {
+                                              final int ms = (fraction *
+                                                      duration.inMilliseconds)
+                                                  .round();
+                                              ref
+                                                  .read(audioHandlerProvider)
+                                                  .seek(Duration(
+                                                      milliseconds: ms));
+                                            },
+                                    ),
                                     const SizedBox(height: 6),
                                     Row(
                                       mainAxisAlignment:
@@ -257,14 +290,16 @@ class _CoverArt extends StatelessWidget {
 }
 
 /// Progress display: gradient fill over a faint track, with a round thumb
-/// at the current position (matches the mockup's visible knob). Not an
-/// actual slider — seeking stays on /player; the knob is indicative only.
-/// Deliberately keeps the brand gradient (not the per-song tint) so the
-/// heerr identity anchors every card.
+/// at the current position (matches the mockup's visible knob). Tap or
+/// drag anywhere on the bar to seek — [onSeek] receives the tapped/dragged
+/// fraction (0..1) — disabled (no gesture) when [onSeek] is null (no known
+/// duration). Deliberately keeps the brand gradient (not the per-song
+/// tint) so the heerr identity anchors every card.
 class _ProgressBar extends StatelessWidget {
-  const _ProgressBar({required this.progress});
+  const _ProgressBar({required this.progress, this.onSeek});
 
   final double progress;
+  final ValueChanged<double>? onSeek;
 
   static const double _knobDiameter = 12;
   static const double _rowHeight = 14;
@@ -279,52 +314,73 @@ class _ProgressBar extends StatelessWidget {
           final double knobLeft =
               (progress * trackWidth - _knobDiameter / 2)
                   .clamp(0.0, trackWidth - _knobDiameter);
-          return Stack(
-            clipBehavior: Clip.none,
-            children: <Widget>[
-              Align(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
-                  child: SizedBox(
-                    height: 5,
-                    child: Stack(
-                      children: <Widget>[
-                        const Positioned.fill(
-                          child: ColoredBox(color: Color(0x33FFFFFF)),
-                        ),
-                        FractionallySizedBox(
-                          key: const Key('continue-listening-progress'),
-                          widthFactor: progress,
-                          heightFactor: 1.0,
-                          child: const DecoratedBox(
-                            decoration: BoxDecoration(gradient: heerrGradient),
+
+          void seekAt(double dx) {
+            final ValueChanged<double>? seek = onSeek;
+            if (seek == null || trackWidth <= 0) return;
+            seek((dx / trackWidth).clamp(0.0, 1.0));
+          }
+
+          return GestureDetector(
+            key: const Key('continue-listening-seek-area'),
+            behavior: HitTestBehavior.opaque,
+            onTapDown: onSeek == null
+                ? null
+                : (TapDownDetails d) => seekAt(d.localPosition.dx),
+            onHorizontalDragStart: onSeek == null
+                ? null
+                : (DragStartDetails d) => seekAt(d.localPosition.dx),
+            onHorizontalDragUpdate: onSeek == null
+                ? null
+                : (DragUpdateDetails d) => seekAt(d.localPosition.dx),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: <Widget>[
+                Align(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: SizedBox(
+                      height: 5,
+                      child: Stack(
+                        children: <Widget>[
+                          const Positioned.fill(
+                            child: ColoredBox(color: Color(0x33FFFFFF)),
                           ),
+                          FractionallySizedBox(
+                            key: const Key('continue-listening-progress'),
+                            widthFactor: progress,
+                            heightFactor: 1.0,
+                            child: const DecoratedBox(
+                              decoration:
+                                  BoxDecoration(gradient: heerrGradient),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: knobLeft,
+                  top: (_rowHeight - _knobDiameter) / 2,
+                  child: Container(
+                    key: const Key('continue-listening-progress-knob'),
+                    width: _knobDiameter,
+                    height: _knobDiameter,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: heerrGradient,
+                      boxShadow: <BoxShadow>[
+                        BoxShadow(
+                          color: heerrMagenta.withValues(alpha: 0.6),
+                          blurRadius: 6,
                         ),
                       ],
                     ),
                   ),
                 ),
-              ),
-              Positioned(
-                left: knobLeft,
-                top: (_rowHeight - _knobDiameter) / 2,
-                child: Container(
-                  key: const Key('continue-listening-progress-knob'),
-                  width: _knobDiameter,
-                  height: _knobDiameter,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: heerrGradient,
-                    boxShadow: <BoxShadow>[
-                      BoxShadow(
-                        color: heerrMagenta.withValues(alpha: 0.6),
-                        blurRadius: 6,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),
