@@ -44,6 +44,10 @@ class Routes {
   static String libraryAlbum(String id) => '/library/album/$id';
   static String libraryPlaylist(String id) => '/library/playlist/$id';
   static const String libraryRecommendations = '/library/recommendations';
+  // Home redesign (HOMESCREEN.md tasks 3-5): Quick Access destinations.
+  // Screens register under /library so the Library tab stays selected.
+  static const String libraryFavorites = '/library/favorites';
+  static const String libraryRecentlyAdded = '/library/recently-added';
 
   // Job-detail lands at D3; route shape defined here to lock the URL.
   static String job(String id) => '/job/$id';

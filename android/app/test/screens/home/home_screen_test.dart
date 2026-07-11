@@ -161,6 +161,13 @@ void main() {
       ]));
       await tester.pumpAndSettle();
 
+      // The redesign rows above push these sections below the fold — the
+      // outer ListView only builds visible children, so scroll them in.
+      await tester.scrollUntilVisible(
+        find.text('Most played'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('Jump back in'), findsOneWidget);
       expect(find.text('Most played'), findsOneWidget);
       // Two HomeSections rendered (one per non-empty section).
@@ -241,6 +248,11 @@ void main() {
       ]));
       await tester.pumpAndSettle();
 
+      await tester.scrollUntilVisible(
+        find.text('Picked for you'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('Picked for you'), findsOneWidget);
       expect(find.text('Discover'), findsNothing);
     },
@@ -272,6 +284,11 @@ void main() {
       ]));
       await tester.pumpAndSettle();
 
+      await tester.scrollUntilVisible(
+        find.text('Discover'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('Discover'), findsOneWidget);
       expect(find.text('Picked for you'), findsNothing);
     },

@@ -2496,3 +2496,12 @@ User review of the previous widget-polish commit flagged two remaining mismatche
 - **`lib/screens/home/home_screen.dart`** — card inserted into the body after `_GreetingBlock`.
 - **`test/screens/home/continue_listening_card_test.dart`** (new) — 10 tests: hidden-when-empty, content render, progress fraction, null-duration guard (`--:--`, zero fill), play/pause via mocktail `HeerrAudioHandler` stub, tap-through to /player, `barHeights` determinism/range.
 - Verification: `flutter analyze` clean, `flutter test` 788/788 green.
+
+## 2026-07-11 — Home redesign part 3: Quick Access shortcut row
+
+- **`lib/screens/home/quick_access_row.dart`** (new) — `QuickAccessRow`: "Quick Access" header + horizontally scrollable row of 4 static 150×110 outlined cards with gradient-tinted icons: For You → `/library/recommendations`, Favorites → `/library/favorites` (screen lands in part 5), Offline → `/downloads` with a live "N songs" count from `downloadedSongsProvider` (falls back to "Downloads" while loading/on error — local disk state, not network), Recently Added → `/library/recently-added` (screen lands in part 4). No "Edit" affordance — deferred per DECISIONLOG 2026-07-11.
+- **`lib/router.dart`** — `Routes.libraryFavorites` + `Routes.libraryRecentlyAdded` constants added (GoRoutes register in parts 4/5).
+- **`lib/screens/home/home_screen.dart`** — row inserted after the hero card.
+- **`test/screens/home/quick_access_row_test.dart`** (new) — 8 tests: header + 4 cards render, no Edit, count/singular/error subtitles, all four navigation targets.
+- **`test/screens/home/home_screen_test.dart`** — 3 legacy-section tests now scroll before asserting (the new rows push "Most played" / "Picked for you" below the built viewport).
+- Verification: `flutter analyze` clean, `flutter test` 796/796 green.
