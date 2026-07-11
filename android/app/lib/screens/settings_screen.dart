@@ -15,6 +15,7 @@ import '../providers/server_creds.dart';
 import '../theme.dart';
 import '../widgets/download_icon.dart';
 import '../widgets/error_snackbar.dart';
+import 'settings/profile_card.dart';
 import 'settings/profiles_section.dart';
 
 // A17: the recommendations-health + offline-downloads sections live in sibling
@@ -51,6 +52,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       // in ProfilesSection.
       body: ListView(
         children: const <Widget>[
+          // Phase Z: profile entry point at the top of Settings, alongside
+          // the Home AppBar avatar.
+          ProfileCard(),
+          Divider(height: 1),
           // #17: each section is collapsible to keep the screen uncluttered.
           // Profiles (the primary credential surface) stays open by default;
           // the heavier Offline + Recommendations sections start collapsed.

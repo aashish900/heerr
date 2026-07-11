@@ -19,8 +19,10 @@ import 'screens/home/home_screen.dart';
 import 'screens/library/playlist_detail_screen.dart';
 import 'screens/library/favorites_screen.dart';
 import 'screens/library/recently_added_screen.dart';
+import 'screens/library/recently_played_screen.dart';
 import 'screens/player/now_playing_screen.dart';
 import 'screens/profile/edit_server_details_screen.dart';
+import 'screens/profile/profile_edit_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/queue_screen.dart';
 import 'screens/recommendations_screen.dart';
@@ -38,6 +40,7 @@ class Routes {
   static const String settings = '/settings';
   static const String login = '/login';
   static const String profile = '/profile';
+  static const String profileEdit = '/profile/edit';
   static const String editServerDetails = '/edit-server-details';
 
   // Library detail (Subsonic via Navidrome). Nested under the library
@@ -50,9 +53,28 @@ class Routes {
   // Screens register under /library so the Library tab stays selected.
   static const String libraryFavorites = '/library/favorites';
   static const String libraryRecentlyAdded = '/library/recently-added';
+  // Profile "My Music" (Phase Z redesign) — recently played albums.
+  static const String libraryRecentlyPlayed = '/library/recently-played';
+  // Deep-links the Library tab's Playlists sub-tab, per the profile's
+  // Playlists row (Phase Z).
+  static const String libraryPlaylistsTab = '/library?tab=playlists';
 
   // Job-detail lands at D3; route shape defined here to lock the URL.
   static String job(String id) => '/job/$id';
+}
+
+/// Maps the `/library?tab=` query param to [LibraryScreen]'s tab order
+/// (Albums / Artists / Playlists — X1 mockup order). Unknown or missing
+/// values default to the Albums tab (index 0), the redesign's first tab.
+int _tabIndexFor(String? tab) {
+  switch (tab) {
+    case 'artists':
+      return 1;
+    case 'playlists':
+      return 2;
+    default:
+      return 0;
+  }
 }
 
 /// Builds the app's `GoRouter`. Lives at module scope so widget tests can
@@ -120,7 +142,10 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
           GoRoute(
             path: Routes.library,
             builder: (BuildContext context, GoRouterState state) =>
-                const LibraryScreen(),
+                LibraryScreen(
+                  initialTabIndex:
+                      _tabIndexFor(state.uri.queryParameters['tab']),
+                ),
             routes: <RouteBase>[
               GoRoute(
                 path: 'artist/:id',
@@ -148,6 +173,11 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
                 path: 'recently-added',
                 builder: (BuildContext context, GoRouterState state) =>
                     const RecentlyAddedScreen(),
+              ),
+              GoRoute(
+                path: 'recently-played',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const RecentlyPlayedScreen(),
               ),
               GoRoute(
                 path: 'favorites',
@@ -186,11 +216,20 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
         builder: (BuildContext context, GoRouterState state) =>
             const NowPlayingScreen(),
       ),
-      // Profile page (#37) — top-level full-screen push, like Now Playing.
+      // Profile page (#37, Phase Z redesign) — top-level full-screen push,
+      // like Now Playing. The display screen lives at /profile; the edit
+      // form is nested at /profile/edit behind the avatar pencil badge.
       GoRoute(
         path: Routes.profile,
         builder: (BuildContext context, GoRouterState state) =>
             const ProfileScreen(),
+        routes: <RouteBase>[
+          GoRoute(
+            path: 'edit',
+            builder: (BuildContext context, GoRouterState state) =>
+                const ProfileEditScreen(),
+          ),
+        ],
       ),
       // Edit server details — reached from the profiles list 3-dot menu.
       // Optional ?profileId= selects which profile to edit; falls back to

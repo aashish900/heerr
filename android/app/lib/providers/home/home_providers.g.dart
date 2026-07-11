@@ -51,5 +51,28 @@ final recentlyAddedFullProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef RecentlyAddedFullRef = AutoDisposeFutureProviderRef<List<Album>>;
+String _$recentlyPlayedHash() => r'8bcb5453cb93648034f9568e625c7401ce9b3134';
+
+/// Recently *played* albums for the Profile screen's "Recently Played" row
+/// (Phase Z redesign) — `getAlbumList2.view?type=recent`, distinct from
+/// [recentlyAddedFull]'s `type=newest`. Empty on a fresh install / library
+/// with no play history; [RecentlyPlayedScreen] renders that as a plain
+/// empty state, not an error.
+///
+/// Copied from [recentlyPlayed].
+@ProviderFor(recentlyPlayed)
+final recentlyPlayedProvider = AutoDisposeFutureProvider<List<Album>>.internal(
+  recentlyPlayed,
+  name: r'recentlyPlayedProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$recentlyPlayedHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef RecentlyPlayedRef = AutoDisposeFutureProviderRef<List<Album>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

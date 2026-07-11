@@ -244,3 +244,12 @@ reliably supported in home-screen widgets); tapping the tile opens the app.
 
 - **Quick Access "Edit"** — the mockup shows an Edit action implying user-reorderable/hideable shortcut cards. Shipped as a static 4-card row; customization (persisted order/visibility + edit mode UI) deferred.
 - **Recently-Added row kebab menu** — the mockup shows a per-row overflow menu. Rows currently tap through to the album detail; an album-level action sheet (play / shuffle / download) is deferred.
+
+## Library redesign deferrals (2026-07-11, LIBRARYSCREEN.md)
+
+- **Explicit "E" badge on album rows** — the mockup shows an explicit-content badge; no explicit flag exists in the Subsonic album/song payloads the app consumes. Needs a data source before it can ship.
+- **Trailing filter icon is decorative** — the chip row renders a disabled `filter_list` icon ("More filters coming soon"); no additional filters exist yet.
+- **Artist song counts** — rows show "N albums" only; true per-artist song counts require a `getArtist` fan-out (one request per artist) that was rejected for v1.
+- **"See all" on Most Played Artists** — the rail caps at 10 with no see-all surface; the full artists list is the same screen, so a dedicated most-played-ordered view was skipped.
+- **"Year" as a range filter** — Year ships as a sort option inside the sort chip, not the mockup's separate "Year ▾" range picker.
+- **On-device smoke pending** — X1–X6 verified by widget tests only; no device was attached during implementation (same status as the Home redesign smoke).

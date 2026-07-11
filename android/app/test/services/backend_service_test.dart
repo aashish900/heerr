@@ -51,6 +51,8 @@ ResponseBody _json(String body, int status) {
   );
 }
 
+ResponseBody _noContent() => ResponseBody.fromString('', 204);
+
 void main() {
   group('deleteLibrarySong', () {
     test('issues DELETE /library/song with the path in the body', () async {
@@ -180,6 +182,42 @@ void main() {
       );
       await expectLater(
         service.editLibrarySong(path: 'p.mp3', title: 'x'),
+        throwsA(isA<NetworkError>()),
+      );
+    });
+  });
+
+  group('logout', () {
+    test('issues POST /auth/logout and completes on 204', () async {
+      final (BackendService service, _FakeAdapter adapter) = _service(
+        (_) => _noContent(),
+      );
+
+      await service.logout();
+
+      expect(adapter.lastRequest!.method, 'POST');
+      expect(adapter.lastRequest!.path, '/auth/logout');
+    });
+
+    test('401 maps to an ApiError (caller swallows it)', () async {
+      final (BackendService service, _) = _service(
+        (_) => _json('{"detail": "invalid or expired token"}', 401),
+      );
+      await expectLater(
+        service.logout(),
+        throwsA(isA<ApiError>()),
+      );
+    });
+
+    test('connection failure maps to NetworkError', () async {
+      final (BackendService service, _) = _service(
+        (RequestOptions options) => throw DioException.connectionError(
+          requestOptions: options,
+          reason: 'refused',
+        ),
+      );
+      await expectLater(
+        service.logout(),
         throwsA(isA<NetworkError>()),
       );
     });

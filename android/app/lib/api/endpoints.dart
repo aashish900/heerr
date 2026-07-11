@@ -28,6 +28,10 @@ class Endpoints {
   /// navidromeUsername}` on success.
   static const String authLogin = '/auth/login';
 
+  /// Phase Z (Profile redesign): backend `POST /auth/logout`. Bearer-authed,
+  /// revokes the current token server-side. Returns 204.
+  static const String authLogout = '/auth/logout';
+
   /// Phase W (#41): backend N1 — `DELETE /library/song`. Body
   /// `{path: <subsonic-relative-path>}` deletes the file from the music
   /// library on the server; Navidrome drops the track on its next scan.

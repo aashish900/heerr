@@ -18,13 +18,15 @@ import 'package:heerr/providers/library/library_albums.dart';
 import 'package:heerr/providers/library/library_artists.dart';
 import 'package:heerr/providers/library/library_playlists.dart';
 import 'package:heerr/providers/library/library_search.dart';
+import 'package:heerr/providers/library/most_played_artists.dart';
 import 'package:heerr/providers/library/playlist_mutations.dart';
+import 'package:heerr/providers/library/starred_songs.dart';
 import 'package:heerr/providers/queue.dart';
 import 'package:heerr/providers/search.dart';
 import 'package:heerr/providers/secure_storage.dart';
+import 'package:heerr/screens/library/album_grid_card.dart';
 import 'package:heerr/screens/library/library_screen.dart';
 import 'package:heerr/widgets/empty_state.dart';
-import 'package:heerr/widgets/library_result_tile.dart';
 import 'package:heerr/widgets/result_tile.dart';
 import 'package:heerr/widgets/skeleton.dart';
 
@@ -128,24 +130,198 @@ Widget _wrap(List<Override> overrides) {
 }
 
 // Defaults: empty-data on the two non-focal tabs so they don't trip up
-// rendering when widgets-under-test build the focal tab only.
-List<Override> _defaultsExcept({Override? artists, Override? albums, Override? playlists}) {
+// rendering when widgets-under-test build the focal tab only. The
+// most-played rail defaults to empty so the Artists tab never fans out a
+// real frequent-albums fetch in tests.
+List<Override> _defaultsExcept(
+    {Override? artists,
+    Override? albums,
+    Override? playlists,
+    List<MostPlayedArtist> mostPlayed = const <MostPlayedArtist>[]}) {
   return <Override>[
     artists ?? _artistsValue(const AsyncData<List<ArtistIndex>>(<ArtistIndex>[])),
     albums ?? _albumsValue(const AsyncData<List<Album>>(<Album>[])),
     playlists ?? _playlistsValue(const AsyncData<List<Playlist>>(<Playlist>[])),
+    mostPlayedArtistsProvider.overrideWith(
+      (Ref<AsyncValue<List<MostPlayedArtist>>> ref) async => mostPlayed,
+    ),
+    // Favorites card/row count — stubbed empty so the Playlists tab never
+    // fires a real getStarred2 fetch in tests.
+    starredSongsProvider.overrideWith(
+      (Ref<AsyncValue<List<Song>>> ref) async => const <Song>[],
+    ),
   ];
 }
 
 void main() {
-  group('Artists tab (default)', () {
+  group('X1 header + tabs', () {
+    testWidgets('browse mode renders the branded header and headline',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(_defaultsExcept()));
+      await tester.pumpAndSettle();
+      expect(find.text('Your Library'), findsOneWidget);
+      // Shared header: profile avatar + queue shortcut + search action.
+      expect(find.byKey(const Key('home-profile-avatar')), findsOneWidget);
+      expect(find.byIcon(Icons.queue_music_outlined), findsWidgets);
+      expect(find.byIcon(Icons.search), findsOneWidget);
+      // No legacy plain title.
+      expect(find.text('Library'), findsNothing);
+    });
+
+    testWidgets('tab order is Albums / Artists / Playlists',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(_defaultsExcept()));
+      await tester.pumpAndSettle();
+      final TabBar bar = tester.widget<TabBar>(find.byType(TabBar));
+      expect(bar.tabs, hasLength(3));
+      // Label order inside the TabBar.
+      final Finder labels = find.descendant(
+        of: find.byType(TabBar),
+        matching: find.byType(Text),
+      );
+      final List<String> texts = tester
+          .widgetList<Text>(labels)
+          .map((Text t) => t.data)
+          .whereType<String>()
+          .toList();
+      expect(texts, <String>['Albums', 'Artists', 'Playlists']);
+    });
+
+    testWidgets('initialTabIndex: 2 opens the Playlists tab',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(ProviderScope(
+        overrides: <Override>[
+          secureStorageProvider.overrideWithValue(_NoopStorage()),
+          queueProvider.overrideWith(_StubQueue.new),
+          searchDebounceProvider.overrideWithValue(Duration.zero),
+          ..._defaultsExcept(),
+        ],
+        child: const MaterialApp(home: LibraryScreen(initialTabIndex: 2)),
+      ));
+      await tester.pumpAndSettle();
+      // The Playlists tab always renders the Favorites card first.
+      expect(
+          find.byKey(const Key('favorites-grid-card')), findsOneWidget);
+    });
+  });
+
+  group('Albums tab (default)', () {
     testWidgets('loading → SkeletonList', (WidgetTester tester) async {
       await tester.pumpWidget(_wrap(_defaultsExcept(
-        artists: _artistsValue(const AsyncLoading<List<ArtistIndex>>()),
+        albums: _albumsValue(const AsyncLoading<List<Album>>()),
       )));
       await tester.pump();
       expect(find.byType(SkeletonList), findsOneWidget);
     });
+
+    testWidgets('default tab shows the grid card + full-list row (X3)',
+        (WidgetTester tester) async {
+      const Album album = Album(
+        id: 'al-1',
+        name: 'Currents',
+        artist: 'Tame Impala',
+        coverArt: 'al-1',
+        year: 2015,
+        songCount: 13,
+      );
+      await tester.pumpWidget(_wrap(_defaultsExcept(
+        albums: _albumsValue(const AsyncData<List<Album>>(<Album>[album])),
+      )));
+      await tester.pumpAndSettle();
+
+      // Grid card renders above the fold, with the chip row.
+      expect(find.byType(AlbumGridCard), findsOneWidget);
+      expect(find.text('Currents'), findsOneWidget);
+      expect(find.text('Recently Added'), findsOneWidget);
+      expect(find.text('Downloaded'), findsOneWidget);
+
+      // The full-list section sits below the grid — scroll it into view.
+      await tester.drag(
+          find.byType(CustomScrollView), const Offset(0, -600));
+      await tester.pumpAndSettle();
+      // List row subtitle joins artist • year • songs.
+      expect(find.text('Tame Impala • 2015 • 13 songs'), findsOneWidget);
+    });
+
+    testWidgets('grid caps at 9 cards; list carries all albums (X3)',
+        (WidgetTester tester) async {
+      final List<Album> albums = List<Album>.generate(
+        12,
+        (int i) => Album(id: 'al-$i', name: 'Album $i'),
+      );
+      await tester.pumpWidget(_wrap(_defaultsExcept(
+        albums: _albumsValue(AsyncData<List<Album>>(albums)),
+      )));
+      await tester.pumpAndSettle();
+
+      // Grid children are built lazily, but the delegate's childCount is
+      // the contract — read it off the SliverGrid.
+      final SliverGrid grid =
+          tester.widget<SliverGrid>(find.byType(SliverGrid, skipOffstage: false));
+      expect(grid.delegate.estimatedChildCount, 9);
+      final SliverFixedExtentList list = tester.widget<SliverFixedExtentList>(
+          find.byType(SliverFixedExtentList, skipOffstage: false));
+      expect(list.delegate.estimatedChildCount, 12);
+    });
+
+    testWidgets(
+        'A–Z sort shows the alphabet scrubber; scrubbing jumps the list (X4)',
+        (WidgetTester tester) async {
+      final List<Album> albums = List<Album>.generate(
+        30,
+        (int i) =>
+            Album(id: 'al-$i', name: '${String.fromCharCode(65 + (i % 26))}lbum $i'),
+      );
+      await tester.pumpWidget(_wrap(_defaultsExcept(
+        albums: _albumsValue(AsyncData<List<Album>>(albums)),
+      )));
+      await tester.pumpAndSettle();
+
+      // Default sort (Recently Added) → no scrubber.
+      expect(find.byKey(const Key('alphabet-scrubber')), findsNothing);
+
+      // Switch to A–Z via the sort chip.
+      await tester.tap(find.byKey(const Key('library-sort-chip')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('A–Z').last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('alphabet-scrubber')), findsOneWidget);
+
+      // Scrub near the bottom → the scroll view jumps well past the top.
+      final ScrollableState scrollable = tester.state<ScrollableState>(
+        find
+            .descendant(
+              of: find.byType(CustomScrollView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      final Offset bottom = tester
+          .getBottomLeft(find.byKey(const Key('alphabet-scrubber')))
+          .translate(10, -2);
+      await tester.tapAt(bottom);
+      await tester.pumpAndSettle();
+      expect(scrollable.position.pixels, greaterThan(0));
+    });
+
+    testWidgets('Albums empty → EmptyState "No albums yet"',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(_defaultsExcept(
+        albums: _albumsValue(const AsyncData<List<Album>>(<Album>[])),
+      )));
+      await tester.pumpAndSettle();
+      expect(find.text('No albums yet'), findsOneWidget);
+    });
+  });
+
+  group('Artists sub-tab', () {
+    Future<void> goToArtists(WidgetTester tester) async {
+      await tester.tap(find.descendant(
+        of: find.byType(TabBar),
+        matching: find.text('Artists'),
+      ));
+      await tester.pumpAndSettle();
+    }
 
     testWidgets('empty library → EmptyState "No artists yet"',
         (WidgetTester tester) async {
@@ -154,12 +330,44 @@ void main() {
             _artistsValue(const AsyncData<List<ArtistIndex>>(<ArtistIndex>[])),
       )));
       await tester.pumpAndSettle();
+      await goToArtists(tester);
       expect(find.byType(EmptyState), findsOneWidget);
       expect(find.text('No artists yet'), findsOneWidget);
     });
 
-    testWidgets('data → renders artist tiles grouped by letter',
+    testWidgets('data → flattened rows with album counts + scrubber (X5)',
         (WidgetTester tester) async {
+      const List<ArtistIndex> indices = <ArtistIndex>[
+        ArtistIndex(name: 'T', artist: <Artist>[
+          Artist(id: 'ar-1', name: 'Tame Impala', albumCount: 4),
+        ]),
+        ArtistIndex(name: 'A', artist: <Artist>[
+          Artist(id: 'ar-2', name: 'Adele', albumCount: 2),
+        ]),
+      ];
+      await tester.pumpWidget(_wrap(_defaultsExcept(
+        artists: _artistsValue(
+            const AsyncData<List<ArtistIndex>>(indices)),
+      )));
+      await tester.pumpAndSettle();
+      await goToArtists(tester);
+      expect(find.text('Tame Impala'), findsOneWidget);
+      expect(find.text('4 albums'), findsOneWidget);
+      // Flattened A–Z: Adele's row is above Tame Impala's.
+      expect(
+        tester.getTopLeft(find.text('Adele')).dy,
+        lessThan(tester.getTopLeft(find.text('Tame Impala')).dy),
+      );
+      // A–Z is the default artist sort → scrubber visible.
+      expect(find.byKey(const Key('alphabet-scrubber')), findsOneWidget);
+    });
+
+    testWidgets('most played rail renders entries with play badges (X5)',
+        (WidgetTester tester) async {
+      const List<MostPlayedArtist> rail = <MostPlayedArtist>[
+        MostPlayedArtist(
+            artistId: 'ar-w', name: 'The Weeknd', topAlbumId: 'al-1'),
+      ];
       const ArtistIndex aIndex = ArtistIndex(
         name: 'T',
         artist: <Artist>[
@@ -169,11 +377,14 @@ void main() {
       await tester.pumpWidget(_wrap(_defaultsExcept(
         artists: _artistsValue(
             const AsyncData<List<ArtistIndex>>(<ArtistIndex>[aIndex])),
+        mostPlayed: rail,
       )));
       await tester.pumpAndSettle();
-      expect(find.text('T'), findsOneWidget);
-      expect(find.text('Tame Impala'), findsOneWidget);
-      expect(find.byType(LibraryResultTile), findsOneWidget);
+      await goToArtists(tester);
+      expect(find.text('Most Played Artists'), findsOneWidget);
+      expect(find.text('The Weeknd'), findsOneWidget);
+      expect(
+          find.byKey(const Key('most-played-play-ar-w')), findsOneWidget);
     });
 
     testWidgets('error → renders error message',
@@ -184,71 +395,48 @@ void main() {
         ),
       )));
       await tester.pumpAndSettle();
+      await goToArtists(tester);
       expect(find.textContaining('Error'), findsOneWidget);
     });
   });
 
-  group('Albums sub-tab', () {
-    testWidgets('swiping to Albums shows the data list',
-        (WidgetTester tester) async {
-      const Album album = Album(
-        id: 'al-1',
-        name: 'Currents',
-        artist: 'Tame Impala',
-        coverArt: 'al-1',
-      );
-      await tester.pumpWidget(_wrap(_defaultsExcept(
-        albums: _albumsValue(const AsyncData<List<Album>>(<Album>[album])),
-      )));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.descendant(
-        of: find.byType(TabBar),
-        matching: find.text('Albums'),
-      ));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Currents'), findsOneWidget);
-      expect(find.text('Tame Impala'), findsOneWidget);
-    });
-
-    testWidgets('Albums empty → EmptyState "No albums yet"',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(_defaultsExcept(
-        albums: _albumsValue(const AsyncData<List<Album>>(<Album>[])),
-      )));
-      await tester.pumpAndSettle();
-      await tester.tap(find.descendant(
-        of: find.byType(TabBar),
-        matching: find.text('Albums'),
-      ));
-      await tester.pumpAndSettle();
-      expect(find.text('No albums yet'), findsOneWidget);
-    });
-  });
-
   group('Playlists sub-tab', () {
-    testWidgets('swiping to Playlists shows the data list',
+    Future<void> goToPlaylists(WidgetTester tester) async {
+      await tester.tap(find.descendant(
+        of: find.byType(TabBar),
+        matching: find.text('Playlists'),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('shows Favorites card, playlist card and full-list row (X6)',
         (WidgetTester tester) async {
       const Playlist playlist = Playlist(
         id: 'pl-1',
         name: 'Morning',
         songCount: 12,
+        owner: 'aashish',
       );
       await tester.pumpWidget(_wrap(_defaultsExcept(
         playlists:
             _playlistsValue(const AsyncData<List<Playlist>>(<Playlist>[playlist])),
       )));
       await tester.pumpAndSettle();
+      await goToPlaylists(tester);
 
-      await tester.tap(find.descendant(
-        of: find.byType(TabBar),
-        matching: find.text('Playlists'),
-      ));
-      await tester.pumpAndSettle();
-
+      // Grid: Favorites card first, then the playlist card.
+      expect(find.byKey(const Key('favorites-grid-card')), findsOneWidget);
+      expect(
+          find.byKey(const Key('playlist-grid-card-pl-1')), findsOneWidget);
       expect(find.text('Morning'), findsOneWidget);
-      expect(find.text('12 songs'), findsOneWidget);
+      expect(find.text('by aashish'), findsOneWidget);
+
+      // Full-list section below the grid — scroll down to it.
+      await tester.drag(
+          find.byType(CustomScrollView), const Offset(0, -700));
+      await tester.pumpAndSettle();
+      expect(find.text('by aashish • 12 songs'), findsOneWidget);
+      expect(find.byKey(const Key('library-favorites-row')), findsOneWidget);
     });
 
     testWidgets(
@@ -259,40 +447,37 @@ void main() {
               _playlistsValue(const AsyncData<List<Playlist>>(<Playlist>[])),
         )));
         await tester.pumpAndSettle();
-        await tester.tap(find.descendant(
-          of: find.byType(TabBar),
-          matching: find.text('Playlists'),
-        ));
-        await tester.pumpAndSettle();
+        await goToPlaylists(tester);
         // M2 empty state replaced by always-visible For You entry — N3
         // makes recommendations reachable even before the user has any
-        // playlists.
+        // playlists. X6 keeps it as the list tail; scroll past the card
+        // grid to reach it.
+        await tester.drag(
+            find.byType(CustomScrollView), const Offset(0, -700));
+        await tester.pumpAndSettle();
         expect(find.byKey(const Key('library-for-you-entry')),
             findsOneWidget);
       },
     );
 
     testWidgets(
-      'FAB is rendered on the Playlists sub-tab',
+      'Create Playlist card replaces the FAB (X6)',
       (WidgetTester tester) async {
         await tester.pumpWidget(_wrap(_defaultsExcept(
           playlists:
               _playlistsValue(const AsyncData<List<Playlist>>(<Playlist>[])),
         )));
         await tester.pumpAndSettle();
-        await tester.tap(find.descendant(
-          of: find.byType(TabBar),
-          matching: find.text('Playlists'),
-        ));
-        await tester.pumpAndSettle();
+        await goToPlaylists(tester);
 
-        expect(find.byType(FloatingActionButton), findsOneWidget);
-        expect(find.text('New playlist'), findsOneWidget);
+        expect(find.byType(FloatingActionButton), findsNothing);
+        expect(find.byKey(const Key('create-playlist-card')), findsOneWidget);
+        expect(find.text('Create Playlist'), findsOneWidget);
       },
     );
 
     testWidgets(
-      'tapping FAB + entering name calls createPlaylist once with the name',
+      'tapping the Create card + entering name calls createPlaylist once',
       (WidgetTester tester) async {
         _StubPlaylistMutations.reset();
         addTearDown(_StubPlaylistMutations.reset);
@@ -308,14 +493,10 @@ void main() {
           ],
         ));
         await tester.pumpAndSettle();
-        await tester.tap(find.descendant(
-          of: find.byType(TabBar),
-          matching: find.text('Playlists'),
-        ));
-        await tester.pumpAndSettle();
+        await goToPlaylists(tester);
 
-        // Open the dialog via the FAB.
-        await tester.tap(find.byType(FloatingActionButton));
+        // Open the dialog via the Create Playlist grid card.
+        await tester.tap(find.byKey(const Key('create-playlist-card')));
         await tester.pumpAndSettle();
 
         // Enter a name with surrounding whitespace to also assert the
@@ -338,15 +519,15 @@ void main() {
         await tester.pumpWidget(_wrap(_defaultsExcept()));
         await tester.pumpAndSettle();
 
-        // Idle Library shows the AppBar "Library" title.
-        expect(find.text('Library'), findsOneWidget);
+        // Idle Library shows the "Your Library" headline.
+        expect(find.text('Your Library'), findsOneWidget);
         expect(find.byType(TextField), findsNothing);
 
         await tester.tap(find.byIcon(Icons.search));
         await tester.pumpAndSettle();
 
-        // The TextField has replaced the title; the AppBar title text is gone.
-        expect(find.text('Library'), findsNothing);
+        // The TextField has replaced the browse UI; the headline is gone.
+        expect(find.text('Your Library'), findsNothing);
         expect(find.byType(TextField), findsOneWidget);
         // Initial empty-query placeholder.
         expect(find.text('Search your library'), findsOneWidget);
@@ -522,7 +703,7 @@ void main() {
 
         // Back to browse mode.
         expect(find.byType(TextField), findsNothing);
-        expect(find.text('Library'), findsOneWidget);
+        expect(find.text('Your Library'), findsOneWidget);
       },
     );
   });

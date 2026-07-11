@@ -1052,3 +1052,61 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Why:** Both were "the card still doesn't match/behave like the reference" gaps identified by the user testing the running app, not new scope.
 
 **Reference:** `lib/screens/home/continue_listening_card.dart`, `android/app/android/app/src/main/kotlin/com/aashish/heerr/HeroWidgetProvider.kt`.
+
+## 2026-07-11 — Phase Z: Profile screen redesign — heerr v4.9.0
+
+**Context:** A mockup (Profile Screen.png) turned `/profile` from a plain edit form (avatar picker, Name/Nickname/Bio fields, Save) into a display-first profile page: gradient-ring avatar, name/@handle/bio, a stats row, "My Music" quick-link cards, a "Settings" section, and a Log Out button. The existing edit functionality (avatar photo sheet with 2 MB cap, Name/Nickname/Bio fields, "Edit server details" menu) needed to survive unchanged, just relocated behind an edit affordance.
+
+**Decision:**
+1. **`/profile` becomes the display screen; the edit form moves to `/profile/edit`.** `lib/screens/profile/profile_edit_screen.dart` is the old `profile_screen.dart` content verbatim (renamed `ProfileEditScreen`), with the only behavioural change being post-save navigation: `context.pop()` back to the display screen instead of `go(Routes.home)`. The avatar's gradient ring and a magenta pencil badge both push `/profile/edit`.
+2. **Stats row is Playlists / Songs / Albums / Artists — Hours dropped, no new endpoints.** The mockup's 4th column ("Hours") has no data source (no local or server-side listening-time tracking exists). `profileStatsProvider` (`lib/providers/profiles/profile_stats.dart`) sums three providers the app already fetches elsewhere (`libraryPlaylistsProvider`, `libraryAlbumsProvider` for both the Albums count and a `songCount` sum, `libraryArtistsProvider`) — all L5 cache-aware, so the row still renders offline. A `formatStatCount` helper renders compact counts (`1234` → `"1.2K"`).
+3. **"heerr Radio" and "Followed Artists" rows are deferred**, per user decision — not present in the shipped "My Music" section (Liked Songs, Downloaded, Recently Played, Playlists only).
+4. **Recently Played is a new screen sourced from Subsonic `type=recent`**, distinct from the existing Home "Recently Added" (`type=newest`). `recentlyPlayedProvider` (`lib/providers/home/home_providers.dart`) + `RecentlyPlayedScreen` (`lib/screens/library/recently_played_screen.dart`, cloned from `RecentlyAddedScreen`) at route `/library/recently-played`. Empty state reads "Nothing played yet" rather than an error — `type=recent` may be genuinely empty on a fresh install with no play history.
+5. **Playlists row deep-links the Library tab's Playlists sub-tab** via `/library?tab=playlists`. `LibraryScreen` gained an `initialTabIndex` constructor param feeding `DefaultTabController(initialIndex:)`; the router maps the query param in `_tabIndexFor`.
+6. **Log Out is best-effort remote token revoke, then unconditional local sign-out.** Added `POST /auth/logout` (`Endpoints.authLogout`, `BackendService.logout()`) — the backend already implements it (`backend/app/api/v1/auth.py` revokes the bearer token, 204). The screen wraps the call in try/catch: an unreachable backend must never block the local sign-out, since that's often exactly why someone is logging out. Local sign-out is `profileRegistryProvider.notifier.setActive(null)` — **not** `removeProfile` — so the profile row survives in the registry for a fast re-login. The router's existing `refreshListenable` redirect (A2, 2026-06-20 ADR) then rewrites to `/login` automatically; the screen does no manual navigation. A confirmation `AlertDialog` guards the button.
+7. **About/Help are dialogs, not new screens.** About shows the app name/logo (`HeerrLogo`) + `appVersionProvider`'s installed version. Help & Support is a static dialog pointing at Tailscale connectivity as the most common self-hosted failure mode — no ticketing/support backend exists to link to.
+8. **Settings gained a profile entry point** (`ProfileCard`, `lib/screens/settings/profile_card.dart`) at the top of the Settings tab, alongside the pre-existing Home AppBar avatar button — both push `/profile`. The gradient-ring avatar rendering (previously duplicated between the Home button and the edit form) was extracted into a shared `ProfileAvatarRing` widget (`lib/widgets/profile_avatar_ring.dart`) parameterised by radius/padding, now used in all three locations (Home header, Profile display header, Settings card).
+
+**Why:**
+- **Stats from existing providers, not new endpoints** — the three sources are already fetched for the Library tab; summing them client-side costs nothing extra and inherits the L5 offline cache for free.
+- **`setActive(null)` over `removeProfile`** — logging out is not the same intent as deleting a profile. Keeping the registry row means a user who logs out to test a different account (or hit an auth error) doesn't lose their saved credentials.
+- **Best-effort backend logout** — matches the app's existing posture toward backend reachability (e.g. offline sync, cache-aware library providers): local state changes proceed even when the home-server/Tailscale path is down.
+- **Shared `ProfileAvatarRing`** — three near-identical gradient-ring implementations (radius 14 in Home, radius 44 in the edit form, now radius 18 in the Settings card) were consolidating into one widget rather than a fourth copy-paste.
+
+**Alternatives considered:**
+- **Track listening hours locally** (hook the position stream, persist accumulated seconds) to keep the mockup's 4th stat column literally. Rejected for v1: a real feature (start-from-zero on install, needs its own persistence + migration story) disguised as a stats-row filler; Albums is a truthful, already-available substitute.
+- **`removeProfile` on logout.** Rejected — conflates "sign out" with "forget this server," forcing full re-entry of Navidrome credentials on the next login for no benefit.
+- **Route the backend logout call through a blocking `await` before sign-out** (fail the whole flow if the backend call fails). Rejected — an unreachable backend is a common *reason* to log out (e.g. switching to a different server), not a case that should trap the user on the profile screen.
+
+**Trade-off:** `libraryAlbumsProvider` and `libraryArtistsProvider` currently cap at 500/whatever page size their underlying `SubsonicLibraryService` calls use — very large libraries (beyond that cap) will undercount Songs/Albums on the stats row. Acceptable: it's the same cap already governing the Albums sub-tab, and a stats display is inherently approximate.
+
+**Reference:** `lib/screens/profile/{profile_screen,profile_edit_screen}.dart`, `lib/providers/profiles/profile_stats.dart`, `lib/screens/library/recently_played_screen.dart`, `lib/providers/home/home_providers.dart` (`recentlyPlayedProvider`), `lib/screens/settings/profile_card.dart`, `lib/widgets/profile_avatar_ring.dart`, `lib/services/backend_service.dart` (`logout`), `router.dart` (`Routes.profileEdit`, `Routes.libraryRecentlyPlayed`, `Routes.libraryPlaylistsTab`, `_tabIndexFor`). Roadmap milestones Z1–Z6.
+
+## 2026-07-11 — Phase X: Library screen redesign — heerr v4.10.0
+
+**Context:** A three-panel mockup (pasted in-session; to be saved as `Library Screen.png`) redesigns the Library tab from a plain Material `TabBar` + flat lists into the branded layout: shared header, "Your Library" headline, icon segmented tabs, per-tab filter chips, an albums grid, an A–Z scrubber, artist rows with a "Most Played Artists" rail, and playlist cards with Favorites/Create tiles. Full task plan: `LIBRARYSCREEN.md`.
+
+**Decision:**
+1. **Header extraction, not duplication.** The Home AppBar trio (logo, queue shortcut, avatar button) plus the greeting block moved into `lib/widgets/branded_header.dart` (`BrandedAppBar`, `GreetingBlock`, `ProfileAvatarButton`, `greetingForHour`). Library renders the compact variant (logo mark + small two-line greeting); Home keeps the wordmark + body greeting. `home_screen.dart` re-exports `greetingForHour` so existing imports keep resolving.
+2. **Tab order becomes Albums / Artists / Playlists (mockup order); deep link mapping updated in the same commit.** `_tabIndexFor` in `router.dart` now maps `artists`→1, `playlists`→2, default→0 (Albums). The Z3 `/library?tab=playlists` deep link is unaffected in behavior.
+3. **All sorting/filtering is client-side — zero new endpoints.** `AlbumSort` (Recently Added default / A–Z / Year), `ArtistSort` (A–Z / Z–A), `PlaylistSort` (Recently Added / A–Z) sort the existing cached fetches (`created`/`changed` ISO strings compare lexicographically). "Downloaded" chips filter on the offline manifest: `markedAlbums` for albums, `markedPlaylists` for playlists, and for artists `markedArtists` ∪ artists of marked albums joined on `Album.artistId`.
+4. **Grid = recent subset, list = full library** (user decision). Albums: 9-cap 3-column grid + full "Albums ›" list below in one `CustomScrollView`. Playlists: 2-column card grid (Favorites card first with the starred-songs count, up to 6 playlist cards, "+ Create Playlist" card last — replacing the FAB but reusing the same `CreatePlaylistDialog` flow) + full "Playlists ›" list with the For You entry preserved at the tail.
+5. **A–Z scrubber only in alphabetical sort, with fixed extents for exact jumps.** `AlphabetScrubber` (27 buckets, `#` + A–Z) fires letters; the tabs compute jump offsets from pinned extents (rows 72 via `SliverFixedExtentList`, chip row 56, section header 44) plus, on Albums, mirrored grid geometry. `scrubTargetIndex` does nearest-bucket fallthrough (Spotify behavior).
+6. **"Most Played Artists" is derived, not fetched.** Subsonic has no frequent-artists endpoint; `mostPlayedArtistsFrom` dedupes `getAlbumList2?type=frequent` by `artistId` (first album wins — the list is play-count ordered), the album cover doubles as the avatar and its id backs the play badge. Cap 10; the rail hides on loading/error/empty.
+7. **Artist rows show "N albums" only** (user decision) — `getArtists` has no song count and a per-artist `getArtist` fan-out was rejected.
+8. **Bottom nav unchanged** (user decision) — the mockup's 5-tab Home/Library/Downloads/Search/Profile nav is out of scope for this phase.
+9. **Explicit "E" badge dropped** — no explicit flag exists anywhere in the Subsonic album/song payload the app consumes.
+
+**Why:**
+- **Client-side sort over new endpoints** — the full album list (500-cap) is already fetched and L5-cached; re-sorting in memory is free and works offline. `type=byYear` would additionally require a fixed year range, which the chip UX doesn't need.
+- **Manifest joins for "Downloaded"** — the manifest is the single source of truth for offline marking; deriving artist downloaded-ness through `Album.artistId` avoids inventing a parallel tracking set.
+- **Fixed extents for the scrubber** — computing sliver offsets generically is fragile; pinning three constants makes jumps deterministic and testable.
+
+**Alternatives considered:**
+- **Grid/list view toggle** (one dataset, two layouts) instead of grid-subset + full list. Rejected by user in favor of the literal mockup reading.
+- **Per-artist `getArtist` fan-out** for true song counts. Rejected: one request per artist on first paint for a vanity number.
+- **`scrollable_positioned_list` package** for index jumps. Rejected: a dependency to avoid three height constants.
+
+**Trade-off:** the Albums scrub-jump mirrors the grid geometry formula; if the grid's `childAspectRatio`/spacing change, `_gridExtent` must change with them (they sit adjacent in `library_tabs.dart` with a comment). The playlists grid caps at 6 cards — by design, the full list is directly below.
+
+**Reference:** `lib/widgets/{branded_header,library_filter_chips,alphabet_scrubber}.dart`, `lib/providers/library/{library_filters,library_views,most_played_artists}.dart`, `lib/screens/library/{library_screen,library_tabs,album_grid_card,playlist_grid_card}.dart`, `router.dart` (`_tabIndexFor`). Roadmap milestones X1–X7; plan doc `LIBRARYSCREEN.md`.

@@ -1,22 +1,31 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:heerr/api/api_error.dart';
 import 'package:heerr/models/profile.dart';
+import 'package:heerr/models/profile_meta.dart';
+import 'package:heerr/models/subsonic/album.dart';
+import 'package:heerr/models/subsonic/artist.dart';
+import 'package:heerr/models/subsonic/artist_index.dart';
+import 'package:heerr/models/subsonic/playlist.dart';
+import 'package:heerr/providers/library/library_albums.dart';
+import 'package:heerr/providers/library/library_artists.dart';
+import 'package:heerr/providers/library/library_playlists.dart';
 import 'package:heerr/providers/prefs_storage.dart';
 import 'package:heerr/providers/profiles/active_profile.dart';
 import 'package:heerr/providers/profiles/profile_avatar.dart';
-import 'package:heerr/providers/profiles/profile_image_picker.dart';
 import 'package:heerr/providers/profiles/profile_registry.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/screens/profile/profile_screen.dart';
-import 'package:heerr/utils/word_limit.dart';
+import 'package:heerr/services/backend_service.dart';
 
-class _FakeKv implements SecureStorage, PrefsStorage {
+class _FakePrefs implements PrefsStorage {
   final Map<String, String> store = <String, String>{};
   @override
   Future<String?> read(String key) async => store[key];
@@ -24,6 +33,29 @@ class _FakeKv implements SecureStorage, PrefsStorage {
   Future<void> write(String key, String value) async => store[key] = value;
   @override
   Future<void> delete(String key) async => store.remove(key);
+}
+
+class _FakeSecureStorage implements SecureStorage {
+  final Map<String, String> store = <String, String>{};
+  @override
+  Future<String?> read(String key) async => store[key];
+  @override
+  Future<void> write(String key, String value) async => store[key] = value;
+  @override
+  Future<void> delete(String key) async => store.remove(key);
+}
+
+class _RecordingBackendService extends BackendService {
+  _RecordingBackendService({this.throwOnLogout = false}) : super(Dio());
+
+  final bool throwOnLogout;
+  int logoutCalls = 0;
+
+  @override
+  Future<void> logout() async {
+    logoutCalls++;
+    if (throwOnLogout) throw const NetworkError();
+  }
 }
 
 Profile _profile() => Profile(
@@ -40,168 +72,326 @@ Profile _profile() => Profile(
 
 void main() {
   late Directory tmp;
-  setUp(() => tmp = Directory.systemTemp.createTempSync('profile_screen'));
+  setUp(() => tmp = Directory.systemTemp.createTempSync('profile_display'));
   tearDown(() => tmp.deleteSync(recursive: true));
 
-  Widget wrap(
-    _FakeKv kv, {
-    Uint8List? pickResult,
+  Widget wrap({
+    ProfileMeta? meta,
+    Profile? profile,
+    _FakeSecureStorage? secure,
+    _RecordingBackendService? backend,
   }) {
-    // Seed the registry index so updateDisplayName finds the profile.
-    kv.store[kProfilesIndexKey] = jsonEncode(<String, Object?>{
-      'profiles': <Map<String, dynamic>>[_profile().toJson()],
-    });
+    final _FakePrefs prefs = _FakePrefs();
+    final Profile p = profile ?? _profile();
+    if (meta != null) {
+      prefs.store['profile_meta_${p.id}'] = jsonEncode(meta.toJson());
+    }
+    final _FakeSecureStorage kv = secure ?? _FakeSecureStorage();
+    // A minimal router so the pencil badge's push target is assertable
+    // without booting the whole app router.
+    final GoRouter router = GoRouter(
+      initialLocation: '/profile',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/profile',
+          builder: (BuildContext context, GoRouterState state) =>
+              const ProfileScreen(),
+          routes: <RouteBase>[
+            GoRoute(
+              path: 'edit',
+              builder: (BuildContext context, GoRouterState state) =>
+                  const Scaffold(body: Text('EDIT_SCREEN')),
+            ),
+          ],
+        ),
+        GoRoute(
+          path: '/library/favorites',
+          builder: (BuildContext context, GoRouterState state) =>
+              const Scaffold(body: Text('FAVORITES_SCREEN')),
+        ),
+        GoRoute(
+          path: '/library/recently-played',
+          builder: (BuildContext context, GoRouterState state) =>
+              const Scaffold(body: Text('RECENTLY_PLAYED_SCREEN')),
+        ),
+        GoRoute(
+          path: '/library',
+          builder: (BuildContext context, GoRouterState state) => Scaffold(
+            body: Text('LIBRARY_SCREEN tab=${state.uri.queryParameters['tab']}'),
+          ),
+        ),
+        GoRoute(
+          path: '/downloads',
+          builder: (BuildContext context, GoRouterState state) =>
+              const Scaffold(body: Text('DOWNLOADS_SCREEN')),
+        ),
+        GoRoute(
+          path: '/settings',
+          builder: (BuildContext context, GoRouterState state) =>
+              const Scaffold(body: Text('SETTINGS_SCREEN')),
+        ),
+      ],
+    );
     return ProviderScope(
       overrides: <Override>[
+        prefsStorageProvider.overrideWithValue(prefs),
         secureStorageProvider.overrideWith((Ref<SecureStorage> _) => kv),
-        prefsStorageProvider.overrideWithValue(kv),
-        activeProfileProvider.overrideWithValue(_profile()),
+        activeProfileProvider.overrideWithValue(p),
         avatarsDirProvider.overrideWith((_) async => tmp),
-        profileImagePickerProvider.overrideWithValue(() async => pickResult),
+        backendServiceProvider.overrideWith(
+          (BackendServiceRef ref) async =>
+              backend ?? _RecordingBackendService(),
+        ),
+        libraryPlaylistsProvider.overrideWith(
+          (LibraryPlaylistsRef ref) async => <Playlist>[
+            const Playlist(id: '1', name: 'A'),
+          ],
+        ),
+        libraryAlbumsProvider.overrideWith(
+          (LibraryAlbumsRef ref) async => <Album>[
+            const Album(id: '1', name: 'Al1', songCount: 12),
+          ],
+        ),
+        libraryArtistsProvider.overrideWith(
+          (LibraryArtistsRef ref) async => <ArtistIndex>[
+            const ArtistIndex(name: 'A', artist: <Artist>[
+              Artist(id: '1', name: 'Artist One'),
+            ]),
+          ],
+        ),
       ],
-      child: const MaterialApp(home: ProfileScreen()),
+      child: MaterialApp.router(routerConfig: router),
     );
   }
 
-  testWidgets('renders placeholder avatar + name prefilled + empty extras',
+  testWidgets('renders name, @handle and bio from profile + meta',
       (WidgetTester tester) async {
-    final _FakeKv kv = _FakeKv();
-    await tester.pumpWidget(wrap(kv));
+    await tester.pumpWidget(
+        wrap(meta: const ProfileMeta(bio: 'Music is life. Play it loud.')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Alice'), findsOneWidget);
+    expect(find.text('@alice-nd'), findsOneWidget);
+    expect(find.text('Music is life. Play it loud.'), findsOneWidget);
+  });
+
+  testWidgets('bio line is hidden when meta has no bio',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('profile-bio')), findsNothing);
+    expect(find.text('@alice-nd'), findsOneWidget);
+  });
+
+  testWidgets('placeholder person icon renders when no avatar file exists',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.person_outline), findsOneWidget);
-    expect(find.text('Add photo'), findsOneWidget);
+  });
+
+  testWidgets('pencil badge pushes /profile/edit',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('profile-edit-badge')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('EDIT_SCREEN'), findsOneWidget);
+  });
+
+  testWidgets('avatar tap also pushes /profile/edit',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('profile-avatar')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('EDIT_SCREEN'), findsOneWidget);
+  });
+
+  testWidgets('stats row renders playlist/song/album/artist counts',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
+
+    expect(find.text('1'), findsNWidgets(3)); // playlists, albums, artists
+    expect(find.text('12'), findsOneWidget); // songs
     expect(
-      tester.widget<TextField>(find.byKey(const Key('profile-name'))).controller!.text,
-      'Alice',
+      find.descendant(
+        of: find.byKey(const Key('profile-stat-playlists')),
+        matching: find.text('Playlists'),
+      ),
+      findsOneWidget,
     );
+    expect(find.text('Songs'), findsOneWidget);
+    expect(find.text('Albums'), findsOneWidget);
     expect(
-      tester.widget<TextField>(find.byKey(const Key('profile-nickname'))).controller!.text,
-      isEmpty,
-    );
-    expect(
-      tester.widget<TextField>(find.byKey(const Key('profile-bio'))).controller!.text,
-      isEmpty,
+      find.descendant(
+        of: find.byKey(const Key('profile-stat-artists')),
+        matching: find.text('Artists'),
+      ),
+      findsOneWidget,
     );
   });
 
-  testWidgets('save persists name to registry + nickname/bio to meta',
+  testWidgets('Liked Songs card pushes /library/favorites',
       (WidgetTester tester) async {
-    final _FakeKv kv = _FakeKv();
-    await tester.pumpWidget(wrap(kv));
+    await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('profile-row-liked-songs')));
+    await tester.pumpAndSettle();
+    expect(find.text('FAVORITES_SCREEN'), findsOneWidget);
+  });
 
-    await tester.enterText(
-        find.byKey(const Key('profile-name')), 'Alice Cooper');
-    await tester.enterText(find.byKey(const Key('profile-nickname')), 'Al');
-    await tester.enterText(find.byKey(const Key('profile-bio')), 'hi there');
+  testWidgets('Downloaded card goes to /downloads',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('profile-row-downloaded')));
+    await tester.pumpAndSettle();
+    expect(find.text('DOWNLOADS_SCREEN'), findsOneWidget);
+  });
+
+  testWidgets('Recently Played card pushes /library/recently-played',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('profile-row-recently-played')));
+    await tester.pumpAndSettle();
+    expect(find.text('RECENTLY_PLAYED_SCREEN'), findsOneWidget);
+  });
+
+  testWidgets('Playlists card goes to /library?tab=playlists',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('profile-row-playlists')));
+    await tester.pumpAndSettle();
+    expect(find.text('LIBRARY_SCREEN tab=playlists'), findsOneWidget);
+  });
+
+  testWidgets('Settings card goes to /settings', (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-        find.byKey(const Key('profile-save')), 200,
+        find.byKey(const Key('profile-row-settings')), 300,
         scrollable: find.byType(Scrollable).first);
-    await tester.tap(find.byKey(const Key('profile-save')));
+    // Scroll a bit further so the row clears the pinned AppBar — otherwise
+    // "just barely visible" can still land under it and the tap misses.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -80));
     await tester.pumpAndSettle();
-
-    expect(find.text('Profile saved'), findsOneWidget);
-    expect(kv.store[kProfilesIndexKey], contains('Alice Cooper'));
-    expect(kv.store['profile_meta_p1'], contains('Al'));
-    expect(kv.store['profile_meta_p1'], contains('hi there'));
+    await tester.tap(find.byKey(const Key('profile-row-settings')));
+    await tester.pumpAndSettle();
+    expect(find.text('SETTINGS_SCREEN'), findsOneWidget);
   });
 
-  testWidgets('blank name falls back to the Navidrome username on save',
+  testWidgets('Help & Support opens a dialog with Tailscale guidance',
       (WidgetTester tester) async {
-    final _FakeKv kv = _FakeKv();
-    await tester.pumpWidget(wrap(kv));
+    await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
-
-    await tester.enterText(find.byKey(const Key('profile-name')), '   ');
     await tester.scrollUntilVisible(
-        find.byKey(const Key('profile-save')), 200,
+        find.byKey(const Key('profile-row-help')), 300,
         scrollable: find.byType(Scrollable).first);
-    await tester.tap(find.byKey(const Key('profile-save')));
+    await tester.tap(find.byKey(const Key('profile-row-help')));
     await tester.pumpAndSettle();
-
-    expect(kv.store[kProfilesIndexKey], contains('alice-nd'));
+    expect(find.text('Help & Support'), findsNWidgets(2)); // row + dialog title
+    expect(find.textContaining('Tailscale'), findsOneWidget);
   });
 
-  testWidgets('bio input is blocked past 100 words',
+  testWidgets('About heerr opens a dialog showing the app version',
       (WidgetTester tester) async {
-    final _FakeKv kv = _FakeKv();
-    await tester.pumpWidget(wrap(kv));
+    await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
-
-    final String hundred =
-        List<String>.generate(100, (int i) => 'w$i').join(' ');
-    await tester.enterText(find.byKey(const Key('profile-bio')), hundred);
-    expect(
-      countWords(tester
-          .widget<TextField>(find.byKey(const Key('profile-bio')))
-          .controller!
-          .text),
-      100,
-    );
-
-    await tester.enterText(
-        find.byKey(const Key('profile-bio')), '$hundred onemore');
-    expect(
-      countWords(tester
-          .widget<TextField>(find.byKey(const Key('profile-bio')))
-          .controller!
-          .text),
-      lessThanOrEqualTo(100),
-    );
+    await tester.scrollUntilVisible(
+        find.byKey(const Key('profile-row-about')), 300,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byKey(const Key('profile-row-about')));
+    await tester.pumpAndSettle();
+    expect(find.text('About heerr'), findsNWidgets(2)); // row + dialog title
   });
 
-  testWidgets('pick photo via sheet sets the avatar',
+  testWidgets('Log Out cancel dismisses without calling the backend',
       (WidgetTester tester) async {
-    final _FakeKv kv = _FakeKv();
-    await tester.pumpWidget(
-        wrap(kv, pickResult: Uint8List.fromList(<int>[1, 2, 3])));
+    final _RecordingBackendService backend = _RecordingBackendService();
+    await tester.pumpWidget(wrap(backend: backend));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('profile-avatar')));
+    await tester.scrollUntilVisible(
+        find.byKey(const Key('profile-logout')), 300,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byKey(const Key('profile-logout')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('profile-pic-pick')));
+    expect(find.text('Log out?'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
 
-    expect(tmp.listSync().whereType<File>(), hasLength(1));
-    expect(find.text('Edit photo'), findsOneWidget);
+    expect(backend.logoutCalls, 0);
+    expect(find.text('Log out?'), findsNothing); // dialog dismissed
+    expect(find.byKey(const Key('profile-logout')), findsOneWidget);
   });
 
-  testWidgets('remove photo via sheet deletes the avatar',
+  testWidgets(
+      'Log Out confirm calls the backend then clears the active profile pointer',
       (WidgetTester tester) async {
-    final _FakeKv kv = _FakeKv();
-    await tester.pumpWidget(
-        wrap(kv, pickResult: Uint8List.fromList(<int>[1, 2, 3])));
+    final _FakeSecureStorage kv = _FakeSecureStorage();
+    kv.store[kActiveProfileIdKey] = 'p1';
+    final _RecordingBackendService backend = _RecordingBackendService();
+    await tester.pumpWidget(wrap(secure: kv, backend: backend));
     await tester.pumpAndSettle();
 
-    // Set one first.
-    await tester.tap(find.byKey(const Key('profile-avatar')));
+    await tester.scrollUntilVisible(
+        find.byKey(const Key('profile-logout')), 300,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byKey(const Key('profile-logout')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('profile-pic-pick')));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('profile-avatar')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('profile-pic-remove')));
+    await tester.tap(find.text('Log out'));
     await tester.pumpAndSettle();
 
-    expect(tmp.listSync().whereType<File>(), isEmpty);
-    expect(find.text('Add photo'), findsOneWidget);
+    expect(backend.logoutCalls, 1);
+    expect(kv.store.containsKey(kActiveProfileIdKey), isFalse);
   });
 
-  testWidgets('oversize pick shows the too-large snackbar, keeps no file',
+  testWidgets(
+      'Log Out confirm still clears the active profile when the backend call fails',
       (WidgetTester tester) async {
-    final _FakeKv kv = _FakeKv();
-    await tester
-        .pumpWidget(wrap(kv, pickResult: Uint8List(kMaxAvatarBytes + 1)));
+    final _FakeSecureStorage kv = _FakeSecureStorage();
+    kv.store[kActiveProfileIdKey] = 'p1';
+    final _RecordingBackendService backend =
+        _RecordingBackendService(throwOnLogout: true);
+    await tester.pumpWidget(wrap(secure: kv, backend: backend));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('profile-avatar')));
+    await tester.scrollUntilVisible(
+        find.byKey(const Key('profile-logout')), 300,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.byKey(const Key('profile-logout')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('profile-pic-pick')));
+    await tester.tap(find.text('Log out'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('too large'), findsOneWidget);
-    expect(tmp.listSync().whereType<File>(), isEmpty);
+    expect(backend.logoutCalls, 1);
+    expect(kv.store.containsKey(kActiveProfileIdKey), isFalse);
+  });
+
+  testWidgets('signed-out (null profile) renders an empty scaffold',
+      (WidgetTester tester) async {
+    final _FakePrefs prefs = _FakePrefs();
+    await tester.pumpWidget(ProviderScope(
+      overrides: <Override>[
+        prefsStorageProvider.overrideWithValue(prefs),
+        activeProfileProvider.overrideWithValue(null),
+        avatarsDirProvider.overrideWith((_) async => tmp),
+      ],
+      child: const MaterialApp(home: ProfileScreen()),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('profile-display-name')), findsNothing);
   });
 }

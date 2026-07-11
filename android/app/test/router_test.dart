@@ -13,6 +13,8 @@ import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/router.dart';
 import 'package:heerr/screens/auth/login_screen.dart';
 import 'package:heerr/screens/home/home_screen.dart';
+import 'package:heerr/screens/profile/profile_edit_screen.dart';
+import 'package:heerr/screens/profile/profile_screen.dart';
 import 'package:heerr/theme.dart';
 import 'package:heerr/widgets/heerr_logo.dart';
 
@@ -98,6 +100,38 @@ void main() {
         reason: 'expected "$label" in bottom nav',
       );
     }
+  });
+
+  testWidgets('/library?tab=playlists opens the Library tab on Playlists', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_bootApp());
+    await tester.pumpAndSettle();
+
+    final BuildContext ctx = tester.element(find.byType(HomeScreen));
+    GoRouter.of(ctx).go('/library?tab=playlists');
+    await tester.pumpAndSettle();
+
+    final TabController controller =
+        DefaultTabController.of(tester.element(find.byType(TabBar)));
+    expect(controller.index, 2);
+  });
+
+  testWidgets('/profile shows the display screen; /profile/edit the form', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_bootApp());
+    await tester.pumpAndSettle();
+
+    final BuildContext ctx = tester.element(find.byType(HomeScreen));
+    unawaited(GoRouter.of(ctx).push(Routes.profile));
+    await tester.pumpAndSettle();
+    expect(find.byType(ProfileScreen), findsOneWidget);
+    expect(find.byType(ProfileEditScreen), findsNothing);
+
+    unawaited(GoRouter.of(ctx).push(Routes.profileEdit));
+    await tester.pumpAndSettle();
+    expect(find.byType(ProfileEditScreen), findsOneWidget);
   });
 
   testWidgets('Library tab renders the Artists / Albums / Playlists sub-tabs', (
