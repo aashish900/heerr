@@ -17,6 +17,7 @@ import 'screens/library/artist_detail_screen.dart';
 import 'screens/library/library_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/library/playlist_detail_screen.dart';
+import 'screens/library/favorites_screen.dart';
 import 'screens/library/recently_added_screen.dart';
 import 'screens/player/now_playing_screen.dart';
 import 'screens/profile/edit_server_details_screen.dart';
@@ -147,6 +148,11 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
                 path: 'recently-added',
                 builder: (BuildContext context, GoRouterState state) =>
                     const RecentlyAddedScreen(),
+              ),
+              GoRoute(
+                path: 'favorites',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const FavoritesScreen(),
               ),
             ],
           ),

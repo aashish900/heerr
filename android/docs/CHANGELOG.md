@@ -2515,3 +2515,11 @@ User review of the previous widget-polish commit flagged two remaining mismatche
 - **`lib/screens/home/home_screen.dart`** — section inserted after Quick Access.
 - **`test/screens/home/recently_added_test.dart`** (new) — 8 tests: section render cap (5 rows), empty/error hidden, row tap → album, See all → screen, screen list/error-retry/pull-to-refresh.
 - Verification: `flutter analyze` clean, `flutter test` 804/804 green.
+
+## 2026-07-11 — Home redesign part 5: Favorites screen
+
+- **`lib/providers/library/starred_songs.dart`** (new) — `starredSongsProvider` over the existing `SubsonicLibraryService.getStarredSongs()` (`getStarred2.view`). Codegen re-run.
+- **`lib/screens/library/favorites_screen.dart`** (new) — `FavoritesScreen`: starred songs as ListTiles reusing `LibraryCoverArt` + `SongRowActions` (find-similar / edit / delete hooks); tap plays via the shared `playAllSongsFromSubsonic` path — no new playback entry point. Loading skeletons, error + Retry, `EmptyState` ("No favorites yet"), pull-to-refresh.
+- **`lib/router.dart`** — nested `favorites` GoRoute under `/library`; the Quick Access Favorites card's target now resolves.
+- **`test/screens/library/favorites_screen_test.dart`** (new) — 4 tests: rows + actions render, empty state, error + Retry re-fetch, pull-to-refresh.
+- Verification: `flutter analyze` clean, `flutter test` 808/808 green.
