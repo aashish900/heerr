@@ -47,7 +47,12 @@ part 'library_tabs.dart';
 /// "In your library" (Subsonic search3) above "On YouTube Music" (heerr
 /// backend search, auto-fired on empty library or manually).
 class LibraryScreen extends ConsumerStatefulWidget {
-  const LibraryScreen({super.key});
+  const LibraryScreen({this.initialTabIndex = 0, super.key});
+
+  /// Which sub-tab (0=Artists, 1=Albums, 2=Playlists) to open on. Set via
+  /// the `/library?tab=` query param (Phase Z Profile "Playlists" deep
+  /// link) — see `_tabIndexFor` in router.dart.
+  final int initialTabIndex;
 
   @override
   ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
@@ -124,6 +129,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
     return DefaultTabController(
       length: 3,
+      initialIndex: widget.initialTabIndex,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Library'),

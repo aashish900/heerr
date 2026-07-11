@@ -102,6 +102,21 @@ void main() {
     }
   });
 
+  testWidgets('/library?tab=playlists opens the Library tab on Playlists', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_bootApp());
+    await tester.pumpAndSettle();
+
+    final BuildContext ctx = tester.element(find.byType(HomeScreen));
+    GoRouter.of(ctx).go('/library?tab=playlists');
+    await tester.pumpAndSettle();
+
+    final TabController controller =
+        DefaultTabController.of(tester.element(find.byType(TabBar)));
+    expect(controller.index, 2);
+  });
+
   testWidgets('/profile shows the display screen; /profile/edit the form', (
     WidgetTester tester,
   ) async {

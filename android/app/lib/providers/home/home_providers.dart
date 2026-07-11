@@ -29,3 +29,15 @@ Future<List<Album>> recentlyAddedFull(RecentlyAddedFullRef ref) async {
       await ref.watch(subsonicLibraryServiceProvider.future);
   return service.getAlbumList(type: 'newest', size: 50);
 }
+
+/// Recently *played* albums for the Profile screen's "Recently Played" row
+/// (Phase Z redesign) — `getAlbumList2.view?type=recent`, distinct from
+/// [recentlyAddedFull]'s `type=newest`. Empty on a fresh install / library
+/// with no play history; [RecentlyPlayedScreen] renders that as a plain
+/// empty state, not an error.
+@riverpod
+Future<List<Album>> recentlyPlayed(RecentlyPlayedRef ref) async {
+  final SubsonicLibraryService service =
+      await ref.watch(subsonicLibraryServiceProvider.future);
+  return service.getAlbumList(type: 'recent', size: 50);
+}

@@ -19,6 +19,7 @@ import 'screens/home/home_screen.dart';
 import 'screens/library/playlist_detail_screen.dart';
 import 'screens/library/favorites_screen.dart';
 import 'screens/library/recently_added_screen.dart';
+import 'screens/library/recently_played_screen.dart';
 import 'screens/player/now_playing_screen.dart';
 import 'screens/profile/edit_server_details_screen.dart';
 import 'screens/profile/profile_edit_screen.dart';
@@ -52,9 +53,28 @@ class Routes {
   // Screens register under /library so the Library tab stays selected.
   static const String libraryFavorites = '/library/favorites';
   static const String libraryRecentlyAdded = '/library/recently-added';
+  // Profile "My Music" (Phase Z redesign) — recently played albums.
+  static const String libraryRecentlyPlayed = '/library/recently-played';
+  // Deep-links the Library tab's Playlists sub-tab, per the profile's
+  // Playlists row (Phase Z).
+  static const String libraryPlaylistsTab = '/library?tab=playlists';
 
   // Job-detail lands at D3; route shape defined here to lock the URL.
   static String job(String id) => '/job/$id';
+}
+
+/// Maps the `/library?tab=` query param to [LibraryScreen]'s tab order
+/// (Artists / Albums / Playlists). Unknown or missing values default to the
+/// Artists tab (index 0) — the screen's historical default.
+int _tabIndexFor(String? tab) {
+  switch (tab) {
+    case 'albums':
+      return 1;
+    case 'playlists':
+      return 2;
+    default:
+      return 0;
+  }
 }
 
 /// Builds the app's `GoRouter`. Lives at module scope so widget tests can
@@ -122,7 +142,10 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
           GoRoute(
             path: Routes.library,
             builder: (BuildContext context, GoRouterState state) =>
-                const LibraryScreen(),
+                LibraryScreen(
+                  initialTabIndex:
+                      _tabIndexFor(state.uri.queryParameters['tab']),
+                ),
             routes: <RouteBase>[
               GoRoute(
                 path: 'artist/:id',
@@ -150,6 +173,11 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
                 path: 'recently-added',
                 builder: (BuildContext context, GoRouterState state) =>
                     const RecentlyAddedScreen(),
+              ),
+              GoRoute(
+                path: 'recently-played',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const RecentlyPlayedScreen(),
               ),
               GoRoute(
                 path: 'favorites',

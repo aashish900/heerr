@@ -70,6 +70,27 @@ void main() {
             ),
           ],
         ),
+        GoRoute(
+          path: '/library/favorites',
+          builder: (BuildContext context, GoRouterState state) =>
+              const Scaffold(body: Text('FAVORITES_SCREEN')),
+        ),
+        GoRoute(
+          path: '/library/recently-played',
+          builder: (BuildContext context, GoRouterState state) =>
+              const Scaffold(body: Text('RECENTLY_PLAYED_SCREEN')),
+        ),
+        GoRoute(
+          path: '/library',
+          builder: (BuildContext context, GoRouterState state) => Scaffold(
+            body: Text('LIBRARY_SCREEN tab=${state.uri.queryParameters['tab']}'),
+          ),
+        ),
+        GoRoute(
+          path: '/downloads',
+          builder: (BuildContext context, GoRouterState state) =>
+              const Scaffold(body: Text('DOWNLOADS_SCREEN')),
+        ),
       ],
     );
     return ProviderScope(
@@ -156,10 +177,58 @@ void main() {
 
     expect(find.text('1'), findsNWidgets(3)); // playlists, albums, artists
     expect(find.text('12'), findsOneWidget); // songs
-    expect(find.text('Playlists'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('profile-stat-playlists')),
+        matching: find.text('Playlists'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Songs'), findsOneWidget);
     expect(find.text('Albums'), findsOneWidget);
-    expect(find.text('Artists'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('profile-stat-artists')),
+        matching: find.text('Artists'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Liked Songs card pushes /library/favorites',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('profile-row-liked-songs')));
+    await tester.pumpAndSettle();
+    expect(find.text('FAVORITES_SCREEN'), findsOneWidget);
+  });
+
+  testWidgets('Downloaded card goes to /downloads',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('profile-row-downloaded')));
+    await tester.pumpAndSettle();
+    expect(find.text('DOWNLOADS_SCREEN'), findsOneWidget);
+  });
+
+  testWidgets('Recently Played card pushes /library/recently-played',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('profile-row-recently-played')));
+    await tester.pumpAndSettle();
+    expect(find.text('RECENTLY_PLAYED_SCREEN'), findsOneWidget);
+  });
+
+  testWidgets('Playlists card goes to /library?tab=playlists',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('profile-row-playlists')));
+    await tester.pumpAndSettle();
+    expect(find.text('LIBRARY_SCREEN tab=playlists'), findsOneWidget);
   });
 
   testWidgets('signed-out (null profile) renders an empty scaffold',

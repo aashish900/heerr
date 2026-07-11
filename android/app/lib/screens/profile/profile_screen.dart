@@ -42,6 +42,33 @@ class ProfileScreen extends ConsumerWidget {
           _ProfileHeader(profile: profile, avatar: avatar, meta: meta),
           const SizedBox(height: 24),
           const _StatsRow(),
+          const SizedBox(height: 28),
+          const _SectionHeader('My Music'),
+          const SizedBox(height: 8),
+          _ProfileActionCard(
+            key: const Key('profile-row-liked-songs'),
+            icon: Icons.favorite_border,
+            label: 'Liked Songs',
+            onTap: () => context.push(Routes.libraryFavorites),
+          ),
+          _ProfileActionCard(
+            key: const Key('profile-row-downloaded'),
+            icon: Icons.download_outlined,
+            label: 'Downloaded',
+            onTap: () => context.go(Routes.downloads),
+          ),
+          _ProfileActionCard(
+            key: const Key('profile-row-recently-played'),
+            icon: Icons.history,
+            label: 'Recently Played',
+            onTap: () => context.push(Routes.libraryRecentlyPlayed),
+          ),
+          _ProfileActionCard(
+            key: const Key('profile-row-playlists'),
+            icon: Icons.queue_music_outlined,
+            label: 'Playlists',
+            onTap: () => context.go(Routes.libraryPlaylistsTab),
+          ),
         ],
       ),
     );
@@ -220,6 +247,72 @@ class _StatDivider extends StatelessWidget {
       width: 1,
       height: 32,
       color: Theme.of(context).colorScheme.outlineVariant,
+    );
+  }
+}
+
+/// "My Music" / "Settings" section label, per the mockup.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: Theme.of(context)
+          .textTheme
+          .titleMedium
+          ?.copyWith(fontWeight: FontWeight.bold),
+    );
+  }
+}
+
+/// One rounded, full-width row card — used for the "My Music" section
+/// (magenta outlined icons, per the mockup). Reused for the "Settings"
+/// section at Z4 with a neutral icon tint.
+class _ProfileActionCard extends StatelessWidget {
+  const _ProfileActionCard({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: <Widget>[
+                Icon(icon, color: heerrMagenta, size: 22),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
