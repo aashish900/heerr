@@ -2693,3 +2693,12 @@ User review flagged four more issues:
 - `screens/player/now_playing_transport.dart` (`_BottomActionsRow`): speaker placeholder removed (moved to header); row now holds only the queue trigger, right-aligned.
 - New `test/widgets/glass_icon_button_test.dart` (3 tests). New test in `now_playing_screen_test.dart`: collapse button pops a pushed route (push via `Navigator.push` + tap chevron + assert back on the prior screen).
 - Verification: `flutter analyze` clean; `flutter test` 899/899 (895 → 899, +4 new: 3 glass-button + 1 collapse-pop).
+
+## 2026-07-11 — Now Playing redesign NP3 — hero art glow/float/on-art download
+
+- `screens/player/now_playing_screen.dart`: `_WideCoverArt` (12dp radius, no glow) replaced with `_HeroArt` — 28dp radius, hairline border, a soft two-layer glow shadow blended from the palette tint via `brandBlend()` (cross-fades through the existing `AnimatedTint` widget, same 400 ms contract), and a slow ±3px floating breathe (6s `AnimationController`, disabled test-side by the new module-scope `heroArtFloatEnabled` flag — same seam shape as `paletteExtractorOverride`; a repeating controller never satisfies `pumpAndSettle`). Artwork itself is never recoloured, only the glow — matches the Home hero / MiniPlayer adaptive-theming rule.
+- New `_HeroArtDownloadButton` (floating top-right on the art, hidden for preview items): reflects the song's real `OfflineSongEntry.state` from `offlineManifestProvider` rather than inventing a single-song download mutation that doesn't exist in this codebase — see DECISIONLOG 2026-07-11 (§2.4). No entry → explains via snackbar; `downloading` → spinner; `queued` → disabled glyph; `failed` → red glyph, tap shows the error; `ready` → magenta glyph, tap calls the real `OfflineMarker.deleteSongLocally`.
+- `widgets/glass_icon_button.dart`: added an `iconColor` param (overrides the enabled-state white tint; disabled always dims to `white38` regardless, so a coloured icon never reads as tappable when it isn't).
+- Test-seam plumbing: `heroArtFloatEnabled` reset alongside `paletteExtractorOverride` in all six existing `test/screens/player/*_test.dart` files' `setUp`/`tearDown` (every one of them now renders `_HeroArt` via the shared screen).
+- New `test/screens/player/now_playing_hero_art_test.dart` (7 tests) covering all five download-button states + the 28dp radius. New `test/widgets/glass_icon_button_test.dart` cases for `iconColor`.
+- Verification: `flutter analyze` clean; `flutter test` 908/908.

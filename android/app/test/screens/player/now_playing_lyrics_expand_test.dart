@@ -123,9 +123,11 @@ const String _syncedBody = '''
 void main() {
   setUp(() {
     paletteExtractorOverride = (Uri? _) async => null;
+    heroArtFloatEnabled = false;
   });
   tearDown(() {
     paletteExtractorOverride = dominantColorFor;
+    heroArtFloatEnabled = true;
   });
 
   testWidgets('lyrics render inside a card with an expand affordance',

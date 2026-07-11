@@ -123,6 +123,7 @@ void main() {
 
   setUp(() {
     paletteExtractorOverride = (Uri? _) async => null;
+    heroArtFloatEnabled = false;
     handler = _MockHandler();
     when(() => handler.setRepeatMode(any())).thenAnswer((_) async {});
     when(() => handler.setShuffleMode(any())).thenAnswer((_) async {});
@@ -130,6 +131,7 @@ void main() {
 
   tearDown(() {
     paletteExtractorOverride = dominantColorFor;
+    heroArtFloatEnabled = true;
   });
 
   testWidgets('shuffle + repeat buttons render', (WidgetTester tester) async {

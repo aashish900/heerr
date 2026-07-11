@@ -1128,3 +1128,27 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Trade-off:** The header always reads "NOW PLAYING", never "Playing from \<source\>". Logged here so NP2 isn't mistaken for having silently dropped scope — this was the plan's own cheaper branch, taken deliberately.
 
 **Reference:** `android/app/lib/screens/player/now_playing_screen.dart` (`_Header`), `android/docs/NOWPLAYING.md` §2.1.
+
+## 2026-07-11 — Now Playing NP3: on-art download button reflects existing per-song state, doesn't invent single-song downloads
+
+**Context:** NOWPLAYING.md §2.4 assumed the hero-art floating download button "marks/unmarks the current song for offline". Investigation of `offline_marker.dart` / `offline_manifest.dart` / `album_detail_screen.dart` / `playlist_detail_screen.dart` showed no such mutation exists anywhere in the app: offline downloads are driven exclusively by marking whole albums/playlists/artists (`OfflineMarker.markAlbum/markPlaylist/markArtist`); per-song entries in `OfflineManifest.songs` are populated by `OfflineSync` as a side effect of those container marks, not created directly. The only per-song mutation that exists is `OfflineMarker.deleteSongLocally` (removal). Every existing per-song UI affordance (`album_detail_screen.dart` `_buildSongTrailing`, `playlist_detail_screen.dart` equivalent) is a read-only status glyph, never a button.
+
+**Decision:** The NP3 hero-art download button reflects the song's real `OfflineSongEntry.state` (mirroring the existing read-only glyph convention) and offers the one per-song mutation that's real:
+- No entry → outlined download icon; tap shows a snackbar explaining the song's album/playlist must be downloaded (no silent no-op).
+- `downloading` → indeterminate spinner, no tap target.
+- `queued` → disabled schedule glyph.
+- `failed` → red error glyph; tap shows the error message (mirrors the `Tooltip` already used in `album_detail_screen.dart`).
+- `ready` → magenta-filled icon; tap calls the real `deleteSongLocally` and confirms via snackbar.
+
+**Why:**
+- Inventing a single-song "download just this track" mutation would require new manifest shape (standalone songs outside any marked container) and new `OfflineSync` logic to actually fetch it — a materially larger feature than NP3's stated scope (hero-art visual polish), and one no other screen in the app offers.
+- A button that silently no-ops when tapped (because no infra exists) would be a worse outcome than an honest explainer — matches the same "don't invent dead affordances" principle applied to NP2's `playContext` deferral.
+- Reusing the real `deleteSongLocally` API for the one direction that does exist keeps the button fully functional rather than read-only chrome.
+
+**Alternatives considered:**
+- **Add single-song marking to `OfflineManifest` + `OfflineSync`.** Rejected as disproportionate to NP3; would need its own DECISIONLOG entry and roadmap slot if the user wants it later.
+- **Hide the button entirely (read-only status glyph only, like the existing album/playlist detail rows).** Rejected — the mockup explicitly shows a tappable action, and the "ready → delete" direction is real and worth keeping interactive.
+
+**Trade-off:** The button trends toward the mockup's *intent* (an on-art download affordance) rather than its literal behavior (a single-song toggle). If single-song ad-hoc downloads are wanted later, this is a new feature with its own ADR, not a NOWPLAYING follow-up.
+
+**Reference:** `android/app/lib/screens/player/now_playing_screen.dart` (`_HeroArtDownloadButton`), `android/docs/NOWPLAYING.md` §2.4.

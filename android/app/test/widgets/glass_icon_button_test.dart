@@ -38,4 +38,26 @@ void main() {
     )));
     expect(find.byTooltip('More'), findsOneWidget);
   });
+
+  testWidgets('iconColor overrides the default white tint when enabled',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap(GlassIconButton(
+      icon: Icons.download_done,
+      onPressed: () {},
+      iconColor: const Color(0xFFF533C8),
+    )));
+    final Icon icon = tester.widget<Icon>(find.byIcon(Icons.download_done));
+    expect(icon.color, const Color(0xFFF533C8));
+  });
+
+  testWidgets('disabled button ignores iconColor and dims to white38',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap(const GlassIconButton(
+      icon: Icons.schedule,
+      onPressed: null,
+      iconColor: Color(0xFFF533C8),
+    )));
+    final Icon icon = tester.widget<Icon>(find.byIcon(Icons.schedule));
+    expect(icon.color, Colors.white38);
+  });
 }

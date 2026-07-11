@@ -125,9 +125,11 @@ Widget _wrap({
 void main() {
   setUp(() {
     paletteExtractorOverride = (Uri? _) async => null;
+    heroArtFloatEnabled = false;
   });
   tearDown(() {
     paletteExtractorOverride = dominantColorFor;
+    heroArtFloatEnabled = true;
   });
 
   testWidgets('lyrics section is visible by default — no toggle needed',

@@ -139,10 +139,12 @@ void main() {
     _pauseCalls = 0;
     _resumeCalls = 0;
     paletteExtractorOverride = (Uri? _) async => null; // deterministic, no I/O
+    heroArtFloatEnabled = false; // repeating controller never settles
   });
 
   tearDown(() {
     paletteExtractorOverride = dominantColorFor;
+    heroArtFloatEnabled = true;
   });
 
   testWidgets('"Nothing is playing" when snapshot has no item',

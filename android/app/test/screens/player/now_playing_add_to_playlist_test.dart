@@ -127,9 +127,11 @@ Widget _wrap({MediaItem? item}) {
 void main() {
   setUp(() {
     paletteExtractorOverride = (Uri? _) async => null;
+    heroArtFloatEnabled = false;
   });
   tearDown(() {
     paletteExtractorOverride = dominantColorFor;
+    heroArtFloatEnabled = true;
   });
 
   testWidgets('overflow menu exposes an "Add to playlist" item',

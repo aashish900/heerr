@@ -9,6 +9,8 @@ import '../../api/api_error.dart';
 import '../../models/seed_track.dart';
 import '../../models/subsonic/lyrics.dart';
 import '../../models/subsonic/song.dart';
+import '../../offline/offline_manifest.dart';
+import '../../offline/offline_marker.dart';
 import '../../player/heerr_audio_handler.dart';
 import '../../player/player_provider.dart';
 import '../../player/sleep_timer.dart';
@@ -20,6 +22,7 @@ import '../../providers/queue.dart';
 import '../../theme.dart';
 import '../../utils/palette.dart';
 import '../../widgets/add_to_playlist_sheet.dart';
+import '../../widgets/animated_tint.dart';
 import '../../widgets/error_snackbar.dart';
 import '../../widgets/glass_icon_button.dart';
 import '../../widgets/gradient_icon.dart';
@@ -36,6 +39,14 @@ typedef PaletteExtractor = Future<Color?> Function(Uri? artUri);
 
 @visibleForTesting
 PaletteExtractor paletteExtractorOverride = dominantColorFor;
+
+/// NP3 — hero-art "float" breathing animation. A module-scope flag rather
+/// than a widget parameter (same shape as [paletteExtractorOverride]) so the
+/// whole screen tree doesn't need to plumb an `animate` argument down to
+/// `_HeroArt`. Tests must set this `false` in `setUp` — a repeating
+/// [AnimationController] never satisfies `pumpAndSettle`.
+@visibleForTesting
+bool heroArtFloatEnabled = true;
 
 /// Full-screen Now Playing surface. Big cover art, title/artist with inline
 /// favourite, scrubber, transport with rounded shuffle/loop, bottom-bar with
@@ -349,7 +360,11 @@ class _Body extends ConsumerWidget {
               onAddToPlaylist: onAddToPlaylist,
             ),
           ),
-          _WideCoverArt(artUri: item.artUri),
+          _HeroArt(
+            artUri: item.artUri,
+            tintColor: tintColor,
+            song: currentSong,
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 8, 16, 0),
             child: Row(
@@ -410,39 +425,205 @@ class _Body extends ConsumerWidget {
   }
 }
 
-class _WideCoverArt extends StatelessWidget {
-  const _WideCoverArt({required this.artUri});
+/// Hero artwork (NOWPLAYING.md NP3): 28dp radius, hairline border, a soft
+/// glow blended from the palette [tintColor] (never recolours the artwork
+/// itself — only the surrounding glow, matching the Home hero / MiniPlayer
+/// adaptive-theming rule), a slow floating breathe, and a floating on-art
+/// download-state button for [song] (hidden for preview items, where
+/// [song] is null).
+class _HeroArt extends StatefulWidget {
+  const _HeroArt({
+    required this.artUri,
+    required this.tintColor,
+    required this.song,
+  });
 
   final Uri? artUri;
+  final Color? tintColor;
+  final Song? song;
+
+  @override
+  State<_HeroArt> createState() => _HeroArtState();
+}
+
+class _HeroArtState extends State<_HeroArt> with SingleTickerProviderStateMixin {
+  late final AnimationController _floatCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 6),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (heroArtFloatEnabled) _floatCtrl.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _floatCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final double size = MediaQuery.sizeOf(context).width - 48;
     final ColorScheme cs = Theme.of(context).colorScheme;
-    final Widget placeholder = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    final Uri? uri = widget.artUri;
+    final Color? tint = widget.tintColor;
+
+    final Widget placeholderIcon = Center(
       child: Icon(Icons.music_note, size: size * 0.3, color: cs.onSurfaceVariant),
     );
-    final Uri? uri = artUri;
+    final Widget content = uri == null
+        ? placeholderIcon
+        : Image.network(
+            uri.toString(),
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            errorBuilder: (_, _, _) => placeholderIcon,
+          );
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-      child: uri == null
-          ? placeholder
-          : ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                uri.toString(),
+      child: AnimatedBuilder(
+        animation: _floatCtrl,
+        builder: (BuildContext context, Widget? child) => Transform.translate(
+          offset: Offset(
+            0,
+            heroArtFloatEnabled ? (_floatCtrl.value * 6 - 3) : 0,
+          ),
+          child: child,
+        ),
+        child: AnimatedTint(
+          tint: tint ?? cs.surfaceContainerHighest,
+          builder: (BuildContext context, Color glow) => Stack(
+            clipBehavior: Clip.none,
+            children: <Widget>[
+              Container(
                 width: size,
                 height: size,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => placeholder,
+                decoration: BoxDecoration(
+                  color: uri == null ? cs.surfaceContainerHighest : null,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.24),
+                  ),
+                  boxShadow: tint == null
+                      ? const <BoxShadow>[]
+                      : <BoxShadow>[
+                          BoxShadow(
+                            color: brandBlend(tint).withValues(alpha: 0.45),
+                            blurRadius: 24,
+                            spreadRadius: -4,
+                          ),
+                          BoxShadow(
+                            color: brandBlend(tint).withValues(alpha: 0.2),
+                            blurRadius: 60,
+                            spreadRadius: 4,
+                          ),
+                        ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
+                  child: content,
+                ),
+              ),
+              if (widget.song != null)
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: _HeroArtDownloadButton(song: widget.song!),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// On-art floating download-state affordance (NOWPLAYING.md §2.4). The app
+/// has no single-song download mutation — offline downloads are driven by
+/// marking whole albums/playlists/artists (`OfflineMarker`). This button
+/// reflects the song's existing per-song manifest state (mirrors the
+/// read-only glyphs in `album_detail_screen.dart` /
+/// `playlist_detail_screen.dart`) and, when already downloaded, offers the
+/// one per-song mutation that *does* exist: `deleteSongLocally`. When not
+/// yet downloaded, tapping explains how to make it available rather than
+/// silently no-op-ing.
+class _HeroArtDownloadButton extends ConsumerWidget {
+  const _HeroArtDownloadButton({required this.song});
+
+  final Song song;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final OfflineManifest? manifest =
+        ref.watch(offlineManifestProvider).valueOrNull;
+    final OfflineSongEntry? entry = manifest?.songs[song.id];
+
+    switch (entry?.state) {
+      case null:
+        return GlassIconButton(
+          key: const Key('now-playing-hero-download'),
+          icon: Icons.download_outlined,
+          tooltip:
+              'Download the album or playlist this song belongs to, to '
+              'make it available offline',
+          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                "Download this song's album or playlist to make it "
+                'available offline.',
               ),
             ),
-    );
+          ),
+        );
+      case OfflineSongState.downloading:
+        return const Padding(
+          padding: EdgeInsets.all(8),
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.white,
+            ),
+          ),
+        );
+      case OfflineSongState.queued:
+        return const GlassIconButton(
+          icon: Icons.schedule,
+          tooltip: 'Queued for download',
+          onPressed: null,
+        );
+      case OfflineSongState.failed:
+        return GlassIconButton(
+          key: const Key('now-playing-hero-download'),
+          icon: Icons.error_outline,
+          tooltip: entry?.lastError ?? 'Download failed',
+          iconColor: Colors.redAccent,
+          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(entry?.lastError ?? 'Download failed')),
+          ),
+        );
+      case OfflineSongState.ready:
+        return GlassIconButton(
+          key: const Key('now-playing-hero-download'),
+          icon: Icons.download_done,
+          tooltip: 'Downloaded — tap to remove',
+          iconColor: heerrMagenta,
+          onPressed: () async {
+            await ref
+                .read(offlineMarkerProvider.notifier)
+                .deleteSongLocally(song.id);
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Removed from downloads')),
+            );
+          },
+        );
+    }
   }
 }

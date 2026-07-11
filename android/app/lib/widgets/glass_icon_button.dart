@@ -13,12 +13,18 @@ class GlassIconButton extends StatelessWidget {
     required this.onPressed,
     this.tooltip,
     this.size = 40,
+    this.iconColor,
   });
 
   final IconData icon;
   final VoidCallback? onPressed;
   final String? tooltip;
   final double size;
+
+  /// Overrides the enabled glyph colour (default white). Ignored when
+  /// disabled — the dimmed `white38` always wins so a coloured icon doesn't
+  /// read as active when it can't be tapped.
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +42,7 @@ class GlassIconButton extends StatelessWidget {
           height: size,
           child: Icon(
             icon,
-            color: enabled ? Colors.white : Colors.white38,
+            color: enabled ? (iconColor ?? Colors.white) : Colors.white38,
             size: size * 0.5,
           ),
         ),

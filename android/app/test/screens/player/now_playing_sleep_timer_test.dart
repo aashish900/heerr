@@ -142,9 +142,11 @@ class _SleepValueSeederState extends ConsumerState<_SleepValueSeeder> {
 void main() {
   setUp(() {
     paletteExtractorOverride = (Uri? _) async => null;
+    heroArtFloatEnabled = false;
   });
   tearDown(() {
     paletteExtractorOverride = dominantColorFor;
+    heroArtFloatEnabled = true;
   });
 
   testWidgets('countdown chip is absent when timer is idle',
