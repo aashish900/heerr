@@ -1,45 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../models/seed_track.dart';
-import '../../models/subsonic/song.dart';
-import '../../player/playback_actions.dart';
-import '../../providers/library/starred_songs.dart';
+import '../../models/subsonic/playlist.dart';
+import '../../providers/library/favourites.dart';
 import '../../widgets/empty_state.dart';
-import '../../widgets/library_cover_art.dart';
 import '../../widgets/skeleton.dart';
-import '../../widgets/song_row_actions.dart';
+import 'playlist_detail_screen.dart';
 
-/// Starred-songs list — the Favorites Quick Access card's destination
-/// (HOMESCREEN.md task 5). Rows reuse the same building blocks as the
-/// playlist screen (LibraryCoverArt + SongRowActions) and play through the
-/// shared `playAllSongsFromSubsonic` path — no new playback entry point.
+/// Favorites Quick Access card's destination (HOMESCREEN.md task 5).
+///
+/// Favorites is a real Navidrome playlist named `Favourites`
+/// ([kFavouritesPlaylistName]), not the Subsonic star primitive — an
+/// earlier decision (DECISIONLOG "Subsonic star primitive for Favourites")
+/// rejected `star.view`/`getStarred2.view` for this exact surface because
+/// starred items don't render as an openable/playable list in Navidrome.
+/// The heart icon elsewhere in the app (`PlaylistMutations.toggleFavourite`)
+/// already maintains this playlist. This screen just resolves it and hands
+/// off to [PlaylistDetailScreen] — no separate row/play UI to maintain.
 class FavoritesScreen extends ConsumerWidget {
   const FavoritesScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<List<Song>> starred = ref.watch(starredSongsProvider);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Favorites')),
-      body: RefreshIndicator(
-        onRefresh: () {
-          ref.invalidate(starredSongsProvider);
-          return ref
-              .read(starredSongsProvider.future)
-              .catchError((_) => const <Song>[]);
-        },
-        child: starred.when(
-          loading: () => ListView(
-            children: const <Widget>[
-              SkeletonTile(),
-              SkeletonTile(),
-              SkeletonTile(),
-              SkeletonTile(),
-              SkeletonTile(),
-            ],
-          ),
-          error: (Object e, _) => ListView(
+    final AsyncValue<Playlist?> fav = ref.watch(favouritesPlaylistProvider);
+    return fav.when(
+      loading: () => Scaffold(
+        appBar: AppBar(title: const Text('Favorites')),
+        body: const SkeletonList(),
+      ),
+      error: (Object e, _) => Scaffold(
+        appBar: AppBar(title: const Text('Favorites')),
+        body: RefreshIndicator(
+          onRefresh: () async => ref.invalidate(favouritesPlaylistProvider),
+          child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             children: <Widget>[
               SizedBox(
@@ -58,7 +51,8 @@ class FavoritesScreen extends ConsumerWidget {
                       const SizedBox(height: 16),
                       FilledButton.icon(
                         key: const Key('favorites-retry'),
-                        onPressed: () => ref.invalidate(starredSongsProvider),
+                        onPressed: () =>
+                            ref.invalidate(favouritesPlaylistProvider),
                         icon: const Icon(Icons.refresh),
                         label: const Text('Retry'),
                       ),
@@ -68,9 +62,15 @@ class FavoritesScreen extends ConsumerWidget {
               ),
             ],
           ),
-          data: (List<Song> songs) {
-            if (songs.isEmpty) {
-              return ListView(
+        ),
+      ),
+      data: (Playlist? playlist) {
+        if (playlist == null) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Favorites')),
+            body: RefreshIndicator(
+              onRefresh: () async => ref.invalidate(favouritesPlaylistProvider),
+              child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: const <Widget>[
                   Padding(
@@ -78,47 +78,16 @@ class FavoritesScreen extends ConsumerWidget {
                     child: EmptyState(
                       icon: Icons.favorite_outline,
                       title: 'No favorites yet',
-                      subtitle: 'Star songs to collect them here.',
+                      subtitle: 'Heart songs to collect them here.',
                     ),
                   ),
                 ],
-              );
-            }
-            return ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: songs.length,
-              itemBuilder: (BuildContext c, int i) {
-                final Song s = songs[i];
-                return ListTile(
-                  leading: LibraryCoverArt(coverArtId: s.coverArt, size: 40),
-                  title: Text(
-                    s.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    s.artist ?? '',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: SongRowActions(
-                    song: s,
-                    findSimilarSeed: seedForSong(s),
-                    editMetadataSong: s,
-                    deleteFromServerSong: s,
-                  ),
-                  onTap: () => playAllSongsFromSubsonic(
-                    ref,
-                    c,
-                    songs,
-                    startIndex: i,
-                  ),
-                );
-              },
-            );
-          },
-        ),
-      ),
+              ),
+            ),
+          );
+        }
+        return PlaylistDetailScreen(playlistId: playlist.id);
+      },
     );
   }
 }

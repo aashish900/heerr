@@ -998,3 +998,57 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Alternatives considered:** documented per-task in HOMESCREEN.md and the scoping entry.
 
 **Reference:** commits `bf1ccdf`..`301a2b0` on `redesign/home-screen`; CHANGELOG 2026-07-11 parts 1–7, B1+B3, B2. On-device smoke (G-gate) pending — no device attached this session.
+
+## 2026-07-11 — Favorites Quick Access repointed to the real Favourites playlist (fix round 2)
+
+**Context:** User reported the Favorites Quick Access card led to a blank/empty page. Investigation found the Home redesign's `FavoritesScreen` (task 5, prior entry) was built over `getStarred2.view` (Subsonic star primitive) — but an earlier ADR ("Subsonic star primitive for Favourites", above) had already rejected that exact approach for this exact reason: starred items don't open as a playable list in Navidrome, so a user whose favorites live in the `Favourites` playlist (the app's existing heart-icon mechanism, `PlaylistMutations.toggleFavourite` / `favouritesPlaylistProvider`) saw nothing, since they'd never used the separate star feature.
+
+**Decision:** `FavoritesScreen` now resolves `favouritesPlaylistProvider` (existing provider, unchanged) and delegates to the existing `PlaylistDetailScreen(playlistId: ...)` for the data/list/play UI, instead of hand-rolling a starred-song list. Empty state (`null` playlist — not lazy-created yet) still renders `EmptyState`, copy changed from "Star songs..." to "Heart songs to collect them here." to match the actual mechanism. `starredSongsProvider` / `getStarred2.view` is untouched — it's still correctly used by `seedCollectionProvider` (N2 recommendations seeding), just no longer misapplied to the Favorites screen.
+
+**Why:** Reuses the fully-featured, already-tested `PlaylistDetailScreen` (play/edit/reorder/delete) instead of maintaining a second, thinner song-list UI — and fixes the actual bug (wrong data source) rather than fixing symptoms in the hand-rolled list.
+
+**Alternatives considered:**
+- **Keep the star-based list, just make sure it's non-empty.** Rejected — doesn't fix the mismatch between "what the user calls Favorites" (the playlist, maintained by the heart icon everywhere else in the app) and "what this screen reads" (stars, a separate/unused mechanism in this app).
+
+**Reference:** `lib/screens/library/favorites_screen.dart`, `lib/providers/library/favourites.dart` (pre-existing), `lib/screens/library/playlist_detail_screen.dart`.
+
+## 2026-07-11 — Continue Listening hero card restyle to match the mockup (fix round 2)
+
+**Context:** User review of the hero card against `Home Screen.png` found four concrete mismatches, confirmed via `AskUserQuestion`: the card border, the full-card blurred-art backdrop, the play button, and the progress bar.
+
+**Decision:**
+1. Card border: 1.5px `heerrGradient` ring → single-colour `heerrMagenta` hairline (`BorderSide`, ~0.5 alpha) — matches the mockup's subtle single-hue outline.
+2. Dropped the Part B full-card blurred-art backdrop (`ImageFiltered` + darkening `LinearGradient` bled across the whole card). The mockup's text half is plain solid black; the backdrop made the card's overall color shift per song, which read as a mismatch from the source. Per-song adaptive tinting is **not** removed — the waveform and both glow `BoxShadow`s (art tile + play button) still take `brandBlend(extracted colour)`, cross-faded via `AnimatedTint`. Only the full-bleed backdrop layer is gone. `kArtBackdropBlur` removed from `lib/utils/palette.dart` (dead after this).
+3. Play button: solid `heerrGradient`-filled disc with a black icon → thin outlined ring (`Border.all(color: tint)`) with a transparent center and a `ShaderMask`-gradient icon — matches the mockup's ring-button look.
+4. Progress bar: added a round gradient knob (`Positioned` circle, `Key('continue-listening-progress-knob')`) at the current-position fraction. Indicative only — seeking still lives on `/player` (unchanged from the original Task 2 decision); the knob doesn't add drag-to-seek on Home.
+5. Album art tile width: 140 → 161 (+15%), per explicit user request — separate from the mockup-matching pass above.
+
+**Why:** These are all "make it actually match the reference image" fixes surfaced by direct visual comparison, not new feature work — no HOMESCREEN.md scope change.
+
+**Reference:** `lib/screens/home/continue_listening_card.dart`, `lib/utils/palette.dart`.
+
+## 2026-07-11 — Home-screen App Widget: dropped gradient border; Flutter waveform matches the widget's baseline anchoring (fix round 3)
+
+**Context:** User asked to (1) remove the gradient border from the home-screen App Widget (`HeroWidgetProvider`/`hero_widget.xml`) and (2) fix the MiniPlayer's waveform so it matches the widget's own waveform, which it was nominally already supposed to mirror (per the fix-round-1 decision "reusing the home-screen widget's look").
+
+**Decision:**
+1. Widget border: `widget_gradient_border.xml` (2dp magenta→violet rim over a 2dp-inset dark interior, `layer-list` trick) replaced by `widget_background.xml` — a single solid `#0A0A0A` rounded rect, no border. `hero_widget.xml`'s root `FrameLayout` drops `android:padding="2dp"` (no longer needed without the inset). `HeroWidgetProvider.kt`: `CORNER_DP` 26 → 28 (art's rounded corners now match the tile's own un-inset radius) and `BORDER_DP` removed along with the `- 2 * BORDER_DP` height adjustment (the art bitmap now uses the widget's full reported height, since there's no more 2dp top/bottom padding to subtract).
+2. Comparing `tool/gen_widget_wave.py` (the widget's waveform generator) against `WaveformStrip._WaveformPainter.paint`: the widget's 36 bars are **baseline-anchored** — each bar's path runs from a computed top down to a fixed `BASELINE_Y` (bottom), so short bars barely rise off the floor and tall bars reach up. The Flutter `WaveformStrip` instead centered every bar vertically (`top = (size.height - px) / 2`), which reads as a symmetric two-sided equalizer — a different silhouette from the widget's rising-bars look. Fixed: bars now anchor to `size.height` (bottom) and grow upward, matching the widget. This is shared by both `MiniPlayer` and `ContinueListeningCard` (same `WaveformStrip`), consistent with the "reuse the widget's look" intent recorded in fix round 1 — not scoped to only the MiniPlayer.
+
+**Why:** Both are literal visual-parity asks against an existing native reference (the widget), not new design decisions — the widget itself is the source of truth.
+
+**Not changed:** the per-bar height *distribution* (deterministic LCG random, uniform-ish across the strip) still differs from the widget's fixed 3-cluster Gaussian envelope (tall groups separated by near-baseline dots) — only the anchoring/orientation was fixed. Revisit if closer fidelity is wanted; would need to touch `WaveformStrip.barHeights`, which three existing unit tests pin to a `[0.15, 1.0]` range.
+
+**Reference:** `android/app/android/app/src/main/res/drawable/widget_background.xml` (new), `widget_gradient_border.xml` (deleted), `hero_widget.xml`, `HeroWidgetProvider.kt`, `lib/widgets/waveform_strip.dart`, `tool/gen_widget_wave.py`.
+
+## 2026-07-11 — Hero card: art edge fade + real progress seeking (fix round 4)
+
+**Context:** User review flagged two remaining gaps in the Continue Listening hero card: (1) a hard visible border between the album-art tile and the rest of the card — the home-screen widget fades its art into the tile instead — and (2) the progress bar still only displays position; it doesn't let the user seek, despite earlier rounds (fix round 2) explicitly deferring seek to `/player` ("the knob doesn't add drag-to-seek on Home").
+
+**Decision:**
+1. Art edge: ported the widget's own fade technique (`HeroWidgetProvider.kt` `buildArtBitmap`, `DST_IN` alpha gradient over the right `FADE_FRACTION = 0.35` of the bitmap) to Flutter as a `ShaderMask` (`BlendMode.dstIn`, white→transparent `LinearGradient`, stops `[0, 0.65, 1]`) wrapping `_CoverArt`. Reveals the card's `surfaceContainerLow` background through the art's right edge instead of a hard seam — no change to the artwork's own pixels (consistent with the standing Part B rule "the artwork is never recoloured").
+2. Progress bar: reversed the fix-round-2 decision to keep seeking `/player`-only. Added a `GestureDetector` (tap + horizontal drag) directly over the bar, converting gesture x-position into a seek fraction and calling `HeerrAudioHandler.seek(...)`. It's nested inside the card's outer `InkWell` (tap-to-open-`/player`); relies on Flutter's gesture-arena resolving nested tap/drag conflicts toward the innermost recognizer, verified by a regression test that taps the bar and asserts no navigation occurred.
+
+**Why:** Both were "the card still doesn't match/behave like the reference" gaps identified by the user testing the running app, not new scope.
+
+**Reference:** `lib/screens/home/continue_listening_card.dart`, `android/app/android/app/src/main/kotlin/com/aashish/heerr/HeroWidgetProvider.kt`.

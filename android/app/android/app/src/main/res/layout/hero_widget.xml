@@ -25,8 +25,7 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_gradient_border"
-    android:padding="2dp">
+    android:background="@drawable/widget_background">
 
     <!-- IDLE -->
     <LinearLayout
@@ -119,7 +118,7 @@
         android:visibility="gone">
 
         <!-- Full-height cover, flush against the tile's left edge; the
-             provider rounds the bitmap's left corners to hug the border. -->
+             provider rounds the bitmap's left corners to hug the tile edge. -->
         <ImageView
             android:id="@+id/widget_art"
             android:layout_width="112dp"

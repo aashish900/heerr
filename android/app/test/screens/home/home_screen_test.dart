@@ -1,11 +1,14 @@
 import 'dart:io';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:heerr/models/profile_meta.dart';
+import 'package:heerr/player/heerr_audio_handler.dart';
+import 'package:heerr/player/player_provider.dart';
 import 'package:heerr/models/subsonic/album.dart';
 import 'package:heerr/models/subsonic/song.dart';
 import 'package:heerr/providers/downloaded_songs.dart';
@@ -111,6 +114,38 @@ void main() {
     expect(find.text('Most played'), findsNothing);
     expect(find.text('Picked for you'), findsNothing);
   });
+
+  testWidgets(
+    'regression: with a live track, hero card AND all sections render '
+    '(the unbounded-height card used to kill everything below it)',
+    (WidgetTester tester) async {
+      const MediaItem item = MediaItem(
+        id: 'http://stream/1',
+        title: 'Live Track',
+        artist: 'Artist',
+        duration: Duration(minutes: 3),
+      );
+      await tester.pumpWidget(_wrap(overrides: <Override>[
+        ..._homeOverrides(newest: <Album>[
+          _album('al-1', 'Fresh Album', artist: 'Fresh Artist'),
+        ]),
+        playerSnapshotProvider.overrideWith(
+          (Ref<AsyncValue<PlayerSnapshot>> ref) =>
+              Stream<PlayerSnapshot>.value(PlayerSnapshot(
+            item: item,
+            state: PlaybackState(), // paused — restored-queue cold start
+          )),
+        ),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(find.text('CONTINUE LISTENING'), findsOneWidget);
+      expect(find.text('Live Track'), findsOneWidget);
+      expect(find.byType(QuickAccessRow), findsOneWidget);
+      expect(find.byType(RecentlyAddedSection), findsOneWidget);
+      expect(find.text('Fresh Album'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'empty newest + idle player → empty-state replaces Recently Added',

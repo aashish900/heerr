@@ -2569,3 +2569,79 @@ User review of the previous widget-polish commit flagged two remaining mismatche
 
 - **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.7.4 → 4.8.0 per the version-sync convention. Minor bump (not patch): the Home Screen redesign replaces the layout, adds two screens (Favorites, Recently Added), and introduces per-song adaptive theming. Android-side only; backend bumped for sync.
 - Tagged `v4.8.0`.
+
+## 2026-07-11 — Home redesign fix round 1: layout bug + mockup fidelity (user review)
+
+User review of v4.8.0 flagged four issues:
+
+- **Home sections vanished while a track was live (bug).** The hero card's `Row(crossAxisAlignment: stretch)` sits in a Stack that gets **unbounded height inside Home's ListView**; with a current MediaItem the card mounted, layout threw, and everything below it (Quick Access, Recently Added) failed to render. Widget tests missed it because they pumped the card inside a bounded Scaffold body. Fix: card content wrapped in `SizedBox(height: 212)`; inner column centered. Regression test added that pumps the full HomeScreen with a live snapshot and asserts hero + both sections render (`test/screens/home/home_screen_test.dart`).
+- **Search pill too round.** `_HomeSearchBar` radius 28 → 14 (mockup: squarish with gently curved corners). Only occurrence in the app — Library search is an inline AppBar field.
+- **MiniPlayer waveform wrong colour + static.** `WaveformStrip` gained `gradient` (shader paint) and `animate` (equalizer breathing via a repeating 1.2 s AnimationController, phase-shifted per bar — the home-screen widget's look). MiniPlayer waveform now `heerrGradient` + animates only while playing (a repeating animation must not run while paused — also keeps `pumpAndSettle` usable in tests). The per-song tint remains on the play-circle glow.
+- **MiniPlayer border too loud.** Gradient border shell replaced with `surfaceContainerLow` card + 0.8dp `outline`-grey hairline (`RoundedRectangleBorder.side`), per the mockup.
+- Tests: mini-player Part B assertions repointed (waveform → gradient check; tint → glow BoxShadow colour), playing-state test switched to fixed pumps, new hairline-border test.
+- Verification: `flutter analyze` clean, `flutter test` 807/807 green.
+
+## 2026-07-11 — Version bump to 4.8.1 (redesign fix-round release)
+
+- **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.8.0 → 4.8.1 per the version-sync convention, covering the "fix round 1" commit (unbounded hero-card layout bug, search-pill radius, animated gradient waveform, subtle minibar border). Android-side only; backend bumped for sync.
+- Tagged `v4.8.1`.
+
+## 2026-07-11 — Fix: hero-card waveform was static (never wired `animate`)
+
+User reported the Continue Listening card's waveform doesn't move. Root cause: `ContinueListeningCard` (`android/app/lib/screens/home/continue_listening_card.dart`) builds its `WaveformStrip` without passing `animate:`, so it always fell back to the `false` default — unlike the MiniPlayer, which was correctly wired to `s.isPlaying` in the fix-round-1 pass. Fix: added `animate: s.isPlaying` to the card's `WaveformStrip`.
+
+- New regression test (`test/screens/home/continue_listening_card_test.dart`): "waveform animates while playing, static when paused" — asserts `WaveformStrip.animate` flips both ways across a play/pause transition.
+- While writing that test, an unrelated test-harness gotcha surfaced: driving a play→pause transition by calling `pumpWidget` twice with two separate `Stream.value()` `ProviderScope` overrides doesn't reliably rebuild an already-instantiated Riverpod provider — `pumpAndSettle` hung waiting on a `WaveformStrip` animation that was never told to stop, because the second override never actually took effect. This doesn't happen in production (a single `audio_service` stream subscription persists and emits repeatedly). Fixed the test by feeding a shared `StreamController` into one long-lived `ProviderScope`/override (`_wrapStream` helper) and emitting both snapshots into it — the same shape the MiniPlayer test already avoided by never testing this transition.
+- Verification: `flutter analyze` clean, `flutter test` 808/808 green (isolated `now_playing_persistence_test.dart` flake under full-suite parallelism reran green standalone — unrelated to this change).
+
+## 2026-07-11 — Fix round 2: progress bar, card mockup fidelity, Favorites routing
+
+User review flagged four more issues:
+
+- **Hero-card progress bar invisible while playing (bug, actually always broken).** `_ProgressBar`'s `FractionallySizedBox` set `widthFactor` but not `heightFactor`; with no `heightFactor` its height derives from its child, and the child `DecoratedBox` had no `child:` — so the gradient fill rendered at **zero height**, always, regardless of play state (confirmed via a widget-test `Rect` probe: `top == bottom`). Fixed by adding `heightFactor: 1.0`.
+- **Continue Listening card mismatched the mockup.** Four confirmed diffs, all fixed (`lib/screens/home/continue_listening_card.dart`): the 1.5px `heerrGradient` border ring → a single-colour `heerrMagenta` hairline; the Part B full-card blurred-art backdrop (bled across the whole card, shifting its color per song) removed — text half is plain black again, matching the source (per-song tint stays on the waveform + glows, just not the backdrop); the solid gradient-filled play disc → a thin outlined ring with a `ShaderMask`-gradient icon; a round gradient knob added to the progress bar at the current position (indicative only — seeking still lives on `/player`). `kArtBackdropBlur` removed from `lib/utils/palette.dart` (dead after the backdrop removal).
+- **Album art tile enlarged 140px → 161px** (+15%, explicit user request).
+- **Favorites Quick Access led to a blank page (bug).** `FavoritesScreen` was built over `getStarred2.view` (Subsonic star primitive) during the redesign — but an earlier ADR ("Subsonic star primitive for Favourites", DECISIONLOG) had already rejected that exact source for this exact reason: starred items aren't a playable list in Navidrome. Users who favorite songs via the app's existing heart icon (`PlaylistMutations.toggleFavourite`, the `Favourites` playlist) saw an empty screen because they'd never used the separate, unrelated star feature. Fixed: `FavoritesScreen` now resolves `favouritesPlaylistProvider` (pre-existing) and delegates to the existing `PlaylistDetailScreen` for the list/play UI instead of a hand-rolled starred-song list. `starredSongsProvider` is untouched — still correctly used by `seedCollectionProvider` (N2 recommendation seeding), just no longer misapplied here.
+- Tests: `continue_listening_card_test.dart` — new regression tests for the border colour, ring play button, progress knob, art-tile width; Part B "blurred backdrop" test removed (no backdrop left to test), "no backdrop and fallback tint" retitled and kept (tint-without-art path still exists via the glows). `favorites_screen_test.dart` rewritten around `favouritesPlaylistProvider` + `libraryPlaylistProvider`, delegating render assertions to `PlaylistDetailScreen`'s own content.
+- Verification: `flutter analyze` clean, `flutter test` 811/811 green.
+
+## 2026-07-11 — Version bump to 4.8.2 (fix-round-2 release)
+
+- **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.8.1 → 4.8.2 per the version-sync convention, covering "fix round 2" (progress-bar zero-height bug, hero-card mockup restyle, +15% art width, Favorites repointed to the real Favourites playlist). Android-side only; backend bumped for sync.
+- Tagged `v4.8.2`.
+
+## 2026-07-11 — Fix round 3: widget border removed, waveform matches the widget
+
+- **Home-screen App Widget: gradient border removed.** `widget_gradient_border.xml` (2dp magenta→violet rim, layer-list trick) replaced by `widget_background.xml` — a plain solid rounded tile, no border. `hero_widget.xml` drops the now-unneeded 2dp padding; `HeroWidgetProvider.kt` updated (`CORNER_DP` 26→28, `BORDER_DP` + its height subtraction removed) so the album art still fills the tile edge-to-edge correctly.
+- **Flutter waveform now matches the widget's waveform.** `tool/gen_widget_wave.py` (the widget's waveform generator) draws all bars **baseline-anchored** — rising from the bottom edge. `WaveformStrip`'s painter was instead centering every bar vertically (symmetric two-sided look) — a different silhouette from the widget it was meant to echo. Fixed: bars now anchor to the bottom and grow up, in both the MiniPlayer and the Continue Listening hero card (same shared `WaveformStrip`). Per-bar height *distribution* (deterministic random vs. the widget's fixed 3-cluster envelope) is unchanged — only the anchor/orientation.
+- Verification: `flutter analyze` clean, `flutter test` 811/811 green, `flutter build apk --debug` succeeds (exercises the Kotlin/XML widget changes, which aren't covered by `flutter test`).
+
+## 2026-07-11 — Version bump to 4.8.3 (fix-round-3 release)
+
+- **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.8.2 → 4.8.3 per the version-sync convention, covering "fix round 3" (widget gradient border removed, MiniPlayer/hero-card waveform baseline-anchored to match the widget). Android-side only; backend bumped for sync.
+- Tagged `v4.8.3`.
+
+## 2026-07-11 — Fix round 4: hero card art edge fade + real progress seeking
+
+- **Album art now fades into the card instead of a hard seam.** `lib/screens/home/continue_listening_card.dart` — the art tile's right edge is alpha-faded to transparent via a `ShaderMask` (`BlendMode.dstIn`, white→transparent `LinearGradient`, stops `[0, 0.65, 1]`), revealing the card's `surfaceContainerLow` background underneath instead of a hard vertical border between art and text. Mirrors the home-screen widget's own art treatment (`HeroWidgetProvider.kt` `buildArtBitmap`, `FADE_FRACTION = 0.35`) — same 35% fade fraction, ported from the native `DST_IN` bitmap mask to a Flutter `ShaderMask`.
+- **Progress bar is now actually seekable, not just a display.** The bar previously only rendered position — the class doc even said "seeking lives on /player." Added a `GestureDetector` (`onTapDown` + `onHorizontalDragStart/Update`) over the bar area (`Key('continue-listening-seek-area')`) that converts the tap/drag x-offset into a fraction and calls `HeerrAudioHandler.seek(...)`; disabled (no gesture) when duration is unknown. The gesture detector is nested inside the card's outer `InkWell` (which navigates to `/player` on tap) — Flutter's gesture-arena resolves nested tap/drag conflicts in favour of the innermost recognizer, so seeking on the bar no longer also navigates.
+- Tests: `continue_listening_card_test.dart` — new `fix round 4` group: art fade asserts a `ShaderMask` with `BlendMode.dstIn` exists; tap-to-seek and drag-to-seek assert `handler.seek(...)` is called with a duration derived from the gesture position; a regression test asserts tapping the seek area does not also push `/player`.
+- Verification: `flutter analyze` clean, `flutter test` 815/815 green.
+
+## 2026-07-11 — Version bump to 4.8.4 (fix-round-4 release)
+
+- **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.8.3 → 4.8.4 per the version-sync convention, covering "fix round 4" (hero card album-art edge fade, tap/drag-to-seek progress bar). Android-side only; backend bumped for sync.
+- Tagged `v4.8.4`.
+
+## 2026-07-11 — Fix: hero card progress bar rendered centred, not left-anchored
+
+- **Bug:** the progress track (faint background + gradient fill) visually floated in the middle of the bar instead of starting at the left edge — the fill appeared to "start from the middle." Root cause in `lib/screens/home/continue_listening_card.dart`'s `_ProgressBar`: the track's `SizedBox(height: 5)` only constrained height, leaving width unbounded-but-loose. Its child `Stack` (default `StackFit.loose`) then sized itself to its widest **non-positioned, sized** child — the `FractionallySizedBox` fill, which renders at `progress * trackWidth` wide — not the full bar width. The faint background track is a `Positioned.fill` child, so it doesn't contribute to the Stack's own size; it just fills whatever (shrunken) size the Stack ended up with. The outer `Align` then centred that shrunken track+fill assembly within the full-width bar, instead of the fill starting flush at the left edge. This is the same class of bug as the earlier progress-bar zero-height fix (fix round 2) — a `FractionallySizedBox`/Stack sizing gap, not a state/logic bug.
+- **Fix:** added `width: double.infinity` to the track's `SizedBox`, forcing it (and the `Stack` inside) to claim the full bar width regardless of `progress`, so the fill is sized relative to the true full width and starts at the left edge.
+- Tests: new pixel-position regression test asserting the fill's rendered `Rect.left` matches the seek area's left edge (not centred) and its width is `progress * barWidth` in **actual rendered pixels**, not just the `FractionallySizedBox.widthFactor` property (which was already correct and didn't catch this class of bug).
+- Verification: `flutter analyze` clean, `flutter test` 816/816 green.
+
+## 2026-07-11 — Version bump to 4.8.5 + merge redesign/home-screen into main
+
+- **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.8.4 → 4.8.5 per the version-sync convention, covering the hero-card progress-bar centring fix. Android-side only; backend bumped for sync.
+- `redesign/home-screen` merged into `main` — closes out the Home Screen redesign (HOMESCREEN.md Part A + Part B) and all five user-review fix rounds (v4.8.1–v4.8.5).
+- Tagged `v4.8.5`.

@@ -1,25 +1,38 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
 
-/// Decorative static waveform (redesign — HOMESCREEN.md task 2). Purely
-/// visual: bar heights are pseudo-random but deterministic per [seed], so a
-/// given track always renders the same shape and rebuilds don't flicker.
+/// Decorative waveform (redesign — HOMESCREEN.md task 2). Bar heights are
+/// pseudo-random but deterministic per [seed], so a given track always
+/// renders the same shape and rebuilds don't flicker.
+///
+/// [animate] adds the equalizer motion from the home-screen widget's
+/// concept art: bars breathe around their base height while a track plays.
+/// [gradient] paints the bars with a shader (e.g. [heerrGradient]) instead
+/// of the flat [color].
 ///
 /// Not a progress indicator and not tappable — pair it with a real progress
 /// bar where needed (Continue Listening card, MiniPlayer).
-class WaveformStrip extends StatelessWidget {
+class WaveformStrip extends StatefulWidget {
   const WaveformStrip({
     super.key,
     this.height = 28,
     this.color = heerrMagenta,
+    this.gradient,
     this.seed = 0,
     this.barWidth = 3,
     this.gap = 2,
+    this.animate = false,
   });
 
   final double height;
   final Color color;
+
+  /// When set, bars are shader-painted with this gradient and [color] is
+  /// ignored.
+  final Gradient? gradient;
 
   /// Seeds the bar-height sequence — pass something stable per track
   /// (e.g. `title.hashCode`).
@@ -27,6 +40,10 @@ class WaveformStrip extends StatelessWidget {
 
   final double barWidth;
   final double gap;
+
+  /// Animate the bars (equalizer breathing) — enable while playing only;
+  /// a repeating animation never "settles" (mind `pumpAndSettle` in tests).
+  final bool animate;
 
   /// Deterministic bar heights in 0.15..1.0 (fraction of [height]).
   /// LCG (numerical-recipes constants) rather than `Random(seed)` so the
@@ -43,16 +60,54 @@ class WaveformStrip extends StatelessWidget {
   }
 
   @override
+  State<WaveformStrip> createState() => _WaveformStripState();
+}
+
+class _WaveformStripState extends State<WaveformStrip>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.animate) _ctrl.repeat();
+  }
+
+  @override
+  void didUpdateWidget(WaveformStrip old) {
+    super.didUpdateWidget(old);
+    if (widget.animate && !_ctrl.isAnimating) {
+      _ctrl.repeat();
+    } else if (!widget.animate && _ctrl.isAnimating) {
+      _ctrl.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: height,
+      height: widget.height,
       width: double.infinity,
-      child: CustomPaint(
-        painter: _WaveformPainter(
-          color: color,
-          seed: seed,
-          barWidth: barWidth,
-          gap: gap,
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (BuildContext context, _) => CustomPaint(
+          painter: _WaveformPainter(
+            color: widget.color,
+            gradient: widget.gradient,
+            seed: widget.seed,
+            barWidth: widget.barWidth,
+            gap: widget.gap,
+            phase: widget.animate ? _ctrl.value * 2 * math.pi : null,
+          ),
         ),
       ),
     );
@@ -62,28 +117,51 @@ class WaveformStrip extends StatelessWidget {
 class _WaveformPainter extends CustomPainter {
   const _WaveformPainter({
     required this.color,
+    required this.gradient,
     required this.seed,
     required this.barWidth,
     required this.gap,
+    required this.phase,
   });
 
   final Color color;
+  final Gradient? gradient;
   final int seed;
   final double barWidth;
   final double gap;
+
+  /// Animation phase in radians; null = static bars at their base height.
+  final double? phase;
 
   @override
   void paint(Canvas canvas, Size size) {
     final int count = (size.width / (barWidth + gap)).floor();
     if (count <= 0) return;
     final List<double> heights = WaveformStrip.barHeights(count, seed);
-    final Paint paint = Paint()..color = color;
+    final Paint paint = Paint();
+    final Gradient? g = gradient;
+    if (g != null) {
+      paint.shader = g.createShader(Offset.zero & size);
+    } else {
+      paint.color = color;
+    }
+    final double? p = phase;
     for (int i = 0; i < count; i++) {
-      final double h = heights[i] * size.height;
+      double h = heights[i];
+      if (p != null) {
+        // Equalizer breathing: each bar oscillates around its base height,
+        // phase-shifted by index so the strip ripples instead of pulsing.
+        h = (h * (0.55 + 0.45 * math.sin(p + i * 0.9))).clamp(0.10, 1.0);
+      }
+      final double px = h * size.height;
       final double x = i * (barWidth + gap);
+      // Baseline-anchored (bars grow up from the bottom), not vertically
+      // centered — matches the home-screen widget's waveform
+      // (widget_wave_*.xml, generated by tool/gen_widget_wave.py), which
+      // this strip is meant to visually echo.
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromLTWH(x, (size.height - h) / 2, barWidth, h),
+          Rect.fromLTWH(x, size.height - px, barWidth, px),
           Radius.circular(barWidth / 2),
         ),
         paint,
@@ -94,7 +172,9 @@ class _WaveformPainter extends CustomPainter {
   @override
   bool shouldRepaint(_WaveformPainter old) =>
       old.color != color ||
+      old.gradient != gradient ||
       old.seed != seed ||
       old.barWidth != barWidth ||
-      old.gap != gap;
+      old.gap != gap ||
+      old.phase != phase;
 }

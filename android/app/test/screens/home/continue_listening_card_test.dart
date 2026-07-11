@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -41,6 +43,21 @@ MediaItem _item({
 Widget _wrap({
   required PlayerSnapshot snapshot,
   HeerrAudioHandler? handler,
+}) =>
+    _wrapStream(
+      stream: Stream<PlayerSnapshot>.value(snapshot),
+      handler: handler,
+    );
+
+// Feeds playerSnapshotProvider from a single, long-lived stream — matching
+// production, where audio_service emits repeatedly into one subscription.
+// Swapping ProviderScope overrides across a fresh pumpWidget call (i.e. two
+// separate Stream.value() overrides) doesn't reliably rebuild an
+// already-instantiated provider, which made an earlier play->pause
+// regression test hang on pumpAndSettle for the wrong reason.
+Widget _wrapStream({
+  required Stream<PlayerSnapshot> stream,
+  HeerrAudioHandler? handler,
 }) {
   final GoRouter router = GoRouter(
     routes: <RouteBase>[
@@ -58,8 +75,7 @@ Widget _wrap({
     overrides: <Override>[
       if (handler != null) audioHandlerProvider.overrideWithValue(handler),
       playerSnapshotProvider.overrideWith(
-        (Ref<AsyncValue<PlayerSnapshot>> ref) =>
-            Stream<PlayerSnapshot>.value(snapshot),
+        (Ref<AsyncValue<PlayerSnapshot>> ref) => stream,
       ),
     ],
     child: MaterialApp.router(
@@ -70,6 +86,10 @@ Widget _wrap({
 }
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(Duration.zero);
+  });
+
   testWidgets('hidden when the snapshot has no current item',
       (WidgetTester tester) async {
     await tester.pumpWidget(_wrap(snapshot: _snap()));
@@ -108,6 +128,32 @@ void main() {
     final FractionallySizedBox fill = tester.widget<FractionallySizedBox>(
         find.byKey(const Key('continue-listening-progress')));
     expect(fill.widthFactor, closeTo(0.5, 0.001));
+  });
+
+  testWidgets(
+      'regression: progress track spans the full bar width and starts at '
+      'the left edge, not centred',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(
+      snapshot: _snap(
+        item: _item(duration: const Duration(minutes: 2)),
+        position: const Duration(seconds: 36), // 30% progress
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final Rect barRect = tester
+        .getRect(find.byKey(const Key('continue-listening-seek-area')));
+    final Rect fillRect = tester
+        .getRect(find.byKey(const Key('continue-listening-progress')));
+
+    // The fill must start flush with the bar's left edge — if the track's
+    // Stack shrinks to the fill's own (progress-fraction) width instead of
+    // the full bar width, the whole track gets centred by its parent Align
+    // and the fill appears to start partway across the bar instead of at
+    // the left edge.
+    expect(fillRect.left, closeTo(barRect.left, 1.0));
+    expect(fillRect.width, closeTo(barRect.width * 0.3, 1.0));
   });
 
   testWidgets('null duration renders --:-- and zero progress (no crash)',
@@ -149,11 +195,40 @@ void main() {
       snapshot: _snap(item: _item(), playing: true),
       handler: handler,
     ));
-    await tester.pumpAndSettle();
+    // While playing the waveform animates forever — pump fixed frames
+    // instead of pumpAndSettle.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byIcon(Icons.pause), findsOneWidget);
     await tester.tap(find.byKey(const Key('continue-listening-play')));
     verify(handler.pause).called(1);
+  });
+
+  testWidgets(
+      'regression: waveform animates while playing, static when paused',
+      (WidgetTester tester) async {
+    final StreamController<PlayerSnapshot> ctrl =
+        StreamController<PlayerSnapshot>.broadcast();
+    addTearDown(ctrl.close);
+
+    await tester.pumpWidget(_wrapStream(stream: ctrl.stream));
+    ctrl.add(_snap(item: _item(), playing: true));
+    // The waveform animates forever while playing — pump fixed frames
+    // instead of pumpAndSettle.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      tester.widget<WaveformStrip>(find.byType(WaveformStrip)).animate,
+      isTrue,
+    );
+
+    ctrl.add(_snap(item: _item(), playing: false));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<WaveformStrip>(find.byType(WaveformStrip)).animate,
+      isFalse,
+    );
   });
 
   testWidgets('card tap (not on the button) pushes /player',
@@ -200,28 +275,169 @@ void main() {
       expect(calls, 1, reason: 'one extraction per unique cover URI');
     });
 
-    testWidgets('blurred backdrop renders when the item has art',
-        (WidgetTester tester) async {
-      dominantColorForOverride = (Uri? _) async => null;
-      await tester.pumpWidget(_wrap(
-        snapshot: _snap(item: itemWithArt()),
-      ));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(ImageFiltered), findsOneWidget);
-    });
-
-    testWidgets('no backdrop and fallback tint without art',
+    testWidgets('fallback tint without art (no cover-driven backdrop)',
         (WidgetTester tester) async {
       await tester.pumpWidget(_wrap(
         snapshot: _snap(item: _item()), // no artUri
       ));
       await tester.pumpAndSettle();
 
-      expect(find.byType(ImageFiltered), findsNothing);
       final WaveformStrip strip =
           tester.widget<WaveformStrip>(find.byType(WaveformStrip));
       expect(strip.color, brandBlend(heerrPurple));
+    });
+  });
+
+  group('restyle: mockup fidelity (user review)', () {
+    testWidgets('card border is a thin single-colour magenta hairline',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(snapshot: _snap(item: _item())));
+      await tester.pumpAndSettle();
+
+      final Material card = tester.widget<Material>(find.byWidgetPredicate(
+          (Widget w) => w is Material && w.shape is RoundedRectangleBorder));
+      final RoundedRectangleBorder shape =
+          card.shape! as RoundedRectangleBorder;
+      expect(shape.side.color, heerrMagenta.withValues(alpha: 0.5));
+    });
+
+    testWidgets('play control is an outlined ring, not a filled disc',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(snapshot: _snap(item: _item())));
+      await tester.pumpAndSettle();
+
+      final Container ring = tester.widget<Container>(find.byWidgetPredicate(
+          (Widget w) =>
+              w is Container &&
+              w.decoration is BoxDecoration &&
+              (w.decoration! as BoxDecoration).shape == BoxShape.circle &&
+              (w.decoration! as BoxDecoration).border != null));
+      final BoxDecoration deco = ring.decoration! as BoxDecoration;
+      expect(deco.gradient, isNull);
+      expect(deco.border, isNotNull);
+    });
+
+    testWidgets('progress bar shows a round knob at the current position',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(
+        snapshot: _snap(
+          item: _item(),
+          position: const Duration(minutes: 1, seconds: 7),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(
+          find.byKey(const Key('continue-listening-progress-knob')),
+          findsOneWidget);
+    });
+
+    testWidgets('album art tile is 161px wide (+15% over the original 140)',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(snapshot: _snap(item: _item())));
+      await tester.pumpAndSettle();
+
+      final Container artTile = tester.widget<Container>(find.byWidgetPredicate(
+          (Widget w) =>
+              w is Container &&
+              w.constraints?.maxWidth == 161 &&
+              w.decoration is BoxDecoration &&
+              (w.decoration! as BoxDecoration).boxShadow != null));
+      expect(artTile.constraints?.maxWidth, 161);
+    });
+  });
+
+  group('fix round 4 (user review)', () {
+    testWidgets(
+        'album art fades into the card edge (no hard border, like the widget)',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(snapshot: _snap(item: _item())));
+      await tester.pumpAndSettle();
+
+      final Iterable<ShaderMask> masks =
+          tester.widgetList<ShaderMask>(find.byType(ShaderMask));
+      expect(
+        masks.where((ShaderMask m) => m.blendMode == BlendMode.dstIn),
+        isNotEmpty,
+        reason: 'art tile should alpha-fade its right edge, matching the '
+            'home-screen widget (HeroWidgetProvider.kt buildArtBitmap)',
+      );
+    });
+
+    testWidgets('tapping the progress bar seeks to that position',
+        (WidgetTester tester) async {
+      final _StubHandler handler = _StubHandler();
+      when(() => handler.seek(any())).thenAnswer((_) async {});
+      await tester.pumpWidget(_wrap(
+        snapshot: _snap(
+          item: _item(duration: const Duration(minutes: 4)),
+          position: const Duration(minutes: 1),
+        ),
+        handler: handler,
+      ));
+      await tester.pumpAndSettle();
+
+      final Finder area =
+          find.byKey(const Key('continue-listening-seek-area'));
+      final Rect rect = tester.getRect(area);
+      await tester.tapAt(rect.centerLeft + const Offset(4, 0));
+      await tester.pump();
+
+      final Duration captured =
+          verify(() => handler.seek(captureAny())).captured.single as Duration;
+      // Tapped near the left edge of a 4-minute track — should seek well
+      // short of the un-touched position (1:00), proving it used the tap
+      // location, not just re-issuing the current position.
+      expect(captured, lessThan(const Duration(seconds: 30)));
+    });
+
+    testWidgets('dragging the progress bar seeks continuously',
+        (WidgetTester tester) async {
+      final _StubHandler handler = _StubHandler();
+      when(() => handler.seek(any())).thenAnswer((_) async {});
+      await tester.pumpWidget(_wrap(
+        snapshot: _snap(
+          item: _item(duration: const Duration(minutes: 4)),
+          position: Duration.zero,
+        ),
+        handler: handler,
+      ));
+      await tester.pumpAndSettle();
+
+      final Finder area =
+          find.byKey(const Key('continue-listening-seek-area'));
+      final Rect rect = tester.getRect(area);
+      await tester.dragFrom(
+        rect.centerLeft + const Offset(4, 0),
+        Offset(rect.width * 0.75, 0),
+      );
+      await tester.pump();
+
+      final List<Duration> captured =
+          verify(() => handler.seek(captureAny())).captured.cast<Duration>();
+      expect(captured, isNotEmpty);
+      expect(captured.last, greaterThan(const Duration(minutes: 2)));
+    });
+
+    testWidgets('tapping the progress bar does not navigate to /player',
+        (WidgetTester tester) async {
+      final _StubHandler handler = _StubHandler();
+      when(() => handler.seek(any())).thenAnswer((_) async {});
+      await tester.pumpWidget(_wrap(
+        snapshot: _snap(
+          item: _item(duration: const Duration(minutes: 4)),
+          position: const Duration(minutes: 1),
+        ),
+        handler: handler,
+      ));
+      await tester.pumpAndSettle();
+
+      final Finder area =
+          find.byKey(const Key('continue-listening-seek-area'));
+      await tester.tapAt(tester.getRect(area).centerLeft + const Offset(4, 0));
+      await tester.pumpAndSettle();
+
+      expect(find.text('NOW_PLAYING_SCREEN'), findsNothing);
     });
   });
 

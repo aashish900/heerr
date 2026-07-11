@@ -89,13 +89,13 @@ class HeroWidgetProvider : HomeWidgetProvider() {
                 )
 
                 // Full-height cover, cropped to the art view's aspect and with
-                // its LEFT corners rounded so it hugs the tile's gradient
-                // border (RemoteViews can't clip an ImageView). The view's
-                // height comes from the widget options (portrait = maxHeight).
+                // its LEFT corners rounded so it hugs the tile's edge
+                // (RemoteViews can't clip an ImageView). The view's height
+                // comes from the widget options (portrait = maxHeight).
                 val heightDp = appWidgetManager
                     .getAppWidgetOptions(appWidgetId)
                     .getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT)
-                    .let { if (it > 0) it else FALLBACK_HEIGHT_DP } - 2 * BORDER_DP
+                    .let { if (it > 0) it else FALLBACK_HEIGHT_DP }
                 val bitmap = if (!artPath.isNullOrEmpty() && File(artPath).exists()) {
                     runCatching {
                         buildArtBitmap(context, artPath, ART_WIDTH_DP, heightDp)
@@ -304,9 +304,8 @@ class HeroWidgetProvider : HomeWidgetProvider() {
     private companion object {
         const val MAX_ART_PX = 512
         const val ART_WIDTH_DP = 112
-        /** Matches widget_gradient_border's inner-rect radius (26dp). */
-        const val CORNER_DP = 26
-        const val BORDER_DP = 2
+        /** Matches widget_background's corner radius (28dp) — no border inset. */
+        const val CORNER_DP = 28
         const val FALLBACK_HEIGHT_DP = 110
         /** Right fraction of the art bitmap that alpha-fades to transparent. */
         const val FADE_FRACTION = 0.35f
