@@ -21,6 +21,7 @@ import '../../theme.dart';
 import '../../utils/palette.dart';
 import '../../widgets/add_to_playlist_sheet.dart';
 import '../../widgets/error_snackbar.dart';
+import '../../widgets/glass_icon_button.dart';
 import '../../widgets/gradient_icon.dart';
 import '../../widgets/now_playing_background.dart';
 import '../../widgets/preview_badge.dart';
@@ -226,52 +227,77 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: <Widget>[
-          const BackButton(),
+          GlassIconButton(
+            key: const Key('now-playing-collapse'),
+            icon: Icons.keyboard_arrow_down,
+            tooltip: 'Collapse',
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
           Expanded(
             child: Text(
+              // NOWPLAYING.md §2.1: "Playing from <context>" is deferred —
+              // the player has no play-source context to show today. Static
+              // label kept until that plumbing exists.
               'NOW PLAYING',
               textAlign: TextAlign.center,
               style: Theme.of(context)
                   .textTheme
                   .labelSmall
-                  ?.copyWith(letterSpacing: 1.5),
+                  ?.copyWith(letterSpacing: 1.5, color: Colors.white70),
             ),
           ),
-          if (sleepRemaining != null)
+          if (sleepRemaining != null) ...<Widget>[
             _SleepCountdownChip(remaining: sleepRemaining!),
-          PopupMenuButton<String>(
-            key: const Key('now-playing-overflow'),
-            tooltip: 'More',
-            icon: const Icon(Icons.more_vert),
-            onSelected: (String v) {
-              if (v == 'sleep') {
-                onSleepTap();
-              } else if (v == 'add_to_playlist') {
-                onAddToPlaylist();
-              }
-            },
-            itemBuilder: (BuildContext _) => const <PopupMenuEntry<String>>[
-              PopupMenuItem<String>(
-                key: Key('now-playing-add-to-playlist'),
-                value: 'add_to_playlist',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.playlist_add),
-                  title: Text('Add to playlist'),
+            const SizedBox(width: 8),
+          ],
+          // NOWPLAYING.md §2.3: disabled placeholder — no output-routing
+          // feature exists yet; visual parity with the mockup only.
+          const GlassIconButton(
+            icon: Icons.speaker_outlined,
+            tooltip: 'Audio device',
+            onPressed: null,
+          ),
+          const SizedBox(width: 8),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withValues(alpha: 0.06),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
+            ),
+            child: PopupMenuButton<String>(
+              key: const Key('now-playing-overflow'),
+              tooltip: 'More',
+              icon: const Icon(Icons.more_vert, color: Colors.white),
+              onSelected: (String v) {
+                if (v == 'sleep') {
+                  onSleepTap();
+                } else if (v == 'add_to_playlist') {
+                  onAddToPlaylist();
+                }
+              },
+              itemBuilder: (BuildContext _) => const <PopupMenuEntry<String>>[
+                PopupMenuItem<String>(
+                  key: Key('now-playing-add-to-playlist'),
+                  value: 'add_to_playlist',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.playlist_add),
+                    title: Text('Add to playlist'),
+                  ),
                 ),
-              ),
-              PopupMenuItem<String>(
-                value: 'sleep',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.bedtime_outlined),
-                  title: Text('Sleep timer'),
+                PopupMenuItem<String>(
+                  value: 'sleep',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.bedtime_outlined),
+                    title: Text('Sleep timer'),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

@@ -1110,3 +1110,21 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Trade-off:** the Albums scrub-jump mirrors the grid geometry formula; if the grid's `childAspectRatio`/spacing change, `_gridExtent` must change with them (they sit adjacent in `library_tabs.dart` with a comment). The playlists grid caps at 6 cards — by design, the full list is directly below.
 
 **Reference:** `lib/widgets/{branded_header,library_filter_chips,alphabet_scrubber}.dart`, `lib/providers/library/{library_filters,library_views,most_played_artists}.dart`, `lib/screens/library/{library_screen,library_tabs,album_grid_card,playlist_grid_card}.dart`, `router.dart` (`_tabIndexFor`). Roadmap milestones X1–X7; plan doc `LIBRARYSCREEN.md`.
+
+## 2026-07-11 — Now Playing NP2: static "Playing from" label kept, not wired to a source context
+
+**Context:** NOWPLAYING.md §2.1 flagged that the mockup's "PLAYING FROM Favorites ›" header label has no backing data — `MediaItem.extras` carries `subsonicId` etc. but nothing about which album/playlist/search/recommendation dispatched the current queue. The plan offered two paths: thread a `playContext` string (+ optional route) through every queue-set call site into `MediaItem.extras`, or keep the existing static "NOW PLAYING" label and drop the feature for v1.
+
+**Decision:** Keep the static "NOW PLAYING" label. No `playContext` plumbing added in NP2.
+
+**Why:**
+- Threading `playContext` touches every dispatch site that builds a queue (album/artist/playlist detail screens, search, recommendations, offline downloads) — a cross-cutting change disproportionate to a header label, and orthogonal to NP2's actual scope (glass chrome restyle).
+- NP2's real deliverable — circular glass header buttons, chevron-collapse replacing `BackButton`, disabled audio-output placeholder — ships cleanly without it.
+- Cheapest alternative explicitly named in the plan; can be revisited as its own task if the user wants the context label later.
+
+**Alternatives considered:**
+- **Thread `playContext` now.** Rejected per above — disproportionate blast radius for a v1 header label.
+
+**Trade-off:** The header always reads "NOW PLAYING", never "Playing from \<source\>". Logged here so NP2 isn't mistaken for having silently dropped scope — this was the plan's own cheaper branch, taken deliberately.
+
+**Reference:** `android/app/lib/screens/player/now_playing_screen.dart` (`_Header`), `android/docs/NOWPLAYING.md` §2.1.

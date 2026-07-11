@@ -248,7 +248,8 @@ class _Transport extends ConsumerWidget {
   }
 }
 
-/// Row below transport with device picker (placeholder) and queue trigger.
+/// Row below transport with the queue trigger. The device-picker placeholder
+/// moved to the header in NP2 (NOWPLAYING.md §2.3).
 class _BottomActionsRow extends StatelessWidget {
   const _BottomActionsRow({required this.onQueueTap});
 
@@ -259,13 +260,8 @@ class _BottomActionsRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
         children: <Widget>[
-          const IconButton(
-            icon: Icon(Icons.speaker_outlined),
-            tooltip: 'Audio device',
-            onPressed: null,
-          ),
-          const Spacer(),
           IconButton(
             key: const Key('now-playing-queue-button'),
             icon: const Icon(Icons.queue_music_rounded),

@@ -404,4 +404,73 @@ void main() {
     await tester.pumpAndSettle();
     expect(_resumeCalls, 1);
   });
+
+  // NP2 — glass header chevron replaces BackButton; same maybePop behavior.
+  testWidgets('collapse button pops the route',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          applicationDocumentsDirectoryProvider.overrideWith(
+            (ApplicationDocumentsDirectoryRef ref) async =>
+                Directory.systemTemp.createTempSync('heerr-np-collapse-'),
+          ),
+          subsonicDioClientProvider.overrideWith(
+            (Ref<AsyncValue<Dio>> ref) async {
+              final Dio dio = Dio(BaseOptions(baseUrl: 'http://navi.test'));
+              dio.httpClientAdapter = _NoopAdapter();
+              return dio;
+            },
+          ),
+          lyricsServiceProvider.overrideWith((LyricsServiceRef ref) async {
+            final Dio subsonic =
+                await ref.watch(subsonicDioClientProvider.future);
+            final Dio lrcLib = Dio(BaseOptions(baseUrl: 'http://navi.test'));
+            lrcLib.httpClientAdapter = _NoopAdapter();
+            return LyricsService(subsonic, lrcLibDio: lrcLib);
+          }),
+          playerSnapshotProvider.overrideWith(
+            (Ref<AsyncValue<PlayerSnapshot>> ref) =>
+                Stream<PlayerSnapshot>.value(
+                  _snap(item: _item(), playing: false),
+                ),
+          ),
+          playerQueueProvider.overrideWith(
+            (Ref<AsyncValue<List<MediaItem>>> ref) =>
+                Stream<List<MediaItem>>.value(const <MediaItem>[]),
+          ),
+          currentMediaItemProvider.overrideWith(
+            (Ref<AsyncValue<MediaItem?>> ref) =>
+                Stream<MediaItem?>.value(_item()),
+          ),
+          queueProvider.overrideWith(_StubQueue.new),
+        ],
+        child: MaterialApp(
+          home: Builder(
+            builder: (BuildContext context) => Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const NowPlayingScreen(),
+                    ),
+                  ),
+                  child: const Text('open player'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('open player'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('now-playing-collapse')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('now-playing-collapse')));
+    await tester.pumpAndSettle();
+    expect(find.text('open player'), findsOneWidget);
+    expect(find.byKey(const Key('now-playing-collapse')), findsNothing);
+  });
 }
