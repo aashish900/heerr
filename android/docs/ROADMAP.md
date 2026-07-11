@@ -4,7 +4,7 @@ Track progress through the Android client build. Each milestone = one git commit
 
 See `DECISIONLOG.md` for the *what*; this file is the *how* / *when*.
 
-**Status (2026-07-11):** Phases A–Y complete. Phase Y (edit song metadata — title/album/artist + cover art, issue #44) shipped 2026-07-06 at `v4.6.2`; `v4.7.0` (2026-07-10) is the app-wide gradient redesign — magenta→purple→violet theme across every screen + the new 4x2 gradient hero home-screen widget (replaces the classic/bar/pill widgets); `v4.7.1` (2026-07-10) polishes the hero widget (album-art fade, tap-to-seek, redrawn logo/waveform) and adds the gradient Library tab indicator; `v4.7.2` (2026-07-10) fixes the widget idle icon to use the real app-icon mark and corrects the tab indicator's fade extension; `v4.7.3` (2026-07-11) removes a leftover ghost ring from the widget icon, enlarges it 20%, and makes the tab indicator's faint line span the full selected tab; `v4.7.4` (2026-07-11) fixes the idle-state prompt's line break so "Start listening" / "to your music" wrap as in the reference instead of an uneven mid-word split; `v4.8.0` (2026-07-11) is the Home Screen redesign (HOMESCREEN.md) — branded header, Continue Listening hero card, Quick Access row, Recently Added section + see-all screen, Favorites screen, MiniPlayer restyle, and per-song adaptive art theming (Part B); `v4.8.1` (2026-07-11) fixes a layout bug where the hero card's unbounded-height Row killed every section below it while a track was live, squares off the search pill's corner radius, makes the MiniPlayer waveform an animated brand-gradient equalizer (reusing the home-screen widget's look), and softens the MiniPlayer border to a thin grey hairline; `v4.8.2` (2026-07-11) fixes the hero card's progress-bar fill (zero-height bug, always broken), restyles the card to match the mockup (hairline border, no full-card art backdrop, outlined play ring, progress knob, +15% art width), and repoints Favorites from the Subsonic star primitive to the real Favourites playlist; `v4.8.3` (2026-07-11) removes the home-screen App Widget's gradient border and fixes the Flutter waveform (MiniPlayer + hero card) to anchor bars at the baseline, matching the widget's own waveform look; `v4.8.4` (2026-07-11) fades the hero card's album-art edge into the card background (mirroring the widget's own art fade) and makes the hero card's progress bar tap/drag-seekable instead of display-only; `v4.8.5` (2026-07-11) fixes the hero card's progress bar rendering centred instead of left-anchored, and merges `redesign/home-screen` into `main`; `v4.9.0` (2026-07-11) is the Profile screen redesign (Phase Z) — display/edit split (`/profile` display screen, `/profile/edit` form), server-derived Playlists/Songs/Albums/Artists stats row, "My Music" quick-links (Liked Songs, Downloaded, Recently Played, Playlists) with a new recently-played screen, "Settings" section with About/Help dialogs and a log-out flow, and a Settings-tab profile card entry point alongside the existing Home avatar.
+**Status (2026-07-11):** Phases A–Y complete. Phase Y (edit song metadata — title/album/artist + cover art, issue #44) shipped 2026-07-06 at `v4.6.2`; `v4.7.0` (2026-07-10) is the app-wide gradient redesign — magenta→purple→violet theme across every screen + the new 4x2 gradient hero home-screen widget (replaces the classic/bar/pill widgets); `v4.7.1` (2026-07-10) polishes the hero widget (album-art fade, tap-to-seek, redrawn logo/waveform) and adds the gradient Library tab indicator; `v4.7.2` (2026-07-10) fixes the widget idle icon to use the real app-icon mark and corrects the tab indicator's fade extension; `v4.7.3` (2026-07-11) removes a leftover ghost ring from the widget icon, enlarges it 20%, and makes the tab indicator's faint line span the full selected tab; `v4.7.4` (2026-07-11) fixes the idle-state prompt's line break so "Start listening" / "to your music" wrap as in the reference instead of an uneven mid-word split; `v4.8.0` (2026-07-11) is the Home Screen redesign (HOMESCREEN.md) — branded header, Continue Listening hero card, Quick Access row, Recently Added section + see-all screen, Favorites screen, MiniPlayer restyle, and per-song adaptive art theming (Part B); `v4.8.1` (2026-07-11) fixes a layout bug where the hero card's unbounded-height Row killed every section below it while a track was live, squares off the search pill's corner radius, makes the MiniPlayer waveform an animated brand-gradient equalizer (reusing the home-screen widget's look), and softens the MiniPlayer border to a thin grey hairline; `v4.8.2` (2026-07-11) fixes the hero card's progress-bar fill (zero-height bug, always broken), restyles the card to match the mockup (hairline border, no full-card art backdrop, outlined play ring, progress knob, +15% art width), and repoints Favorites from the Subsonic star primitive to the real Favourites playlist; `v4.8.3` (2026-07-11) removes the home-screen App Widget's gradient border and fixes the Flutter waveform (MiniPlayer + hero card) to anchor bars at the baseline, matching the widget's own waveform look; `v4.8.4` (2026-07-11) fades the hero card's album-art edge into the card background (mirroring the widget's own art fade) and makes the hero card's progress bar tap/drag-seekable instead of display-only; `v4.8.5` (2026-07-11) fixes the hero card's progress bar rendering centred instead of left-anchored, and merges `redesign/home-screen` into `main`; `v4.9.0` (2026-07-11) is the Profile screen redesign (Phase Z) — display/edit split (`/profile` display screen, `/profile/edit` form), server-derived Playlists/Songs/Albums/Artists stats row, "My Music" quick-links (Liked Songs, Downloaded, Recently Played, Playlists) with a new recently-played screen, "Settings" section with About/Help dialogs and a log-out flow, and a Settings-tab profile card entry point alongside the existing Home avatar; `v4.10.0` (2026-07-11) is the Library screen redesign (Phase X, LIBRARYSCREEN.md) — shared branded header, "Your Library" headline, Albums/Artists/Playlists segmented tabs, per-tab sort + Downloaded filter chips, albums grid with offline badges, A–Z index scrubber, artist rows with a Most Played rail, and playlist cards with Favorites + Create Playlist tiles.
 
 **Conventions:**
 - TDD by default (CLAUDE.md §2) — widget tests / unit tests written first, land in the same commit as code.
@@ -847,6 +847,47 @@ Fires only when the shell route is the top route (pushed detail screens pop them
 
 ---
 
+## Phase X — Library screen redesign (v4.10.0)
+
+**Architecture note:** A three-panel mockup redesigns the Library tab: shared branded header (logo + compact greeting + queue/avatar), "Your Library" headline, icon segmented tabs reordered to Albums / Artists / Playlists, per-tab filter chips (sort + Downloaded), an albums grid with offline badges, an A–Z index scrubber, artist rows with a "Most Played Artists" rail (derived from `type=frequent` albums — Subsonic has no frequent-artists endpoint), and playlist cards with Favorites + Create Playlist tiles. Pure-Android slice — zero new endpoints; all sorting/filtering is client-side over the existing cached fetches. Full plan: `LIBRARYSCREEN.md`; rationale: `DECISIONLOG.md` 2026-07-11 ("Phase X").
+
+### [x] X1. Shared branded header + "Your Library" + segmented tabs + tab reorder
+**Files:** new `lib/widgets/branded_header.dart` (`BrandedAppBar`, `GreetingBlock`, `ProfileAvatarButton`, `greetingForHour` — extracted from Home); `heerr_logo.dart` gained `showWordmark`; `home_screen.dart` slimmed to consume the shared header; `library_screen.dart` browse scaffold (compact-greeting AppBar + search action, headline, `_LibrarySegmentedTabs` with `GradientTabIndicator`); `router.dart` `_tabIndexFor` remapped to Albums=0 / Artists=1 / Playlists=2.
+**Test gate:** new `branded_header_test.dart`; library header/tab-order/deep-link tests; `flutter test` 856/856 green.
+**Commit:** `feat(flutter): library redesign X1 — shared branded header, Your Library headline, segmented tabs, tab reorder`
+
+### [x] X2. Filter chips + per-tab sort/downloaded state
+**Files:** new `lib/providers/library/library_filters.dart` (`LibraryTab`, `AlbumSort`/`ArtistSort`/`PlaylistSort` + notifiers, `downloadedOnlyNotifierProvider` family, pure `sortAlbums`/`sortPlaylists` helpers); new `lib/widgets/library_filter_chips.dart` (magenta sort chip → bottom-sheet picker, Downloaded toggle, decorative filter icon).
+**Test gate:** provider defaults/transitions + comparator null-handling + chip widget tests; `flutter test` 868/868 green.
+**Commit:** `feat(flutter): library redesign X2 — filter chips + per-tab sort/downloaded state`
+
+### [x] X3. Albums tab — grid + full list
+**Files:** new `sortedLibraryAlbumsProvider` (`lib/providers/library/library_views.dart`); new `lib/screens/library/album_grid_card.dart`; `_AlbumsTab` rewritten as a `CustomScrollView` — chip row, 9-cap 3-column grid with magenta offline badges, "Albums ›" header, full list with `artist • year • N songs` subtitles.
+**Test gate:** provider sort/filter tests + grid-cap and subtitle widget tests; `flutter test` 872/872 green.
+**Commit:** `feat(flutter): library redesign X3 — albums grid + full list + downloaded badges`
+
+### [x] X4. Alphabet index scrubber
+**Files:** new `lib/widgets/alphabet_scrubber.dart` (`AlphabetScrubber` + pure `letterForDy` / `scrubTargetIndex`); `_AlbumsTab` gained a `ScrollController`, fixed extents (rows 72, chips 56, header 44) and grid-geometry math so scrub jumps land on rows; scrubber overlays only in A–Z sort.
+**Test gate:** mapping unit tests, gesture test, visibility + jump widget test; `flutter test` 884/884 green.
+**Commit:** `feat(flutter): library redesign X4 — alphabet index scrubber`
+
+### [x] X5. Artists tab — rows, downloaded filter, most played rail
+**Files:** new `sortedLibraryArtistsProvider` (flattens `ArtistIndex` buckets; Downloaded = `markedArtists` plus artists of `markedAlbums` joined on `Album.artistId`); new `lib/providers/library/most_played_artists.dart` (`mostPlayedArtistsFrom` dedupe over `type=frequent`, cap 10); `_ArtistsTab` rewritten (circular-avatar rows, "N albums", scrubber, `_MostPlayedArtistsRail` with gradient play badges).
+**Test gate:** flatten/sort/join provider tests, rail dedupe tests, row + rail widget tests; `flutter test` 891/891 green.
+**Commit:** `feat(flutter): library redesign X5 — artist rows, downloaded filter, most played rail`
+
+### [x] X6. Playlists tab — cards, Favorites, Create Playlist, full list
+**Files:** new `sortedLibraryPlaylistsProvider`; new `lib/screens/library/playlist_grid_card.dart` (`PlaylistGridCard`, `FavoritesGridCard`, `CreatePlaylistGridCard`); `_PlaylistsTab` rewritten — 2-column grid (Favorites first with starred count, up to 6 playlist cards, Create card replacing the FAB), "Playlists ›" list (Favorites row, playlist rows with `by owner • N songs`, For You tail entry preserved).
+**Test gate:** card order, create flow via card, For You retention; `flutter test` 891/891 green.
+**Commit:** `feat(flutter): library redesign X6 — playlist cards, favorites tile, create-playlist card, full list`
+
+### [x] X7. Docs + version bump 4.10.0
+**Files:** `DECISIONLOG.md` ADR, `CHANGELOG.md` entries, `DEBT.md` deferrals, this ROADMAP section + status line, `LIBRARYSCREEN.md` status flip, version bump (`android/app/pubspec.yaml`, `backend/pyproject.toml`, `backend/app/main.py`, both ROADMAP status lines).
+**Done when:** `flutter analyze` clean, full `flutter test` suite green.
+**Commit:** `docs(flutter): library redesign X7 — ADR, changelog, roadmap + version bump to 4.10.0`
+
+---
+
 ## Cross-cutting reminders
 
 - **`flutter analyze` green before declaring any milestone done.**
@@ -883,7 +924,7 @@ Items scheduled into v1.5.0 (Phase P) or v2.0.0 (Phase Q) are no longer here —
 
 ## Roadmap complete when
 
-1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5, P1–P4, Q1–Q4, R1, S1–S11, T1–T5, U1, V1, W1, Y1–Y2, Z1–Z6).
+1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5, P1–P4, Q1–Q4, R1, S1–S11, T1–T5, U1, V1, W1, X1–X7, Y1–Y2, Z1–Z6).
 2. Every test gate green at its milestone.
 3. G1, K2, L6, M5, N5, O5, P4, Q4, R1, S11, and T5 manual smokes verified on-device.
 4. CHANGELOG entries exist for each milestone group.

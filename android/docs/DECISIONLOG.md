@@ -1081,3 +1081,32 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Trade-off:** `libraryAlbumsProvider` and `libraryArtistsProvider` currently cap at 500/whatever page size their underlying `SubsonicLibraryService` calls use — very large libraries (beyond that cap) will undercount Songs/Albums on the stats row. Acceptable: it's the same cap already governing the Albums sub-tab, and a stats display is inherently approximate.
 
 **Reference:** `lib/screens/profile/{profile_screen,profile_edit_screen}.dart`, `lib/providers/profiles/profile_stats.dart`, `lib/screens/library/recently_played_screen.dart`, `lib/providers/home/home_providers.dart` (`recentlyPlayedProvider`), `lib/screens/settings/profile_card.dart`, `lib/widgets/profile_avatar_ring.dart`, `lib/services/backend_service.dart` (`logout`), `router.dart` (`Routes.profileEdit`, `Routes.libraryRecentlyPlayed`, `Routes.libraryPlaylistsTab`, `_tabIndexFor`). Roadmap milestones Z1–Z6.
+
+## 2026-07-11 — Phase X: Library screen redesign — heerr v4.10.0
+
+**Context:** A three-panel mockup (pasted in-session; to be saved as `Library Screen.png`) redesigns the Library tab from a plain Material `TabBar` + flat lists into the branded layout: shared header, "Your Library" headline, icon segmented tabs, per-tab filter chips, an albums grid, an A–Z scrubber, artist rows with a "Most Played Artists" rail, and playlist cards with Favorites/Create tiles. Full task plan: `LIBRARYSCREEN.md`.
+
+**Decision:**
+1. **Header extraction, not duplication.** The Home AppBar trio (logo, queue shortcut, avatar button) plus the greeting block moved into `lib/widgets/branded_header.dart` (`BrandedAppBar`, `GreetingBlock`, `ProfileAvatarButton`, `greetingForHour`). Library renders the compact variant (logo mark + small two-line greeting); Home keeps the wordmark + body greeting. `home_screen.dart` re-exports `greetingForHour` so existing imports keep resolving.
+2. **Tab order becomes Albums / Artists / Playlists (mockup order); deep link mapping updated in the same commit.** `_tabIndexFor` in `router.dart` now maps `artists`→1, `playlists`→2, default→0 (Albums). The Z3 `/library?tab=playlists` deep link is unaffected in behavior.
+3. **All sorting/filtering is client-side — zero new endpoints.** `AlbumSort` (Recently Added default / A–Z / Year), `ArtistSort` (A–Z / Z–A), `PlaylistSort` (Recently Added / A–Z) sort the existing cached fetches (`created`/`changed` ISO strings compare lexicographically). "Downloaded" chips filter on the offline manifest: `markedAlbums` for albums, `markedPlaylists` for playlists, and for artists `markedArtists` ∪ artists of marked albums joined on `Album.artistId`.
+4. **Grid = recent subset, list = full library** (user decision). Albums: 9-cap 3-column grid + full "Albums ›" list below in one `CustomScrollView`. Playlists: 2-column card grid (Favorites card first with the starred-songs count, up to 6 playlist cards, "+ Create Playlist" card last — replacing the FAB but reusing the same `CreatePlaylistDialog` flow) + full "Playlists ›" list with the For You entry preserved at the tail.
+5. **A–Z scrubber only in alphabetical sort, with fixed extents for exact jumps.** `AlphabetScrubber` (27 buckets, `#` + A–Z) fires letters; the tabs compute jump offsets from pinned extents (rows 72 via `SliverFixedExtentList`, chip row 56, section header 44) plus, on Albums, mirrored grid geometry. `scrubTargetIndex` does nearest-bucket fallthrough (Spotify behavior).
+6. **"Most Played Artists" is derived, not fetched.** Subsonic has no frequent-artists endpoint; `mostPlayedArtistsFrom` dedupes `getAlbumList2?type=frequent` by `artistId` (first album wins — the list is play-count ordered), the album cover doubles as the avatar and its id backs the play badge. Cap 10; the rail hides on loading/error/empty.
+7. **Artist rows show "N albums" only** (user decision) — `getArtists` has no song count and a per-artist `getArtist` fan-out was rejected.
+8. **Bottom nav unchanged** (user decision) — the mockup's 5-tab Home/Library/Downloads/Search/Profile nav is out of scope for this phase.
+9. **Explicit "E" badge dropped** — no explicit flag exists anywhere in the Subsonic album/song payload the app consumes.
+
+**Why:**
+- **Client-side sort over new endpoints** — the full album list (500-cap) is already fetched and L5-cached; re-sorting in memory is free and works offline. `type=byYear` would additionally require a fixed year range, which the chip UX doesn't need.
+- **Manifest joins for "Downloaded"** — the manifest is the single source of truth for offline marking; deriving artist downloaded-ness through `Album.artistId` avoids inventing a parallel tracking set.
+- **Fixed extents for the scrubber** — computing sliver offsets generically is fragile; pinning three constants makes jumps deterministic and testable.
+
+**Alternatives considered:**
+- **Grid/list view toggle** (one dataset, two layouts) instead of grid-subset + full list. Rejected by user in favor of the literal mockup reading.
+- **Per-artist `getArtist` fan-out** for true song counts. Rejected: one request per artist on first paint for a vanity number.
+- **`scrollable_positioned_list` package** for index jumps. Rejected: a dependency to avoid three height constants.
+
+**Trade-off:** the Albums scrub-jump mirrors the grid geometry formula; if the grid's `childAspectRatio`/spacing change, `_gridExtent` must change with them (they sit adjacent in `library_tabs.dart` with a comment). The playlists grid caps at 6 cards — by design, the full list is directly below.
+
+**Reference:** `lib/widgets/{branded_header,library_filter_chips,alphabet_scrubber}.dart`, `lib/providers/library/{library_filters,library_views,most_played_artists}.dart`, `lib/screens/library/{library_screen,library_tabs,album_grid_card,playlist_grid_card}.dart`, `router.dart` (`_tabIndexFor`). Roadmap milestones X1–X7; plan doc `LIBRARYSCREEN.md`.

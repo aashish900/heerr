@@ -1,6 +1,6 @@
 # LIBRARYSCREEN.md — Library Screen redesign plan
 
-Status: **PLANNED** 2026-07-11. Written against branch `redesign/profile-screen` @ `312e958` (v4.9.0).
+Status: **IMPLEMENTED** 2026-07-11 on branch `redesign/library-screen` (X1–X7, v4.10.0). Remaining: on-device smoke (no device attached during implementation — see DEBT.md). Originally written against branch `redesign/profile-screen` @ `312e958` (v4.9.0).
 Reference mockup: pasted in the planning session (three-panel image: Albums / Artists / Playlists tabs). **Not yet on disk** — save it as `/Users/E1621/Documents/Personal/Android/Library Screen.png` (or `android/docs/assets/library-screen.png` to version it).
 Milestone prefix: **X** (X1–X7) — the only unused letter in the A–Z roadmap sequence.
 
