@@ -3,15 +3,43 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:heerr/models/subsonic/song.dart';
+import 'package:heerr/offline/offline_manifest.dart';
 import 'package:heerr/offline/offline_marker.dart';
+import 'package:heerr/offline/offline_sync.dart';
 import 'package:heerr/providers/downloaded_songs.dart';
+import 'package:heerr/providers/downloads_views.dart';
 import 'package:heerr/providers/library/library_delete.dart';
 import 'package:heerr/providers/secure_storage.dart';
+import 'package:heerr/providers/server_status.dart';
 import 'package:heerr/screens/downloads/downloads_screen.dart';
 
 import '../support/cred_test_support.dart';
 
 // W1 (#41): Downloads > Songs long-press → Device / Server / Both sheet.
+
+/// Static server-status/sync stubs — the real notifiers schedule a
+/// `Timer.periodic` in `build()` and hit the network via `BackendService`;
+/// under `pumpAndSettle`'s fake-time pump loop that Timer re-fires
+/// repeatedly and each tick's real HTTP call drags in real wall-clock time,
+/// eventually timing the test out. Overriding `build()` entirely (not
+/// calling `super.build()`) means no Timer is ever scheduled.
+class _StaticServerStatus extends ServerStatusNotifier {
+  @override
+  Future<ServerStatus> build() async =>
+      (online: false, errorMessage: null, checkedAt: DateTime.now());
+}
+
+class _StaticOfflineSync extends OfflineSync {
+  @override
+  Future<OfflineSyncStatus> build() async => (
+        running: false,
+        targetCount: 0,
+        readyCount: 0,
+        failedCount: 0,
+        lastError: null,
+        lastTickAt: null,
+      );
+}
 
 class _NoopStorage implements SecureStorage {
   @override
@@ -70,15 +98,20 @@ const Song _withPath = Song(
 const Song _noPath = Song(id: 's2', title: 'Pathless', artist: 'Artist');
 
 Future<void> _pumpSongsTab(WidgetTester tester, List<Song> songs) async {
+  final List<DownloadedSongRow> rows = songs
+      .map((Song s) => (song: s, entry: const OfflineSongEntry(state: OfflineSongState.ready)))
+      .toList();
   await tester.pumpWidget(
     ProviderScope(
       overrides: <Override>[
         secureStorageProvider.overrideWithValue(_NoopStorage()),
         activeProfileOverride(),
         downloadedAlbumIdsProvider.overrideWith((_) async => <String>[]),
-        downloadedSongsProvider.overrideWith((_) async => songs),
+        downloadedSongsViewProvider.overrideWith((_) async => rows),
         offlineMarkerProvider.overrideWith(_StubMarker.new),
         libraryDeleteProvider.overrideWith(_StubLibraryDelete.new),
+        serverStatusNotifierProvider.overrideWith(_StaticServerStatus.new),
+        offlineSyncProvider.overrideWith(_StaticOfflineSync.new),
       ],
       child: const MaterialApp(home: DownloadsScreen()),
     ),

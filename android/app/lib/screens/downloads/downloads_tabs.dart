@@ -16,12 +16,13 @@ class _SongsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<List<Song>> async = ref.watch(downloadedSongsProvider);
+    final AsyncValue<List<DownloadedSongRow>> async =
+        ref.watch(downloadedSongsViewProvider);
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (Object e, _) => _ErrorView(message: 'Songs error: $e'),
-      data: (List<Song> songs) {
-        if (songs.isEmpty) {
+      data: (List<DownloadedSongRow> rows) {
+        if (rows.isEmpty) {
           return const _EmptyView(
             icon: Icons.music_off_outlined,
             message:
@@ -31,25 +32,83 @@ class _SongsTab extends ConsumerWidget {
           );
         }
         return ListView.builder(
-          itemCount: songs.length,
-          itemBuilder: (BuildContext c, int i) {
-            final Song s = songs[i];
-            final String subtitle = <String?>[
-              s.artist,
-              s.album,
-            ].where((String? v) => v != null && v.isNotEmpty).join(' • ');
-            return ListTile(
-              leading: LibraryCoverArt(coverArtId: s.coverArt),
-              title: Text(s.title),
-              subtitle: subtitle.isNotEmpty ? Text(subtitle) : null,
-              onTap: () => playSongFromSubsonic(ref, context, s),
-              onLongPress: () => _showDeleteOptions(context, ref, s),
-            );
-          },
+          itemCount: rows.length,
+          itemBuilder: (BuildContext c, int i) =>
+              _SongRow(row: rows[i]),
         );
       },
     );
   }
+}
+
+/// DL6: metadata line under the title — "Lossless • Yesterday • 24 MB"
+/// (D7: Lossless covers `kLosslessSuffixes`, not just flac). Skips any
+/// piece the manifest entry doesn't carry rather than showing a blank.
+class _SongRow extends ConsumerWidget {
+  const _SongRow({required this.row});
+  final DownloadedSongRow row;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final Song s = row.song;
+    final OfflineSongEntry e = row.entry;
+    final List<String> parts = <String>[
+      <String?>[s.artist, s.album]
+          .where((String? v) => v != null && v.isNotEmpty)
+          .join(' • '),
+    ].where((String v) => v.isNotEmpty).toList();
+
+    final List<String> metaParts = <String>[];
+    final String? suffix = e.suffix;
+    if (suffix != null && suffix.isNotEmpty) {
+      metaParts.add(
+        kLosslessSuffixes.contains(suffix.toLowerCase())
+            ? 'Lossless'
+            : suffix.toUpperCase(),
+      );
+    }
+    final DateTime? at = e.downloadedAt;
+    if (at != null) metaParts.add(_dayLabel(at));
+    final int? size = e.size;
+    if (size != null) metaParts.add(_humanBytes(size));
+    if (metaParts.isNotEmpty) parts.add(metaParts.join(' • '));
+
+    return ListTile(
+      leading: LibraryCoverArt(coverArtId: s.coverArt),
+      title: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: parts.isEmpty
+          ? null
+          : Text(parts.join('\n'), maxLines: 2, overflow: TextOverflow.ellipsis),
+      isThreeLine: parts.length > 1,
+      trailing: IconButton(
+        key: const Key('downloads-song-kebab'),
+        icon: const Icon(Icons.more_vert),
+        tooltip: 'More',
+        onPressed: () => _showDeleteOptions(context, ref, s),
+      ),
+      onTap: () => playSongFromSubsonic(ref, context, s),
+      onLongPress: () => _showDeleteOptions(context, ref, s),
+    );
+  }
+}
+
+String _dayLabel(DateTime at) {
+  final DateTime now = DateTime.now();
+  final DateTime d = DateTime(at.year, at.month, at.day);
+  final DateTime today = DateTime(now.year, now.month, now.day);
+  final int diff = today.difference(d).inDays;
+  if (diff == 0) return 'Today';
+  if (diff == 1) return 'Yesterday';
+  return '${at.month}/${at.day}/${at.year}';
+}
+
+String _humanBytes(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  if (bytes < 1024 * 1024 * 1024) {
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+  return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
 }
 
 class _AlbumsTab extends ConsumerWidget {
@@ -57,19 +116,12 @@ class _AlbumsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Use the union provider — markedAlbums plus every album reached
-    // through a markedArtists expansion. Without this, marking an
-    // artist would download the songs but the Albums / Songs tabs
-    // would stay empty until the user also individually marked each
-    // album under the artist.
-    final AsyncValue<List<String>> idsAsync = ref.watch(
-      downloadedAlbumIdsProvider,
-    );
-    return idsAsync.when(
+    final AsyncValue<List<Album>> async = ref.watch(sortedDownloadedAlbumsProvider);
+    return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (Object e, _) => _ErrorView(message: 'Downloads error: $e'),
-      data: (List<String> ids) {
-        if (ids.isEmpty) {
+      data: (List<Album> albums) {
+        if (albums.isEmpty) {
           return const _EmptyView(
             icon: Icons.album_outlined,
             message:
@@ -79,8 +131,8 @@ class _AlbumsTab extends ConsumerWidget {
           );
         }
         return ListView.builder(
-          itemCount: ids.length,
-          itemBuilder: (BuildContext c, int i) => _AlbumRow(albumId: ids[i]),
+          itemCount: albums.length,
+          itemBuilder: (BuildContext c, int i) => _AlbumRow(album: albums[i]),
         );
       },
     );
@@ -88,36 +140,25 @@ class _AlbumsTab extends ConsumerWidget {
 }
 
 class _AlbumRow extends ConsumerWidget {
-  const _AlbumRow({required this.albumId});
-  final String albumId;
+  const _AlbumRow({required this.album});
+  final Album album;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<Album> albumAsync = ref.watch(
-      libraryAlbumProvider(albumId),
+    final OfflineManifest? manifest = ref.watch(offlineManifestProvider).valueOrNull;
+    final String subtitle = _containerSubtitle(
+      primary: album.artist,
+      songs: album.song,
+      totalHint: album.songCount,
+      manifest: manifest,
     );
-    return albumAsync.when(
-      loading: () => const ListTile(
-        leading: SizedBox(
-          width: 56,
-          height: 56,
-          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-        ),
-        title: Text('Loading…'),
-      ),
-      error: (Object e, _) => ListTile(
-        leading: const Icon(Icons.error_outline),
-        title: Text('Album $albumId'),
-        subtitle: Text('Couldn\'t load: $e'),
-      ),
-      data: (Album album) => LibraryResultTile(
-        title: album.name,
-        subtitle: album.artist,
-        coverArtId: album.coverArt,
-        onTap: () => context.push(Routes.libraryAlbum(album.id)),
-        trailingPlay: true,
-        onPlay: () => playAlbumFromSubsonic(ref, context, album.id),
-      ),
+    return LibraryResultTile(
+      title: album.name,
+      subtitle: subtitle,
+      coverArtId: album.coverArt,
+      onTap: () => context.push(Routes.libraryAlbum(album.id)),
+      trailingPlay: true,
+      onPlay: () => playAlbumFromSubsonic(ref, context, album.id),
     );
   }
 }
@@ -127,15 +168,13 @@ class _PlaylistsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<OfflineManifest> manifestAsync = ref.watch(
-      offlineManifestProvider,
-    );
-    return manifestAsync.when(
+    final AsyncValue<List<Playlist>> async =
+        ref.watch(sortedDownloadedPlaylistsProvider);
+    return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (Object e, _) => _ErrorView(message: 'Manifest error: $e'),
-      data: (OfflineManifest m) {
-        final List<String> ids = m.markedPlaylists.toList()..sort();
-        if (ids.isEmpty) {
+      data: (List<Playlist> playlists) {
+        if (playlists.isEmpty) {
           return const _EmptyView(
             icon: Icons.queue_music_outlined,
             message:
@@ -144,9 +183,9 @@ class _PlaylistsTab extends ConsumerWidget {
           );
         }
         return ListView.builder(
-          itemCount: ids.length,
+          itemCount: playlists.length,
           itemBuilder: (BuildContext c, int i) =>
-              _PlaylistRow(playlistId: ids[i]),
+              _PlaylistRow(playlist: playlists[i]),
         );
       },
     );
@@ -154,38 +193,47 @@ class _PlaylistsTab extends ConsumerWidget {
 }
 
 class _PlaylistRow extends ConsumerWidget {
-  const _PlaylistRow({required this.playlistId});
-  final String playlistId;
+  const _PlaylistRow({required this.playlist});
+  final Playlist playlist;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<Playlist> async = ref.watch(
-      libraryPlaylistProvider(playlistId),
+    final OfflineManifest? manifest = ref.watch(offlineManifestProvider).valueOrNull;
+    final String subtitle = _containerSubtitle(
+      primary: playlist.owner == null ? null : 'by ${playlist.owner}',
+      songs: playlist.entry,
+      totalHint: playlist.songCount,
+      manifest: manifest,
     );
-    return async.when(
-      loading: () => const ListTile(
-        leading: SizedBox(
-          width: 56,
-          height: 56,
-          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-        ),
-        title: Text('Loading…'),
-      ),
-      error: (Object e, _) => ListTile(
-        leading: const Icon(Icons.error_outline),
-        title: Text('Playlist $playlistId'),
-        subtitle: Text('Couldn\'t load: $e'),
-      ),
-      data: (Playlist p) => LibraryResultTile(
-        title: p.name,
-        subtitle: p.owner,
-        coverArtId: p.coverArt,
-        onTap: () => context.push(Routes.libraryPlaylist(p.id)),
-        trailingPlay: true,
-        onPlay: () => playPlaylistFromSubsonic(ref, context, p.id),
-      ),
+    return LibraryResultTile(
+      title: playlist.name,
+      subtitle: subtitle,
+      coverArtId: playlist.coverArt,
+      onTap: () => context.push(Routes.libraryPlaylist(playlist.id)),
+      trailingPlay: true,
+      onPlay: () => playPlaylistFromSubsonic(ref, context, playlist.id),
     );
   }
+}
+
+/// DL6: "N songs ready of M" sub-line, cheap because the album/playlist
+/// fetch already carries its song list — no extra provider needed. Falls
+/// back to just [primary] when the manifest hasn't loaded yet.
+String _containerSubtitle({
+  required String? primary,
+  required List<Song> songs,
+  required int? totalHint,
+  required OfflineManifest? manifest,
+}) {
+  final List<String> parts = <String>[if (primary != null && primary.isNotEmpty) primary];
+  if (manifest != null && songs.isNotEmpty) {
+    final int ready = songs
+        .where((Song s) => manifest.songs[s.id]?.state == OfflineSongState.ready)
+        .length;
+    final int total = totalHint ?? songs.length;
+    parts.add('$ready of $total songs ready');
+  }
+  return parts.join(' • ');
 }
 
 /// W1 (#41): long-press on a downloaded song offers three delete targets.
