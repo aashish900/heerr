@@ -27,7 +27,8 @@ def cover_url_for_source_url(source_url: str) -> str | None:
     if host.endswith("youtu.be"):
         video_id = parsed.path.lstrip("/").split("/")[0] or None
     elif host.endswith("youtube.com"):
-        video_id = (parse_qs(parsed.query).get("v") or [None])[0]
+        v_values = parse_qs(parsed.query).get("v")
+        video_id = v_values[0] if v_values else None
     if not video_id:
         return None
     return f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg"

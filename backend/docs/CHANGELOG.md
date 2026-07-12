@@ -946,3 +946,7 @@ Server half of issue #44 begins: in-place tag editing for library files. Files a
 - `tests/test_recommend.py` — endpoint test asserts `cover_url` in the response; null-cover test for browse URLs; 2 unit tests for the helper (valid forms + bad-URL matrix). TDD: red first, then green. 521 passed.
 - **Why:** the Android client previously derived thumbnails from `source_url` on-device, which required upstream host names in the client binary. Resolving server-side keeps that knowledge out of the shipped APK (Play-compliance hardening; see `android/docs/DECISIONLOG.md` 2026-07-13).
 - Version bump `4.13.0` → `4.14.0` across the five sync locations.
+
+## 2026-07-13 — Fix mypy list-item error in cover_url_for_source_url
+
+- `app/services/recommenders/yt_resolver.py` — `(parse_qs(...).get("v") or [None])[0]` failed strict mypy in CI (`List item 0 has incompatible type "None"; expected "str"`). Replaced with an explicit `v_values[0] if v_values else None` branch. Behavior identical; existing tests cover both paths. `poetry run mypy app/` clean (57 files), 17 recommend tests pass.
