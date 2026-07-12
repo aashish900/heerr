@@ -23,7 +23,7 @@ class _SongsTab extends ConsumerWidget {
       error: (Object e, _) => _ErrorView(message: 'Songs error: $e'),
       data: (List<DownloadedSongRow> rows) {
         if (rows.isEmpty) {
-          return const _EmptyView(
+          return const _TabEmptyWithStorage(
             icon: Icons.music_off_outlined,
             message:
                 'No downloaded songs yet.\n'
@@ -32,9 +32,10 @@ class _SongsTab extends ConsumerWidget {
           );
         }
         return ListView.builder(
-          itemCount: rows.length,
-          itemBuilder: (BuildContext c, int i) =>
-              _SongRow(row: rows[i]),
+          itemCount: rows.length + 1,
+          itemBuilder: (BuildContext c, int i) => i == rows.length
+              ? const StorageCard()
+              : _SongRow(row: rows[i]),
         );
       },
     );
@@ -122,7 +123,7 @@ class _AlbumsTab extends ConsumerWidget {
       error: (Object e, _) => _ErrorView(message: 'Downloads error: $e'),
       data: (List<Album> albums) {
         if (albums.isEmpty) {
-          return const _EmptyView(
+          return const _TabEmptyWithStorage(
             icon: Icons.album_outlined,
             message:
                 'No albums marked for offline.\n'
@@ -131,8 +132,10 @@ class _AlbumsTab extends ConsumerWidget {
           );
         }
         return ListView.builder(
-          itemCount: albums.length,
-          itemBuilder: (BuildContext c, int i) => _AlbumRow(album: albums[i]),
+          itemCount: albums.length + 1,
+          itemBuilder: (BuildContext c, int i) => i == albums.length
+              ? const StorageCard()
+              : _AlbumRow(album: albums[i]),
         );
       },
     );
@@ -175,7 +178,7 @@ class _PlaylistsTab extends ConsumerWidget {
       error: (Object e, _) => _ErrorView(message: 'Manifest error: $e'),
       data: (List<Playlist> playlists) {
         if (playlists.isEmpty) {
-          return const _EmptyView(
+          return const _TabEmptyWithStorage(
             icon: Icons.queue_music_outlined,
             message:
                 'No playlists marked for offline.\n'
@@ -183,9 +186,10 @@ class _PlaylistsTab extends ConsumerWidget {
           );
         }
         return ListView.builder(
-          itemCount: playlists.length,
-          itemBuilder: (BuildContext c, int i) =>
-              _PlaylistRow(playlist: playlists[i]),
+          itemCount: playlists.length + 1,
+          itemBuilder: (BuildContext c, int i) => i == playlists.length
+              ? const StorageCard()
+              : _PlaylistRow(playlist: playlists[i]),
         );
       },
     );
@@ -369,6 +373,24 @@ Future<void> _confirmDelete(
       duration: kSnackBarDuration,
       content: Text('Deleted "${song.title}" from $where'),
     ));
+}
+
+/// DL7: empty-tab state with the storage card pinned below it — usage is
+/// orthogonal to whether *this* tab's data list is empty.
+class _TabEmptyWithStorage extends StatelessWidget {
+  const _TabEmptyWithStorage({required this.icon, required this.message});
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: <Widget>[
+        Expanded(child: _EmptyView(icon: icon, message: message)),
+        const StorageCard(),
+      ],
+    );
+  }
 }
 
 class _EmptyView extends StatelessWidget {
