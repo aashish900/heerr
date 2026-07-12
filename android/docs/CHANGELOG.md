@@ -2891,3 +2891,12 @@ User review flagged four more issues:
 - `lib/screens/settings/profile_card.dart` — restyled from a plain `ListTile` into a floating card (`surfaceContainerHigh`, 24dp rounded corners, soft `Colors.white10` border) matching `SettingsGroupCard`'s visual language. Avatar ring grows 18→28px radius. Subtitle changed from `@handle` to "Manage your profile" (mockup copy; no "Premium User" badge — heerr is free, per the redesign brief).
 - `test/screens/settings/profile_card_test.dart` — updated the display-name assertion to check for "Manage your profile" instead of `@alice-nd`.
 - Verification: `flutter analyze` clean; full `flutter test` green (980 tests, no new — restyle only).
+
+## 2026-07-12 — Settings redesign SE4: promoted Server & Sync card
+
+- New `lib/screens/settings/server_sync_card.dart`: `ServerSyncCard` — hostname (`serverCredsProvider`), Online/Offline pill reusing the exact `serverStatusNotifierProvider` poll + `heerrOnlineGreen` semantics as the Downloads hero (D3, no new "subtle" indicator), last-sync relative time (`offlineSyncProvider.lastTickAt`), inline **Sync now** action (logic lifted from the old `_SyncNowAction`, busy spinner, disabled while a background sync is `running`). States: online+synced, offline+unreachable, never-synced.
+- Wired into `settings_screen.dart` between the `ProfileCard` and the flat section list, under a new `SettingsSectionHeader('Server & Sync')`.
+- **Removed** `_SyncNowAction` from `lib/screens/settings/settings_offline.dart` — it's now redundant with the promoted card's Sync Now (D6: Wi-Fi only / Charging only / Sync interval stay in Downloads & Storage; Sync Now moves to Server & Sync only). Two identical buttons on one screen was worse than one.
+- New `test/screens/settings/server_sync_card_test.dart` (4 tests): online/offline/never-synced states, Sync Now tap fires `syncNow()`.
+- `test/screens/settings_screen_test.dart` — updated comment noting Sync Now's new home; assertion count unchanged (still exactly one, now from the promoted card).
+- Verification: `flutter analyze` clean; full `flutter test` green (984 tests).

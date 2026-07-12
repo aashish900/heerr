@@ -89,7 +89,6 @@ class _OfflineSection extends ConsumerWidget {
                     ],
                   ),
                 ),
-                const _SyncNowAction(),
                 const _StorageLine(),
                 const _ClearAllAction(),
               ],
@@ -98,68 +97,6 @@ class _OfflineSection extends ConsumerWidget {
         ),
       ],
     );
-  }
-}
-
-class _SyncNowAction extends ConsumerStatefulWidget {
-  const _SyncNowAction();
-  @override
-  ConsumerState<_SyncNowAction> createState() => _SyncNowActionState();
-}
-
-class _SyncNowActionState extends ConsumerState<_SyncNowAction> {
-  bool _busy = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Row(
-        children: <Widget>[
-          FilledButton.icon(
-            icon: _busy
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.sync),
-            label: const Text('Sync now'),
-            onPressed: _busy ? null : _runSync,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _runSync() async {
-    setState(() => _busy = true);
-    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-    try {
-      messenger.showSnackBar(const SnackBar(
-        duration: kSnackBarDuration,
-        content: Text('Syncing…'),
-      ));
-      final OfflineSyncResult r =
-          await ref.read(offlineSyncProvider.notifier).syncNow();
-      if (!mounted) return;
-      final String msg;
-      if (r.error != null) {
-        msg = 'Sync: ${r.error}';
-      } else {
-        final List<String> parts = <String>[];
-        if (r.downloadedCount > 0) parts.add('${r.downloadedCount} downloaded');
-        if (r.failedCount > 0) parts.add('${r.failedCount} failed');
-        if (r.sweptCount > 0) parts.add('${r.sweptCount} cleaned up');
-        msg = parts.isEmpty ? 'Nothing to do.' : 'Synced: ${parts.join(', ')}';
-      }
-      messenger.showSnackBar(SnackBar(
-        duration: kSnackBarDuration,
-        content: Text(msg),
-      ));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 }
 

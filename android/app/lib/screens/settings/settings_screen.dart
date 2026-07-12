@@ -9,7 +9,6 @@ import '../../offline/offline_manifest.dart';
 import '../../offline/offline_paths.dart';
 import '../../offline/offline_settings.dart';
 import '../../offline/offline_size_estimator.dart';
-import '../../offline/offline_sync.dart';
 import '../../providers/recommendations.dart';
 import '../../providers/server_creds.dart';
 import '../../theme.dart';
@@ -18,6 +17,8 @@ import '../../widgets/download_icon.dart';
 import '../../widgets/error_snackbar.dart';
 import 'profile_card.dart';
 import 'profiles_section.dart';
+import 'server_sync_card.dart';
+import 'settings_tiles.dart';
 
 // A17: the recommendations-health + offline-downloads sections live in sibling
 // part files to keep this screen file readable (shared imports + privacy).
@@ -61,6 +62,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // single credential surface — added via /login (Phase S) and
           // managed in ProfilesSection.
           const SliverToBoxAdapter(child: ProfileCard()),
+          const SliverToBoxAdapter(child: SettingsSectionHeader('Server & Sync')),
+          const SliverToBoxAdapter(child: ServerSyncCard()),
           SliverList(
             delegate: SliverChildListDelegate(const <Widget>[
               Divider(height: 1),

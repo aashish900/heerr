@@ -194,6 +194,8 @@ void main() {
       expect(find.text('Offline downloads'), findsAtLeast(1));
       expect(find.text('WiFi only'), findsOneWidget);
       expect(find.text('Sync interval'), findsOneWidget);
+      // Sync Now lives on the promoted Server & Sync card (SE4), not inline
+      // in the Offline downloads section.
       expect(find.text('Sync now'), findsOneWidget);
       expect(find.text('Clear all downloads'), findsOneWidget);
       expect(find.text('Sync entire library'), findsOneWidget);
