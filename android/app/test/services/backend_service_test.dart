@@ -222,4 +222,40 @@ void main() {
       );
     });
   });
+
+  group('health', () {
+    test('issues GET /health and returns true on {"status": "ok"}',
+        () async {
+      final (BackendService service, _FakeAdapter adapter) = _service(
+        (_) => _json('{"status": "ok"}', 200),
+      );
+
+      final bool online = await service.health();
+
+      expect(online, isTrue);
+      expect(adapter.lastRequest!.method, 'GET');
+      expect(adapter.lastRequest!.path, '/health');
+    });
+
+    test('returns false when status is not "ok"', () async {
+      final (BackendService service, _) = _service(
+        (_) => _json('{"status": "degraded"}', 200),
+      );
+
+      expect(await service.health(), isFalse);
+    });
+
+    test('connection failure maps to NetworkError', () async {
+      final (BackendService service, _) = _service(
+        (RequestOptions options) => throw DioException.connectionError(
+          requestOptions: options,
+          reason: 'refused',
+        ),
+      );
+      await expectLater(
+        service.health(),
+        throwsA(isA<NetworkError>()),
+      );
+    });
+  });
 }

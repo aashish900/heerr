@@ -1,74 +1,53 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-
-import '../api/api_error.dart';
-import '../models/subsonic/album.dart';
-import '../models/subsonic/playlist.dart';
-import '../models/subsonic/song.dart';
-import '../offline/offline_manifest.dart';
-import '../offline/offline_marker.dart';
-import '../player/playback_actions.dart';
-import '../providers/downloaded_songs.dart';
-import '../providers/library/library_album.dart';
-import '../providers/library/library_delete.dart';
-import '../providers/library/library_playlist.dart';
-import '../router.dart';
-import '../widgets/error_snackbar.dart';
-import '../widgets/gradient_icon.dart';
-import '../widgets/library_cover_art.dart';
-import '../widgets/library_result_tile.dart';
+part of 'downloads_screen.dart';
 
 /// Browse-and-play surface for everything that has been downloaded for
-/// offline use. Three top-tabs:
-/// - **Albums** — every album in `OfflineManifest.markedAlbums`.
-/// - **Playlists** — every playlist in `OfflineManifest.markedPlaylists`.
+/// offline use. Three tabs (D3: Songs first — the primary intent of this
+/// screen):
 /// - **Songs** — flat list of every song whose manifest entry is `ready`,
 ///   resolved through the marked album / playlist metadata.
+/// - **Albums** — every album in `OfflineManifest.markedAlbums`.
+/// - **Playlists** — every playlist in `OfflineManifest.markedPlaylists`.
 ///
 /// Every metadata fetch goes through the existing cache-aware library
 /// providers (L5) so this screen works fully offline.
-class DownloadsScreen extends ConsumerStatefulWidget {
-  const DownloadsScreen({super.key});
+
+class _SongsTab extends ConsumerWidget {
+  const _SongsTab();
 
   @override
-  ConsumerState<DownloadsScreen> createState() => _DownloadsScreenState();
-}
-
-class _DownloadsScreenState extends ConsumerState<DownloadsScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabs;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabs = TabController(length: 3, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Downloads'),
-        bottom: TabBar(
-          controller: _tabs,
-          tabs: const <Widget>[
-            Tab(text: 'Albums'),
-            Tab(text: 'Playlists'),
-            Tab(text: 'Songs'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabs,
-        children: const <Widget>[_AlbumsTab(), _PlaylistsTab(), _SongsTab()],
-      ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AsyncValue<List<Song>> async = ref.watch(downloadedSongsProvider);
+    return async.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (Object e, _) => _ErrorView(message: 'Songs error: $e'),
+      data: (List<Song> songs) {
+        if (songs.isEmpty) {
+          return const _EmptyView(
+            icon: Icons.music_off_outlined,
+            message:
+                'No downloaded songs yet.\n'
+                'Mark an album or playlist for offline,\n'
+                'then wait for sync to complete.',
+          );
+        }
+        return ListView.builder(
+          itemCount: songs.length,
+          itemBuilder: (BuildContext c, int i) {
+            final Song s = songs[i];
+            final String subtitle = <String?>[
+              s.artist,
+              s.album,
+            ].where((String? v) => v != null && v.isNotEmpty).join(' • ');
+            return ListTile(
+              leading: LibraryCoverArt(coverArtId: s.coverArt),
+              title: Text(s.title),
+              subtitle: subtitle.isNotEmpty ? Text(subtitle) : null,
+              onTap: () => playSongFromSubsonic(ref, context, s),
+              onLongPress: () => _showDeleteOptions(context, ref, s),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -205,47 +184,6 @@ class _PlaylistRow extends ConsumerWidget {
         trailingPlay: true,
         onPlay: () => playPlaylistFromSubsonic(ref, context, p.id),
       ),
-    );
-  }
-}
-
-class _SongsTab extends ConsumerWidget {
-  const _SongsTab();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<List<Song>> async = ref.watch(downloadedSongsProvider);
-    return async.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (Object e, _) => _ErrorView(message: 'Songs error: $e'),
-      data: (List<Song> songs) {
-        if (songs.isEmpty) {
-          return const _EmptyView(
-            icon: Icons.music_off_outlined,
-            message:
-                'No downloaded songs yet.\n'
-                'Mark an album or playlist for offline,\n'
-                'then wait for sync to complete.',
-          );
-        }
-        return ListView.builder(
-          itemCount: songs.length,
-          itemBuilder: (BuildContext c, int i) {
-            final Song s = songs[i];
-            final String subtitle = <String?>[
-              s.artist,
-              s.album,
-            ].where((String? v) => v != null && v.isNotEmpty).join(' • ');
-            return ListTile(
-              leading: LibraryCoverArt(coverArtId: s.coverArt),
-              title: Text(s.title),
-              subtitle: subtitle.isNotEmpty ? Text(subtitle) : null,
-              onTap: () => playSongFromSubsonic(ref, context, s),
-              onLongPress: () => _showDeleteOptions(context, ref, s),
-            );
-          },
-        );
-      },
     );
   }
 }

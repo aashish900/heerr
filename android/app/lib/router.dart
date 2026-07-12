@@ -10,7 +10,7 @@ import 'app/lifecycle_coordinator.dart';
 import 'providers/library/library_search_query.dart';
 import 'providers/profiles/profile_registry.dart';
 import 'screens/auth/login_screen.dart';
-import 'screens/downloads_screen.dart';
+import 'screens/downloads/downloads_screen.dart';
 import 'screens/job_detail_screen.dart';
 import 'screens/library/album_detail_screen.dart';
 import 'screens/library/artist_detail_screen.dart';

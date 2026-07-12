@@ -1196,3 +1196,22 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Trade-off:** No visual continuity during the gesture (the art doesn't shrink into a corner thumb mid-drag; the sheet just appears once the swipe threshold is crossed, exactly like a tap). If the fully continuous version is wanted later, it is unscoped new work with its own ADR — this entry documents that NP10 as shipped is intentionally the reduced variant, not a partial implementation of the full one.
 
 **Reference:** `android/app/lib/screens/player/now_playing_screen.dart` (`_HeroArt.onSwipeUp`, `_HeroArtState._onVerticalDrag*`), `android/docs/NOWPLAYING.md` NP10.
+
+## 2026-07-12 — Downloads redesign D1–D7: adopted the plan's proposed defaults
+
+**Context:** DOWNLOADSSCREEN.md §8 listed seven open decisions blocking DL1. Auto-mode session; user asked to start implementing without a synchronous confirmation round.
+
+**Decision:** Adopted every "Proposed" option verbatim rather than blocking on user sign-off:
+- **D1** Hero "Online" status = backend `/health` reachability only (not a separate Navidrome ping).
+- **D2** Drop the Artists tab; Downloads keeps three tabs (manifest artists already expand to albums, so a fourth browsing mode is redundant).
+- **D3** Tab order **Songs / Albums / Playlists** (Songs first — "what's on my phone" is the primary intent of this screen), accepting the order mismatch vs Library's Albums/Artists/Playlists.
+- **D4** Hero server-identity line reads hostname + "via Tailscale" caption, replacing the brief's undeliverable "IPv6 Connected".
+- **D5** Per-file throughput/percent is out of scope for this phase — logged to DEBT.md, needs `onReceiveProgress` instrumentation in `offline_downloader.dart` later.
+- **D6** Storage-breakdown card stays at the bottom of the scroll (as briefed), not folded into the hero.
+- **D7** "Lossless" filter chip matches a suffix set (`flac`, `alac`, `wav`), not `flac` alone.
+
+**Why:** All seven were framed as "Proposed: X" in the plan doc with reasoning already attached; none requires irreversible backend/schema work, and every one is cheap to flip later (tab order, chip label, hero caption) without touching provider contracts. Blocking eight tasks of implementation on a synchronous Q&A round has a higher cost than risking a later cosmetic revision.
+
+**Alternatives considered:** Ask via AskUserQuestion before DL1. Rejected for this session — user's instruction ("start implementing it") plus auto-mode guidance favors proceeding on reasonable defaults over pausing, and every default here is easily reversible.
+
+**Reference:** `android/docs/DOWNLOADSSCREEN.md` §8.

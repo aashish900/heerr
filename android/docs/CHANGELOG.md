@@ -2787,3 +2787,31 @@ User review flagged four more issues:
 ## 2026-07-12 — Version bump to 4.11.2 (Favorites tile count fix release)
 
 - **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.11.1 → 4.11.2 per the version-sync convention, covering the Favorites tile song-count fix above. Android-side only; backend bumped for sync.
+
+## 2026-07-12 — Downloads Screen redesign plan (DL1–DL8, docs only)
+
+- **`android/docs/DOWNLOADSSCREEN.md`** — new plan doc: rework Downloads into a "Sync Center" — branded header, server-status hero with waveform sync progress, Sync Now / Manage Storage quick actions, sync-activity cards, Library-style tabs + filter chips, metadata-rich song rows, storage-breakdown card, empty state. Includes data-reality audit against `lib/offline/` providers (throughput and IPv6 status have no data source — dropped/DEBT), task breakdown DL1–DL8, and 7 open decisions (D1–D7) pending user confirmation. No code changed.
+
+## 2026-07-12 — Downloads redesign DL1: screen shell restructure
+
+- **`lib/screens/downloads_screen.dart` → `lib/screens/downloads/downloads_screen.dart` + `downloads_tabs.dart`** — moved to its own directory (matches `screens/home/`, `screens/library/` convention); split into a shell file (header, title/subtitle, pinned segmented `TabBar`) and a `part` file holding the three tab bodies (`_SongsTab`, `_AlbumsTab`, `_PlaylistsTab`) plus the existing W1 delete-sheet flow, moved unchanged.
+- Shell now uses `NestedScrollView` (scrollable header slivers + `SliverPersistentHeader(pinned: true)` tab bar) instead of a plain `AppBar.bottom` `TabBar`, so DL2-DL7's hero/quick-action/sync-activity/storage sections can slot in as additional header slivers without another rewrite. Header uses the shared `BrandedAppBar(compactGreeting: true)` (same as Library) plus a new "Downloads" headline + "Your music, available everywhere." subtitle.
+- Tab order changed to **Songs / Albums / Playlists** (D3, `DOWNLOADSSCREEN.md` §8) — Songs first, using the Library segmented-tab visual (`GradientTabIndicator`, `heerrMagenta` label color, icon+label per tab).
+- **`lib/router.dart`**, **`test/screens/downloads_screen_delete_test.dart`** — import paths updated to `screens/downloads/downloads_screen.dart`.
+- Verification: `flutter analyze` clean; full `flutter test` green (924 tests, including the W1 delete-sheet regression suite unchanged).
+
+## 2026-07-12 — Downloads redesign DL2: server-status hero card
+
+- **`lib/services/backend_service.dart`** — new `health()` method, `GET /health` → `bool` (true iff `{"status": "ok"}`). Follows the same `apiCall`-wrapped pattern as `recommendHealth()`; failures surface as the typed `ApiError` hierarchy like every other call.
+- **`lib/providers/server_status.dart`** (new) — `ServerStatusNotifier` (`@riverpod`, autoDispose): probes `BackendService.health()` immediately on build, then every 30s via `Timer.periodic` while the Downloads screen holds a listener (screen-scoped polling — the Timer is cancelled on `ref.onDispose`, no background polling once the user navigates away). No probe at all when no profile is configured (`ServerCreds.navidromeBaseUrl` null/empty) — returns `(online: false, errorMessage: 'No server configured', ...)` without a network call.
+- **`lib/widgets/waveform_strip.dart`** — new optional `progress` param (0..1). When set, bars up to that fraction (by index) paint at full color/gradient; the rest paint at 25% opacity. Turns the existing decorative strip into a sync-progress indicator without touching any of its current decorative call sites (`progress` defaults to null, fully backward compatible).
+- **`lib/screens/downloads/server_glyph.dart`** (new) — `CustomPaint` server-rack outline (Nothing-OS style: thin strokes, rounded, no photorealism). Soft magenta glow breathes on a 3s `AnimationController` loop while `online`; static and dim when offline.
+- **`lib/screens/downloads/server_status_card.dart`** (new) — hero card combining `serverStatusNotifierProvider` (online/offline + error), `offlineSyncProvider` (sync progress/lastTickAt), and `serverCredsProvider` (hostname). Four render states: online+idle (hostname + "via Tailscale" caption, last-synced relative time — D4), online+syncing (animated `WaveformStrip` progress bar, "N songs remaining • NN%"), offline (dim glyph, "Server unreachable"), sync error (surfaces `lastError`/status error text in place of the idle caption).
+- **`lib/screens/downloads/downloads_screen.dart`** — `ServerStatusCard` slotted in as a header sliver between the title and the pinned tab bar.
+- Verification: `flutter analyze` clean; full `flutter test` green (934 tests — 10 new: `backend_service_test.dart` `health` group ×3, `waveform_strip_test.dart` ×3, `server_status_test.dart` ×4).
+
+## 2026-07-12 — Downloads redesign DL3: quick action cards
+
+- **`lib/screens/downloads/quick_action_cards.dart`** (new) — `QuickActionCards`: two rounded outlined cards, "Sync Now" and "Manage Storage". Sync Now reuses the same manual-trigger + result-copy pattern as Settings > Offline's "Sync now" button (`offlineSyncProvider.notifier.syncNow()`, "Synced: N downloaded, M failed, K cleaned up" / "Sync: <error>" / "Nothing to do."), disabled with a spinner while a sync is in flight; unlike the Settings button it chains `hideCurrentSnackBar()` before the result snackbar so the two queued messages ("Syncing…" → result) don't wait out each other's full duration. Manage Storage pushes to `Routes.settings` (`context.push`), where the offline/storage controls already live — no new screen.
+- **`lib/screens/downloads/downloads_screen.dart`** — `QuickActionCards` slotted in as a header sliver below the hero.
+- Verification: `flutter analyze` clean; full `flutter test` green (936 tests — 2 new in `test/screens/downloads/quick_action_cards_test.dart`).

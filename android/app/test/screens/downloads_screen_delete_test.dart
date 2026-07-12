@@ -7,7 +7,7 @@ import 'package:heerr/offline/offline_marker.dart';
 import 'package:heerr/providers/downloaded_songs.dart';
 import 'package:heerr/providers/library/library_delete.dart';
 import 'package:heerr/providers/secure_storage.dart';
-import 'package:heerr/screens/downloads_screen.dart';
+import 'package:heerr/screens/downloads/downloads_screen.dart';
 
 import '../support/cred_test_support.dart';
 

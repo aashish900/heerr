@@ -74,6 +74,19 @@ class BackendService {
     );
   }
 
+  /// `GET /health` → `{"status": "ok"}` when the backend is reachable.
+  /// DL2 (Downloads "Sync Center" hero, D1): the only reachability probe the
+  /// thin client performs — it never talks to Navidrome directly, so "online"
+  /// here means "the backend pipeline that talks to Navidrome is alive", not
+  /// a direct Navidrome ping.
+  Future<bool> health() {
+    return apiCall<bool>(
+      () => _dio.get<dynamic>(Endpoints.health),
+      (dynamic data) =>
+          data is Map && data['status'] == 'ok',
+    );
+  }
+
   /// `GET /queue` → the current download queue snapshot.
   Future<QueueResponse> getQueue() {
     return apiCall<QueueResponse>(
