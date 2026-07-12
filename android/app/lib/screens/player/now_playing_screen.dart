@@ -127,20 +127,42 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (_) => SizedBox(
-        height: MediaQuery.sizeOf(context).height * 0.7,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Text(
-                'Queue',
-                style: Theme.of(context).textTheme.titleMedium,
+      // NOWPLAYING.md NP9 — glass sheet chrome over the modal barrier;
+      // the underlying Material scaffold background stays transparent so
+      // this decoration reads through cleanly.
+      backgroundColor: Colors.transparent,
+      builder: (_) => ClipRRect(
+        key: const Key('now-playing-queue-sheet'),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xFF141118).withValues(alpha: 0.96),
+            border: Border(
+              top: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+            ),
+          ),
+          // Transparent Material so the ListTile rows inside _QueueList get
+          // a proper ink/splash ancestor — the glass fill lives on the
+          // DecoratedBox above, not here.
+          child: Material(
+            type: MaterialType.transparency,
+            child: SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.7,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Text(
+                      'Queue',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  const Expanded(child: _QueueList()),
+                ],
               ),
             ),
-            const Expanded(child: _QueueList()),
-          ],
+          ),
         ),
       ),
     );

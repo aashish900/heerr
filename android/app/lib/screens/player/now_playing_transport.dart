@@ -218,6 +218,121 @@ class _Transport extends ConsumerWidget {
   }
 }
 
+/// Cover-art thumb for a queue row. Queue [MediaItem]s only carry a
+/// resolved [Uri] (no raw Subsonic `coverArtId`), so this is a direct
+/// [Image.network] — the same pattern `_CornerArt` already uses elsewhere
+/// in this screen — rather than `LibraryCoverArt`, which needs a
+/// `coverArtId` to drive its own offline cache.
+class _QueueRowArt extends StatelessWidget {
+  const _QueueRowArt({required this.artUri});
+
+  static const double _size = 44;
+
+  final Uri? artUri;
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget placeholder = Container(
+      width: _size,
+      height: _size,
+      decoration: BoxDecoration(
+        color: Colors.white12,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: const Icon(Icons.music_note, color: Colors.white54, size: 20),
+    );
+    final Uri? uri = artUri;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: uri == null
+          ? placeholder
+          : Image.network(
+              uri.toString(),
+              width: _size,
+              height: _size,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => placeholder,
+            ),
+    );
+  }
+}
+
+class _QueueSectionLabel extends StatelessWidget {
+  const _QueueSectionLabel(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Colors.white54,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.1,
+            ),
+      ),
+    );
+  }
+}
+
+class _QueueRow extends StatelessWidget {
+  const _QueueRow({
+    super.key,
+    required this.item,
+    required this.isCurrent,
+    this.dimmed = false,
+    this.trailing,
+    this.onTap,
+  });
+
+  final MediaItem item;
+  final bool isCurrent;
+  final bool dimmed;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final double opacity = dimmed ? 0.5 : 1.0;
+    return Opacity(
+      opacity: opacity,
+      child: ListTile(
+        leading: isCurrent
+            ? Icon(Icons.equalizer, color: Theme.of(context).colorScheme.primary)
+            : _QueueRowArt(artUri: item.artUri),
+        title: Text(
+          item.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontWeight: isCurrent ? FontWeight.w600 : null),
+        ),
+        subtitle: item.artist == null
+            ? null
+            : Text(item.artist!, maxLines: 1, overflow: TextOverflow.ellipsis),
+        trailing: trailing,
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+/// Sectioned queue sheet (NOWPLAYING.md NP9): items before the current one
+/// render dimmed with no section header ("earlier" — cheaper than a third
+/// "History" section per the plan); the current item gets its own
+/// non-reorderable, non-dismissible "Now Playing" row; everything after it
+/// is "Next Up" — the only slice that's actually reorderable/dismissible,
+/// via [SliverReorderableList] (the same primitive `ReorderableListView`
+/// wraps) so it can sit in a [CustomScrollView] alongside the earlier/
+/// current sections without nesting one scrollable inside another.
+///
+/// Index mapping: the reorderable sub-list is 0-based over `nextUp`: a
+/// local index [i] maps to the real audio-handler queue index via
+/// `currentIndex + 1 + i`. `onReorderItem` (not the deprecated `onReorder`)
+/// already reports the final target index with no further off-by-one
+/// adjustment — verified by `now_playing_screen_test.dart`'s reorder test.
 class _QueueList extends ConsumerWidget {
   const _QueueList();
 
@@ -239,57 +354,87 @@ class _QueueList extends ConsumerWidget {
             ),
           );
         }
-        return ReorderableListView.builder(
-          buildDefaultDragHandles: false,
-          itemCount: items.length,
-          onReorderItem: (int oldIndex, int newIndex) {
-            ref.read(audioHandlerProvider).moveQueueItem(oldIndex, newIndex);
-          },
-          itemBuilder: (BuildContext c, int i) {
-            final MediaItem m = items[i];
-            final bool isCurrent = m.id == currentId;
-            return Dismissible(
-              key: ValueKey<String>('queue-row-$i-${m.id}'),
-              direction: DismissDirection.endToStart,
-              background: Container(
-                color: Theme.of(c).colorScheme.errorContainer,
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 16),
-                child: Icon(
-                  Icons.delete_outline,
-                  color: Theme.of(c).colorScheme.onErrorContainer,
+        final int foundIndex =
+            items.indexWhere((MediaItem m) => m.id == currentId);
+        final int currentIndex = foundIndex < 0 ? 0 : foundIndex;
+        final List<MediaItem> earlier = items.sublist(0, currentIndex);
+        final MediaItem nowPlaying = items[currentIndex];
+        final List<MediaItem> nextUp = items.sublist(currentIndex + 1);
+
+        return CustomScrollView(
+          slivers: <Widget>[
+            if (earlier.isNotEmpty)
+              SliverList.builder(
+                itemCount: earlier.length,
+                itemBuilder: (BuildContext c, int i) => _QueueRow(
+                  key: ValueKey<String>('queue-earlier-$i-${earlier[i].id}'),
+                  item: earlier[i],
+                  isCurrent: false,
+                  dimmed: true,
+                  onTap: () =>
+                      ref.read(audioHandlerProvider).skipToQueueItem(i),
                 ),
               ),
-              onDismissed: (_) =>
-                  ref.read(audioHandlerProvider).removeQueueItemAt(i),
-              child: ListTile(
-                leading: Icon(
-                  isCurrent ? Icons.equalizer : Icons.music_note,
-                  color: isCurrent
-                      ? Theme.of(c).colorScheme.primary
-                      : null,
-                ),
-                title: Text(
-                  m.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: isCurrent ? FontWeight.w600 : null,
-                  ),
-                ),
-                subtitle: m.artist == null
-                    ? null
-                    : Text(m.artist!,
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                trailing: ReorderableDragStartListener(
-                  index: i,
-                  child: const Icon(Icons.drag_handle),
-                ),
-                onTap: () =>
-                    ref.read(audioHandlerProvider).skipToQueueItem(i),
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const _QueueSectionLabel('NOW PLAYING'),
+                  _QueueRow(item: nowPlaying, isCurrent: true),
+                  if (nextUp.isNotEmpty) const _QueueSectionLabel('NEXT UP'),
+                ],
               ),
-            );
-          },
+            ),
+            if (nextUp.isNotEmpty)
+              SliverReorderableList(
+                itemCount: nextUp.length,
+                onReorderItem: (int oldIndex, int newIndex) {
+                  final int from = currentIndex + 1 + oldIndex;
+                  final int to = currentIndex + 1 + newIndex;
+                  ref.read(audioHandlerProvider).moveQueueItem(from, to);
+                },
+                itemBuilder: (BuildContext c, int i) {
+                  final MediaItem m = nextUp[i];
+                  final int realIndex = currentIndex + 1 + i;
+                  // SliverReorderableList (unlike ReorderableListView) hoists
+                  // the dragged item into the ambient Overlay without its
+                  // own Material wrapper — give each row its own so the
+                  // drag-proxy ListTile always has a Material ancestor.
+                  return Material(
+                    key: ValueKey<String>('queue-row-$realIndex-${m.id}'),
+                    type: MaterialType.transparency,
+                    child: Dismissible(
+                      key: ValueKey<String>(
+                          'queue-dismiss-$realIndex-${m.id}'),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        color: Theme.of(c).colorScheme.errorContainer,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 16),
+                        child: Icon(
+                          Icons.delete_outline,
+                          color: Theme.of(c).colorScheme.onErrorContainer,
+                        ),
+                      ),
+                      onDismissed: (_) => ref
+                          .read(audioHandlerProvider)
+                          .removeQueueItemAt(realIndex),
+                      child: _QueueRow(
+                        item: m,
+                        isCurrent: false,
+                        trailing: ReorderableDragStartListener(
+                          index: i,
+                          child: const Icon(Icons.drag_handle),
+                        ),
+                        onTap: () => ref
+                            .read(audioHandlerProvider)
+                            .skipToQueueItem(realIndex),
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
         );
       },
     );

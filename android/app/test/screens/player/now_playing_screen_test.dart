@@ -208,6 +208,57 @@ void main() {
     expect(find.text('Track B'), findsOneWidget);
     // The current track gets the equalizer icon.
     expect(find.byIcon(Icons.equalizer), findsOneWidget);
+    // NP9 — sectioned sheet: "Now Playing" (Track A) + "Next Up" (Track B).
+    // Scoped to the sheet — the header (NP2) has its own static "NOW
+    // PLAYING" label elsewhere on screen.
+    final Finder sheet = find.byKey(const Key('now-playing-queue-sheet'));
+    expect(find.descendant(of: sheet, matching: find.text('NOW PLAYING')),
+        findsOneWidget);
+    expect(find.descendant(of: sheet, matching: find.text('NEXT UP')),
+        findsOneWidget);
+  });
+
+  // NP9 — when the current track isn't first, everything before it renders
+  // dimmed with no section header ("earlier" — cheaper than a third
+  // "History" section per NOWPLAYING.md).
+  testWidgets('items before the current track render with no section header',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final MediaItem a = _item(id: 'http://s/1', title: 'Track A');
+    final MediaItem b = _item(id: 'http://s/2', title: 'Track B');
+    final MediaItem c = _item(id: 'http://s/3', title: 'Track C');
+    await tester.pumpWidget(_wrap(
+      snapshot: _snap(item: b, playing: true),
+      queue: <MediaItem>[a, b, c],
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byKey(const Key('now-playing-queue-button')));
+    await tester.tap(find.byKey(const Key('now-playing-queue-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Track A'), findsOneWidget);
+    // Track B is current — also rendered as the big hero title, hence
+    // findsWidgets rather than findsOneWidget (mirrors the pattern in
+    // "renders queue items with current track marked" above).
+    expect(find.text('Track B'), findsWidgets);
+    expect(find.text('Track C'), findsOneWidget);
+    final Finder sheet = find.byKey(const Key('now-playing-queue-sheet'));
+    expect(find.descendant(of: sheet, matching: find.text('NOW PLAYING')),
+        findsOneWidget);
+    expect(find.descendant(of: sheet, matching: find.text('NEXT UP')),
+        findsOneWidget);
+    // No third "History"/"Earlier" header — just the dimmed row.
+    expect(find.text('EARLIER'), findsNothing);
+    expect(find.text('HISTORY'), findsNothing);
+    // Track A (earlier) has no drag handle; only Track C (Next Up) does.
+    expect(find.byIcon(Icons.drag_handle), findsOneWidget);
   });
 
   group('queue edit (#35)', () {
@@ -242,9 +293,12 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('rows render drag handles', (WidgetTester tester) async {
+    // NP9 — the "Now Playing" row (Track A here) is neither draggable nor
+    // dismissible; only the "Next Up" rows (Track B, Track C) get a handle.
+    testWidgets('only Next Up rows render drag handles',
+        (WidgetTester tester) async {
       await pumpQueue(tester);
-      expect(find.byIcon(Icons.drag_handle), findsNWidgets(3));
+      expect(find.byIcon(Icons.drag_handle), findsNWidgets(2));
     });
 
     testWidgets('swipe-to-dismiss removes the row at its index',
@@ -255,10 +309,12 @@ void main() {
       verify(() => handler.removeQueueItemAt(1)).called(1);
     });
 
-    testWidgets('dragging a handle reorders via moveQueueItem',
+    testWidgets(
+        'dragging a Next Up handle reorders via moveQueueItem (real queue indices)',
         (WidgetTester tester) async {
       await pumpQueue(tester);
-      // Row height ~56px; drag Track A's handle down past Track B.
+      // Track A (current) has no handle; .first is Track B's. Row height
+      // ~56px; drag it down past Track C.
       await tester.timedDrag(
         find.byIcon(Icons.drag_handle).first,
         const Offset(0, 70),
@@ -268,8 +324,10 @@ void main() {
       final List<dynamic> args = verify(
         () => handler.moveQueueItem(captureAny(), captureAny()),
       ).captured;
-      expect(args[0], 0);
-      expect(args[1], 1);
+      // Track B is real queue index 1, Track C is real queue index 2 —
+      // the local Next Up sub-list index (0) is offset by currentIndex + 1.
+      expect(args[0], 1);
+      expect(args[1], 2);
     });
   });
 
