@@ -12,8 +12,8 @@ part 'seed_track.g.dart';
 ///   `getAlbumList2.view?type=frequent`).
 /// - [artist] — track artist (or album artist).
 /// - [sourceUrl] — optional `music.youtube.com/watch?v=…` URL. When the
-///   seed already has a YouTube videoId attached (rare on the Android side
-///   today), engines like ytmusic can skip the search-resolve step. Null in
+///   seed already has a source videoId attached (rare on the Android side
+///   today), some engines can skip the search-resolve step. Null in
 ///   v1 — populated by future features only.
 @freezed
 class SeedTrack with _$SeedTrack {

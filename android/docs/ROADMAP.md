@@ -140,7 +140,7 @@ See `DECISIONLOG.md` for the *what*; this file is the *how* / *when*.
 ## Phase G — Smoke
 
 ### [x] G1. End-to-end smoke against the home server
-**Deliverable:** Real APK on the Pixel reaches the backend on the home server (via Tailscale), searches Spotify, dispatches a download, watches the queue, and confirms the file lands in Navidrome.
+**Deliverable:** Real APK on the Pixel reaches the backend on the home server (via Tailscale), searches the online catalog, dispatches a download, watches the queue, and confirms the file lands in Navidrome.
 **Test gate:** manual; the 7-step verification block in PLAN §12.
 **Done when:** all 7 PLAN §12 steps pass.
 **Commit:** `chore(flutter): e2e smoke verified`
@@ -149,7 +149,7 @@ See `DECISIONLOG.md` for the *what*; this file is the *how* / *when*.
 
 ## Phase H — Subsonic foundation
 
-**Architecture note:** heerr backend stays unchanged. The Android app gains a second backend connection (Navidrome's Subsonic API) for library browse + streaming + cover art. The existing standalone "Search" bottom-nav tab is removed at I1; its YouTube-Music search functionality folds into the new Library tab as a fallback source (library-first; YT only when library is empty or the user taps "Search more"). Bottom nav goes from `Search · Queue · Settings` → `Library · Queue · Settings`.
+**Architecture note:** heerr backend stays unchanged. The Android app gains a second backend connection (Navidrome's Subsonic API) for library browse + streaming + cover art. The existing standalone "Search" bottom-nav tab is removed at I1; its online-search functionality folds into the new Library tab as a fallback source (library-first; online only when library is empty or the user taps "Search more"). Bottom nav goes from `Search · Queue · Settings` → `Library · Queue · Settings`.
 
 ### [x] H1. Subsonic auth client + Settings extension + "Test Navidrome"
 **Files:**
@@ -198,12 +198,12 @@ See `DECISIONLOG.md` for the *what*; this file is the *how* / *when*.
 - New: `android/app/lib/providers/library/combined_search.dart`, `android/app/lib/screens/library/library_search_results.dart`.
 - Modified: `android/app/lib/providers/search.dart` (rename `searchResultsProvider` → `ytmSearchProvider`), `android/app/lib/screens/library/library_screen.dart` (search field in AppBar).
 
-**Deliverable:** `combinedSearchProvider(query)` — library fires on every debounced keystroke; YouTube Music fires only when library result is empty (auto-fire) or user taps "Search more on YouTube Music". Reactive promotion: `queueProvider` watches for `done` transitions on YT URIs in the results → after 60s grace calls `ref.invalidate(librarySearchProvider)`.
+**Deliverable:** `combinedSearchProvider(query)` — library fires on every debounced keystroke; online search fires only when library result is empty (auto-fire) or user taps "Search online". Reactive promotion: `queueProvider` watches for `done` transitions on online-search URIs in the results → after 60s grace calls `ref.invalidate(librarySearchProvider)`.
 
 **Test gate:** provider unit tests for all firing rules, cancellation, and reactive promotion. Widget tests for library-only / auto-YT / manual-YT / both-empty renders.
 
 **Done when:** all provider + widget tests green; `grep -r searchResultsProvider android/app/lib` empty.
-**Commit:** `feat(flutter): combined library + youtube music search with reactive promotion`
+**Commit:** `feat(flutter): combined library + online search with reactive promotion`
 
 ---
 
@@ -402,7 +402,7 @@ See `DECISIONLOG.md` for the *what*; this file is the *how* / *when*.
 
 ## Phase O — Home screen
 
-**Architecture note:** Pure-Android slice. No heerr backend changes — recommendations reuse the existing `POST /api/v1/recommend` endpoint; recently-played / most-played / random-songs come from Navidrome Subsonic (`getAlbumList2`, `getRandomSongs`). Bottom nav becomes `Home · Library · Downloads · Settings` (Queue tab dropped — Queue is now reachable via a `queue_music_outlined` IconButton in the Home AppBar). Default boot tab changes from Library to Home. Design target: Spotify home — time-of-day greeting, 2-column quick-access grid, horizontal-scroll sections, large "Picked for you" cards.
+**Architecture note:** Pure-Android slice. No heerr backend changes — recommendations reuse the existing `POST /api/v1/recommend` endpoint; recently-played / most-played / random-songs come from Navidrome Subsonic (`getAlbumList2`, `getRandomSongs`). Bottom nav becomes `Home · Library · Downloads · Settings` (Queue tab dropped — Queue is now reachable via a `queue_music_outlined` IconButton in the Home AppBar). Default boot tab changes from Library to Home. Design target: a familiar streaming-app home — time-of-day greeting, 2-column quick-access grid, horizontal-scroll sections, large "Picked for you" cards.
 
 ### [x] O1. Nav restructure — add Home tab
 **Files (new):** `android/app/lib/screens/home/home_screen.dart` (scaffold + greeting + Queue shortcut).
@@ -423,7 +423,7 @@ See `DECISIONLOG.md` for the *what*; this file is the *how* / *when*.
 **Commit:** `feat(flutter): O2 — home data providers (recent, frequent, random, recommendations)`
 
 ### [x] O3. Home screen — quick-access grid + horizontal sections
-**Files (new):** `android/app/lib/widgets/home_grid_tile.dart` (compact 2-col tile: 56 px square cover art flush-left + album/playlist name, dark surface, Spotify-style), `android/app/lib/widgets/home_section.dart` (section header text + horizontal `ListView.builder` of square cover-art cards with title below).
+**Files (new):** `android/app/lib/widgets/home_grid_tile.dart` (compact 2-col tile: 56 px square cover art flush-left + album/playlist name, dark surface, reference-app style), `android/app/lib/widgets/home_section.dart` (section header text + horizontal `ListView.builder` of square cover-art cards with title below).
 **Files (modify):** `android/app/lib/screens/home/home_screen.dart`:
 - Greeting row at top (time-of-day string).
 - **Quick-access grid:** 2-column `GridView` of up to 6 recently-played albums (`homeRecentProvider`). Fallback: when recent is empty, show top-6 `homeRecommendationsProvider` results in the same grid layout.
@@ -626,9 +626,9 @@ See `DECISIONLOG.md` for the *what*; this file is the *how* / *when*.
 
 ---
 
-## Phase T — Stream-first preview of YouTube Music results (v3.5.0)
+## Phase T — Stream-first preview of online search results (v3.5.0)
 
-**Architecture note:** Lets the user **preview** (stream) a YouTube-Music search result *before* downloading it into the library — closing the find → *hear* → download loop. Consumes backend `GET /api/v1/preview/stream` (backend **Phase K**): the device plays a heerr-backend URL via just_audio while the backend proxies the audio from googlevideo over Tailscale. **Pure-client slice on top of K — no other backend change.** The preview `MediaItem.id` is the backend proxy URL with the bearer token as a `?token=` query param (just_audio cannot set auth headers — the same constraint Subsonic playback already works around). Previews are **ephemeral** and added to no library; the existing reactive-promotion path (`combined_search.dart`) still upgrades a row from preview → real Subsonic playback once the user downloads it and Navidrome re-indexes. The `MediaItem.id`-is-the-URI invariant is preserved — this is simply a **third URI kind** alongside `file://` and the Subsonic stream URL. **Depends on backend K2.**
+**Architecture note:** Lets the user **preview** (stream) an online search result *before* downloading it into the library — closing the find → *hear* → download loop. Consumes backend `GET /api/v1/preview/stream` (backend **Phase K**): the device plays a heerr-backend URL via just_audio while the backend proxies the audio from googlevideo over Tailscale. **Pure-client slice on top of K — no other backend change.** The preview `MediaItem.id` is the backend proxy URL with the bearer token as a `?token=` query param (just_audio cannot set auth headers — the same constraint Subsonic playback already works around). Previews are **ephemeral** and added to no library; the existing reactive-promotion path (`combined_search.dart`) still upgrades a row from preview → real Subsonic playback once the user downloads it and Navidrome re-indexes. The `MediaItem.id`-is-the-URI invariant is preserved — this is simply a **third URI kind** alongside `file://` and the Subsonic stream URL. **Depends on backend K2.**
 
 ### [x] T1. Preview stream URL builder + endpoint constant
 **Files (new):** `android/app/lib/player/preview_url.dart`, `android/app/test/player/preview_url_test.dart`.
@@ -644,7 +644,7 @@ See `DECISIONLOG.md` for the *what*; this file is the *how* / *when*.
 **Deliverable:** build a `MediaItem` with `id` = the T1 preview URL, `title`/`artist`/`album`/`artUri` from the `SearchResultItem` (`coverUrl`), `extras: {'preview': true, 'sourceUrl': item.sourceUrl}`. `playPreview` reads the active profile for base URL + token, then routes the single item through the existing `HeerrAudioHandler` queue — **bypassing `songToMediaItem`** (no Subsonic / file path). Reuses the existing handler / mini-player wiring untouched.
 **Test gate:** `MediaItem` shape (id = preview URL, `preview: true`, art set); handler receives the item; assert neither the Subsonic-stream nor `file://` builder is invoked.
 **Done when:** `flutter analyze` clean; `flutter test` green.
-**Commit:** `feat(flutter): T2 — preview playback action for YouTube results`
+**Commit:** `feat(flutter): T2 — preview playback action for online search results`
 
 ### [x] T3. Preview affordance on the search result tile + Now Playing badge
 **Files (modify):** `android/app/lib/widgets/result_tile.dart` (a play/preview `IconButton` beside the existing download control; tap → `playPreview`), `android/app/lib/screens/library/library_search_results.dart` (wire it where YT results render), `android/app/lib/widgets/mini_player.dart` + `android/app/lib/screens/player/now_playing_screen.dart` (small "Preview" chip when `extras['preview'] == true`), corresponding widget tests.
@@ -669,7 +669,7 @@ See `DECISIONLOG.md` for the *what*; this file is the *how* / *when*.
 
 ## Phase U — Download-to-playlist (optional post-download playlist assignment)
 
-**Architecture note:** When a user taps the download icon on a YouTube Music search result, show a bottom sheet letting them either download directly (current behaviour) or download and automatically add the song to one of their Navidrome playlists once the download job completes and Navidrome indexes the file. **Pure-client slice — no backend changes required.** The async orchestration lives as a top-level function (no persistent Riverpod state), mirroring the pattern of `playPreview` / `playSongFromSubsonic`.
+**Architecture note:** When a user taps the download icon on an online search result, show a bottom sheet letting them either download directly (current behaviour) or download and automatically add the song to one of their Navidrome playlists once the download job completes and Navidrome indexes the file. **Pure-client slice — no backend changes required.** The async orchestration lives as a top-level function (no persistent Riverpod state), mirroring the pattern of `playPreview` / `playSongFromSubsonic`.
 
 **Depends on:** backend Phase K (for `BackendService.jobStatus`) and existing `SubsonicLibraryService.findLibraryMatch` + `PlaylistMutations.addSongs`.
 
@@ -794,7 +794,7 @@ Fires only when the shell route is the top route (pushed detail screens pop them
 
 ## Phase Y — Edit song metadata (#44, v4.3.0)
 
-**Architecture note:** Issue #44 — YT-Music downloads sometimes carry wrong titles / cover art. The client sends changed tags + an optional cover image to the backend's new multipart `PATCH /api/v1/library/song` (backend Phase O), identifying the file by the Subsonic-relative `Song.path` the client already holds. The backend rewrites tags in place (never renames), so `Song.path` stays stable; Navidrome re-reads the file on its next scan (~1 min). Mirrors the Phase W shape (service method → keepAlive notifier → long-press-sheet tile), plus L5 cover-cache eviction. Phase letter is **Y** (not X) — `DEBT.md` uses item IDs X1–X7. **Depends on backend O2.**
+**Architecture note:** Issue #44 — online-search downloads sometimes carry wrong titles / cover art. The client sends changed tags + an optional cover image to the backend's new multipart `PATCH /api/v1/library/song` (backend Phase O), identifying the file by the Subsonic-relative `Song.path` the client already holds. The backend rewrites tags in place (never renames), so `Song.path` stays stable; Navidrome re-reads the file on its next scan (~1 min). Mirrors the Phase W shape (service method → keepAlive notifier → long-press-sheet tile), plus L5 cover-cache eviction. Phase letter is **Y** (not X) — `DEBT.md` uses item IDs X1–X7. **Depends on backend O2.**
 
 ### [x] Y1. Edit-metadata service + notifier + cover-cache eviction
 **Files (new):** `android/app/lib/providers/library/library_edit.dart` (`LibraryEdit` keepAlive notifier — guards `song.path` + at-least-one-change, calls `BackendService.editLibrarySong`, invalidates the same 9 library/downloads/home read providers as `LibraryDelete`; when a cover was uploaded also deletes the L5 cached cover JPG for `song.coverArt` and clears the in-memory image cache), `android/app/test/providers/library/library_edit_test.dart`.
@@ -898,7 +898,7 @@ Fires only when the shell route is the top route (pushed detail screens pop them
 - **No backend change from Android phases** — each Android phase is a pure-client slice; any required backend endpoints ship in the corresponding backend roadmap first.
 - **DECISIONLOG drift:** any contract / stack change → update `DECISIONLOG.md` + `PLAN.md` in the same commit (CLAUDE.md staleness rule).
 - **Owner-only edits** — any new playlist mutation affordance added later must honour the `canEdit(Playlist, SettingsValue)` gate.
-- **`MediaItem.id` is the playback URI** — one of three kinds: `file://` when local (offline), the Subsonic stream URL when streaming a library track, or the heerr `/preview/stream?...&token=` proxy URL for a YouTube-Music preview (Phase T, built by `searchResultToMediaItem`). Any deviation breaks offline playback. Preview items also carry `extras['preview'] == true` (vs `extras['subsonicId']` for library tracks) — use `isPreviewMediaItem` to tell them apart.
+- **`MediaItem.id` is the playback URI** — one of three kinds: `file://` when local (offline), the Subsonic stream URL when streaming a library track, or the heerr `/preview/stream?...&token=` proxy URL for an online-search preview (Phase T, built by `searchResultToMediaItem`). Any deviation breaks offline playback. Preview items also carry `extras['preview'] == true` (vs `extras['subsonicId']` for library tracks) — use `isPreviewMediaItem` to tell them apart.
 
 ---
 
@@ -909,7 +909,7 @@ Items scheduled into v1.5.0 (Phase P) or v2.0.0 (Phase Q) are no longer here —
 - iOS port.
 - Light theme.
 - Push notifications / FCM.
-- Spotify SDK / OAuth on device.
+- Third-party music-service SDK / OAuth on device.
 - Admin endpoints (CLI-only on backend).
 - Internationalisation.
 - Offline mutation queue (mutations require online connectivity in v1).

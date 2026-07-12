@@ -105,7 +105,7 @@ void main() {
     ])));
     await tester.pumpAndSettle();
 
-    expect(find.text('Search your library + YouTube Music'), findsOneWidget);
+    expect(find.text('Search your library + online'), findsOneWidget);
     expect(find.byType(QuickAccessRow), findsOneWidget);
     expect(find.byType(RecentlyAddedSection), findsOneWidget);
     expect(find.text('Fresh Album'), findsOneWidget);

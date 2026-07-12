@@ -21,9 +21,9 @@ For the build sequence: `android/docs/ROADMAP.md`.
 
 ## Architecture (do not re-litigate)
 
-- **Thin client.** REST-over-HTTPS against the FastAPI backend at `http://<tailscale-host>:8000/api/v1`. No download logic on the device. No spotDL. No Spotify SDK. No Spotify OAuth.
+- **Thin client.** REST-over-HTTPS against the FastAPI backend at `http://<tailscale-host>:8000/api/v1`. No download logic on the device. No download tool, SDK, or OAuth for any third-party music source runs on the device.
 - **Connectivity is Tailscale-only.** App reaches the backend via the host's tailnet IP / MagicDNS name. There is no public ingress; the user enters the backend URL in Settings.
-- **Multi-user via Navidrome IdP only.** As of v3.0.0 (Phase S), the app supports multiple on-device profiles, but identity is delegated to Navidrome through the backend's `POST /api/v1/auth/login` shim — no other Sign-In-With-X providers (Google, Spotify, Apple, etc.) are permitted. The bearer token is either minted by the backend CLI (legacy installs) or by the login IdP shim; the device pastes it into Settings once per profile. Biometric token unlock is still out of scope.
+- **Multi-user via Navidrome IdP only.** As of v3.0.0 (Phase S), the app supports multiple on-device profiles, but identity is delegated to Navidrome through the backend's `POST /api/v1/auth/login` shim — no other Sign-In-With-X providers (Google, Apple, or any other third-party account, etc.) are permitted. The bearer token is either minted by the backend CLI (legacy installs) or by the login IdP shim; the device pastes it into Settings once per profile. Biometric token unlock is still out of scope.
 - **Android-only.** iOS is out of scope (no Xcode / Apple Developer / CocoaPods). Don't suggest Cupertino widgets, iOS-specific plugins, or iOS deployment steps. (See `/CLAUDE.md` §3.)
 - **Polling, not streaming.** The backend exposes REST endpoints only — no WebSocket / SSE. The queue + job-detail screens poll on a timer (see `docs/PLAN.md` "Polling cadence").
 
@@ -71,7 +71,7 @@ The user *does* know REST APIs, JSON, async, containers, and the backend in this
 
 ## Hard "don't"s
 
-- Don't add a Sign-In-With-Spotify, -Google, -Apple, or any other third-party-IdP flow on the device. The **one** permitted login path is the Navidrome-IdP shim at `POST /api/v1/auth/login` (Phase S); every other auth domain is rejected.
+- Don't add a Sign-In-With-Google, -Apple, or any other third-party-IdP flow on the device. The **one** permitted login path is the Navidrome-IdP shim at `POST /api/v1/auth/login` (Phase S); every other auth domain is rejected.
 - Don't propose iOS / Cupertino / Xcode steps.
 - Don't store the bearer token in `shared_preferences` or write it to a file — `flutter_secure_storage` only. The same rule applies to the per-profile Navidrome password persisted under the [Profile] registry — secure storage is the only acceptable location.
 - Don't add a real-time push channel (WebSocket / Firebase Cloud Messaging). Polling is the contract.

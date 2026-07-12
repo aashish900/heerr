@@ -12,7 +12,7 @@ part 'recommended_track.g.dart';
 ///
 /// `sourceUrl` is always a `music.youtube.com/watch?v=…` URL, even when
 /// the upstream signal came from Last.fm or ListenBrainz: the backend's
-/// `YTMusicResolver` resolves every candidate before the response ships.
+/// source resolver resolves every candidate before the response ships.
 /// Tapping Download therefore dispatches through the existing
 /// `POST /download` flow with no special-casing.
 ///
@@ -44,7 +44,7 @@ class RecommendedTrack with _$RecommendedTrack {
     /// Threaded through to the Home "Picked for you" card so it can render
     /// the cached library cover instead of a placeholder.
     /// Null for genuinely-online recommendations — those fall back to the
-    /// YouTube video thumbnail derived from `sourceUrl`.
+    /// remote video thumbnail derived from `sourceUrl`.
     String? coverArt,
   }) = _RecommendedTrack;
 

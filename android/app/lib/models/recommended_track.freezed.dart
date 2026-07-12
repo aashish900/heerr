@@ -39,7 +39,7 @@ mixin _$RecommendedTrack {
   /// Threaded through to the Home "Picked for you" card so it can render
   /// the cached library cover instead of a placeholder.
   /// Null for genuinely-online recommendations — those fall back to the
-  /// YouTube video thumbnail derived from `sourceUrl`.
+  /// remote video thumbnail derived from `sourceUrl`.
   String? get coverArt => throw _privateConstructorUsedError;
 
   /// Serializes this RecommendedTrack to a JSON map.
@@ -247,7 +247,7 @@ class _$RecommendedTrackImpl implements _RecommendedTrack {
   /// Threaded through to the Home "Picked for you" card so it can render
   /// the cached library cover instead of a placeholder.
   /// Null for genuinely-online recommendations — those fall back to the
-  /// YouTube video thumbnail derived from `sourceUrl`.
+  /// remote video thumbnail derived from `sourceUrl`.
   @override
   final String? coverArt;
 
@@ -342,7 +342,7 @@ abstract class _RecommendedTrack implements RecommendedTrack {
   /// Threaded through to the Home "Picked for you" card so it can render
   /// the cached library cover instead of a placeholder.
   /// Null for genuinely-online recommendations — those fall back to the
-  /// YouTube video thumbnail derived from `sourceUrl`.
+  /// remote video thumbnail derived from `sourceUrl`.
   @override
   String? get coverArt;
 

@@ -28,7 +28,7 @@ class BackendService {
 
   final Dio _dio;
 
-  /// `POST /search` (YouTube-Music search). Content type fixed to song to
+  /// `POST /search` (online search). Content type fixed to song to
   /// match the combined-search UI. [cancelToken] aborts a superseded request.
   Future<SearchResponse> ytmSearch(String query, {CancelToken? cancelToken}) {
     final SearchRequest body =

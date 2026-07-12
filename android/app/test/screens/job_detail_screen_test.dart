@@ -154,7 +154,7 @@ void main() {
   ) async {
     final JobView j = _job(
       state: JobState.failed,
-      error: 'spotdl: track not found on yt',
+      error: 'download tool: track not found',
       finishedAt: DateTime.now(),
     );
     await tester.pumpWidget(
@@ -163,7 +163,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('failed'), findsOneWidget);
-    expect(find.text('spotdl: track not found on yt'), findsOneWidget);
+    expect(find.text('download tool: track not found'), findsOneWidget);
     expect(find.byIcon(Icons.error_outline), findsOneWidget);
   });
 

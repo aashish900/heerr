@@ -164,7 +164,7 @@ void main() {
       final _FakeAdapter adapter = _FakeAdapter(
         (_) => _json(422, <String, dynamic>{
           'detail': <Map<String, dynamic>>[
-            <String, dynamic>{'msg': 'invalid spotify URI'},
+            <String, dynamic>{'msg': 'invalid source URI'},
           ],
         }),
       );

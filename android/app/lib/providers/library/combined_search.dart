@@ -22,10 +22,10 @@ const Duration kReindexGrace = Duration(seconds: 60);
 @Riverpod(keepAlive: true)
 Duration reindexGrace(ReindexGraceRef ref) => kReindexGrace;
 
-/// Set of queries the user has explicitly opted into firing a YouTube-Music
+/// Set of queries the user has explicitly opted into firing an online
 /// search for. Auto-fire (when the library result is empty) bypasses this;
 /// this set is only consulted when the library half *did* return results
-/// and the user tapped "Search more on YouTube Music".
+/// and the user tapped "Search online".
 @Riverpod(keepAlive: true)
 class YtmManualTrigger extends _$YtmManualTrigger {
   @override
@@ -43,11 +43,11 @@ class YtmManualTrigger extends _$YtmManualTrigger {
   }
 }
 
-/// Result of a combined library + YouTube-Music search. The UI renders both
+/// Result of a combined library + online search. The UI renders both
 /// halves; this class is just the bag.
 ///
-/// `ytm == null` means the YT half hasn't been fired for this query — the
-/// UI should render the "Search more on YouTube Music" button instead.
+/// `ytm == null` means the online half hasn't been fired for this query — the
+/// UI should render the "Search online" button instead.
 class CombinedSearchResult {
   const CombinedSearchResult({
     required this.query,
@@ -164,9 +164,9 @@ CombinedSearchResult combinedSearch(CombinedSearchRef ref, String query) {
     ytmManualTriggerProvider.select((Set<String> s) => s.contains(query)),
   );
 
-  // Auto-fire YT only after the library half has resolved as empty.
-  // (If library is still loading, we don't pre-fire YT — we wait so we
-  // don't burn YouTube-Music quota on every keystroke that's about to land
+  // Auto-fire the online search only after the library half has resolved as
+  // empty. (If library is still loading, we don't pre-fire it — we wait so
+  // we don't burn online-search quota on every keystroke that's about to land
   // in the local library.)
   final bool shouldFireYtm =
       query.trim().isNotEmpty && (libraryEmpty || manuallyTriggered);

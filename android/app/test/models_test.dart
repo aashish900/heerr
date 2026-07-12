@@ -192,7 +192,7 @@ void main() {
         sourceUrl: 'https://www.youtube.com/watch?v=test',
         sourceType: ContentType.song,
         state: JobState.failed,
-        error: 'spotdl exited 1',
+        error: 'download tool exited 1',
         createdAt: DateTime.utc(2026, 6, 9, 10),
         startedAt: DateTime.utc(2026, 6, 9, 10),
         finishedAt: DateTime.utc(2026, 6, 9, 10, 0, 5),

@@ -535,7 +535,7 @@ void main() {
     );
 
     testWidgets(
-      'library hits render with the "On YouTube Music" manual button',
+      'library hits render with the "Online results" manual button',
       (WidgetTester tester) async {
         const Song s = Song(
           id: 'so-1',
@@ -562,16 +562,16 @@ void main() {
         // Library section + song title rendered.
         expect(find.text('In your library'), findsOneWidget);
         expect(find.text('Let It Happen'), findsOneWidget);
-        // YT section header + manual button rendered.
-        expect(find.text('On YouTube Music'), findsOneWidget);
-        expect(find.text('Search more on YouTube Music'), findsOneWidget);
+        // Online section header + manual button rendered.
+        expect(find.text('Online results'), findsOneWidget);
+        expect(find.text('Search online'), findsOneWidget);
         // No YT results yet.
         expect(find.byType(ResultTile), findsNothing);
       },
     );
 
     testWidgets(
-      'tapping "Search more on YouTube Music" reveals the YT results',
+      'tapping "Search online" reveals the online results',
       (WidgetTester tester) async {
         const Song s = Song(
           id: 'so-1',
@@ -608,13 +608,13 @@ void main() {
         await tester.pumpAndSettle();
 
         // Button is showing before tap.
-        expect(find.text('Search more on YouTube Music'), findsOneWidget);
+        expect(find.text('Search online'), findsOneWidget);
 
-        await tester.tap(find.text('Search more on YouTube Music'));
+        await tester.tap(find.text('Search online'));
         await tester.pumpAndSettle();
 
-        // Button gone, YT result tile present.
-        expect(find.text('Search more on YouTube Music'), findsNothing);
+        // Button gone, online result tile present.
+        expect(find.text('Search online'), findsNothing);
         expect(find.text('Let It Happen (Live)'), findsOneWidget);
       },
     );
@@ -654,8 +654,8 @@ void main() {
         // Library section shows "Not in your library." copy.
         expect(find.text('In your library'), findsOneWidget);
         expect(find.text('Not in your library.'), findsOneWidget);
-        // YT section auto-fired (no manual button).
-        expect(find.text('Search more on YouTube Music'), findsNothing);
+        // Online section auto-fired (no manual button).
+        expect(find.text('Search online'), findsNothing);
         expect(find.text('Brand New Song'), findsOneWidget);
       },
     );

@@ -19,7 +19,7 @@ void main() {
       home: Scaffold(
         body: EmptyState(
           icon: Icons.search,
-          title: 'Search Spotify',
+          title: 'Search library',
           subtitle: 'Tracks, albums, or playlists',
         ),
       ),

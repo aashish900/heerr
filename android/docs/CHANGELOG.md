@@ -69,13 +69,13 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
 
 - New `android/app/build.yaml` — global `json_serializable` config (`field_rename: snake`, `explicit_to_json: true`, `include_if_null: false`). Single source of truth for the Dart-camelCase ↔ wire-snake_case mapping; no per-field `@JsonKey` annotations needed.
 - New `android/app/lib/models/`:
-  - `enums.dart` — `SpotifyType` (`track`/`album`/`playlist`) + `JobState` (`queued`/`running`/`done`/`failed`) with `@JsonValue('…')` for each variant. `JobStateX.isTerminal` extension exposes the polling-stop condition for the job-detail screen at D3.
+  - `enums.dart` — `SourceType` (`track`/`album`/`playlist`) + `JobState` (`queued`/`running`/`done`/`failed`) with `@JsonValue('…')` for each variant. `JobStateX.isTerminal` extension exposes the polling-stop condition for the job-detail screen at D3.
   - `search_request.dart` — `SearchRequest({query, type, limit=20})`.
-  - `search_result_item.dart` — `SearchResultItem({spotifyUri, spotifyUrl, title, artist, album?, durationMs?, coverUrl?, alreadyDownloaded, activeJobId?})`.
+  - `search_result_item.dart` — `SearchResultItem({sourceUri, sourceUrl, title, artist, album?, durationMs?, coverUrl?, alreadyDownloaded, activeJobId?})`.
   - `search_response.dart` — `SearchResponse({results})`.
-  - `download_request.dart` — `DownloadRequest({spotifyUri})`.
+  - `download_request.dart` — `DownloadRequest({sourceUri})`.
   - `download_response.dart` — `DownloadResponse({jobId, state, deduped})`.
-  - `job_view.dart` — `JobView({jobId, spotifyUri, spotifyType, state, progress?, error?, outputPath?, createdAt, startedAt?, finishedAt?})`. `progress` is reserved by the backend (always `null` in v1).
+  - `job_view.dart` — `JobView({jobId, sourceUri, sourceType, state, progress?, error?, outputPath?, createdAt, startedAt?, finishedAt?})`. `progress` is reserved by the backend (always `null` in v1).
   - `queue_response.dart` — `QueueResponse({active, recent})`.
 - Codegen: `dart run build_runner build --delete-conflicting-outputs` produced 21 outputs (7×`*.freezed.dart` + 7×`*.g.dart` + supporting). Verified by re-running `flutter analyze` (no issues) and `flutter test` (17/17 passing: 12 new model tests + 5 router tests from A2).
 - New `android/app/test/models_test.dart` — 12 tests covering:
@@ -88,7 +88,7 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
   - `JobState.isTerminal` table-driven check (done/failed terminal; queued/running not).
 - **Drift correction (per `/CLAUDE.md` staleness rule).** The planning round's `android/docs/PLAN.md` §3 had several drifts vs the actual backend schemas in `backend/app/schemas/`:
   - `SearchResponse` had `{type, items}` — backend returns `{results}` (no envelope type field).
-  - `SearchResultItem` had `name`/`thumbnailUrl` — backend uses `title`/`cover_url`, and PLAN missed `spotify_url`.
+  - `SearchResultItem` had `name`/`thumbnailUrl` — backend uses `title`/`cover_url`, and PLAN missed `source_url`.
   - `JobView` had `id`/`error_msg`/`attempt_count`/`owner_label` — backend uses `job_id`/`error`, and `attempt_count`/`owner_label` are NOT in the wire shape (they live in the DB but aren't exposed in `JobView`). PLAN also missed `progress` (reserved, always null in v1).
   - PLAN's §3 is now rewritten to match the implemented Dart models (which match the backend exactly). PLAN §2's model-file list updated to reflect the real `lib/models/` layout (added `enums.dart`, renamed `search_result.dart` → `search_result_item.dart`).
 - Verification (green-before + green-after per `CLAUDE.md`): `flutter analyze` → no issues; `flutter test` → 17/17 pass.
@@ -160,9 +160,9 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
 ## 2026-06-09 — C1: search providers
 
 - New `android/app/lib/providers/search.dart`:
-  - `typedef SearchQueryState = ({String query, SpotifyType type})` — Dart 3 record for the search-bar state. Free `==`, no codegen.
+  - `typedef SearchQueryState = ({String query, SourceType type})` — Dart 3 record for the search-bar state. Free `==`, no codegen.
   - `searchDebounceProvider` (Riverpod, `keepAlive: true`) returns `Duration` — default `300ms`. Exposed as its own provider so tests override to `Duration.zero` for the simple cases and to a short real duration only when verifying cancellation timing.
-  - `SearchQuery` (`@Riverpod(keepAlive: true) class … extends _$SearchQuery`) — `Notifier<SearchQueryState>`. `keepAlive: true` because the user's last query should survive a tab switch (Search → Queue → Search). Exposes `setQuery(String)` and `setType(SpotifyType)` mutators that preserve the other field.
+  - `SearchQuery` (`@Riverpod(keepAlive: true) class … extends _$SearchQuery`) — `Notifier<SearchQueryState>`. `keepAlive: true` because the user's last query should survive a tab switch (Search → Queue → Search). Exposes `setQuery(String)` and `setType(SourceType)` mutators that preserve the other field.
   - `searchResults` (`@riverpod Future<SearchResponse>`) — depends on `searchQueryProvider` and `dioClientProvider`. Empty query (incl. whitespace-only) short-circuits to `SearchResponse(results: [])` without touching the network. Non-empty:
     1. Register `CancelToken` via `ref.onDispose(cancelToken.cancel)` — fires when the user retypes (provider invalidates → autoDispose tears down the old ref).
     2. `await Future.delayed(debounce)`.
@@ -187,10 +187,10 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
   - `Opacity(0.5)` wrapper when `alreadyDownloaded` is true. Tap-to-download dispatch lands at D1; until then the trailing slot is information-only.
 - New `android/app/lib/screens/search_screen.dart` — replaces the A2 stub with a real `ConsumerStatefulWidget`:
   - `TextField` with `controller: TextEditingController(text: ref.read(searchQueryProvider).query)` initialised once in `initState` — so the user's last query survives a Search → Queue → Search tab round-trip (paired with `keepAlive: true` on `searchQueryProvider`). `onChanged` forwards every keystroke to `setQuery`; debouncing lives in the provider per C1.
-  - `SegmentedButton<SpotifyType>` for the Tracks/Albums/Playlists toggle; `onSelectionChanged` calls `setType`. Single-select (`SegmentedButton.selected` is a `Set<SpotifyType>` of size 1).
-  - `Expanded` body driven by `searchResultsProvider.when(loading, error, data)`. Empty query → "Type to search Spotify" hint; empty results → "No results"; `ApiError` → its `message`; populated → `ListView.builder` of `ResultTile`s.
+  - `SegmentedButton<SourceType>` for the Tracks/Albums/Playlists toggle; `onSelectionChanged` calls `setType`. Single-select (`SegmentedButton.selected` is a `Set<SourceType>` of size 1).
+  - `Expanded` body driven by `searchResultsProvider.when(loading, error, data)`. Empty query → "Type to search" hint; empty results → "No results"; `ApiError` → its `message`; populated → `ListView.builder` of `ResultTile`s.
 - New `android/app/test/screens/search_screen_test.dart` — 10 widget tests:
-  1. Initial state (empty query) shows the "Type to search Spotify" hint and zero `ResultTile`s.
+  1. Initial state (empty query) shows the "Type to search" hint and zero `ResultTile`s.
   2. Loading state shows a `CircularProgressIndicator`.
   3. Non-empty query + results renders a `ResultTile` per item, the right title/artist text, the `artist • album` subtitle when album is present, and the `download_done` badge on the `alreadyDownloaded` row.
   4. Non-empty query with empty results shows "No results".
@@ -204,14 +204,14 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
 
 ## 2026-06-09 — D1: Download dispatch from result tile
 
-- New `android/app/lib/providers/download.dart` — `DownloadDispatcher` (`@Riverpod(keepAlive: true) class … extends _$DownloadDispatcher`). State is `Set<String>` (in-flight `spotify_uri`s). The single mutator `dispatch(String spotifyUri)`:
+- New `android/app/lib/providers/download.dart` — `DownloadDispatcher` (`@Riverpod(keepAlive: true) class … extends _$DownloadDispatcher`). State is `Set<String>` (in-flight `source_uri`s). The single mutator `dispatch(String sourceUri)`:
   1. Adds the URI to `state` (so any widget watching `state.contains(uri)` sees a transition to `true`).
   2. `await ref.read(dioClientProvider.future)` → `apiCall<DownloadResponse>(dio.post(/download, …))` reusing B2's typed-error pipeline.
   3. `finally` removes the URI from `state` — guarantees the tile becomes responsive again whether dispatch succeeded or threw `ApiError`.
   - `keepAlive: true` so the in-flight set survives screen rebuilds (typing in the search box rebuilds the result list; we don't want a tile spinner to flicker off mid-flight).
 - Modified `android/app/lib/widgets/result_tile.dart` — `ResultTile` is now a `ConsumerWidget`:
   - Accepts optional `VoidCallback? onTap`.
-  - Watches `downloadDispatcherProvider.select(s => s.contains(item.spotifyUri))` so only its own URI's transitions cause a rebuild — not the whole list when any one tile flips.
+  - Watches `downloadDispatcherProvider.select(s => s.contains(item.sourceUri))` so only its own URI's transitions cause a rebuild — not the whole list when any one tile flips.
   - Trailing slot is now a 3-way `_Trailing`: spinner (`SizedBox(24×24, CircularProgressIndicator(strokeWidth: 2))`) when in-flight → `Icons.download_done` when `alreadyDownloaded` → `Icons.download_outlined` otherwise (replaces C2's "no trailing when not downloaded" — the outline icon advertises tap-to-queue affordance).
   - `onTap` is wired to `ListTile.onTap` only when `onTap != null && !inFlight && !item.alreadyDownloaded` — prevents double-firing and matches the dimmed-disabled visual on already-downloaded rows.
 - Modified `android/app/lib/screens/search_screen.dart`:
@@ -220,13 +220,13 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
   - New top-level `_dispatchDownload(BuildContext, WidgetRef, SearchResultItem)` captures the `ScaffoldMessenger` before the await, awaits `dispatch(uri)`, then shows one of: `"Queued"` (deduped == false), `"Already downloaded"` (deduped == true), or `ApiError.message` on catch. `hideCurrentSnackBar()` runs before each show so rapid taps don't queue up snackbars.
 - New `android/app/test/providers/download_test.dart` — 5 unit tests:
   - Initial state: in-flight set is empty.
-  - Happy path: dispatch POSTs `/download` with `{spotify_uri: …}` body; response parsed into `DownloadResponse{jobId, state, deduped}`.
+  - Happy path: dispatch POSTs `/download` with `{source_uri: …}` body; response parsed into `DownloadResponse{jobId, state, deduped}`.
   - Deduped response is surfaced through `DownloadResponse.deduped`.
   - In-flight set membership transitions empty → {uri} → empty across a gated dispatch; observed via `c.listen(downloadDispatcherProvider, …)` history list.
   - 4xx response throws typed `UnauthorizedError`; finally-block still clears the URI from the in-flight set.
   - Concurrent dispatches for two URIs are both tracked simultaneously and clear independently as each completes.
 - Search-screen widget tests extended — 5 new tests under `group('D1 — tap dispatches /download')`:
-  - non-deduped (HTTP 202, `deduped: false`) → asserts `POST /download` with `spotify_uri` body + "Queued" snackbar text rendered.
+  - non-deduped (HTTP 202, `deduped: false`) → asserts `POST /download` with `source_uri` body + "Queued" snackbar text rendered.
   - deduped (`deduped: true`) → "Already downloaded" snackbar.
   - 401 response → snackbar shows the mapped `ApiError.message` ("token revoked").
   - Mid-flight (gated `Completer` response): tapping shows a `CircularProgressIndicator` on the row; completing the gate clears it.
@@ -251,7 +251,7 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
     - error → centered `ApiError.message` (or `'Error: $e'`).
     - data + both lists empty → "No jobs yet".
     - data + non-empty → `RefreshIndicator` wrapping a `ListView` with two `_SectionHeader`s ("Active" / "Recent") and one `_JobTile` per `JobView`. Sections are only rendered when non-empty.
-  - `_JobTile`: monospace `spotifyUri` title (ellipsis), "job <8-char-id-prefix>" subtitle, trailing `StatusPill`. Tap-to-detail lands at D3.
+  - `_JobTile`: monospace `sourceUri` title (ellipsis), "job <8-char-id-prefix>" subtitle, trailing `StatusPill`. Tap-to-detail lands at D3.
 - New `android/app/test/providers/queue_test.dart` — 6 unit tests (fake_async based):
   - Initial fetch fires `GET /queue` once; response parsed (real `await` outside fake_async).
   - Periodic polling: 3 ticks observed at `t = 0 / 3s / 6s` against a `_CountingAdapter`.
@@ -281,7 +281,7 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
   - `JobStateX.isTerminal` (`done` or `failed`) is the gate.
 - New `android/app/lib/screens/job_detail_screen.dart`:
   - `ConsumerWidget`. Watches `jobStatusProvider(jobId)`. `.when(loading, error, data)` → spinner / `ApiError.message` / `_JobBody`.
-  - `_JobBody` is a scrollable `ListView` containing: header row (`StatusPill` + spotify type), then `_Field` rows for `spotify uri`, `job id`, `_TimestampField`s for `created` (always), `started` (when non-null), `finished` (when non-null), an `_Field` for `output_path` (when present), and an `_ErrorField` (when `error` non-null).
+  - `_JobBody` is a scrollable `ListView` containing: header row (`StatusPill` + source type), then `_Field` rows for `source uri`, `job id`, `_TimestampField`s for `created` (always), `started` (when non-null), `finished` (when non-null), an `_Field` for `output_path` (when present), and an `_ErrorField` (when `error` non-null).
   - `_Field`: label + value, with optional copy-to-clipboard `InkWell` that calls `Clipboard.setData` and shows a `Copied <label>` snackbar.
   - `_TimestampField`: relative ("5m ago") + absolute (`toIso8601String`) lines. `_relative` helper handles seconds/minutes/hours/days; no intl dep needed for the v1 thin client.
   - `_ErrorField`: M3 `errorContainer` background, `error_outline` icon, message text in `onErrorContainer`.
@@ -301,7 +301,7 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
   - `failed` is also terminal → no further ticks.
 - New `android/app/test/screens/job_detail_screen_test.dart` — 6 widget tests:
   - AppBar shows "Job <short-id>"; loading shows `CircularProgressIndicator`.
-  - Full body for a running job: `StatusPill`, label, spotify uri, full job id, relative timestamps ("Xm ago").
+  - Full body for a running job: `StatusPill`, label, source uri, full job id, relative timestamps ("Xm ago").
   - `output_path` rendered + tap → `Clipboard.setData` invoked + "Copied output path" snackbar. Clipboard verified via `TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, …)` capturing `Clipboard.setData` calls.
   - Failed job → error container with `error_outline` icon + the error message.
   - Provider error path → renders `ApiError.message` ("cannot reach backend — check tailscale").
@@ -318,7 +318,7 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
     - 401 `UnauthorizedError` → "auth failed — re-paste your token"
     - 403 `ForbiddenError` → "this token cannot {action}" when caller passed an `action` verb; falls back to `detail` or "insufficient scope" otherwise
     - 422 `UnprocessableError` → backend `detail` (or "invalid request" fallback)
-    - 503 `RateLimitedError` → "Spotify rate-limited — retry in {Ns}", `SnackBar.duration` clamped to `[2, 10]s` so a long Retry-After doesn't pin the snackbar on screen
+    - 503 `RateLimitedError` → "Upstream rate-limited — retry in {Ns}", `SnackBar.duration` clamped to `[2, 10]s` so a long Retry-After doesn't pin the snackbar on screen
     - `NetworkError` → "cannot reach backend — check Tailscale"
     - `HttpStatusError` → "{code}: {detail}" (or "{code}: request failed")
   - `showApiError(BuildContext, ApiError, {action})` — wraps the pure builder with `ScaffoldMessenger` side effects: hides any current snackbar, shows the new one, and for `UnauthorizedError` additionally posts a `Future.microtask` that calls `GoRouter.of(context).go(Routes.settings)`. The redirect is gated on `GoRouter.maybeOf(context) != null` so widget-level tests that mount a single screen without a router don't crash.
@@ -347,7 +347,7 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
   - `SkeletonList({count})` — `ListView.builder` of `count` `SkeletonTile`s.
 - Modified `android/app/lib/screens/search_screen.dart` `_Body`:
   - `loading` branch → `SkeletonList(count: 6)` (was `CircularProgressIndicator`).
-  - Empty-query data branch → `EmptyState(icon: search, title: 'Search Spotify', subtitle: 'Tracks, albums, or playlists')` (was the centered text "Type to search Spotify").
+  - Empty-query data branch → `EmptyState(icon: search, title: 'Search', subtitle: 'Tracks, albums, or playlists')` (was the centered text "Type to search").
   - Empty-results data branch → `EmptyState(icon: search_off, title: 'No results', subtitle: 'Try a different query')`.
 - Modified `android/app/lib/screens/queue_screen.dart`:
   - `loading` → `SkeletonList(count: 4)`.
@@ -356,7 +356,7 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
   - `loading` → `_JobDetailSkeleton` — column of `SkeletonBox`es laid out to match the detail body's shape (status-pill placeholder + 3 label/value pairs). Visually telegraphs the structure the user is about to see.
 - Updated existing screen tests:
   - `search_screen_test` loading test now asserts `SkeletonList` + `SkeletonTile`s (was `CircularProgressIndicator`).
-  - `search_screen_test` "empty query" test now asserts `EmptyState` + the "Search Spotify" text **scoped under the EmptyState** (the TextField's `labelText` also reads "Search Spotify" so the unscoped `find.text` matched twice).
+  - `search_screen_test` "empty query" test now asserts `EmptyState` + the "Search" text **scoped under the EmptyState** (the TextField's `labelText` also reads "Search" so the unscoped `find.text` matched twice).
   - `search_screen_test` "no results" test asserts the `EmptyState` widget.
   - `queue_screen_test` loading/empty tests assert `SkeletonList`/`EmptyState`.
   - `job_detail_screen_test` loading test asserts `SkeletonBox`es.
@@ -390,7 +390,7 @@ Per-task change log. Newest at the bottom. Append-only; never edit prior entries
 - **`android/app/android/app/src/main/AndroidManifest.xml`** — added `android:usesCleartextTraffic="true"` to `<application>`. Android API 28+ blocks plain HTTP by default, which made every dio request fail as a `NetworkError` ("cannot reach backend — check Tailscale") even though `curl` over Tailscale worked fine. The backend is reached as `http://<tailscale-ip>:8000/api/v1` (no TLS — Tailscale already provides authenticated transport between tailnet peers, see `/CLAUDE.md` §3 "Connectivity is Tailscale only"), so cleartext over the tailnet is the intended posture.
 - Manual smoke verified end-to-end on the Pixel 7 (Android 16) against the live home server (Tailscale IP `100.106.120.121`, backend port 8000):
   1. Settings: pasted URL + admin bearer token, "Test connection" → "Connection OK" snackbar.
-  2. Search: query returned Spotify results with thumbnails and the type toggle behaved.
+  2. Search: query returned online results with thumbnails and the type toggle behaved.
   3. Dispatch: tap a result → backend accepted `/download`, snackbar fired.
   4. Queue + Job detail screens polled correctly through `queued → running → done`.
   5. File landed in `/data/media/music/...` on the home server; Navidrome indexed within ~1 min.
@@ -401,20 +401,20 @@ Android roadmap (A1–G1) complete.
 
 ## 2026-06-10 — display_name shown in queue + job detail
 
-Queue and job-detail screens now show human-readable labels ("Imagine — John Lennon", "Currents — Tame Impala", playlist names) instead of the raw `spotify:…:id` URI. Computed client-side from the search result and passed to `POST /download` for backend persistence.
+Queue and job-detail screens now show human-readable labels ("Imagine — John Lennon", "Currents — Tame Impala", playlist names) instead of the raw source URI. Computed client-side from the search result and passed to `POST /download` for backend persistence.
 
 - **`android/app/lib/models/download_request.dart`** — added optional `displayName`. Generated `toJson` omits the key when null, so old-shape requests are still valid wire-compatible bodies.
 - **`android/app/lib/models/job_view.dart`** — added optional `displayName` mirroring backend `JobView.display_name`.
-- **`android/app/lib/providers/download.dart`** — `dispatch(spotifyUri, {displayName})` named-arg signature.
+- **`android/app/lib/providers/download.dart`** — `dispatch(sourceUri, {displayName})` named-arg signature.
 - **`android/app/lib/screens/search_screen.dart`** — new `_displayNameFor(item)` helper formats `"{title} — {artist}"` for tracks/albums and `"{title}"` for playlists (their `artist` field carries the owner, not a musical artist).
 - **`android/app/lib/screens/queue_screen.dart`** — `_JobTile` renders `displayName` in the body font when present; falls back to monospace URI for legacy jobs (display_name is null on rows created before the upgrade).
 - **`android/app/lib/screens/job_detail_screen.dart`** — `_JobBody` shows the display name as a `titleLarge` heading above the technical fields when present.
 - **Tests:** updated `test/models_test.dart` (DownloadRequest two-case round-trip, JobView payload), `test/providers/download_test.dart` (asserts new dispatch signature + body), `test/screens/search_screen_test.dart` (asserts the formatted display_name in the POST body), `test/screens/settings_screen_test.dart` rewritten to target the new SettingsScreen → ServersScreen navigation (the prior tests targeted the inline URL/token form which moved to ServersScreen earlier today). Suite: 111 passing.
 
-## 2026-06-10 — Post-roadmap: display_name + YTMusic swap
+## 2026-06-10 — Post-roadmap: display_name + online-search swap
 
 - **display_name in queue/job-detail** (v0.1.x): `DownloadRequest` gained optional `display_name`; `JobView` gained `displayName`. Queue and job-detail screens show "Song — Artist" instead of the raw URI. `_displayNameFor(item)` helper computes the label from search result fields.
-- **YTMusic search swap** (v0.2.0): Replaced `SpotifyType` enum with `ContentType` (`song/album/playlist`). `SearchResultItem.spotifyUri/spotifyUrl` → `sourceUrl/sourceType`. `DownloadRequest.spotifyUri` → `sourceUrl + sourceType`. `JobView.spotifyUri/spotifyType` → `sourceUrl/sourceType`. Search screen label updated to "Search YouTube Music". `SegmentedButton` now shows Songs/Albums/Playlists. `_displayNameFor` uses `sourceType` instead of parsing the old URI prefix. All 111 tests updated and passing.
+- **Online-search swap** (v0.2.0): Replaced the old brand-named type enum with `ContentType` (`song/album/playlist`). The old brand-named URI/URL fields on `SearchResultItem`, `DownloadRequest`, and `JobView` were renamed to `sourceUrl`/`sourceType`. Search screen label updated to "Search online". `SegmentedButton` now shows Songs/Albums/Playlists. `_displayNameFor` uses `sourceType` instead of parsing the old URI prefix. All 111 tests updated and passing.
 - **AndroidManifest fix** (G1): `android:usesCleartextTraffic="true"` added — Android API 28+ blocks plain HTTP; backend is reached over Tailscale as `http://` so cleartext is required.
 
 ## 2026-06-11 — H1: Subsonic auth client + Settings extension + "Test Navidrome"
@@ -453,7 +453,7 @@ Second milestone of `ROADMAP_STREAMER.md`. Adds the freezed models for every Sub
   - `library_album.dart` — `libraryAlbumProvider(id)` family → `Future<Album>` via `getAlbum.view?id=…`.
   - `library_playlists.dart` — `libraryPlaylistsProvider` → `Future<List<Playlist>>` via `getPlaylists.view`. Empty-library tolerant.
   - `library_playlist.dart` — `libraryPlaylistProvider(id)` family → `Future<Playlist>` via `getPlaylist.view?id=…`.
-  - `library_search.dart` — `librarySearchProvider(query)` family → `Future<SearchResult3>` via `search3.view?query=…`. Debounced 300ms via the existing `searchDebounceProvider`. Empty / whitespace-only queries short-circuit to `const SearchResult3()` without firing a request. In-flight requests are cancelled when the query changes via a `CancelToken` tied to `ref.onDispose` (mirrors the existing YouTube-Music `searchResultsProvider`).
+  - `library_search.dart` — `librarySearchProvider(query)` family → `Future<SearchResult3>` via `search3.view?query=…`. Debounced 300ms via the existing `searchDebounceProvider`. Empty / whitespace-only queries short-circuit to `const SearchResult3()` without firing a request. In-flight requests are cancelled when the query changes via a `CancelToken` tied to `ref.onDispose` (mirrors the existing online-search `searchResultsProvider`).
 - **Test fixtures** (`android/app/test/fixtures/subsonic/`): six synthetic-but-realistic JSON payloads (`get_artists.json`, `get_artist.json`, `get_album.json`, `get_playlists.json`, `get_playlist.json`, `search3.json`) modelled after the Subsonic API docs and Navidrome's response shape. Fixtures were hand-written rather than captured from the live Navidrome — a real-server capture pass can be added once the implementation is end-to-end smoke-tested at K2, replacing or augmenting these.
 - **Tests:**
   - `android/app/test/models/subsonic_models_test.dart` — 9 cases. Round-trip `fromJson(toJson(x)) == x` for `Song`, `ArtistIndex`, `Album` (3 songs), `Artist` (2 albums), `Playlist` (2 entries), `SearchResult3` (all three sections); empty-list-default cases for `album.song`, `artist.album`, `search.{artist,album,song}`; explicit camelCase-survival test for `Song`'s 6 annotated fields.
@@ -463,7 +463,7 @@ Second milestone of `ROADMAP_STREAMER.md`. Adds the freezed models for every Sub
 
 ## 2026-06-11 — I1: Library tab + Artists / Albums / Playlists screens (+ drop Search tab)
 
-First milestone of Phase I (Library tab + combined search) and the largest UI change since A2 (the original shell scaffold). Replaces the standalone YouTube-Music Search tab with a Library tab driven by Subsonic. Bottom nav goes from `Search · Queue · Settings` to `Library · Queue · Settings`. Combined search (library + YouTube Music fallback) is **deferred to I2** — at I1 the Library tab is browse-only with no search field.
+First milestone of Phase I (Library tab + combined search) and the largest UI change since A2 (the original shell scaffold). Replaces the standalone online-search Search tab with a Library tab driven by Subsonic. Bottom nav goes from `Search · Queue · Settings` to `Library · Queue · Settings`. Combined search (library + online-search fallback) is **deferred to I2** — at I1 the Library tab is browse-only with no search field.
 
 - **Bottom nav restructure** (`android/app/lib/router.dart`):
   - `/` is now the Library route (was the Search route). Initial location updated to match.
@@ -488,14 +488,14 @@ First milestone of Phase I (Library tab + combined search) and the largest UI ch
   - `test/screens/library/library_screen_test.dart` — 8 cases. Artists tab: loading / empty / data (asserts group letter + tile) / error. Albums sub-tab swipe → data / empty. Playlists sub-tab swipe → data / empty. Non-focal tabs stubbed with empty-data so they don't fire real requests.
   - `test/screens/library/{artist,album,playlist}_detail_screen_test.dart` — 4 cases each (loading / empty / data / error). Album-detail's data test asserts both header content (artist, year) and a song-tile m:ss conversion (`467s → 7:47`, `108s → 1:48`).
 - **Test gate:** `dart run build_runner build --delete-conflicting-outputs` clean (1 new `.g.dart` for the new provider). `flutter analyze` clean (the 3 pre-existing `queue_screen.dart` infos predate H1). `flutter test` **167/167** pass (was 159 after H2: +20 new I1 tests, –12 from the deleted `search_screen_test.dart` for a net `+8` — actual count is 159 + 8 = 167).
-- **ADR appended:** "Combined library + YouTube Music search; standalone Search tab removed" (`DECISIONLOG.md`).
+- **ADR appended:** "Combined library + online search; standalone Search tab removed" (`DECISIONLOG.md`).
 - `pubspec.yaml` version bump: `0.3.1+2` → `0.3.2+3`.
 
 ## 2026-06-11 — I2: Combined search inside Library tab (library-first + YT fallback + reactive promotion)
 
-Second I-phase milestone. Wires the search field into the Library tab AppBar and orchestrates two sources — Subsonic `search3` (local library) and the existing heerr-backend YouTube-Music search — behind a single combined-search provider. The YT half is gated: it auto-fires when the library half comes back empty (so the user instantly sees a downloadable fallback) and is manual-button-gated otherwise (so non-empty library searches don't burn YouTube-Music quota on every keystroke). Reactive promotion closes the loop: when a download completes, the library half re-fetches after a 60s Navidrome-reindex grace, and the song auto-moves from the YT section into the library section.
+Second I-phase milestone. Wires the search field into the Library tab AppBar and orchestrates two sources — Subsonic `search3` (local library) and the existing heerr-backend online search — behind a single combined-search provider. The online half is gated: it auto-fires when the library half comes back empty (so the user instantly sees a downloadable fallback) and is manual-button-gated otherwise (so non-empty library searches don't burn online-search quota on every keystroke). Reactive promotion closes the loop: when a download completes, the library half re-fetches after a 60s Navidrome-reindex grace, and the song auto-moves from the online-results section into the library section.
 
-- **YouTube-Music search provider refactor** (`android/app/lib/providers/search.dart`):
+- **Online-search provider refactor** (`android/app/lib/providers/search.dart`):
   - `searchResultsProvider` renamed to **`ytmSearchProvider`** and converted from a singleton (reading state from `searchQueryProvider`) to a **family keyed by `String query`**. Lets the combined-search orchestrator pull a specific query's YT result by family-key rather than via a shared SearchQuery notifier. Content type is fixed to `ContentType.song` (no longer toggleable — the Library combined search is song-focused; if we ever want album/playlist YT search inside Library, lift the type into the family key).
   - `SearchQuery` + `SearchQueryState` notifier deleted. Sole consumer was the now-removed standalone Search tab.
   - `searchDebounceProvider` (300ms default) kept — still wraps both source providers' debounce.
@@ -503,7 +503,7 @@ Second I-phase milestone. Wires the search field into the Library tab AppBar and
   - `@Riverpod(keepAlive: true)` notifier holding the Library search field's current text. Set via `set(String)`, cleared via `clear()`. Survives tab switches (Library → Queue → Library) so a half-typed query isn't dropped.
 - **New `combinedSearchProvider(query)`** (`android/app/lib/providers/library/combined_search.dart`):
   - Family-keyed `@riverpod` (auto-dispose) returning a `CombinedSearchResult` struct (`{query, library: AsyncValue<SearchResult3>, ytm: AsyncValue<SearchResponse>?}`).
-  - Always `ref.watch`'s `librarySearchProvider(query)`. Watches `ytmSearchProvider(query)` only when **(a)** the library half resolved as empty, OR **(b)** the user has tapped "Search more on YouTube Music" for this query (tracked in the new `ytmManualTriggerProvider`, a keepAlive `Set<String>`).
+  - Always `ref.watch`'s `librarySearchProvider(query)`. Watches `ytmSearchProvider(query)` only when **(a)** the library half resolved as empty, OR **(b)** the user has tapped "Search online" for this query (tracked in the new `ytmManualTriggerProvider`, a keepAlive `Set<String>`).
   - **Reactive promotion:** seeds a `Set<String> seenDoneJobIds` from `ref.read(queueProvider)` at build time, then `ref.listen<AsyncValue<QueueResponse>>(queueProvider, ...)` for new `state == done` transitions. Each newly-done job schedules a `Timer(kReindexGrace, () => ref.invalidate(librarySearchProvider(query)))`. All pending timers are cancelled via `ref.onDispose`. Re-seeding existing done jobs (rather than blindly invalidating on the first `ref.listen` callback) prevents the orchestrator from firing 60s timers for downloads that finished long before the user even searched.
   - Reindex grace is exposed as `reindexGraceProvider` (default 60s) so tests can shrink it.
 - **Library AppBar + combined results screen** (`android/app/lib/screens/library/library_screen.dart`):
@@ -512,7 +512,7 @@ Second I-phase milestone. Wires the search field into the Library tab AppBar and
   - Tapping the search icon swaps the AppBar title for a `TextField` (autofocus + close-icon clear). The body becomes the combined-results view, driven by `combinedSearchProvider(query)`.
   - Combined-results layout:
     - **"In your library"** section: when library has hits, renders three subsections (Songs / Albums / Artists) using `LibraryResultTile`. Library Song tap pushes the song's album route (J2 will replace this with a play call); Album/Artist tiles tap-navigate to their existing detail screens. When library is empty, renders "Not in your library." copy.
-    - **"On YouTube Music"** section: renders a `FilledButton.tonal` ("Search more on YouTube Music") when library has results AND the user hasn't manually triggered yet. When auto-fired (empty library) or manually triggered, renders the YT results using the existing `ResultTile` widget; tile tap → `downloadDispatcherProvider.dispatch(...)` + snackbar.
+    - **"Online results"** section: renders a `FilledButton.tonal` ("Search online") when library has results AND the user hasn't manually triggered yet. When auto-fired (empty library) or manually triggered, renders the online results using the existing `ResultTile` widget; tile tap → `downloadDispatcherProvider.dispatch(...)` + snackbar.
   - Both library + YT empty (auto-fire case) → single `EmptyState` ("No matches"). Library loading → `SkeletonList`. Library error → centered error text.
   - Back arrow in search-mode AppBar exits search-mode and clears the query.
 - **Tests:**
@@ -753,7 +753,7 @@ Seven manual on-device steps against the live home server (full log: `android/do
 3. Playback — tap-to-play, scrubber, skip-next, notification pause/resume, lock-screen controls all work.
 4. Combined search (library hit) — library results render, YT auto-fire suppressed, "Search more" button present.
 5. Combined search (library miss → YT fallback) — library empty + YT auto-fires + tap YT result → "queued" snackbar.
-6. Combined search (manual YT) — "Search more on YouTube Music" button renders YT results below library section.
+6. Combined search (manual online) — "Search online" button renders online results below library section.
 7. Reactive promotion — done download appears in "In your library" within ~60s without re-typing.
 
 All seven passed.
@@ -1125,12 +1125,12 @@ Pure data-layer milestone. Adds the `seedCollectionProvider` that the recommenda
 - Added `SubsonicEndpoints.getStarred2 = '/rest/getStarred2.view'` with a doc comment naming the N2 consumer.
 
 ### `android/app/lib/models/seed_track.dart` (new)
-- Freezed model `SeedTrack { title, artist, sourceUrl? }`. Field names + `@JsonKey(name: 'source_url')` mirror the backend's `RecommendSeed` schema so the same model serialises as the `POST /api/v1/recommend` request body without a wire-shape mapper. `sourceUrl` is reserved for future use (when seeds carry a known `music.youtube.com/watch?v=…` URL so the ytmusic backend can skip the search-resolve step) — null in v1.
+- Freezed model `SeedTrack { title, artist, sourceUrl? }`. Field names + `@JsonKey(name: 'source_url')` mirror the backend's `RecommendSeed` schema so the same model serialises as the `POST /api/v1/recommend` request body without a wire-shape mapper. `sourceUrl` is reserved for future use (when seeds carry a known `music.youtube.com/watch?v=…` URL so the backend can skip the search-resolve step) — null in v1.
 
 ### `android/app/lib/providers/recommendations.dart` (new)
 - Pure function `buildSeedCollection({starred, frequent, favourites, maxSeeds = 20})` — keeps merge rules testable without a Riverpod container:
   - Starred songs feed the list first (strongest signal of "user likes this").
-  - Frequent albums feed next — each album contributes one seed shaped as `(album.name, album.artist)`. Treats the album as a quasi-track seed; engines that need a real song title will still get useful results because Last.fm's `track.getSimilar` and ytmusicapi's `search` both tolerate album-name queries well enough at the ranking stage.
+  - Frequent albums feed next — each album contributes one seed shaped as `(album.name, album.artist)`. Treats the album as a quasi-track seed; engines that need a real song title will still get useful results because Last.fm's `track.getSimilar` and the backend's music-search integration both tolerate album-name queries well enough at the ranking stage.
   - Dedup by `(title.lower().trim(), artist.lower().trim())`.
   - Cap at `maxSeeds` (default 20 — backend ceiling is 50 with comfortable headroom).
   - Favourites fallback fires **only** when both primary sources produced zero seeds — avoids stacking Favourites on top of the starred/frequent ranking on every fetch.
@@ -1173,7 +1173,7 @@ UI-layer milestone. Adds the "For You" screen that surfaces backend recommendati
 
 ### `android/app/lib/models/recommended_track.dart` (new)
 - Freezed model mirroring the backend `RecommendResultItem` schema: `title`, `artist`, `sourceUrl` (`@JsonKey(name: 'source_url')`), nullable `score`, `inLibrary` (default `false` — hydrated at N4 by the Subsonic `search3` cross-reference).
-- `sourceUrl` is always a `music.youtube.com/watch?v=…` URL regardless of which backend engine produced the recommendation — the backend's `YTMusicResolver` flattens the wire shape. So Download dispatches through the existing `POST /download` flow with no per-engine special-casing.
+- `sourceUrl` is always a `music.youtube.com/watch?v=…` URL regardless of which backend engine produced the recommendation — the backend's source resolver flattens the wire shape. So Download dispatches through the existing `POST /download` flow with no per-engine special-casing.
 
 ### `android/app/lib/providers/recommendations.dart` (extended)
 - New `recommendationsProvider` (AsyncNotifier). `build()` reads `seedCollectionProvider`, POSTs `{seeds, limit: 20}` to `Endpoints.recommend`, parses the `results` list. Empty seeds are sent through unchanged — the ListenBrainz engine produces results purely from its own history, so an empty-seeds POST is meaningful for users running that engine; the other engines return `[]` and the screen falls back to its empty state.
@@ -1336,7 +1336,7 @@ Closes the recommendations roadmap. Adds a Settings indicator for backend engine
 
 ### O3: Quick-access grid + horizontal sections
 - `android/app/lib/widgets/home_grid_tile.dart` (new) — compact 2-col tile, 56 px square cover (left) + title (right). Used in the Home quick-access grid; tap → push album route.
-- `android/app/lib/widgets/home_section.dart` (new) — Spotify-style horizontal section: bold header + `ListView.builder(scrollDirection: Axis.horizontal)` of 140 px square cover-art cards with title + optional subtitle below. Generic — used for "Jump back in" and "Most played".
+- `android/app/lib/widgets/home_section.dart` (new) — reference-app-style horizontal section: bold header + `ListView.builder(scrollDirection: Axis.horizontal)` of 140 px square cover-art cards with title + optional subtitle below. Generic — used for "Jump back in" and "Most played".
 - `android/app/lib/screens/home/home_screen.dart` — quick-access grid (recently played; falls back to recommendations when recent is empty; full-empty state when both are empty), "Jump back in" section (recent), "Most played" section (frequent). Each section invisible when its source is empty; loading uses `SkeletonBox`; errors silent in v1.
 - `android/app/test/screens/home/home_screen_test.dart` (new) — 6 widget cases: greeting + Queue icon render; recent-albums populate the grid (capped at 6); both sections render when sources are non-empty; empty-recent → recommendation fallback grid OR empty-state; Queue-icon tap routes to /queue.
 
@@ -1436,7 +1436,7 @@ Adds an AppBar lyrics toggle on the Now Playing screen — taps swap the 240×24
 - `flutter test`: **498/498** pass (483 prior + 15 new).
 
 ### Design notes
-- **Lyrics is a per-session view choice**, not a stored preference. Backgrounding then re-foregrounding Now Playing keeps the toggle; popping the screen resets it. This matches how Spotify / Apple Music treat the lyrics overlay and avoids a "why is lyrics on for tracks that have none?" first-impression.
+- **Lyrics is a per-session view choice**, not a stored preference. Backgrounding then re-foregrounding Now Playing keeps the toggle; popping the screen resets it. This matches how popular streaming apps treat the lyrics overlay and avoids a "why is lyrics on for tracks that have none?" first-impression.
 - **No `getLyricsBySongId.view` / synced lyrics in v1.** Open-Subsonic's structured timed-lyrics extension is the future direction but Navidrome's stable release still exposes the classic plain-text endpoint. Upgrading later is a model + provider change; the screen wiring stays.
 - **Selectable text** in the data view because users do copy lyrics to share — defaulting to selectable avoids the "this app stole my long-press" friction.
 
@@ -1488,7 +1488,7 @@ Adds a session-scoped sleep timer to Now Playing. Overflow menu → Sleep timer 
 ### Design notes
 - **Plain-Dart controller, thin Riverpod adapter.** Same shape as `scrobble_controller.dart` + `scrobble_provider.dart` (N1). Unit tests don't depend on `HeerrAudioHandler` (which pulls in `just_audio`'s platform channels and can't be instantiated in `flutter test`). The Riverpod notifier handles the integration; tests of the integration would belong in an on-device smoke (P4).
 - **Session-scoped, not persisted.** A persisted sleep timer would need a "wall-clock end time" stored to disk and a restore path that compares now vs that end-time on cold start. Out of scope for v1; deferring matches user intent ("sleep timer is the gesture you make when going to sleep, not a preference").
-- **Chip-tap reopens the sheet** rather than opening a separate "edit" affordance — matches Spotify's pattern and avoids a second control surface.
+- **Chip-tap reopens the sheet** rather than opening a separate "edit" affordance — matches a common streaming-app pattern and avoids a second control surface.
 - **Custom minutes via TextField + parse.** A more polished v2 could replace with a numeric stepper / wheel picker; the TextField is the simplest input that works (numeric keyboard, integer parse, invalid entries silently dropped).
 
 ### Not done in this commit
@@ -2078,13 +2078,13 @@ analyze` clean; `flutter test` green (567 tests).
 - **`test/widget/now_playing_widget_updater_test.dart`:** added position+duration write, unknown-duration→0, and null-item clear assertions.
 - Verified: `flutter analyze` clean; widget-updater suite green (19 tests); `flutter build apk --debug` succeeds (Kotlin + resources compile). On-device add-to-home-screen verification pending. Tagged **v3.4.0** after smoke.
 
-## 2026-06-23 — Phase T (T1–T4): stream-first preview of YouTube Music results — v3.5.0
+## 2026-06-23 — Phase T (T1–T4): stream-first preview of online search results — v3.5.0
 
-Preview (stream) a YouTube-Music search result before downloading it into Navidrome. Consumes the backend Phase K `/preview/stream` proxy. Pure-client slice. ADR: `DECISIONLOG.md` 2026-06-23. Roadmap T1–T5; T5 is the on-device smoke (pending). Recommendation/home preview deferred to DEBT F3.
+Preview (stream) an online search result before downloading it into Navidrome. Consumes the backend Phase K `/preview/stream` proxy. Pure-client slice. ADR: `DECISIONLOG.md` 2026-06-23. Roadmap T1–T5; T5 is the on-device smoke (pending). Recommendation/home preview deferred to DEBT F3.
 
 - **`lib/api/endpoints.dart`** (T1) — `previewStream = '/preview/stream'` (bare path; base URL already includes `/api/v1`).
 - **`lib/player/preview_url.dart`** (new, T1) — pure `buildPreviewStreamUrl({heerrBaseUrl, sourceUrl, token})` → absolute proxy URL, both params percent-encoded via `Uri`. Bearer rides in `?token=` (just_audio can't set headers). Tests: encoding, round-trip, trailing-slash.
-- **`lib/player/search_result_to_media_item.dart`** (new, T2) — pure `searchResultToMediaItem({item, heerrBaseUrl, token})` → `MediaItem` with `id` = the preview URL (third id kind beside Subsonic-stream and `file://`), `extras: {preview: true, sourceUrl}`, YouTube-thumbnail art with the launcher fallback. Bypasses `songToMediaItem`. 6 tests.
+- **`lib/player/search_result_to_media_item.dart`** (new, T2) — pure `searchResultToMediaItem({item, heerrBaseUrl, token})` → `MediaItem` with `id` = the preview URL (third id kind beside Subsonic-stream and `file://`), `extras: {preview: true, sourceUrl}`, remote-thumbnail art with the launcher fallback. Bypasses `songToMediaItem`. 6 tests.
 - **`lib/player/playback_actions.dart`** (T2) — `playPreview(ref, context, SearchResultItem)` reads `heerrBaseUrl`/`heerrBearerToken` from `activeProfileProvider`, builds the preview `MediaItem`, routes through `audioHandlerProvider.playSong`. "Preview: <title>" snackbar; not-signed-in guard.
 - **`lib/widgets/preview_badge.dart`** (new, T3) — shared `PreviewBadge` pill + `isPreviewMediaItem(item)`.
 - **`lib/widgets/result_tile.dart`** (T3) — `onPreview` → `play_circle_outline` button in the trailing row beside the download affordance; independent of download state.
@@ -2096,7 +2096,7 @@ Preview (stream) a YouTube-Music search result before downloading it into Navidr
 
 ## 2026-06-24 — Phase U (U1): download-to-playlist — optional playlist assignment on YTM download
 
-Tapping the download icon on a YouTube-Music search result now opens a bottom sheet offering either a plain download (existing behaviour) or download-and-add-to-playlist: once the backend job completes and Navidrome indexes the new file, the song is added to a chosen Navidrome playlist. Pure-client slice — no backend change. Async orchestration is a top-level function (no persistent Riverpod state), mirroring `playPreview` / `playSongFromSubsonic`.
+Tapping the download icon on an online search result now opens a bottom sheet offering either a plain download (existing behaviour) or download-and-add-to-playlist: once the backend job completes and Navidrome indexes the new file, the song is added to a chosen Navidrome playlist. Pure-client slice — no backend change. Async orchestration is a top-level function (no persistent Riverpod state), mirroring `playPreview` / `playSongFromSubsonic`.
 
 - **`lib/widgets/download_options_sheet.dart`** (new) — `DownloadOptionsSheet` `ConsumerWidget` + static `show()`. Presentational only. Layout: song title → "Download" `ListTile` (key `download-options-download-only`) → divider → "Add to playlist after download" → owned playlists from `libraryPlaylistsProvider` filtered by `serverCredsProvider.navidromeUsername` (one `ListTile` per playlist, key `download-to-playlist-<id>`; loading/error/empty states). Each tap pops the sheet first, then invokes the `onDownloadOnly` / `onDownloadToPlaylist(id, name)` callback.
 - **`lib/providers/download_to_playlist.dart`** (new) — `downloadAndAddToPlaylist({ref, context, item, playlistId, playlistName, ...})`. Steps (each `await` guarded by `context.mounted`): dispatch via `downloadDispatcherProvider` + "Downloading…" snackbar (ApiError → `showApiError`); poll `BackendService.jobStatus` to terminal when non-terminal (`failed` → error snackbar; timeout → snackbar); poll `SubsonicLibraryService.findLibraryMatch` (transient ApiError keeps polling; null at ceiling → "not indexed yet" warning); `PlaylistMutations.addSongs` + success snackbar. `@visibleForTesting` poll-interval / ceiling knobs.
@@ -2182,7 +2182,7 @@ Completes issue #41 (device-only delete shipped in `64c8e47`). Consumes backend 
 - **`pubspec.yaml`** — `4.2.0`.
 - **Tests (+19):** `test/services/backend_service_test.dart`, `test/providers/library/library_delete_test.dart`, `test/screens/downloads_screen_delete_test.dart`, `test/widgets/add_to_playlist_delete_from_server_test.dart`. Full suite 698 passed; `flutter analyze` clean; `build_runner` clean.
 
-## 2026-07-05 — Now Playing redesign (Spotify-style) + test fixes
+## 2026-07-05 — Now Playing redesign (reference-app-style) + test fixes
 
 - **`lib/screens/player/now_playing_screen.dart`** — full rewrite: removed AppBar; added custom `_Header` (back button, "NOW PLAYING" label, sleep chip, `PopupMenuButton` key `now-playing-overflow`); replaced fixed `Column`+`Expanded(_QueueList)` with `SingleChildScrollView`+`Column`; added `_WideCoverArt` (full-width cover, rounded corners); queue now opens via `showModalBottomSheet` triggered by `_BottomActionsRow`; lyrics always visible by scrolling (no toggle).
 - **`lib/screens/player/now_playing_transport.dart`** — shuffle/repeat buttons styled with `StadiumBorder` + `primaryContainer` fill when active; added `_BottomActionsRow` widget (speaker placeholder left, queue button `now-playing-queue-button` right).
@@ -2217,7 +2217,7 @@ Completes issue #41 (device-only delete shipped in `64c8e47`). Consumes backend 
 
 Delete from device / server / both verified on the Pixel against the home server (backend N1+N2 deployed). Smoke surfaced two operator prerequisites, now documented in ROADMAP Phase W + backend N2: Navidrome must report real paths (`ND_SUBSONIC_DEFAULTREPORTREALPATH=true` + per-player "Report Real Path" on `heerr [Dart]`), and the app needs one re-search so the L5 cache drops pre-flag virtual paths. Tagged `v4.2.0`.
 
-## 2026-07-06 — Spotify-style lyrics card + full-screen lyrics sheet
+## 2026-07-06 — Reference-app-style lyrics card + full-screen lyrics sheet
 
 - **`lib/screens/player/now_playing_lyrics.dart`** — rewritten. Inline lyrics section replaced by a palette-tinted rounded card (`now-playing-lyrics-card`) with a "Lyrics" header and expand affordance (`now-playing-lyrics-expand`). Synced lyrics in the card render as a sliding 5-line preview window (`_SyncedLyricsPreview`, active line ±) instead of the full auto-scrolling list; plain lyrics capped at 8 lines. New `_ExpandedLyricsSheet` (full-height modal bottom sheet, `now-playing-lyrics-sheet`): collapse chevron (`lyrics-sheet-collapse`), title/artist header, album-art corner thumbnail (`lyrics-sheet-art`, `_CornerArt`), big bold auto-scrolling `_SyncedLyrics` — sung+active lines full-contrast, upcoming dimmed. Sheet watches `playerSnapshotProvider` with its own 250 ms ticker. Shared `activeLyricsIndex()` extracted.
 - **`lib/screens/player/now_playing_screen.dart`** — `_Body` gains `tintColor`; palette tint now flows into the lyrics card and sheet background.
@@ -2329,11 +2329,11 @@ Delete from device / server / both verified on the Pixel against the home server
 - **`test/widgets/library_result_tile_test.dart`** — updated finders from `find.byIcon(Icons.download_*)` to `find.byType(DownloadIcon)` / `find.byWidgetPredicate`.
 - **`test/widgets/result_tile_test.dart`** — same finder updates; import added. 774 tests green.
 
-## 2026-07-10 — Redesign: gradient magenta/purple theme (move off Spotify green)
+## 2026-07-10 — Redesign: gradient magenta/purple theme (move off the earlier green seed)
 
 Part 1 of the app-wide visual redesign toward the magenta→purple→violet brand identity (matches the new app icon). Theme + gradient accents only; per-screen layout passes follow.
 
-- **`lib/theme.dart`** — palette swapped from Spotify green to `heerrMagenta #F533C8` (primary), `heerrPurple #A93CF2` (secondary), `heerrViolet #6F4BF5` (tertiary); background deepened to `#0A0A0A`. New `heerrGradient` `LinearGradient` (magenta→purple→violet, topLeft→bottomRight). `onPrimary`/`onSecondary`/`onError` are black (contrast on the bright fills, ~7:1). Added themed `SliderTheme`, `SwitchTheme`, `ChipTheme`, `ProgressIndicatorTheme`, `DividerTheme`, `ListTileTheme`, `FloatingActionButtonTheme`, `TextButtonTheme`, `ElevatedButtonTheme`. Deleted the dead `heerrGreen`/`heerrGolden` aliases (zero references remained).
+- **`lib/theme.dart`** — palette swapped from the earlier green seed to `heerrMagenta #F533C8` (primary), `heerrPurple #A93CF2` (secondary), `heerrViolet #6F4BF5` (tertiary); background deepened to `#0A0A0A`. New `heerrGradient` `LinearGradient` (magenta→purple→violet, topLeft→bottomRight). `onPrimary`/`onSecondary`/`onError` are black (contrast on the bright fills, ~7:1). Added themed `SliderTheme`, `SwitchTheme`, `ChipTheme`, `ProgressIndicatorTheme`, `DividerTheme`, `ListTileTheme`, `FloatingActionButtonTheme`, `TextButtonTheme`, `ElevatedButtonTheme`. Deleted the dead `heerrGreen`/`heerrGolden` aliases (zero references remained).
 - **New `lib/widgets/gradient_icon.dart`** — `ShaderMask` wrapper that gradient-tints any glyph (Icon or SVG) via `heerrGradient`.
 - **New `lib/widgets/gradient_button.dart`** — full-width gradient pill CTA (disabled → grey), the redesign's primary button.
 - **`lib/router.dart`** — selected bottom-nav icon wrapped in `GradientIcon` (active tab sweeps the gradient; unselected stay grey).
@@ -2389,7 +2389,7 @@ Review follow-up to part 5: keep only the new 4x2 hero widget, and stop the live
 
 ## 2026-07-10 — Redesign review sweep: stale-doc + test-harness cleanup (part 7)
 
-Full-branch review of redesign parts 1–6. Code was clean; the drift found was in docs and test scaffolding still referencing the retired Spotify-green theme (staleness rule: docs updated same turn as discovered).
+Full-branch review of redesign parts 1–6. Code was clean; the drift found was in docs and test scaffolding still referencing the retired green-seed theme (staleness rule: docs updated same turn as discovered).
 
 - **`android/CLAUDE.md`** — locked-stack "Theme" line updated: `ColorScheme.fromSeed(#1DB954)` → hand-built raw `ColorScheme` (magenta primary + `heerrGradient` hero accents).
 - **`android/docs/CONTEXT.md`** — stack-table Theme row + "Aesthetic" section rewritten for the gradient identity (magenta `#F533C8` → purple `#A93CF2` → violet `#6F4BF5` on `#0A0A0A`), noting the raw-ColorScheme approach and the gradient-on-hero-accents rule.

@@ -3,7 +3,7 @@ import 'package:audio_service/audio_service.dart';
 import '../models/search_result_item.dart';
 import 'preview_url.dart';
 
-/// Convert a not-in-library YouTube-Music [SearchResultItem] into an
+/// Convert a not-in-library online-search [SearchResultItem] into an
 /// `audio_service` [MediaItem] that streams through the backend preview proxy
 /// (Phase K / Phase T).
 ///
@@ -36,7 +36,7 @@ MediaItem searchResultToMediaItem({
     artUri = Uri.tryParse(cover);
   }
   // Mirror songToMediaItem's launcher fallback so the notification always has
-  // an icon when the YouTube thumbnail is absent or unparseable.
+  // an icon when the remote thumbnail is absent or unparseable.
   artUri ??= Uri.parse('android.resource://com.aashish.heerr/mipmap/ic_launcher');
 
   final int? durationMs = item.durationMs;

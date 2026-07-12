@@ -80,7 +80,7 @@ dependencies:
   # Material Icons font is enabled in the `flutter:` section below; no extra
   # font deps needed for the dark M3 theme.
 
-  # SVG rendering — used for the custom Library tab icon (Spotify-style
+  # SVG rendering — used for the custom Library tab icon (a reference-style
   # 3D stack) that Material Icons doesn't carry.
   flutter_svg: ^2.0.0
   home_widget: ^0.9.3

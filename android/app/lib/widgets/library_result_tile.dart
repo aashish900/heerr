@@ -5,7 +5,7 @@ import 'download_icon.dart';
 import 'library_cover_art.dart';
 
 /// One row in a Library list (Artists / Albums / Playlists). Mirrors the
-/// shape of `ResultTile` (YouTube-Music search results) but talks to the
+/// shape of `ResultTile` (online search results) but talks to the
 /// Subsonic side — cover art comes from `coverArtId` via [LibraryCoverArt]
 /// and the tile is always tappable (no "already downloaded" dim).
 ///

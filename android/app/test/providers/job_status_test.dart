@@ -246,7 +246,7 @@ void main() {
     test('failed state also halts polling', () {
       fakeAsync((FakeAsync async) {
         final _CountingAdapter adapter = _CountingAdapter(
-          (_) => _json(200, _jobJson(state: 'failed', error: 'spotdl bad')),
+          (_) => _json(200, _jobJson(state: 'failed', error: 'download tool bad')),
         );
         final ProviderContainer c = _container(dio: _dioWith(adapter));
         addTearDown(c.dispose);

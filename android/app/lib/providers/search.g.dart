@@ -8,7 +8,7 @@ part of 'search.dart';
 
 String _$searchDebounceHash() => r'b299e6ddbcd847cd680232b2bdafb3bee0459ae6';
 
-/// Debounce applied to both the library and YouTube-Music search providers.
+/// Debounce applied to both the library and online search providers.
 /// Exposed so tests can override it (typically to `Duration.zero`).
 ///
 /// Copied from [searchDebounce].
@@ -49,7 +49,7 @@ class _SystemHash {
   }
 }
 
-/// `POST /search` against the heerr backend (YouTube-Music search), via
+/// `POST /search` against the heerr backend (online search), via
 /// [BackendService].
 ///
 /// Family-keyed by the query string so the combined-search orchestrator can
@@ -64,7 +64,7 @@ class _SystemHash {
 @ProviderFor(ytmSearch)
 const ytmSearchProvider = YtmSearchFamily();
 
-/// `POST /search` against the heerr backend (YouTube-Music search), via
+/// `POST /search` against the heerr backend (online search), via
 /// [BackendService].
 ///
 /// Family-keyed by the query string so the combined-search orchestrator can
@@ -77,7 +77,7 @@ const ytmSearchProvider = YtmSearchFamily();
 ///
 /// Copied from [ytmSearch].
 class YtmSearchFamily extends Family<AsyncValue<SearchResponse>> {
-  /// `POST /search` against the heerr backend (YouTube-Music search), via
+  /// `POST /search` against the heerr backend (online search), via
   /// [BackendService].
   ///
   /// Family-keyed by the query string so the combined-search orchestrator can
@@ -91,7 +91,7 @@ class YtmSearchFamily extends Family<AsyncValue<SearchResponse>> {
   /// Copied from [ytmSearch].
   const YtmSearchFamily();
 
-  /// `POST /search` against the heerr backend (YouTube-Music search), via
+  /// `POST /search` against the heerr backend (online search), via
   /// [BackendService].
   ///
   /// Family-keyed by the query string so the combined-search orchestrator can
@@ -127,7 +127,7 @@ class YtmSearchFamily extends Family<AsyncValue<SearchResponse>> {
   String? get name => r'ytmSearchProvider';
 }
 
-/// `POST /search` against the heerr backend (YouTube-Music search), via
+/// `POST /search` against the heerr backend (online search), via
 /// [BackendService].
 ///
 /// Family-keyed by the query string so the combined-search orchestrator can
@@ -140,7 +140,7 @@ class YtmSearchFamily extends Family<AsyncValue<SearchResponse>> {
 ///
 /// Copied from [ytmSearch].
 class YtmSearchProvider extends AutoDisposeFutureProvider<SearchResponse> {
-  /// `POST /search` against the heerr backend (YouTube-Music search), via
+  /// `POST /search` against the heerr backend (online search), via
   /// [BackendService].
   ///
   /// Family-keyed by the query string so the combined-search orchestrator can

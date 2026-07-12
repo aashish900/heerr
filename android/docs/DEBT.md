@@ -40,7 +40,7 @@ Real missing features; in-scope (not listed in ROADMAP "out of scope").
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| F1 | Cover art on `HomeRecommendationCard`. | ✅ already done | `_CoverArt` in `widgets/home_recommendation_card.dart` already does library cover → YouTube thumbnail → placeholder; `coverArt` field is hydrated on `RecommendedTrack` by the N4 cross-reference step. DEBT entry was stale. |
+| F1 | Cover art on `HomeRecommendationCard`. | ✅ already done | `_CoverArt` in `widgets/home_recommendation_card.dart` already does library cover → remote thumbnail → placeholder; `coverArt` field is hydrated on `RecommendedTrack` by the N4 cross-reference step. DEBT entry was stale. |
 | F2 | Find Similar long-press on **album-detail** and **playlist-detail** song rows. | ✅ 2026-06-15 | `seedForSong(Song)` extracted to `models/seed_track.dart`; both detail screens now pass `findSimilarSeed: seedForSong(s)` on `onLongPress`. `flutter analyze` clean; 462/462 tests pass. |
 | F3 | Extend stream-first **preview** (Phase T) to the **Recommendations screen** + **Home "Picked for you" cards** for `inLibrary == false` rows. | ⏳ deferred | T (v3.5.0) shipped preview on the Library search results only. `playPreview` + `searchResultToMediaItem` are reusable, but those surfaces deal in `RecommendedTrack`/`HomeRecommendationCard` (not `SearchResultItem`); needs a small adapter `sourceUrl → playPreview`. Pick up if previewing a recommendation is requested. ADR: `DECISIONLOG.md` 2026-06-23 (Phase T). |
 

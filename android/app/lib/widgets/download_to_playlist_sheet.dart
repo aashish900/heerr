@@ -7,7 +7,7 @@ import '../models/subsonic/playlist.dart';
 import '../providers/library/library_playlists.dart';
 import '../providers/server_creds.dart';
 
-/// Modal bottom sheet shown when the user long-presses a YouTube-Music search
+/// Modal bottom sheet shown when the user long-presses an online search
 /// result (U1). It lets them pick one of their Navidrome playlists; the caller
 /// then downloads the song and adds it to that playlist once the job finishes
 /// and Navidrome indexes the file. A plain tap on the row's download icon still

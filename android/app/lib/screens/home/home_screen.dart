@@ -262,7 +262,7 @@ class _HomeSearchBar extends ConsumerWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Search your library + YouTube Music',
+                    'Search your library + online',
                     style: TextStyle(
                       color: colors.onSurfaceVariant,
                       fontSize: 15,

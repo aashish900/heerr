@@ -30,19 +30,19 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 
 ## 2026-06-09 — Theme: Material 3, dark only, seed colour `#1DB954`
 
-**Context:** Visual aesthetic per the root `CONTEXT.md` ("Spotify's black + green theme"). Need to pick the colour-derivation strategy.
+**Context:** Visual aesthetic per the root `CONTEXT.md` ("a familiar streaming app's black + green theme"). Need to pick the colour-derivation strategy.
 
 **Decision:** `ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: Color(0xFF1DB954), brightness: Brightness.dark))`. Dark-only — no light-mode variant in v1.
 
 **Why:**
 - M3's `ColorScheme.fromSeed` derives the full 12-role palette from one seed colour algorithmically. We get consistent surface/onSurface/primary/onPrimary contrast without hand-tuning a palette.
-- Spotify's `#1DB954` (the Spotify green) is the seed — produces a recognisably Spotify-like green-on-black with M3-correct contrast ratios.
+- `#1DB954` (a recognisable streaming-app green) is the seed — produces a recognisably familiar green-on-black with M3-correct contrast ratios.
 - Light theme is deferred to v2 (if ever). The user always uses the app on a phone at home in the evening — dark-only is intentional, not unfinished.
 
 **Alternatives considered:**
 - Hand-rolled `ColorScheme(primary: ..., surface: ...)` — more control, more bikeshed. M3 seed-derived palette is good enough out of the box.
 - Material 2 + custom theming — rejected; M3 is the default and the future.
-- `dynamic_color` (Android system colour) — rejected: this is a dedicated music-request app, not a system-tinted utility. We want the Spotify aesthetic specifically.
+- `dynamic_color` (Android system colour) — rejected: this is a dedicated music-request app, not a system-tinted utility. We want that familiar streaming-app aesthetic specifically.
 
 **Trade-off:** Locked to one accent colour. If the user later wants to A/B test "Apple-Music-coral" or similar, it's a one-line change in `theme.dart`.
 
@@ -151,16 +151,16 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 
 ---
 
-## 2026-06-11 — Combined library + YouTube Music search; standalone Search tab removed
+## 2026-06-11 — Combined library + online search; standalone Search tab removed
 
-**Context:** Pre-streaming, the bottom nav was `Search · Queue · Settings` and the Search tab hit `POST /search` on the heerr backend (YouTube Music via `ytmusicapi`). The streaming feature adds a Library tab driven by Subsonic (artists / albums / playlists browse + Subsonic `search3` for library-scoped search). That leaves the app with two parallel search surfaces — library search inside Library, and YouTube-Music search in its own tab — for the same noun ("find a song"). The question is whether both surfaces should coexist or collapse.
+**Context:** Pre-streaming, the bottom nav was `Search · Queue · Settings` and the Search tab hit `POST /search` on the heerr backend (online search via the backend's music-search integration). The streaming feature adds a Library tab driven by Subsonic (artists / albums / playlists browse + Subsonic `search3` for library-scoped search). That leaves the app with two parallel search surfaces — library search inside Library, and online search in its own tab — for the same noun ("find a song"). The question is whether both surfaces should coexist or collapse.
 
-**Decision:** Drop the standalone `Search` tab at I1. Bottom nav becomes `Library · Queue · Settings`. The YouTube-Music search functionality folds into the Library tab's search affordance at I2 as a fall-back source: library results render first; YouTube Music auto-fires only when the library result is empty, or on an explicit "Search more on YouTube Music" tap when the library result is non-empty. A `combinedSearchProvider` orchestrates the two sources, surfacing both result sections plus a reactive-promotion mechanism that moves a downloaded YT result into the library section once Navidrome has re-indexed.
+**Decision:** Drop the standalone `Search` tab at I1. Bottom nav becomes `Library · Queue · Settings`. The online-search functionality folds into the Library tab's search affordance at I2 as a fall-back source: library results render first; online search auto-fires only when the library result is empty, or on an explicit "Search online" tap when the library result is non-empty. A `combinedSearchProvider` orchestrates the two sources, surfacing both result sections plus a reactive-promotion mechanism that moves a downloaded online-search result into the library section once Navidrome has re-indexed.
 
 **Why:**
 - **One search box, one mental model.** The pre-change layout forced the user to pick the right tab before typing: "is this in my library or do I need to download?" The combined flow lets the user just type — library hits surface immediately, YT shows up only when the library can't satisfy the query (auto-fire) or the user explicitly asks for it (the "Search more" button keeps IO opt-in for the common library-hit case).
-- **No redundant IO.** Library `search3` is local-network / fast; YouTube Music's `ytmusicapi` is slower and rate-limited. Firing both on every keystroke would waste both. The auto-fire-on-empty-library + manual "Search more" rule means most queries hit Library only.
-- **Reactive promotion glues the two flows together.** Tapping a YT result still dispatches to the existing `downloadDispatcherProvider`. When the queue's job-status transitions to `done`, the combined search invalidates `librarySearchProvider` so the song promotes from "On YouTube Music" → "In your library" on the next render — closing the find → download → play loop in one screen without re-typing.
+- **No redundant IO.** Library `search3` is local-network / fast; the backend's online-search integration is slower and rate-limited. Firing both on every keystroke would waste both. The auto-fire-on-empty-library + manual "Search more" rule means most queries hit Library only.
+- **Reactive promotion glues the two flows together.** Tapping an online-search result still dispatches to the existing `downloadDispatcherProvider`. When the queue's job-status transitions to `done`, the combined search invalidates `librarySearchProvider` so the song promotes from "Online results" → "In your library" on the next render — closing the find → download → play loop in one screen without re-typing.
 - **Tab budget reclaimed.** Bottom nav with two tabs (Library, Settings) felt thin once Queue was the only "active state" tab. Library + Queue + Settings is the right balance now — Queue stays as the "what's happening server-side" surface, Library is the "what's in my world" surface, Settings is configuration.
 
 **Alternatives considered:**
@@ -231,7 +231,7 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 
 ## 2026-06-14 — Phase N (recommendations + scrobble) — heerr v1.3.0
 
-**Context:** The Android client had the find → download → play loop end-to-end (search → /download → Navidrome stream / offline). What it lacked was *suggestion*: nothing on-device proposed what to play next. Phase N adds the recommendations feature, which depends on a backend recommendations engine (backend Phase I — `RecommendationEngine` Protocol + ytmusic / Last.fm / ListenBrainz / fallback-chain implementations, shipped at `cc0abd7`). The Phase I ADR (`backend/docs/DECISIONLOG.md` 2026-06-13) locks the backend wire shape and engine selection model; this entry captures the client-side decisions that span N1–N5.
+**Context:** The Android client had the find → download → play loop end-to-end (search → /download → Navidrome stream / offline). What it lacked was *suggestion*: nothing on-device proposed what to play next. Phase N adds the recommendations feature, which depends on a backend recommendations engine (backend Phase I — `RecommendationEngine` Protocol + online-catalog / Last.fm / ListenBrainz / fallback-chain implementations, shipped at `cc0abd7`). The Phase I ADR (`backend/docs/DECISIONLOG.md` 2026-06-13) locks the backend wire shape and engine selection model; this entry captures the client-side decisions that span N1–N5.
 
 **Decision:**
 
@@ -241,7 +241,7 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 
 3. **Seed collection is starred-first → frequent-broadening → Favourites-fallback (N2).** `seedCollectionProvider` calls `getStarred2.view` (starred songs — strongest signal) then `getAlbumList2.view?type=frequent&size=30` (broadening — frequently played albums become `(album.name, album.artist)` quasi-track seeds). Merge dedupes case-insensitively on `(title, artist)`, caps at 20. Favourites playlist entries fire **only** when both primary sources came back empty — avoids stacking on every fetch. The merge function is a pure Dart `buildSeedCollection(...)` so the rules are testable without standing up a Riverpod container.
 
-4. **Recommendations provider sends seeds-or-empty, parses the engine-agnostic response (N3).** `recommendationsProvider` (AsyncNotifier) POSTs `{seeds, limit: 20}` to `Endpoints.recommend`. Empty seeds are still POSTed — the ListenBrainz engine produces results entirely from its own history. The response shape (`results: [RecommendedTrack(title, artist, source_url, score?)]`) is identical across engines: every engine resolves results to `music.youtube.com/watch?v=…` via the backend's shared `YTMusicResolver`, so the client tap-Download path goes through the existing `/download` flow with **no per-engine special-casing**.
+4. **Recommendations provider sends seeds-or-empty, parses the engine-agnostic response (N3).** `recommendationsProvider` (AsyncNotifier) POSTs `{seeds, limit: 20}` to `Endpoints.recommend`. Empty seeds are still POSTed — the ListenBrainz engine produces results entirely from its own history. The response shape (`results: [RecommendedTrack(title, artist, source_url, score?)]`) is identical across engines: every engine resolves results to `music.youtube.com/watch?v=…` via the backend's shared source resolver, so the client tap-Download path goes through the existing `/download` flow with **no per-engine special-casing**.
 
 5. **Library cross-reference resolves `inLibrary` + `subsonicSongId` per result (N4).** After the base `/recommend` response lands, the provider fires parallel `search3.view?query=<artist> <title>&songCount=1` calls (one per result) against the Subsonic dio. On match → `copyWith(inLibrary: true, subsonicSongId: <id>)`. Per-result failures are isolated (one bad search3 doesn't kill the list); missing Subsonic config no-ops gracefully (everything stays `inLibrary=false`). The screen's Play branch builds a synthetic `Song(id, title, artist)` and routes through `playSongFromSubsonic` — avoids a round-trip through `getSong` for one play.
 
@@ -273,7 +273,7 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **Always-on health probe (every screen render).** Rejected for the same reason the offline-sync provider has a TTL: the user opens Settings repeatedly, the backend should not see N × open calls.
 - **Push notifications when the engine degrades.** Out of scope; would need an FCM project the rest of the app explicitly avoids. The Settings chip is reactive and accurate enough.
 
-**Trade-off:** The recommendations feature now spans backend Phase I + Android Phase N, with the wire contract owned by the backend ADR (2026-06-13) and the UX + lifecycle owned by this ADR. Any breaking change to the response shape (e.g. adding `source_engine: String` per result so the UI can chip-tag rows) would need both ADRs revisited and a client/server release coordinated. That's the only fragility we accept — every other engine swap (ytmusic ↔ lastfm ↔ listenbrainz, single vs chain) is server-side only.
+**Trade-off:** The recommendations feature now spans backend Phase I + Android Phase N, with the wire contract owned by the backend ADR (2026-06-13) and the UX + lifecycle owned by this ADR. Any breaking change to the response shape (e.g. adding `source_engine: String` per result so the UI can chip-tag rows) would need both ADRs revisited and a client/server release coordinated. That's the only fragility we accept — every other engine swap (between any configured engines, single vs chain) is server-side only.
 
 **Reference:** Implementation across `android/app/lib/{models/{seed_track,recommended_track,recommend_health}.dart, providers/recommendations.dart, screens/{recommendations_screen,settings_screen,library/library_screen}.dart, player/{scrobble_controller,scrobble_provider}.dart, widgets/add_to_playlist_sheet.dart, router.dart}`. Backend side: `backend/app/services/recommenders/*` + `backend/app/api/v1/recommend.py`. Roadmap milestones N1–N5 in `android/docs/ROADMAP.md` and CHANGELOG entries `2026-06-14 — N1` through `2026-06-14 — N5` enumerate the per-milestone deltas.
 
@@ -307,7 +307,7 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 
 **Alternatives considered:**
 
-- **Download via heerr backend (`/download` endpoint).** The backend already invokes spotDL and writes files to the Navidrome library. Rejected: spotDL files are already in the library; re-downloading them to the device via the backend would double the network path and require a new backend endpoint. The Subsonic stream URL is the correct source.
+- **Download via heerr backend (`/download` endpoint).** The backend already invokes its download tool and writes files to the Navidrome library. Rejected: those files are already in the library; re-downloading them to the device via the backend would double the network path and require a new backend endpoint. The Subsonic stream URL is the correct source.
 - **`WorkManager` for background sync.** Would allow sync while the screen is off. Rejected for v1: complexity far exceeds the benefit for a single-user, always-home-network app. Deferred to v2 if user reports the foreground window is insufficient.
 - **SQLite instead of JSON manifest.** More robust at scale, richer query surface. Rejected: the manifest is O(library size) but accessed in bulk at sync time, not queried per-song. JSON + full in-memory parse is simpler and fast enough for libraries under ~10K songs.
 - **Per-song sidecar files instead of a central manifest.** Would avoid the manifest-write bottleneck. Rejected: a central manifest is easier to inspect, backup, and clear atomically. The write-bottleneck concern doesn't apply at the sync cadences we're operating at.
@@ -327,7 +327,7 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 
 1. **Home is the new `initialLocation` (`/`); Library moves to `/library`.** All library nested routes (`/library/artist/:id`, `/library/album/:id`, `/library/playlist/:id`, `/library/recommendations`) keep the same URL shape; only the base segment changed. `Routes.*` helper getters updated so call sites needed no edits.
 
-2. **Home screen layout: Spotify-style greeting + 2-col quick-access grid + horizontal sections.** Time-of-day greeting (`"Good morning"` / `"Good afternoon"` / `"Good evening"`) from pure-Dart `greetingForHour(int)`. Quick-access grid: 2-column `GridView` of up to 6 recently-played albums from `homeRecentProvider`; falls back to `homeRecommendationsProvider` results when recent is empty. Sections: "Jump back in" (recent albums), "Most played" (frequent albums), "Picked for you" / "Discover" (recommendations). All three data sources (`getAlbumList2.view?type=recent`, `getAlbumList2.view?type=frequent`, recommendations) fire in parallel at screen build; pull-to-refresh invalidates all four providers.
+2. **Home screen layout: familiar-streaming-app-style greeting + 2-col quick-access grid + horizontal sections.** Time-of-day greeting (`"Good morning"` / `"Good afternoon"` / `"Good evening"`) from pure-Dart `greetingForHour(int)`. Quick-access grid: 2-column `GridView` of up to 6 recently-played albums from `homeRecentProvider`; falls back to `homeRecommendationsProvider` results when recent is empty. Sections: "Jump back in" (recent albums), "Most played" (frequent albums), "Picked for you" / "Discover" (recommendations). All three data sources (`getAlbumList2.view?type=recent`, `getAlbumList2.view?type=frequent`, recommendations) fire in parallel at screen build; pull-to-refresh invalidates all four providers.
 
 3. **`homeRecommendationsProvider` falls back to random songs (`getRandomSongs.view?size=20`) when the backend returns an empty result list.** Returns a `HomeRecommendations(tracks, isFallback)` record; `isFallback=true` changes the section header from "Picked for you" to "Discover". This ensures the section is never empty (a cold-start app with no scrobble history still shows discovery content), while making clear to the user when they're seeing curated vs random content.
 
@@ -335,7 +335,7 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 
 **Why:**
 
-- **Home as default tab.** A tab that shows "what to play next" is a better cold-open than a library browser. Library is where you go with intent; Home is where the app sells itself. This matches Spotify, Apple Music, and YouTube Music's home-tab convention.
+- **Home as default tab.** A tab that shows "what to play next" is a better cold-open than a library browser. Library is where you go with intent; Home is where the app sells itself. This matches the home-tab convention of popular streaming apps.
 - **Drop Queue from the nav.** Queue is a transient state — only relevant during and immediately after a download. A persistent bottom-nav slot signals that the content is always worth checking, which Queue is not. Moving it to an AppBar icon on Home makes it discoverable without wasting a nav slot.
 - **4 tabs (Home / Library / Downloads / Settings).** Downloads earns its own tab (persistent offline state the user actively manages); Settings is always-available for credential management. 4 tabs is the Material 3 design-system recommended maximum for bottom nav.
 - **Fallback to random songs.** Without it, a new install's Home screen would be mostly empty (no recent albums, no recommendations without scrobble history). Random songs from the library are a better cold-start experience than empty sections and preserve the discovery narrative.
@@ -440,7 +440,7 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 4. **Legacy single-set creds migrate exactly once into a default `Profile`.** `migrateLegacyCreds` (S3) runs in `main.dart` before `runApp`. Detection requires all five legacy keys to be present and non-empty; partial state is left alone (S5 login flow re-collects everything). Migration is idempotent on three axes — already-migrated, no-legacy, partial-legacy all no-op.
 5. **First-launch redirect via `GoRouter.redirect`.** When `activeProfileProvider` is null, every navigation outside `/login` rewrites to `/login` (S5). Conversely, when active is non-null, `/login` redirects to `/`. The redirect closure reads `profileRegistryProvider` from the root `ProviderContainer` — wired by passing the container into `buildHeerrRouter(container: ...)`.
 6. **Settings overlay over per-rewire.** Instead of rewiring every per-server provider to read `activeProfileProvider` directly (offline_paths, library_cache, manifest, NowPlaying persistence, sleep_timer, scrobble_controller), `settingsProvider.build()` (S8) overlays the active profile's `(heerrBaseUrl, heerrBearerToken, navidromeBaseUrl, navidromeUsername, navidromePassword)` onto the `SettingsValue` tuple. The legacy single-set keys remain the fallback for the brief pre-hydration window and for unmigrated installs. Every existing callsite that hashed `(navidromeBaseUrl, navidromeUsername)` into a `serverKey` continues to compile and now isolates per profile automatically. Defense-in-depth: S7 also wires the heerr + Subsonic dio providers to read `activeProfileProvider` directly so a future rewrite can drop the overlay without leaking creds across profiles in the interim.
-7. **Carve-out in `android/CLAUDE.md`.** The existing "Single-user. No multi-user login, no Sign-In-With-X, no biometric token unlock" hard rule is rewritten to (a) permit the Navidrome-IdP login flow specifically and (b) still forbid every other Sign-In-With-X provider (Google, Spotify, Apple). The rule "the bearer token is created on the backend via the CLI" is loosened to "or minted by the backend's `POST /auth/login` IdP shim". The "no biometric token unlock" line stays — biometrics is out of scope for v3.
+7. **Carve-out in `android/CLAUDE.md`.** The existing "Single-user. No multi-user login, no Sign-In-With-X, no biometric token unlock" hard rule is rewritten to (a) permit the Navidrome-IdP login flow specifically and (b) still forbid every other Sign-In-With-X provider (Google, Apple, or any other third-party account). The rule "the bearer token is created on the backend via the CLI" is loosened to "or minted by the backend's `POST /auth/login` IdP shim". The "no biometric token unlock" line stays — biometrics is out of scope for v3.
 
 **Why:**
 
@@ -449,7 +449,7 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **Settings overlay** is one ~12-line change versus the alternative — rewiring every per-server provider to take a `Profile` argument. The overlay also keeps the existing tests' `SettingsValue` contract intact, so the Phase S work doesn't have to touch the L1 / L5 / P1 test suites.
 - **Idempotent migration** lets the v2.1.0 → v3.0.0 upgrade be silent for everyone who had creds saved before the bump; users in a partial-creds state (rare — they'd never have got past the existing Settings flow) just see the login screen and re-enter.
 - **`/login` redirect at the router level** ensures the unauthenticated state can't be navigated *around* — a deep-link from a notification or share-sheet still passes through the gate.
-- **CLAUDE.md carve-out, not deletion.** The "no Sign-In-With-X" rule was about avoiding Google / Spotify / Apple-Auth dependencies, not about Navidrome. The new carve-out reflects that distinction: Navidrome is already inside the trust boundary (it's the music library; we already store its password); Google et al. are not.
+- **CLAUDE.md carve-out, not deletion.** The "no Sign-In-With-X" rule was about avoiding third-party-account dependencies (Google / Apple-Auth), not about Navidrome. The new carve-out reflects that distinction: Navidrome is already inside the trust boundary (it's the music library; we already store its password); Google et al. are not.
 
 **Alternatives considered:**
 
@@ -520,7 +520,7 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 
 ## 2026-06-20 — Retry + debug-log dio interceptors (debt A9)
 
-**Context:** `docs/CONTEXT.md` describes the HTTP stack as "Interceptors for the auth header + retry-on-503 + logging", but only the auth header (`BearerAuthInterceptor` / `SubsonicAuthInterceptor`) was ever implemented. 503s from the heerr backend (forwarded Spotify upstream rate-limits) were mapped to `RateLimitedError` with a parsed `Retry-After` and thrown straight to the caller — every transient blip became a user-visible snackbar (DEBT §5 A9).
+**Context:** `docs/CONTEXT.md` describes the HTTP stack as "Interceptors for the auth header + retry-on-503 + logging", but only the auth header (`BearerAuthInterceptor` / `SubsonicAuthInterceptor`) was ever implemented. 503s from the heerr backend (forwarded upstream rate-limits) were mapped to `RateLimitedError` with a parsed `Retry-After` and thrown straight to the caller — every transient blip became a user-visible snackbar (DEBT §5 A9).
 
 **Decision:** Add `lib/api/interceptors.dart` with two interceptors, wired into both `dioClient` and `subsonicDioClient` in order **auth → retry → log**:
 
@@ -533,7 +533,7 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 
 **Why:**
 - **Hand-rolled over `dio_smart_retry`.** The policy we need (cap on honoured `Retry-After`, give-up-to-surface-`RateLimitedError`) is bespoke; a dep would still need a custom `retryEvaluator`. The repo already prefers minimal deps (see the in-process fake adapter in `client_test.dart` vs `http_mock_adapter`).
-- **Cap-then-surface on 503.** Short rate-limits (a few seconds) are best retried silently; long ones (Spotify can say 30–60s) are better shown to the user with the existing `RateLimitedError` countdown than blocking a request for a minute. 5s is the split.
+- **Cap-then-surface on 503.** Short rate-limits (a few seconds) are best retried silently; long ones (the upstream can say 30–60s) are better shown to the user with the existing `RateLimitedError` countdown than blocking a request for a minute. 5s is the split.
 - **Both clients.** Subsonic envelope failures are HTTP 200 (handled by `subsonicCall`), but real transport 5xx / network errors on Navidrome are just as transient as on heerr, so the same retry applies.
 
 **Alternatives considered:**
@@ -693,17 +693,17 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 
 ## 2026-06-23 — Phase T: stream-first preview via the backend proxy — heerr v3.5.0
 
-**Context:** Before this, hearing a YouTube-Music search result required committing to a full download: tap → `/download` (spotDL) → Navidrome re-index (~1 min) → stream via Subsonic. There was no way to *audition* a result first. Phase T adds a preview affordance that streams the track immediately by consuming the backend's new `GET /api/v1/preview/stream` proxy (backend Phase K — see `backend/docs/DECISIONLOG.md` 2026-06-23). Pure-client slice; the only backend dependency is K2, already shipped.
+**Context:** Before this, hearing an online search result required committing to a full download: tap → `/download` (the backend's download tool) → Navidrome re-index (~1 min) → stream via Subsonic. There was no way to *audition* a result first. Phase T adds a preview affordance that streams the track immediately by consuming the backend's new `GET /api/v1/preview/stream` proxy (backend Phase K — see `backend/docs/DECISIONLOG.md` 2026-06-23). Pure-client slice; the only backend dependency is K2, already shipped.
 
 **Decision:**
 1. **Play preview through the backend proxy, not on-device extraction.** The preview `MediaItem.id` is the heerr `/preview/stream?source_url=…&token=…` URL (built by `buildPreviewStreamUrl`, T1); `just_audio` opens it and the backend proxies the googlevideo bytes over Tailscale.
 2. **A third `MediaItem.id` kind.** Alongside `file://` (offline) and the Subsonic stream URL, preview items use the proxy URL and are stamped `extras['preview'] == true` (vs `extras['subsonicId']` for library tracks). `isPreviewMediaItem` is the discriminator; `searchResultToMediaItem` (T2) is the builder, deliberately **bypassing** `songToMediaItem`.
 3. **Token in the query string.** `just_audio`'s `AudioSource.uri` can't attach an `Authorization` header, so the bearer rides in `?token=` — the same shape Subsonic playback URLs already use. Creds are read from `activeProfileProvider` at the call site (`playPreview`), never baked into the pure builders.
-4. **Ephemeral; reuse existing reactive promotion.** A preview writes nothing and creates no queue/download row. The find → *hear* → download loop is preserved: tapping Download on the same row still dispatches `/download`, and the existing combined-search promotion (`combined_search.dart`) upgrades the row from "On YouTube Music" → library once Navidrome re-indexes.
-5. **Search-results-only in v1.** The preview button is wired on the Library search YouTube-Music section (`ResultTile.onPreview`). Previewing **recommendations** / **Home cards** is deferred (DEBT F3) — those surfaces model `RecommendedTrack`/`HomeRecommendationCard`, not `SearchResultItem`, so they need a small `sourceUrl → playPreview` adapter.
+4. **Ephemeral; reuse existing reactive promotion.** A preview writes nothing and creates no queue/download row. The find → *hear* → download loop is preserved: tapping Download on the same row still dispatches `/download`, and the existing combined-search promotion (`combined_search.dart`) upgrades the row from "Online results" → library once Navidrome re-indexes.
+5. **Search-results-only in v1.** The preview button is wired on the Library search online-results section (`ResultTile.onPreview`). Previewing **recommendations** / **Home cards** is deferred (DEBT F3) — those surfaces model `RecommendedTrack`/`HomeRecommendationCard`, not `SearchResultItem`, so they need a small `sourceUrl → playPreview` adapter.
 
 **Why:**
-- **Backend proxy over on-device extraction** inherits the Phase K rationale: googlevideo URLs are egress-IP-bound (a device-side `youtube_explode_dart` URL or a bare `-g` redirect 403s), and on-device extraction breaks on YouTube player changes that would need an **app release** to fix — whereas the proxy is fixed by a backend `yt-dlp` bump. Keeping the device on the tailnet also matches the connectivity rule.
+- **Backend proxy over on-device extraction** inherits the Phase K rationale: googlevideo URLs are egress-IP-bound (a device-side `youtube_explode_dart` URL or a bare `-g` redirect 403s), and on-device extraction breaks on upstream player changes that would need an **app release** to fix — whereas the proxy is fixed by a backend `yt-dlp` bump. Keeping the device on the tailnet also matches the connectivity rule.
 - **Third id kind, not a parallel player path.** Reusing the existing `HeerrAudioHandler` queue + mini-player + Now Playing means preview gets lock-screen controls, the scrubber, and persistence for free; only the `MediaItem` construction differs. The `extras['preview']` flag drives the one visible difference (the "Preview" badge) without branching the player.
 - **Pure builders + call-site creds** keep `buildPreviewStreamUrl` / `searchResultToMediaItem` unit-testable without a container (matching `songToMediaItem`), and avoid a second credential read path (CLAUDE.md hard rule — creds come from `activeProfileProvider` only).
 - **Search-results-only** ships the highest-value surface (the "is this the right track?" moment is during search) at the smallest blast radius; the recommendation/home surfaces are a clean fast-follow once asked for.
@@ -752,7 +752,7 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 
 **Reference:** `android/app/android/app/src/main/AndroidManifest.xml` (`<application>` comment cites the mechanism), `android/app/lib/router.dart` (shell PopScope), CHANGELOG 2026-07-04.
 
-## 2026-07-05 — Now Playing: always-visible scrollable lyrics, queue bottom sheet, Spotify-style layout
+## 2026-07-05 — Now Playing: always-visible scrollable lyrics, queue bottom sheet, reference-app-style layout
 
 **Context:** User requested a redesigned Now Playing screen: full-width cover art, rounded pill-style shuffle/loop buttons, queue behind a hamburger bottom sheet, 3-dot overflow menu, and lyrics visible by scrolling (not toggled).
 
@@ -762,9 +762,9 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 
 **Alternatives considered:** Keep the toggle — rejected, user explicitly requested no toggle. Use a `CustomScrollView` with slivers — rejected, adds complexity without benefit at this screen's size.
 
-## 2026-07-06 — Lyrics UX: preview card + modal full-screen sheet (Spotify reference)
+## 2026-07-06 — Lyrics UX: preview card + modal full-screen sheet (reference app)
 
-**Context:** User supplied two Spotify screenshots: lyrics as a tinted card on Now Playing, and a fully pulled-up state that is full-screen lyrics with the album cover as a small top-left thumbnail.
+**Context:** User supplied two reference-app screenshots: lyrics as a tinted card on Now Playing, and a fully pulled-up state that is full-screen lyrics with the album cover as a small top-left thumbnail.
 
 **Decision:** Card on the Now Playing scroll page shows a sliding fixed window of synced lines (no inner scrolling); tapping card/expand opens a full-height `showModalBottomSheet` (`isScrollControlled`) that hosts its own `SingleChildScrollView`, ticker, and `playerSnapshotProvider` watch. Auto-scroll (`Scrollable.ensureVisible`) lives only in the expanded sheet.
 
@@ -823,7 +823,7 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 
 ## 2026-07-06 — Phase Y: edit song metadata — full-screen form off the long-press sheet, tags-only, cover-cache eviction (#44)
 
-**Context:** Issue #44 — YT-Music downloads sometimes carry a wrong title or cover art versus what was searched. The client needs to let the user correct a song's title / album / artist and replace its embedded cover. The server half (backend Phase O) rewrites tags in place in the audio file and never renames it. This ADR captures the client-side decisions.
+**Context:** Issue #44 — online-search downloads sometimes carry a wrong title or cover art versus what was searched. The client needs to let the user correct a song's title / album / artist and replace its embedded cover. The server half (backend Phase O) rewrites tags in place in the audio file and never renames it. This ADR captures the client-side decisions.
 
 **Decision:**
 1. **Entry point is an "Edit metadata…" tile in the existing add-to-playlist long-press sheet** (`add_to_playlist_sheet.dart`), sitting just above the Phase-W "Delete from server…" tile and gated on the same `song.path != null` rule. Same three single-song callers pass it (`album_detail`, `playlist_detail`, `library_search_results`); album-level / multi-song callers leave it null.
@@ -850,7 +850,7 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 
 ## 2026-07-10 — Gradient "hero" home-screen widget + live 1s progress ticker
 
-**Context:** The gradient redesign (parts 1–4: theme + Settings + Home + Library/Downloads) moved the app off Spotify green. The user provided concept art for the home-screen widget with an idle state ("Start listening to your music" + gradient heerr logo) and a playing state (album art + gradient waveform + progress + gradient-circle play), inside a gradient border. Three widgets already exist (`NowPlayingWidgetProvider` 4×1 with art; `BarWidgetProvider` 3×1/4×1 with waveform+progress; `PillWidgetProvider` 2×1) sharing one `np_*` home_widget contract, but none combines art + waveform + progress, and the concept is a 2-row tile.
+**Context:** The gradient redesign (parts 1–4: theme + Settings + Home + Library/Downloads) moved the app off the earlier green seed. The user provided concept art for the home-screen widget with an idle state ("Start listening to your music" + gradient heerr logo) and a playing state (album art + gradient waveform + progress + gradient-circle play), inside a gradient border. Three widgets already exist (`NowPlayingWidgetProvider` 4×1 with art; `BarWidgetProvider` 3×1/4×1 with waveform+progress; `PillWidgetProvider` 2×1) sharing one `np_*` home_widget contract, but none combines art + waveform + progress, and the concept is a 2-row tile.
 
 **Decision:** Add a **new 4×2 `HeroWidgetProvider`** that IS the concept (both states in one layout, toggled off `np_has_track`); **recolor the shared green drawables to the magenta→violet gradient** (benefits Bar + Pill for free); and add a **live 1-second position ticker** so the progress bar + `m:ss` timestamps advance smoothly while playing.
 
@@ -929,7 +929,7 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 
 ## 2026-07-11 — Home Screen redesign scoping (mockup-first, own identity)
 
-**Context:** The app's Home Screen (greeting AppBar + recently-played grid + "Jump back in" / "Most played" / "Picked for you" horizontal shelves) reads as a Spotify clone. The user supplied a concept mockup (`Home Screen.png`, outside the repo) defining heerr's own layout: branded header, hero "Continue Listening" card, Quick Access shortcut cards, and a vertical "Recently Added" list. Four scope questions were put to the user before planning.
+**Context:** The app's Home Screen (greeting AppBar + recently-played grid + "Jump back in" / "Most played" / "Picked for you" horizontal shelves) reads as a clone of a familiar streaming app. The user supplied a concept mockup (`Home Screen.png`, outside the repo) defining heerr's own layout: branded header, hero "Continue Listening" card, Quick Access shortcut cards, and a vertical "Recently Added" list. Four scope questions were put to the user before planning.
 
 **Decision:** (all confirmed by the user 2026-07-11)
 1. The old horizontal sections are **dropped entirely** — Home matches the mockup exactly.
@@ -1091,7 +1091,7 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 2. **Tab order becomes Albums / Artists / Playlists (mockup order); deep link mapping updated in the same commit.** `_tabIndexFor` in `router.dart` now maps `artists`→1, `playlists`→2, default→0 (Albums). The Z3 `/library?tab=playlists` deep link is unaffected in behavior.
 3. **All sorting/filtering is client-side — zero new endpoints.** `AlbumSort` (Recently Added default / A–Z / Year), `ArtistSort` (A–Z / Z–A), `PlaylistSort` (Recently Added / A–Z) sort the existing cached fetches (`created`/`changed` ISO strings compare lexicographically). "Downloaded" chips filter on the offline manifest: `markedAlbums` for albums, `markedPlaylists` for playlists, and for artists `markedArtists` ∪ artists of marked albums joined on `Album.artistId`.
 4. **Grid = recent subset, list = full library** (user decision). Albums: 9-cap 3-column grid + full "Albums ›" list below in one `CustomScrollView`. Playlists: 2-column card grid (Favorites card first with the starred-songs count, up to 6 playlist cards, "+ Create Playlist" card last — replacing the FAB but reusing the same `CreatePlaylistDialog` flow) + full "Playlists ›" list with the For You entry preserved at the tail.
-5. **A–Z scrubber only in alphabetical sort, with fixed extents for exact jumps.** `AlphabetScrubber` (27 buckets, `#` + A–Z) fires letters; the tabs compute jump offsets from pinned extents (rows 72 via `SliverFixedExtentList`, chip row 56, section header 44) plus, on Albums, mirrored grid geometry. `scrubTargetIndex` does nearest-bucket fallthrough (Spotify behavior).
+5. **A–Z scrubber only in alphabetical sort, with fixed extents for exact jumps.** `AlphabetScrubber` (27 buckets, `#` + A–Z) fires letters; the tabs compute jump offsets from pinned extents (rows 72 via `SliverFixedExtentList`, chip row 56, section header 44) plus, on Albums, mirrored grid geometry. `scrubTargetIndex` does nearest-bucket fallthrough (familiar streaming-app behavior).
 6. **"Most Played Artists" is derived, not fetched.** Subsonic has no frequent-artists endpoint; `mostPlayedArtistsFrom` dedupes `getAlbumList2?type=frequent` by `artistId` (first album wins — the list is play-count ordered), the album cover doubles as the avatar and its id backs the play badge. Cap 10; the rail hides on loading/error/empty.
 7. **Artist rows show "N albums" only** (user decision) — `getArtists` has no song count and a per-artist `getArtist` fan-out was rejected.
 8. **Bottom nav unchanged** (user decision) — the mockup's 5-tab Home/Library/Downloads/Search/Profile nav is out of scope for this phase.

@@ -9,12 +9,12 @@ part 'search.g.dart';
 
 const Duration _kDefaultSearchDebounce = Duration(milliseconds: 300);
 
-/// Debounce applied to both the library and YouTube-Music search providers.
+/// Debounce applied to both the library and online search providers.
 /// Exposed so tests can override it (typically to `Duration.zero`).
 @Riverpod(keepAlive: true)
 Duration searchDebounce(SearchDebounceRef ref) => _kDefaultSearchDebounce;
 
-/// `POST /search` against the heerr backend (YouTube-Music search), via
+/// `POST /search` against the heerr backend (online search), via
 /// [BackendService].
 ///
 /// Family-keyed by the query string so the combined-search orchestrator can

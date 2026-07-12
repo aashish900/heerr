@@ -53,7 +53,7 @@ part 'library_tabs.dart';
 /// of Albums / Artists / Playlists driven by Subsonic. When the user enters
 /// search mode (search icon in the AppBar), the tab UI is hidden and the
 /// combined-search results render: "In your library" (Subsonic search3)
-/// above "On YouTube Music" (heerr backend search, auto-fired on empty
+/// above "Online results" (heerr backend search, auto-fired on empty
 /// library or manually).
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({this.initialTabIndex = 0, super.key});

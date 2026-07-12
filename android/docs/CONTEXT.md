@@ -8,12 +8,12 @@ Project brief for resuming the Android client build in Claude Code. Read this af
 
 ## Goal
 
-A native Android app where the user (single-user, single-device) searches YouTube Music, dispatches downloads to the home-server backend, and watches the queue / job-status as files are written into the Navidrome library on the home server.
+A native Android app where the user (single-user, single-device) searches the online music catalog, dispatches downloads to the home-server backend, and watches the queue / job-status as files are written into the Navidrome library on the home server.
 
 ## What the app does NOT do
 
-- **No download logic on-device.** The backend invokes spotDL; the device only POSTs `/download` and polls `/status`.
-- **No Spotify SDK / OAuth.** Search is via YouTube Music (backend `ytmusicapi`); the device speaks only to the backend.
+- **No download logic on-device.** The backend invokes its download tool; the device only POSTs `/download` and polls `/status`.
+- **No third-party music-service SDK / OAuth.** Search is via the backend's online-search integration; the device speaks only to the backend.
 - **No real-time channel.** No WebSocket / SSE / FCM. Status updates come from polling `/queue` and `/status/{id}`.
 - **No iOS.** Out of scope (no Xcode / Apple Developer account). Don't propose iOS-aware code.
 - **No public ingress.** App reaches the backend via Tailscale. No "internet" path.
@@ -45,7 +45,7 @@ Auth: `Authorization: Bearer <raw-token>`. The token is minted on the backend vi
 
 ## Aesthetic
 
-heerr brand gradient: magenta `#F533C8` → purple `#A93CF2` → violet `#6F4BF5` on near-black `#0A0A0A`. Material 3 with a hand-built raw `ColorScheme` (not `fromSeed`) in `lib/theme.dart` — primary magenta, explicit neutral `surfaceContainer*` grey ladder, black text on the bright accents. The gradient itself (`heerrGradient`) appears only on hero accents (play button, selected nav icon, scrubber active track, primary CTA, avatar rings); everything else uses solid magenta. Replaced the original Spotify-green seed (`#1DB954`) in the 2026-07 gradient redesign. Single dark theme — no light variant in v1.
+heerr brand gradient: magenta `#F533C8` → purple `#A93CF2` → violet `#6F4BF5` on near-black `#0A0A0A`. Material 3 with a hand-built raw `ColorScheme` (not `fromSeed`) in `lib/theme.dart` — primary magenta, explicit neutral `surfaceContainer*` grey ladder, black text on the bright accents. The gradient itself (`heerrGradient`) appears only on hero accents (play button, selected nav icon, scrubber active track, primary CTA, avatar rings); everything else uses solid magenta. Replaced the original green seed (`#1DB954`) in the 2026-07 gradient redesign. Single dark theme — no light variant in v1.
 
 Since the 2026-07-11 Home redesign the Now Playing chrome (Home hero card + MiniPlayer) also tints per-song: the cover's dominant colour (cached per URI via `artPaletteProvider`) is blended 18% toward brand magenta (`brandBlend`) and applied to waveforms/glows, cross-faded 400 ms on track change. Artwork is never recolored (DECISIONLOG 2026-07-11). The Home screen itself is: branded header, search pill, greeting block, Continue Listening hero card, Quick Access shortcut row, Recently Added list — plus Favorites (`/library/favorites`) and Recently Added (`/library/recently-added`) screens.
 
@@ -71,7 +71,7 @@ Polling cadences and error semantics are locked in `PLAN.md`.
 | 401 | Snackbar "auth failed" + push the user back to Settings (token expired / revoked). |
 | 403 | Snackbar "insufficient scope" — token doesn't have `download`. Don't redirect. |
 | 422 | Inline form error if it was a user-entered field; snackbar otherwise. |
-| 502 | "YouTube Music error: …" — ytmusicapi failure. |
+| 502 | "Online search error: …" — the backend's music-search integration failure. |
 | network failure | "can't reach backend — check Tailscale" snackbar. |
 | other 4xx/5xx | Snackbar with the `detail` field from the backend's error envelope. |
 
@@ -105,7 +105,7 @@ Zero Flutter / Dart / mobile-app experience. Hand-hold every file path, every co
 - Internationalisation / locales.
 - Tablet-optimised layouts.
 - Per-user accounts (this is single-user).
-- Spotify login on device.
+- Third-party music-service login on device.
 - Admin endpoints (`/api/v1/admin/*`) — token management is CLI-only.
 
 ## Next action

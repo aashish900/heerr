@@ -4,7 +4,7 @@ Status: **IMPLEMENTED** 2026-07-11 on branch `redesign/home-screen` (commits `bf
 Structure: **Part A** (§4, tasks 1–8) = the mockup layout. **Part B** (§7, tasks B1–B4) = adaptive art-driven theming of the hero card + MiniPlayer. Part B depends on Part A tasks 2 and 7 having landed.
 Reference mockup: `/Users/E1621/Documents/Personal/Android/Home Screen.png` (outside the repo — copy into `android/docs/assets/` if it should be versioned).
 
-Goal: move the Home Screen away from the Spotify-clone layout (greeting AppBar + album grid + horizontal shelves) to heerr's own identity: branded header, hero **Continue Listening** card, **Quick Access** shortcut cards, and a vertical **Recently Added** list — all on the existing near-black + magenta→purple→violet gradient palette (`lib/theme.dart`).
+Goal: move the Home Screen away from the reference-app-clone layout (greeting AppBar + album grid + horizontal shelves) to heerr's own identity: branded header, hero **Continue Listening** card, **Quick Access** shortcut cards, and a vertical **Recently Added** list — all on the existing near-black + magenta→purple→violet gradient palette (`lib/theme.dart`).
 
 ---
 

@@ -81,7 +81,7 @@ class AlphabetScrubber extends StatelessWidget {
 
 /// First list index the scrubber should land on for [letter], given
 /// case-insensitively sorted [names]. Returns the first exact-bucket match,
-/// else the first entry sorting *after* the bucket (nearest-jump, Spotify
+/// else the first entry sorting *after* the bucket (nearest-jump
 /// behavior), else null for an empty list.
 int? scrubTargetIndex(List<String> names, String letter) {
   if (names.isEmpty) return null;

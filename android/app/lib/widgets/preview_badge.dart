@@ -1,7 +1,7 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 
-/// True when [item] is a YouTube-Music *preview* stream (Phase T) rather than a
+/// True when [item] is an online-search *preview* stream (Phase T) rather than a
 /// library track — i.e. it was built by `searchResultToMediaItem`, which stamps
 /// `extras['preview'] == true`.
 bool isPreviewMediaItem(MediaItem? item) => item?.extras?['preview'] == true;

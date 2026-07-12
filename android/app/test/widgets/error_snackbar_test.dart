@@ -86,11 +86,11 @@ void main() {
       await tester.pumpWidget(_harness(
         onPressed: (BuildContext c) => showApiError(
           c,
-          const UnprocessableError(detail: 'invalid spotify URI'),
+          const UnprocessableError(detail: 'invalid source URI'),
         ),
       ));
       await _tapTrigger(tester);
-      expect(find.text('invalid spotify URI'), findsOneWidget);
+      expect(find.text('invalid source URI'), findsOneWidget);
     });
 
     testWidgets('503 RateLimitedError → "Rate-limited — retry in Ns"', (

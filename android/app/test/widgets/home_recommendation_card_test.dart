@@ -61,45 +61,45 @@ void main() {
     },
   );
 
-  group('extractYoutubeVideoId', () {
+  group('extractSourceVideoId', () {
     test('music.youtube.com watch?v=...', () {
       expect(
-        extractYoutubeVideoId('https://music.youtube.com/watch?v=abc123'),
+        extractSourceVideoId('https://music.youtube.com/watch?v=abc123'),
         'abc123',
       );
     });
     test('youtube.com watch?v=...', () {
       expect(
-        extractYoutubeVideoId('https://www.youtube.com/watch?v=def456'),
+        extractSourceVideoId('https://www.youtube.com/watch?v=def456'),
         'def456',
       );
     });
     test('youtu.be short form', () {
       expect(
-        extractYoutubeVideoId('https://youtu.be/xyz789'),
+        extractSourceVideoId('https://youtu.be/xyz789'),
         'xyz789',
       );
     });
     test('empty string → null', () {
-      expect(extractYoutubeVideoId(''), isNull);
+      expect(extractSourceVideoId(''), isNull);
     });
-    test('non-youtube URL → null', () {
+    test('non-matching URL → null', () {
       expect(
-        extractYoutubeVideoId('https://spotify.com/track/123'),
+        extractSourceVideoId('https://example.com/track/123'),
         isNull,
       );
     });
     test('watch URL missing v param → null', () {
       expect(
-        extractYoutubeVideoId('https://music.youtube.com/watch?foo=bar'),
+        extractSourceVideoId('https://music.youtube.com/watch?foo=bar'),
         isNull,
       );
     });
   });
 
-  test('youtubeThumbnailUrl builds an img.youtube.com URL', () {
+  test('remoteThumbnailUrl builds an img.youtube.com URL', () {
     expect(
-      youtubeThumbnailUrl('abc123'),
+      remoteThumbnailUrl('abc123'),
       'https://img.youtube.com/vi/abc123/mqdefault.jpg',
     );
   });

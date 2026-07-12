@@ -268,10 +268,10 @@ class _CombinedSearchProviderElement
 
 String _$ytmManualTriggerHash() => r'12ccaa1b41250565f306e743e008891b31642776';
 
-/// Set of queries the user has explicitly opted into firing a YouTube-Music
+/// Set of queries the user has explicitly opted into firing an online
 /// search for. Auto-fire (when the library result is empty) bypasses this;
 /// this set is only consulted when the library half *did* return results
-/// and the user tapped "Search more on YouTube Music".
+/// and the user tapped "Search online".
 ///
 /// Copied from [YtmManualTrigger].
 @ProviderFor(YtmManualTrigger)

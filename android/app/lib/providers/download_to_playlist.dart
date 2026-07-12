@@ -12,7 +12,7 @@ import '../widgets/error_snackbar.dart';
 import 'download.dart';
 import 'library/playlist_mutations.dart';
 
-/// U1: dispatch a YouTube-Music download and, once the backend job finishes
+/// U1: dispatch an online-search download and, once the backend job finishes
 /// and Navidrome indexes the new file, add the resulting library song to
 /// [playlistId]. Top-level async orchestration with no persistent Riverpod
 /// state — mirrors `playPreview` / `playSongFromSubsonic`.

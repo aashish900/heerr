@@ -29,7 +29,7 @@ class _SearchModeScaffold extends ConsumerWidget {
             autofocus: true,
             textInputAction: TextInputAction.search,
             decoration: const InputDecoration(
-              hintText: 'Search library + YouTube Music',
+              hintText: 'Search library + online',
               border: InputBorder.none,
             ),
             onChanged: onQueryChanged,
@@ -51,7 +51,7 @@ class _SearchModeScaffold extends ConsumerWidget {
                 icon: Icons.search,
                 title: 'Search your library',
                 subtitle:
-                    'We check Navidrome first. YouTube Music kicks in if nothing matches.',
+                    'We check Navidrome first. Online results kick in if nothing matches.',
               )
             : _CombinedResultsBody(query: query),
     );
@@ -100,7 +100,7 @@ class _CombinedResultsBody extends ConsumerWidget {
             icon: Icons.search_off,
             title: 'No matches',
             subtitle:
-                'Nothing in your library or on YouTube Music for that query.',
+                'Nothing in your library or online for that query.',
           );
         }
 
@@ -166,8 +166,8 @@ class _CombinedResultsBody extends ConsumerWidget {
               ],
             ],
 
-            // -------------------- YouTube Music section --------------------
-            const _SectionHeader(label: 'On YouTube Music'),
+            // -------------------- Online section --------------------
+            const _SectionHeader(label: 'Online results'),
             if (ytm == null && !libEmpty && !manuallyTriggered)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
@@ -175,7 +175,7 @@ class _CombinedResultsBody extends ConsumerWidget {
                   onPressed: () => ref
                       .read(ytmManualTriggerProvider.notifier)
                       .trigger(query),
-                  child: const Text('Search more on YouTube Music'),
+                  child: const Text('Search online'),
                 ),
               )
             else if (ytm != null)
@@ -214,14 +214,14 @@ class _YtmSection extends ConsumerWidget {
       error: (Object e, _) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
         child: Text(
-          e is ApiError ? e.message : 'YouTube Music search failed: $e',
+          e is ApiError ? e.message : 'Online search failed: $e',
         ),
       ),
       data: (SearchResponse r) {
         if (r.results.isEmpty) {
           return const Padding(
             padding: EdgeInsets.fromLTRB(16, 4, 16, 16),
-            child: Text('Nothing on YouTube Music either.'),
+            child: Text('Nothing online either.'),
           );
         }
         return Column(

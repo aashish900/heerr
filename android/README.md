@@ -3,7 +3,7 @@
 [![Android APK](https://github.com/aashish900/heerr/actions/workflows/android-publish.yml/badge.svg)](https://github.com/aashish900/heerr/actions/workflows/android-publish.yml)
 [![latest release](https://img.shields.io/github/v/release/aashish900/heerr)](https://github.com/aashish900/heerr/releases/latest)
 
-Native Android app: search YouTube Music, dispatch downloads to the home-server backend, watch the queue. Talks REST over Tailscale to the FastAPI service in [`../backend/`](../backend/).
+Native Android app: search the online music catalog, dispatch downloads to the home-server backend, watch the queue. Talks REST over Tailscale to the FastAPI service in [`../backend/`](../backend/).
 
 > **Status (2026-06-09):** planning complete. Flutter project itself does not exist yet — `android/app/` is created at milestone A1. Until then this README is forward-looking; commands marked **(post-A1)** won't work yet.
 
@@ -30,7 +30,7 @@ Native Android app: search YouTube Music, dispatch downloads to the home-server 
 3. Tap a result → backend dispatches the download (`/download`) → Navidrome auto-indexes the file on the home server within ~1 min.
 4. Queue + job-detail screens poll `/queue` and `/status/{id}` to show what's in flight.
 
-What it explicitly does **not** do (see `docs/PLAN.md` §11): Spotify SDK / OAuth on device, push notifications, biometric unlock, light theme, iOS port, admin endpoints, internationalisation.
+What it explicitly does **not** do (see `docs/PLAN.md` §11): third-party music-service SDK / OAuth on device, push notifications, biometric unlock, light theme, iOS port, admin endpoints, internationalisation.
 
 ---
 

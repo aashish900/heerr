@@ -168,8 +168,8 @@ List<SeedTrack> sampleSeeds(
 ///
 /// When the seed collection is empty, still calls the backend with
 /// `seeds: []` — the listenbrainz engine drives its own history-based
-/// results, so the empty-seed case is meaningful there. ytmusic and lastfm
-/// engines will return `[]` for empty seeds; the screen renders the
+/// results, so the empty-seed case is meaningful there. Other engines
+/// will return `[]` for empty seeds; the screen renders the
 /// empty-state widget.
 /// Freshness window for [Recommendations.refreshIfStale] (#38). Calls newer
 /// than this no-op; older ones invalidate so the next read re-fetches with a

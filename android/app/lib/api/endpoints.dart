@@ -9,9 +9,10 @@ class Endpoints {
   static const String queue = '/queue';
 
   /// Phase K preview proxy: backend `GET /api/v1/preview/stream`. Resolves a
-  /// YouTube Music watch URL to audio (yt-dlp) and proxies the bytes so a
-  /// search result can be streamed before it is downloaded. just_audio can't
-  /// attach auth headers to an `AudioSource`, so the bearer rides in `?token=`
+  /// watch URL from the online catalog to audio (yt-dlp) and proxies the
+  /// bytes so a search result can be streamed before it is downloaded.
+  /// just_audio can't attach auth headers to an `AudioSource`, so the bearer
+  /// rides in `?token=`
   /// — see `player/preview_url.dart::buildPreviewStreamUrl`.
   static const String previewStream = '/preview/stream';
 

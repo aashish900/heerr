@@ -116,7 +116,7 @@ Future<void> playSongFromSubsonic(
   }
 }
 
-/// Stream a not-in-library YouTube-Music search result through the backend
+/// Stream a not-in-library online search result through the backend
 /// preview proxy (Phase K / Phase T), without downloading it first. Replaces
 /// the queue with just this preview.
 ///
