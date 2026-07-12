@@ -86,6 +86,19 @@ void main() {
       final Size size = tester.getSize(find.byType(SettingsTile));
       expect(size.height, greaterThanOrEqualTo(48));
     });
+
+    testWidgets('titleColor/iconColor override the default magenta', (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(const SettingsTile(
+        icon: Icons.delete_outline,
+        title: 'Clear all downloads',
+        iconColor: Colors.redAccent,
+        titleColor: Colors.redAccent,
+      )));
+      final Icon icon = tester.widget(find.byIcon(Icons.delete_outline));
+      expect(icon.color, Colors.redAccent);
+      final Text title = tester.widget(find.text('Clear all downloads'));
+      expect(title.style?.color, Colors.redAccent);
+    });
   });
 
   group('SettingsSwitchTile', () {

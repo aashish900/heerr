@@ -1,7 +1,7 @@
 part of 'settings_screen.dart';
 
 // ---------------------------------------------------------------------------
-// Offline downloads section (Phase L)
+// Downloads & Storage group (SETTINGSSCREEN.md SE5; originally Phase L)
 // ---------------------------------------------------------------------------
 
 const List<int> _kPollChoices = <int>[5, 15, 30, 60];
@@ -22,32 +22,33 @@ class _OfflineSection extends ConsumerWidget {
           chargingOnly: false,
         );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return SettingsGroupCard(
       children: <Widget>[
-        SwitchListTile(
-          secondary: const DownloadIcon(filled: false),
-          title: const Text('Offline downloads'),
-          subtitle: const Text(
-            'Marked albums and playlists download to the device. '
-            'Playback uses the local file when available.',
-          ),
+        SettingsSwitchTile(
+          icon: Icons.download_outlined,
+          title: 'Offline downloads',
+          // D4: the sync sweep runs automatically (no standalone "Auto
+          // Cleanup" toggle) — mentioned here instead.
+          subtitle: 'Marked albums and playlists download to the device. '
+              'Unmarked files are cleaned up automatically.',
           value: s.enabled,
           onChanged: (bool v) =>
               ref.read(offlineSettingsProvider.notifier).setEnabled(v),
         ),
-        // Sub-controls greyed out when master is off.
+        // Sub-controls greyed out when the master switch is off. D6: Wi-Fi
+        // only / Charging only / Sync interval live here, not on the
+        // promoted Server & Sync card (SE4) — they gate downloading, not
+        // connectivity.
         Opacity(
           opacity: s.enabled ? 1.0 : 0.5,
           child: AbsorbPointer(
             absorbing: !s.enabled,
             child: Column(
               children: <Widget>[
-                SwitchListTile(
-                  title: const Text('WiFi only'),
-                  subtitle: const Text(
-                    'Pause syncing on cellular data.',
-                  ),
+                SettingsSwitchTile(
+                  icon: Icons.wifi,
+                  title: 'WiFi only',
+                  subtitle: 'Pause syncing on cellular data.',
                   value: s.wifiOnly,
                   onChanged: (bool v) => ref
                       .read(offlineSettingsProvider.notifier)
@@ -56,41 +57,29 @@ class _OfflineSection extends ConsumerWidget {
                 // Q2: gates the WorkManager periodic worker on charger state.
                 // Foreground sync ignores this — running while the user has
                 // the app open should never be blocked.
-                SwitchListTile(
-                  title: const Text('Charging only'),
-                  subtitle: const Text(
-                    'Only run background sync while plugged in.',
-                  ),
+                SettingsSwitchTile(
+                  icon: Icons.battery_charging_full_outlined,
+                  title: 'Charging only',
+                  subtitle: 'Only run background sync while plugged in.',
                   value: s.chargingOnly,
                   onChanged: (bool v) => ref
                       .read(offlineSettingsProvider.notifier)
                       .setChargingOnly(v),
                 ),
                 _SyncAllTile(syncAll: s.syncAll),
-                ListTile(
-                  title: const Text('Sync interval'),
-                  subtitle: const Text(
-                    'How often the app checks for new tracks while open.',
-                  ),
-                  trailing: DropdownButton<int>(
-                    value: s.pollIntervalMinutes,
-                    onChanged: (int? v) {
-                      if (v == null) return;
-                      ref
-                          .read(offlineSettingsProvider.notifier)
-                          .setPollInterval(v);
-                    },
-                    items: <DropdownMenuItem<int>>[
-                      for (final int v in _kPollChoices)
-                        DropdownMenuItem<int>(
-                          value: v,
-                          child: Text('$v min'),
-                        ),
-                    ],
-                  ),
+                SettingsDropdownTile<int>(
+                  icon: Icons.timer_outlined,
+                  title: 'Sync interval',
+                  subtitle: 'How often the app checks for new tracks while open.',
+                  value: s.pollIntervalMinutes,
+                  items: _kPollChoices,
+                  labelBuilder: (int v) => '$v min',
+                  onChanged: (int v) => ref
+                      .read(offlineSettingsProvider.notifier)
+                      .setPollInterval(v),
                 ),
                 const _StorageLine(),
-                const _ClearAllAction(),
+                const _ClearAllTile(),
               ],
             ),
           ),
@@ -108,56 +97,43 @@ class _StorageLine extends ConsumerWidget {
     final OfflineManifest? m =
         ref.watch(offlineManifestProvider).valueOrNull;
     if (m == null) {
-      return const ListTile(
-        leading: Icon(Icons.storage_outlined),
-        title: Text('Local storage'),
-        subtitle: Text('—'),
+      return const SettingsTile(
+        icon: Icons.storage_outlined,
+        title: 'Local storage',
+        subtitle: '—',
       );
     }
     final int totalBytes = m.songs.values
         .map((OfflineSongEntry e) => e.size ?? 0)
         .fold<int>(0, (int a, int b) => a + b);
     final String sizeStr = _humanBytes(totalBytes);
-    return ListTile(
-      leading: const Icon(Icons.storage_outlined),
-      title: const Text('Local storage'),
-      subtitle: Text(
-        '${m.markedAlbums.length} albums · '
-        '${m.markedPlaylists.length} playlists · '
-        '${m.songs.length} songs · $sizeStr',
-      ),
+    return SettingsTile(
+      icon: Icons.storage_outlined,
+      title: 'Local storage',
+      subtitle: '${m.markedAlbums.length} albums · '
+          '${m.markedPlaylists.length} playlists · '
+          '${m.songs.length} songs · $sizeStr',
     );
   }
 }
 
-class _ClearAllAction extends ConsumerStatefulWidget {
-  const _ClearAllAction();
+class _ClearAllTile extends ConsumerStatefulWidget {
+  const _ClearAllTile();
   @override
-  ConsumerState<_ClearAllAction> createState() => _ClearAllActionState();
+  ConsumerState<_ClearAllTile> createState() => _ClearAllTileState();
 }
 
-class _ClearAllActionState extends ConsumerState<_ClearAllAction> {
+class _ClearAllTileState extends ConsumerState<_ClearAllTile> {
   bool _busy = false;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: Row(
-        children: <Widget>[
-          TextButton.icon(
-            icon: const Icon(
-              Icons.delete_outline,
-              color: Colors.redAccent,
-            ),
-            label: const Text(
-              'Clear all downloads',
-              style: TextStyle(color: Colors.redAccent),
-            ),
-            onPressed: _busy ? null : _confirm,
-          ),
-        ],
-      ),
+    return SettingsTile(
+      icon: Icons.delete_outline,
+      title: 'Clear all downloads',
+      iconColor: Colors.redAccent,
+      titleColor: Colors.redAccent,
+      onTap: _busy ? null : _confirm,
     );
   }
 
@@ -225,9 +201,10 @@ class _SyncAllTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<int?> estimate = ref.watch(offlineSizeEstimateProvider);
-    return SwitchListTile(
-      title: const Text('Sync entire library'),
-      subtitle: Text(_subtitleFor(estimate)),
+    return SettingsSwitchTile(
+      icon: Icons.library_music_outlined,
+      title: 'Sync entire library',
+      subtitle: _subtitleFor(estimate),
       value: syncAll,
       onChanged: (bool v) async {
         if (v) {

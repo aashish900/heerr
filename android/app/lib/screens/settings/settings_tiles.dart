@@ -82,6 +82,8 @@ class SettingsTile extends StatelessWidget {
     this.value,
     this.onTap,
     this.trailing,
+    this.iconColor,
+    this.titleColor,
     super.key,
   });
 
@@ -91,6 +93,11 @@ class SettingsTile extends StatelessWidget {
   final String? value;
   final VoidCallback? onTap;
   final Widget? trailing;
+
+  /// Overrides for destructive rows (e.g. "Clear all downloads"). Default to
+  /// the theme's magenta accent when unset.
+  final Color? iconColor;
+  final Color? titleColor;
 
   @override
   Widget build(BuildContext context) {
@@ -111,7 +118,7 @@ class SettingsTile extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             child: Row(
               children: <Widget>[
-                Icon(icon, color: heerrMagenta),
+                Icon(icon, color: iconColor ?? heerrMagenta),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -122,6 +129,7 @@ class SettingsTile extends StatelessWidget {
                         title,
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                               fontWeight: FontWeight.w600,
+                              color: titleColor,
                             ),
                       ),
                       if (subtitle != null) ...<Widget>[

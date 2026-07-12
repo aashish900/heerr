@@ -127,37 +127,30 @@ Future<void> _expandSection(WidgetTester tester, String title) async {
 
 void main() {
   group('Collapsible sections (#17)', () {
-    testWidgets('all three section headers render', (WidgetTester tester) async {
+    testWidgets('remaining section headers render (Downloads & Storage is flat, SE5)',
+        (WidgetTester tester) async {
       await _useTallSurface(tester);
       await tester.pumpWidget(_wrap(<Override>[..._storage(_InMemoryStorage())]));
       await _pumpForBuild(tester);
       expect(find.byKey(const Key('settings-section-Profiles')), findsOneWidget);
-      expect(find.byKey(const Key('settings-section-Offline downloads')),
-          findsOneWidget);
       expect(find.byKey(const Key('settings-section-Recommendations')),
           findsOneWidget);
+      // Downloads & Storage was flattened in SE5 — a plain section header +
+      // always-visible SettingsGroupCard, no ExpansionTile.
+      expect(find.text('Downloads & Storage'), findsOneWidget);
     });
 
-    testWidgets('Profiles expanded by default; others collapsed',
+    testWidgets('Profiles expanded by default; Recommendations collapsed',
         (WidgetTester tester) async {
       await _useTallSurface(tester);
       await tester.pumpWidget(_wrap(<Override>[..._storage(_InMemoryStorage())]));
       await _pumpForBuild(tester);
       // Profiles body is visible without tapping (empty registry → Add row).
       expect(find.text('Add profile'), findsOneWidget);
-      // Other sections' bodies are hidden until expanded.
-      expect(find.text('WiFi only'), findsNothing);
-      expect(find.text('Engine health'), findsNothing);
-    });
-
-    testWidgets('collapsed Offline section expands on tap',
-        (WidgetTester tester) async {
-      await _useTallSurface(tester);
-      await tester.pumpWidget(_wrap(<Override>[..._storage(_InMemoryStorage())]));
-      await _pumpForBuild(tester);
-      expect(find.text('WiFi only'), findsNothing);
-      await _expandSection(tester, 'Offline downloads');
+      // Downloads & Storage is flat (SE5) — always visible now.
       expect(find.text('WiFi only'), findsOneWidget);
+      // Recommendations is still collapsible and hidden until expanded.
+      expect(find.text('Engine health'), findsNothing);
     });
   });
 
@@ -188,9 +181,8 @@ void main() {
         ..._storage(_InMemoryStorage()),
       ]));
       await _pumpForBuild(tester);
-      // Collapsed by default (#17) — body hidden until the header is tapped.
-      expect(find.text('WiFi only'), findsNothing);
-      await _expandSection(tester, 'Offline downloads');
+      // SE5: Downloads & Storage is a flat, always-visible SettingsGroupCard
+      // — no expand step needed.
       expect(find.text('Offline downloads'), findsAtLeast(1));
       expect(find.text('WiFi only'), findsOneWidget);
       expect(find.text('Sync interval'), findsOneWidget);
@@ -208,10 +200,8 @@ void main() {
       final _InMemoryStorage store = _InMemoryStorage();
       await tester.pumpWidget(_wrap(_storage(store)));
       await _pumpForBuild(tester);
-      await _expandSection(tester, 'Offline downloads');
 
-      // First SwitchListTile is the master.
-      await tester.tap(find.byType(SwitchListTile).first);
+      await tester.tap(find.byKey(const Key('settings-tile-offline-downloads')));
       await _pumpForBuild(tester);
 
       expect(store.snapshot['offline_enabled'], 'true');
@@ -227,11 +217,8 @@ void main() {
         estimateBytes: 2 * 1024 * 1024,
       ));
       await _pumpForBuild(tester);
-      await _expandSection(tester, 'Offline downloads');
 
-      // Tap the "Sync entire library" switch — it's the SwitchListTile whose
-      // title matches that exact string.
-      await tester.tap(find.widgetWithText(SwitchListTile, 'Sync entire library'));
+      await tester.tap(find.byKey(const Key('settings-tile-sync-entire-library')));
       await _pumpForBuild(tester);
 
       expect(find.text('Sync entire library?'), findsOneWidget);
@@ -256,9 +243,8 @@ void main() {
         estimateBytes: 1024,
       ));
       await _pumpForBuild(tester);
-      await _expandSection(tester, 'Offline downloads');
 
-      await tester.tap(find.widgetWithText(SwitchListTile, 'Sync entire library'));
+      await tester.tap(find.byKey(const Key('settings-tile-sync-entire-library')));
       await _pumpForBuild(tester);
       await tester.tap(find.text('Cancel'));
       await _pumpForBuild(tester);
@@ -279,9 +265,8 @@ void main() {
         estimateBytes: 1024,
       ));
       await _pumpForBuild(tester);
-      await _expandSection(tester, 'Offline downloads');
 
-      await tester.tap(find.widgetWithText(SwitchListTile, 'Sync entire library'));
+      await tester.tap(find.byKey(const Key('settings-tile-sync-entire-library')));
       await _pumpForBuild(tester);
       await tester.tap(find.widgetWithText(FilledButton, 'Sync'));
       // The OFF→ON confirm path is longer than other taps: dialog pop +
@@ -302,7 +287,6 @@ void main() {
         _storage(_InMemoryStorage(<String, String>{'offline_enabled': 'true'})),
       ));
       await _pumpForBuild(tester);
-      await _expandSection(tester, 'Offline downloads');
 
       await tester.tap(find.text('Clear all downloads'));
       await _pumpForBuild(tester);

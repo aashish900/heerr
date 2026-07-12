@@ -13,7 +13,6 @@ import '../../providers/recommendations.dart';
 import '../../providers/server_creds.dart';
 import '../../theme.dart';
 import '../../widgets/branded_header.dart';
-import '../../widgets/download_icon.dart';
 import '../../widgets/error_snackbar.dart';
 import 'profile_card.dart';
 import 'profiles_section.dart';
@@ -77,11 +76,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 initiallyExpanded: true,
                 child: ProfilesSection(),
               ),
-              _CollapsibleSection(
-                leading: DownloadIcon(filled: false, color: heerrMagenta),
-                title: 'Offline downloads',
-                child: _OfflineSection(),
-              ),
+              SettingsSectionHeader('Downloads & Storage'),
+              _OfflineSection(),
               _CollapsibleSection(
                 leading: Icon(Icons.recommend_outlined, color: heerrMagenta),
                 title: 'Recommendations',

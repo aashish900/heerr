@@ -2900,3 +2900,12 @@ User review flagged four more issues:
 - New `test/screens/settings/server_sync_card_test.dart` (4 tests): online/offline/never-synced states, Sync Now tap fires `syncNow()`.
 - `test/screens/settings_screen_test.dart` — updated comment noting Sync Now's new home; assertion count unchanged (still exactly one, now from the promoted card).
 - Verification: `flutter analyze` clean; full `flutter test` green (984 tests).
+
+## 2026-07-12 — Settings redesign SE5: Downloads & Storage group restyle
+
+- `lib/screens/settings/settings_offline.dart` — `_OfflineSection` rebuilt on the SE2 tile system: `SettingsGroupCard` wrapping `SettingsSwitchTile`/`SettingsDropdownTile`/`SettingsTile` rows instead of `SwitchListTile`/`ListTile`. Master-switch subtitle now mentions the automatic sweep ("Unmarked files are cleaned up automatically") since there's no standalone Auto Cleanup toggle (D4). `_ClearAllAction` renamed `_ClearAllTile`, restyled as a `SettingsTile` with `iconColor`/`titleColor: Colors.redAccent`. Sync interval moved to `SettingsDropdownTile<int>`.
+- `lib/screens/settings/settings_tiles.dart` — added optional `iconColor`/`titleColor` params to `SettingsTile` for the destructive Clear-all row.
+- `lib/screens/settings/settings_screen.dart` — Downloads & Storage is no longer wrapped in `_CollapsibleSection`; it's now a flat `SettingsSectionHeader('Downloads & Storage')` + always-visible `_OfflineSection` card (D5 flattening starts here; Profiles/Recommendations follow in SE6, which retires `_CollapsibleSection` entirely). Dropped the now-unused `DownloadIcon` import.
+- `test/screens/settings/settings_tiles_test.dart` — added a test for the new `iconColor`/`titleColor` params.
+- `test/screens/settings_screen_test.dart` — Offline-section tests no longer call `_expandSection` (content is always visible); switch/dialog taps retarget `settings-tile-<slug>` keys instead of `find.byType(SwitchListTile)` (that type no longer appears in this section). Removed the now-inapplicable "collapsed Offline section expands on tap" test.
+- Verification: `flutter analyze` clean; full `flutter test` green (984 tests).
