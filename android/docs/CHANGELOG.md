@@ -2860,3 +2860,7 @@ User review flagged four more issues:
 - **`android/app/assets/images/downloads_server.png`** (new) — user-supplied server illustration (dark cube-shaped device, magenta rim light, glow platform), added to `pubspec.yaml` assets.
 - **`lib/screens/downloads/server_glyph.dart`** — replaced the `CustomPaint` rack-outline illustration with `Image.asset` of the new artwork; kept the breathing-glow animation (now a `BoxShadow` behind the image) and the offline-dim behavior (`Opacity` 0.5 instead of the painter's dim stroke color).
 - Verification: `flutter analyze` clean; full `flutter test` green (971 tests, no new — visual-only change).
+
+## 2026-07-12 — Version bump to 4.12.1 (Downloads hero fix pass release)
+
+- **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.12.0 → 4.12.1 per the version-sync convention, covering the green Online pill + real server illustration fix above. Android-side only; backend bumped for sync.
