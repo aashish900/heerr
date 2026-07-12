@@ -2750,3 +2750,10 @@ User review flagged four more issues:
 - `_openQueueSheet`: glass sheet chrome (28dp top corners, translucent near-black fill, hairline top border) via a custom `backgroundColor: Colors.transparent` + `builder`, replacing the framework's default opaque sheet Material.
 - Test migration (planned, not a regression): "rows render drag handles" (3→2, Now Playing has none) and "dragging a handle reorders" (now drags a Next Up handle, asserting real queue indices `(1, 2)` instead of `(0, 1)`) rewritten for the new semantics. New tests: section labels present and scoped correctly (disambiguated against the header's own static "NOW PLAYING" text via a new `now-playing-queue-sheet` key), and the "current track isn't first" dimmed-earlier-item scenario.
 - Verification: `flutter analyze` clean; `flutter test` 920/920.
+
+## 2026-07-11 — Now Playing redesign NP10 — swipe-up gesture (reduced scope)
+
+- `screens/player/now_playing_screen.dart` (`_HeroArt`): new `onSwipeUp` callback + vertical `GestureDetector` (key `now-playing-hero-swipe-area`) tracking cumulative drag delta and fling velocity. An upward swipe (≥60px cumulative drag, or `primaryVelocity` < -600) opens `_ExpandedLyricsSheet` — the same modal the NP7 Lyrics pill slot and NP8 expand icon already open. Small vertical wobbles (≤10px) don't trigger it.
+- This is a **reduced-scope** implementation of the plan's NP10 spec — a discrete swipe-opens-the-existing-sheet gesture, not the full continuous drag-morph transition (hero art shrinking into a floating corner thumb, title/transport/pill fading, waveform crossfading into a progress line, all interactively scrubbable). See DECISIONLOG 2026-07-11 for the full scoping rationale — the plan itself pre-authorized this fallback ("timebox; if it slips, ship NP1–NP9 and log NP10 to DEBT"). Swipe-down-to-dismiss and the collapse chevron were already covered by `showModalBottomSheet`'s default drag-to-dismiss behaviour — no new code needed there.
+- New tests in `now_playing_lyrics_expand_test.dart`: swipe-up opens the sheet; a small vertical wobble does not.
+- Verification: `flutter analyze` clean; `flutter test` 922/922.

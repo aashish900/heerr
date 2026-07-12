@@ -268,10 +268,10 @@ class _Header extends StatelessWidget {
               // label kept until that plumbing exists.
               'NOW PLAYING',
               textAlign: TextAlign.center,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelSmall
-                  ?.copyWith(letterSpacing: 1.5, color: Colors.white70),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                letterSpacing: 1.5,
+                color: Colors.white70,
+              ),
             ),
           ),
           // NOWPLAYING.md §2.3: disabled placeholder — no output-routing
@@ -315,22 +315,21 @@ class _Body extends ConsumerWidget {
     final MediaItem item = snapshot.item!;
     final Duration duration = item.duration ?? Duration.zero;
     final Duration position = scrubOverride ?? snapshot.state.position;
-    final Song? currentSong =
-        !isPreviewMediaItem(item) ? songFromMediaItem(item) : null;
+    final Song? currentSong = !isPreviewMediaItem(item)
+        ? songFromMediaItem(item)
+        : null;
     final Duration? sleepRemaining = ref.watch(sleepTimerNotifierProvider);
 
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          const SafeArea(
-            bottom: false,
-            child: _Header(),
-          ),
+          const SafeArea(bottom: false, child: _Header()),
           _HeroArt(
             artUri: item.artUri,
             tintColor: tintColor,
             song: currentSong,
+            onSwipeUp: () => _ExpandedLyricsSheet.show(context, tintColor),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 8, 16, 0),
@@ -347,9 +346,7 @@ class _Body extends ConsumerWidget {
                       ],
                       Text(
                         item.title,
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineMedium
+                        style: Theme.of(context).textTheme.headlineMedium
                             ?.copyWith(fontWeight: FontWeight.w800),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -358,9 +355,7 @@ class _Body extends ConsumerWidget {
                         const SizedBox(height: 6),
                         Text(
                           item.artist!,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyLarge
+                          style: Theme.of(context).textTheme.bodyLarge
                               ?.copyWith(color: Colors.white70),
                         ),
                       ],
@@ -417,21 +412,36 @@ class _HeroArt extends StatefulWidget {
     required this.artUri,
     required this.tintColor,
     required this.song,
+    this.onSwipeUp,
   });
 
   final Uri? artUri;
   final Color? tintColor;
   final Song? song;
 
+  /// NOWPLAYING.md NP10 — swiping up on the art opens the lyrics takeover.
+  /// A discrete "swipe triggers the existing expanded sheet" gesture,
+  /// not the plan's full continuous drag-morph transform: that version
+  /// requires interpolating the hero art's own position/scale against the
+  /// title/transport/pill layout and the waveform-to-progress-line
+  /// crossfade in lockstep, which is a proportionally much larger effort
+  /// than the rest of NP1–NP9 combined. The plan explicitly invites this
+  /// fallback ("if it slips, ship NP1–NP9 and log NP10 to DEBT") — this is
+  /// the middle ground: real, tested, shippable, without the full rebuild.
+  final VoidCallback? onSwipeUp;
+
   @override
   State<_HeroArt> createState() => _HeroArtState();
 }
 
-class _HeroArtState extends State<_HeroArt> with SingleTickerProviderStateMixin {
+class _HeroArtState extends State<_HeroArt>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _floatCtrl = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 6),
   );
+
+  double _dragAccum = 0;
 
   @override
   void initState() {
@@ -445,6 +455,21 @@ class _HeroArtState extends State<_HeroArt> with SingleTickerProviderStateMixin 
     super.dispose();
   }
 
+  void _onVerticalDragStart(DragStartDetails details) {
+    _dragAccum = 0;
+  }
+
+  void _onVerticalDragUpdate(DragUpdateDetails details) {
+    _dragAccum += details.delta.dy;
+  }
+
+  void _onVerticalDragEnd(DragEndDetails details) {
+    final double velocity = details.primaryVelocity ?? 0;
+    final bool sweptUp = _dragAccum < -60 || velocity < -600;
+    _dragAccum = 0;
+    if (sweptUp) widget.onSwipeUp?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final double size = MediaQuery.sizeOf(context).width - 48;
@@ -453,7 +478,11 @@ class _HeroArtState extends State<_HeroArt> with SingleTickerProviderStateMixin 
     final Color? tint = widget.tintColor;
 
     final Widget placeholderIcon = Center(
-      child: Icon(Icons.music_note, size: size * 0.3, color: cs.onSurfaceVariant),
+      child: Icon(
+        Icons.music_note,
+        size: size * 0.3,
+        color: cs.onSurfaceVariant,
+      ),
     );
     final Widget content = uri == null
         ? placeholderIcon
@@ -465,58 +494,64 @@ class _HeroArtState extends State<_HeroArt> with SingleTickerProviderStateMixin 
             errorBuilder: (_, _, _) => placeholderIcon,
           );
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-      child: AnimatedBuilder(
-        animation: _floatCtrl,
-        builder: (BuildContext context, Widget? child) => Transform.translate(
-          offset: Offset(
-            0,
-            heroArtFloatEnabled ? (_floatCtrl.value * 6 - 3) : 0,
+    return GestureDetector(
+      key: const Key('now-playing-hero-swipe-area'),
+      onVerticalDragStart: _onVerticalDragStart,
+      onVerticalDragUpdate: _onVerticalDragUpdate,
+      onVerticalDragEnd: _onVerticalDragEnd,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+        child: AnimatedBuilder(
+          animation: _floatCtrl,
+          builder: (BuildContext context, Widget? child) => Transform.translate(
+            offset: Offset(
+              0,
+              heroArtFloatEnabled ? (_floatCtrl.value * 6 - 3) : 0,
+            ),
+            child: child,
           ),
-          child: child,
-        ),
-        child: AnimatedTint(
-          tint: tint ?? cs.surfaceContainerHighest,
-          builder: (BuildContext context, Color glow) => Stack(
-            clipBehavior: Clip.none,
-            children: <Widget>[
-              Container(
-                width: size,
-                height: size,
-                decoration: BoxDecoration(
-                  color: uri == null ? cs.surfaceContainerHighest : null,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.24),
+          child: AnimatedTint(
+            tint: tint ?? cs.surfaceContainerHighest,
+            builder: (BuildContext context, Color glow) => Stack(
+              clipBehavior: Clip.none,
+              children: <Widget>[
+                Container(
+                  width: size,
+                  height: size,
+                  decoration: BoxDecoration(
+                    color: uri == null ? cs.surfaceContainerHighest : null,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.24),
+                    ),
+                    boxShadow: tint == null
+                        ? const <BoxShadow>[]
+                        : <BoxShadow>[
+                            BoxShadow(
+                              color: brandBlend(tint).withValues(alpha: 0.45),
+                              blurRadius: 24,
+                              spreadRadius: -4,
+                            ),
+                            BoxShadow(
+                              color: brandBlend(tint).withValues(alpha: 0.2),
+                              blurRadius: 60,
+                              spreadRadius: 4,
+                            ),
+                          ],
                   ),
-                  boxShadow: tint == null
-                      ? const <BoxShadow>[]
-                      : <BoxShadow>[
-                          BoxShadow(
-                            color: brandBlend(tint).withValues(alpha: 0.45),
-                            blurRadius: 24,
-                            spreadRadius: -4,
-                          ),
-                          BoxShadow(
-                            color: brandBlend(tint).withValues(alpha: 0.2),
-                            blurRadius: 60,
-                            spreadRadius: 4,
-                          ),
-                        ],
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: content,
+                  ),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(28),
-                  child: content,
-                ),
-              ),
-              if (widget.song != null)
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: _HeroArtDownloadButton(song: widget.song!),
-                ),
-            ],
+                if (widget.song != null)
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: _HeroArtDownloadButton(song: widget.song!),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -540,8 +575,9 @@ class _HeroArtDownloadButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final OfflineManifest? manifest =
-        ref.watch(offlineManifestProvider).valueOrNull;
+    final OfflineManifest? manifest = ref
+        .watch(offlineManifestProvider)
+        .valueOrNull;
     final OfflineSongEntry? entry = manifest?.songs[song.id];
 
     switch (entry?.state) {

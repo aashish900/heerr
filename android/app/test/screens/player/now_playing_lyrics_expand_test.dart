@@ -212,4 +212,45 @@ void main() {
 
     expect(find.byKey(const Key('now-playing-lyrics-sheet')), findsOneWidget);
   });
+
+  // NP10 — swiping up on the hero art is a third entry point to the same
+  // sheet (discrete swipe-triggers-existing-sheet, not the plan's full
+  // continuous drag-morph transform — see the `onSwipeUp` doc comment on
+  // `_HeroArt` for the scoping rationale).
+  testWidgets('swiping up on the hero art opens the full-screen sheet',
+      (WidgetTester tester) async {
+    final _FakeAdapter adapter = _FakeAdapter((_) => _json(_syncedBody));
+    await tester.pumpWidget(_wrap(
+      snapshot: _snap(item: _item(), position: const Duration(seconds: 6)),
+      adapter: adapter,
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.fling(
+      find.byKey(const Key('now-playing-hero-swipe-area')),
+      const Offset(0, -300),
+      1000,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('now-playing-lyrics-sheet')), findsOneWidget);
+  });
+
+  testWidgets('a small vertical wobble on the hero art does not open the sheet',
+      (WidgetTester tester) async {
+    final _FakeAdapter adapter = _FakeAdapter((_) => _json(_syncedBody));
+    await tester.pumpWidget(_wrap(
+      snapshot: _snap(item: _item(), position: const Duration(seconds: 6)),
+      adapter: adapter,
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.drag(
+      find.byKey(const Key('now-playing-hero-swipe-area')),
+      const Offset(0, -10),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('now-playing-lyrics-sheet')), findsNothing);
+  });
 }
