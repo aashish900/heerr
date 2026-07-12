@@ -52,12 +52,14 @@ void main() {
     );
   }
 
-  testWidgets('renders display name and @handle', (WidgetTester tester) async {
+  testWidgets('renders display name and the "Manage your profile" caption', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(wrap(_profile()));
     await tester.pumpAndSettle();
 
     expect(find.text('Alice'), findsOneWidget);
-    expect(find.text('@alice-nd'), findsOneWidget);
+    expect(find.text('Manage your profile'), findsOneWidget);
   });
 
   testWidgets('tap pushes /profile', (WidgetTester tester) async {

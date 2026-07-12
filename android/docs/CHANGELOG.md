@@ -2885,3 +2885,9 @@ User review flagged four more issues:
 - Not yet wired into `settings_screen.dart` — SE3-SE6 consume this system section by section.
 - New `test/screens/settings/settings_tiles_test.dart` (9 tests): section header, group-card divider placement, tile anatomy/keying/tap/min-height, switch tile, dropdown tile.
 - Verification: `flutter analyze` clean; full `flutter test` green (980 tests).
+
+## 2026-07-12 — Settings redesign SE3: floating ProfileCard restyle
+
+- `lib/screens/settings/profile_card.dart` — restyled from a plain `ListTile` into a floating card (`surfaceContainerHigh`, 24dp rounded corners, soft `Colors.white10` border) matching `SettingsGroupCard`'s visual language. Avatar ring grows 18→28px radius. Subtitle changed from `@handle` to "Manage your profile" (mockup copy; no "Premium User" badge — heerr is free, per the redesign brief).
+- `test/screens/settings/profile_card_test.dart` — updated the display-name assertion to check for "Manage your profile" instead of `@alice-nd`.
+- Verification: `flutter analyze` clean; full `flutter test` green (980 tests, no new — restyle only).
