@@ -262,3 +262,11 @@ reliably supported in home-screen widgets); tapping the tile opens the app.
 - **Single-song ad-hoc download (§2.4)** — the hero-art download button reflects existing per-song offline state and offers `deleteSongLocally` when ready, but there's no "download just this track outside any album/playlist" mutation anywhere in the app. Would need new `OfflineManifest`/`OfflineSync` shape.
 - **Lyrics word-level karaoke highlight** — LRC lyric data is line-timed only; the active-line accent is a whole-line gradient, not word-by-word.
 - **On-device smoke pending** — NP1–NP10 verified by widget tests only (908→922 across the phase); no device was attached during implementation.
+
+## Downloads redesign deferrals (2026-07-12, DOWNLOADSSCREEN.md)
+
+- **Per-file download throughput/percentage** — the brief's "24 MB/s" and per-song "32%" have no data source; `offline_downloader.dart` doesn't instrument `Dio`'s `onReceiveProgress`. The sync-activity Downloading card shows a count ("3 downloading") instead of a named song with a live percentage.
+- **Progress-fraction tween on the hero waveform** — `WaveformStrip.progress` repaints the filled/dim bar split immediately on each rebuild rather than tweening between old/new values (`AnimatedFractionallySizedBox`-style implicit animation from the plan's §6 motion budget). Low-cost polish, deferred rather than adding another animation controller for a fractional visual gain.
+- **Artists tab dropped (D2)** — the brief's four tabs became three (Songs/Albums/Playlists); manifest artists already expand to albums, so a dedicated Artists browsing mode was redundant. Revisit only if a genuinely artist-specific offline view is requested.
+- **IPv6 status line replaced (D4)** — "IPv6 Connected" has no data source (the app never inspects the Tailscale connection directly); the hero shows hostname + "via Tailscale" instead.
+- **On-device smoke pending** — DL1–DL8 verified by widget/provider tests only (971 total); no device was attached during implementation.

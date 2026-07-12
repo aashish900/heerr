@@ -16,6 +16,7 @@ import '../../router.dart';
 import '../../theme.dart';
 import '../../widgets/branded_header.dart';
 import '../../widgets/error_snackbar.dart';
+import '../../widgets/gradient_button.dart';
 import '../../widgets/gradient_icon.dart';
 import '../../widgets/gradient_tab_indicator.dart';
 import '../../widgets/library_cover_art.dart';
@@ -59,6 +60,13 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final OfflineManifest? manifest = ref.watch(offlineManifestProvider).valueOrNull;
+    final bool allEmpty = manifest != null &&
+        manifest.markedAlbums.isEmpty &&
+        manifest.markedPlaylists.isEmpty &&
+        manifest.markedArtists.isEmpty &&
+        manifest.songs.isEmpty;
+
     return Scaffold(
       appBar: const BrandedAppBar(compactGreeting: true),
       body: NestedScrollView(
@@ -67,24 +75,81 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen>
             const SliverToBoxAdapter(child: _DownloadsTitle()),
             const SliverToBoxAdapter(child: ServerStatusCard()),
             const SliverToBoxAdapter(child: QuickActionCards()),
-            const SliverToBoxAdapter(child: SyncActivitySection()),
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _DownloadsTabBarDelegate(tabs: _tabs),
-            ),
-            SliverToBoxAdapter(
-              child: AnimatedBuilder(
-                animation: _tabs,
-                builder: (BuildContext context, _) => DownloadsFilterChips(
-                  tab: DownloadsTab.values[_tabs.index],
+            if (allEmpty)
+              const SliverFillRemaining(child: _DownloadsEmptyState())
+            else ...<Widget>[
+              const SliverToBoxAdapter(child: SyncActivitySection()),
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _DownloadsTabBarDelegate(tabs: _tabs),
+              ),
+              SliverToBoxAdapter(
+                child: AnimatedBuilder(
+                  animation: _tabs,
+                  builder: (BuildContext context, _) => DownloadsFilterChips(
+                    tab: DownloadsTab.values[_tabs.index],
+                  ),
                 ),
               ),
-            ),
+            ],
           ];
         },
-        body: TabBarView(
-          controller: _tabs,
-          children: const <Widget>[_SongsTab(), _AlbumsTab(), _PlaylistsTab()],
+        body: allEmpty
+            ? const SizedBox.shrink()
+            : TabBarView(
+                controller: _tabs,
+                children: const <Widget>[_SongsTab(), _AlbumsTab(), _PlaylistsTab()],
+              ),
+      ),
+    );
+  }
+}
+
+/// DL8 (DOWNLOADSSCREEN.md §6): shown in place of sync-activity/tabs/chips/
+/// content when nothing is downloaded and nothing is marked for offline —
+/// the hero + quick actions above it still render (server status is useful
+/// even at zero downloads).
+class _DownloadsEmptyState extends StatelessWidget {
+  const _DownloadsEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    // SingleChildScrollView (not Center) — this sits in a SliverFillRemaining
+    // whose allocated height can be smaller than the content's natural size
+    // on short viewports; scrolling beats overflowing.
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const GradientIcon(child: Icon(Icons.cloud_off_outlined, size: 72)),
+            const SizedBox(height: 20),
+            Text(
+              'Nothing available offline yet.',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Choose music from your library to make it available anywhere.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: 200,
+              child: GradientButton(
+                onPressed: () => context.go(Routes.library),
+                child: const Text('Browse Library'),
+              ),
+            ),
+          ],
         ),
       ),
     );

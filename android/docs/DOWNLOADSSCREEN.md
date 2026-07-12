@@ -1,6 +1,6 @@
 # DOWNLOADSSCREEN.md — Downloads Screen redesign plan ("Sync Center")
 
-Status: **PLANNED** 2026-07-12 against `main` @ v4.11.2. Not yet implemented.
+Status: **IMPLEMENTED** 2026-07-12 on `main` (DL1–DL8, v4.12.0). D1–D7 adopted the plan's proposed defaults without a synchronous confirmation round (see DECISIONLOG.md). Remaining: on-device smoke (no device attached during implementation — see DEBT.md).
 Reference: prompt-only brief (no mockup image on disk). Concept: reframe Downloads from "list of downloaded songs" to a **Sync Center** — the surface that communicates "my library is synchronized with my home server".
 Milestone prefix: **DL** (DL1–DL8). X and NP are taken (Library, Now Playing).
 

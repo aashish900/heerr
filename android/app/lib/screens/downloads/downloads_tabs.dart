@@ -384,9 +384,15 @@ class _TabEmptyWithStorage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    // ListView (not Column+Expanded) so this never overflows regardless of
+    // how much vertical space the hero/quick-action/sync-activity header
+    // sections above it have already consumed — it scrolls instead.
+    return ListView(
       children: <Widget>[
-        Expanded(child: _EmptyView(icon: icon, message: message)),
+        SizedBox(
+          height: 320,
+          child: _EmptyView(icon: icon, message: message),
+        ),
         const StorageCard(),
       ],
     );
