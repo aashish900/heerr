@@ -7,6 +7,12 @@ const Color heerrPurple = Color(0xFFA93CF2);
 const Color heerrViolet = Color(0xFF6F4BF5);
 const Color heerrBlack = Color(0xFF0A0A0A);
 
+/// Status-only green — server "Online" indicator (Downloads hero). Kept
+/// separate from the brand palette (which is deliberately green-free
+/// everywhere else) because online/offline is a universally-understood
+/// green/grey semantic worth keeping legible over brand consistency.
+const Color heerrOnlineGreen = Color(0xFF22C55E);
+
 const LinearGradient heerrGradient = LinearGradient(
   colors: <Color>[heerrMagenta, heerrPurple, heerrViolet],
   begin: Alignment.topLeft,

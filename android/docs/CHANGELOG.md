@@ -2852,3 +2852,11 @@ User review flagged four more issues:
 - **Version bump 4.11.2 → 4.12.0** — `android/app/pubspec.yaml`, `backend/pyproject.toml`, `backend/app/main.py`, `android/docs/ROADMAP.md`, `backend/docs/ROADMAP.md` (Android-side change; backend bumped for sync per the version-sync convention).
 - **`android/docs/DOWNLOADSSCREEN.md`** — status flipped to IMPLEMENTED.
 - Verification: `flutter analyze` clean; full `flutter test` green (971 tests — 4 new in `downloads_empty_state_test.dart`).
+
+## 2026-07-12 — Downloads hero: green Online pill + real server illustration
+
+- **`lib/theme.dart`** — new `heerrOnlineGreen` (`#22C55E`), a status-only exception to the brand palette's "no green" rule — online/offline is a universally-understood green/grey semantic, kept separate from `heerrGradient`.
+- **`lib/screens/downloads/server_status_card.dart`** — the "Online" pill now uses `heerrOnlineGreen` instead of `heerrMagenta` (offline stays `Colors.white38`); card border/glyph glow are unchanged (still magenta).
+- **`android/app/assets/images/downloads_server.png`** (new) — user-supplied server illustration (dark cube-shaped device, magenta rim light, glow platform), added to `pubspec.yaml` assets.
+- **`lib/screens/downloads/server_glyph.dart`** — replaced the `CustomPaint` rack-outline illustration with `Image.asset` of the new artwork; kept the breathing-glow animation (now a `BoxShadow` behind the image) and the offline-dim behavior (`Opacity` 0.5 instead of the painter's dim stroke color).
+- Verification: `flutter analyze` clean; full `flutter test` green (971 tests, no new — visual-only change).

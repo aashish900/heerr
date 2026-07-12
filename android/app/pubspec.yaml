@@ -114,6 +114,7 @@ flutter:
   assets:
     - assets/icons/
     - assets/icon.png
+    - assets/images/
 
 flutter_launcher_icons:
   image_path: "assets/icon_legacy.png"
