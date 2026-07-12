@@ -2822,3 +2822,10 @@ User review flagged four more issues:
 - **`lib/screens/downloads/sync_activity_section.dart`** (new) — `SyncActivitySection`: up to three compact cards (Downloading, Queued, and a third slot — Waiting-for-Wi-Fi when the gate is holding work back, else Failed, else omitted). Renders nothing when there's nothing to report. Downloading card carries a small animated `WaveformStrip` (equalizer motion only, no progress fraction — matches the count-only data).
 - **`lib/screens/downloads/downloads_screen.dart`** — `SyncActivitySection` slotted in as a header sliver below the quick actions.
 - Verification: `flutter analyze` clean; full `flutter test` green (944 tests — 8 new: `sync_activity_test.dart` ×5, `sync_activity_section_test.dart` ×3).
+
+## 2026-07-12 — Downloads redesign DL5: filter chips
+
+- **`lib/providers/downloads_filters.dart`** (new) — mirrors `library_filters.dart`'s pattern: `DownloadsTab` enum (songs/albums/playlists, matching the DL1 tab order), `DownloadsSongSort` (recent/largest/aToZ) for the Songs tab, `DownloadsContainerSort` (recent/alphabetical) shared by Albums and Playlists, plus standalone `DownloadsLosslessOnlyNotifier` / `DownloadsTodayOnlyNotifier` toggles (Songs tab only). Chips only hold state here — DL6 wires the actual sort/filter application once the metadata join lands.
+- **`lib/screens/downloads/downloads_filter_chips.dart`** (new) — `DownloadsFilterChips`: sort chip (bottom sheet, same visual/interaction as `LibraryFilterChips`'s `_SortChip`) on every tab; "Lossless" and "Downloaded Today" toggle chips added only on Songs. Wrapped in a horizontally-scrolling row (Songs has 4 controls vs Library's 2, so it can overflow on narrow phones).
+- **`lib/screens/downloads/downloads_screen.dart`** — chip row slotted in as a header sliver below the pinned tab bar, tracking the active tab via `AnimatedBuilder(animation: _tabs, ...)` so the right chip set renders per tab without a second `TabController` listener class.
+- Verification: `flutter analyze` clean; full `flutter test` green (949 tests — 5 new in `downloads_filter_chips_test.dart`).

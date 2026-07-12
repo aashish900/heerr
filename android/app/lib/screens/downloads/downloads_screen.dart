@@ -10,6 +10,7 @@ import '../../offline/offline_manifest.dart';
 import '../../offline/offline_marker.dart';
 import '../../player/playback_actions.dart';
 import '../../providers/downloaded_songs.dart';
+import '../../providers/downloads_filters.dart';
 import '../../providers/library/library_album.dart';
 import '../../providers/library/library_delete.dart';
 import '../../providers/library/library_playlist.dart';
@@ -21,6 +22,7 @@ import '../../widgets/gradient_icon.dart';
 import '../../widgets/gradient_tab_indicator.dart';
 import '../../widgets/library_cover_art.dart';
 import '../../widgets/library_result_tile.dart';
+import 'downloads_filter_chips.dart';
 import 'quick_action_cards.dart';
 import 'server_status_card.dart';
 import 'sync_activity_section.dart';
@@ -70,6 +72,14 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen>
             SliverPersistentHeader(
               pinned: true,
               delegate: _DownloadsTabBarDelegate(tabs: _tabs),
+            ),
+            SliverToBoxAdapter(
+              child: AnimatedBuilder(
+                animation: _tabs,
+                builder: (BuildContext context, _) => DownloadsFilterChips(
+                  tab: DownloadsTab.values[_tabs.index],
+                ),
+              ),
             ),
           ];
         },
