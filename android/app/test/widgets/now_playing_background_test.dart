@@ -20,12 +20,15 @@ void main() {
     );
   }
 
-  testWidgets('null artUri + null tint renders child, no glow layer',
+  testWidgets('null artUri + null tint renders child + brand glow fallback',
       (WidgetTester tester) async {
     await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
     expect(find.text('content'), findsOneWidget);
-    expect(find.byKey(const Key('now-playing-bg-glow')), findsNothing);
+    // The brand-magenta glow is always present (the design's atmosphere is
+    // magenta even before the palette resolves) — only the blurred-art
+    // layer waits for a URI.
+    expect(find.byKey(const Key('now-playing-bg-glow')), findsOneWidget);
     expect(
       find.byKey(const ValueKey<String>('now-playing-bg-none')),
       findsOneWidget,

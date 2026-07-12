@@ -23,8 +23,11 @@ class _LyricsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color accent =
-        tintColor != null ? brandBlend(tintColor!) : heerrMagenta;
+    // Active-line highlight is always brand magenta (mockup: "P1 cleaner"
+    // in pink) — brandBlend(tint) only shifts the extracted cover colour
+    // 18% toward magenta, so a blue/green cover produced a blue/green
+    // highlight instead of the design's pink.
+    const Color accent = heerrMagenta;
     const Color fg = Colors.white;
 
     return Padding(
@@ -267,8 +270,12 @@ class _SyncedLyricsPreview extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 3),
             child: i == current
                 ? ShaderMask(
+                    // Mockup: leading words pink, trailing words white
+                    // ("P1 cleaner | than your church shoes") — hold the
+                    // magenta through ~30% before blending out.
                     shaderCallback: (Rect bounds) => LinearGradient(
-                      colors: <Color>[accentColor, Colors.white],
+                      colors: <Color>[accentColor, accentColor, Colors.white],
+                      stops: const <double>[0.0, 0.3, 0.6],
                     ).createShader(bounds),
                     child: Text(
                       lines[i].value,
@@ -368,7 +375,12 @@ class _SyncedLyricsState extends State<_SyncedLyrics> {
             child: i == current
                 ? ShaderMask(
                     shaderCallback: (Rect bounds) => LinearGradient(
-                      colors: <Color>[widget.accentColor, Colors.white],
+                      colors: <Color>[
+                        widget.accentColor,
+                        widget.accentColor,
+                        Colors.white,
+                      ],
+                      stops: const <double>[0.0, 0.3, 0.6],
                     ).createShader(bounds),
                     child: Text(
                       widget.lines[i].value,
@@ -438,102 +450,125 @@ class _ExpandedLyricsSheetState extends ConsumerState<_ExpandedLyricsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme cs = Theme.of(context).colorScheme;
-    final Color bg = Color.lerp(
-      widget.tintColor ?? cs.surfaceContainerHigh,
-      Colors.black,
-      0.6,
-    )!;
-    final Color accent = widget.tintColor != null
-        ? brandBlend(widget.tintColor!)
-        : heerrMagenta;
+    // Same always-magenta accent as the peek card — the design's active
+    // line is pink regardless of the cover's extracted colour.
+    const Color accent = heerrMagenta;
     final PlayerSnapshot? snap =
         ref.watch(playerSnapshotProvider).valueOrNull;
     final MediaItem? item = snap?.item;
 
-    return Container(
+    return ClipRRect(
       key: const Key('now-playing-lyrics-sheet'),
-      height: MediaQuery.sizeOf(context).height,
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
-        ),
-      ),
-      child: SafeArea(
-        child: item == null
-            ? const Center(child: Text('Nothing is playing.'))
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
-                    child: Row(
-                      children: <Widget>[
-                        IconButton(
-                          key: const Key('lyrics-sheet-collapse'),
-                          tooltip: 'Collapse',
-                          icon: const Icon(Icons.keyboard_arrow_down),
-                          color: Colors.white,
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                        Expanded(
-                          child: Column(
-                            children: <Widget>[
-                              Text(
-                                item.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleSmall
-                                    ?.copyWith(color: Colors.white),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height,
+        // Same blurred-art immersive backdrop as the main screen — the
+        // sheet is the "lyrics takeover" state of the same surface, not a
+        // separate flat-colour panel.
+        child: NowPlayingBackground(
+          artUri: item?.artUri,
+          tintColor: widget.tintColor,
+          child: SafeArea(
+            child: item == null
+                ? const Center(child: Text('Nothing is playing.'))
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: Row(
+                          children: <Widget>[
+                            GlassIconButton(
+                              key: const Key('lyrics-sheet-collapse'),
+                              icon: Icons.keyboard_arrow_down,
+                              tooltip: 'Collapse',
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                            Expanded(
+                              child: Column(
+                                children: <Widget>[
+                                  Text(
+                                    item.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(color: Colors.white),
+                                  ),
+                                  if (item.artist != null)
+                                    Text(
+                                      item.artist!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(color: Colors.white70),
+                                    ),
+                                ],
                               ),
-                              if (item.artist != null)
+                            ),
+                            // Balances the leading glass button so the
+                            // title stays centred.
+                            const SizedBox(width: 40),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 20, 24, 4),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: <Widget>[
+                            _CornerArt(artUri: item.artUri),
+                            const SizedBox(width: 16),
+                            // "LYRICS" section label + magenta underline —
+                            // same treatment as the peek card.
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
                                 Text(
-                                  item.artist!,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
+                                  'LYRICS',
                                   style: Theme.of(context)
                                       .textTheme
-                                      .bodySmall
-                                      ?.copyWith(color: Colors.white70),
+                                      .labelSmall
+                                      ?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 1.2,
+                                      ),
                                 ),
-                            ],
+                                const SizedBox(height: 4),
+                                Container(
+                                  width: 24,
+                                  height: 2,
+                                  color: accent,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+                          child: _LyricsContent(
+                            songId: item.extras?['subsonicId'] as String?,
+                            artist: item.artist ?? '',
+                            title: item.title,
+                            position: snap!.state.position,
+                            expanded: true,
+                            foreground: Colors.white,
+                            accentColor: accent,
                           ),
                         ),
-                        // Balances the leading IconButton so the title stays
-                        // centred.
-                        const SizedBox(width: 48),
-                      ],
-                    ),
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 20, 24, 4),
-                      child: _CornerArt(artUri: item.artUri),
-                    ),
-                  ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-                      child: _LyricsContent(
-                        songId: item.extras?['subsonicId'] as String?,
-                        artist: item.artist ?? '',
-                        title: item.title,
-                        position: snap!.state.position,
-                        expanded: true,
-                        foreground: Colors.white,
-                        accentColor: accent,
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
+          ),
+        ),
       ),
     );
   }
@@ -555,25 +590,33 @@ class _CornerArt extends StatelessWidget {
       height: _size,
       decoration: BoxDecoration(
         color: Colors.white12,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: const Icon(Icons.music_note, color: Colors.white54),
     );
     final Uri? uri = artUri;
+    // Miniature of the hero art's treatment: rounded corners + hairline
+    // border so the takeover state reads as the same surface.
     return KeyedSubtree(
       key: const Key('lyrics-sheet-art'),
-      child: uri == null
-          ? placeholder
-          : ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: Image.network(
-                uri.toString(),
-                width: _size,
-                height: _size,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => placeholder,
-              ),
-            ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: uri == null
+              ? placeholder
+              : Image.network(
+                  uri.toString(),
+                  width: _size,
+                  height: _size,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => placeholder,
+                ),
+        ),
+      ),
     );
   }
 }

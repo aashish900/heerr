@@ -54,7 +54,12 @@ class ProfileScreen extends ConsumerWidget {
             key: const Key('profile-row-liked-songs'),
             icon: Icons.favorite_border,
             label: 'Liked Songs',
-            onTap: () => context.push(Routes.libraryFavorites),
+            // go, not push: /profile is itself an imperative push (Home
+            // avatar), and go_router 14 throws a duplicated-page-key
+            // assertion when push-ing a ShellRoute-nested route on top of
+            // an imperatively-pushed non-shell route — on device the tap
+            // silently did nothing. Matches the go-based rows below.
+            onTap: () => context.go(Routes.libraryFavorites),
           ),
           _ProfileActionCard(
             key: const Key('profile-row-downloaded'),
@@ -66,7 +71,8 @@ class ProfileScreen extends ConsumerWidget {
             key: const Key('profile-row-recently-played'),
             icon: Icons.history,
             label: 'Recently Played',
-            onTap: () => context.push(Routes.libraryRecentlyPlayed),
+            // go, not push — same duplicated-page-key crash as Liked Songs.
+            onTap: () => context.go(Routes.libraryRecentlyPlayed),
           ),
           _ProfileActionCard(
             key: const Key('profile-row-playlists'),

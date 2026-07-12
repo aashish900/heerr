@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../theme.dart';
 import '../utils/palette.dart';
 import 'animated_tint.dart';
 
@@ -57,10 +58,13 @@ class NowPlayingBackground extends StatelessWidget {
                 ),
         ),
         // Scrim — keeps foreground content readable over any artwork.
+        // Light enough that the blurred art's colour still bleeds through
+        // (the mockup's magenta smoke), the glow layers below carry the
+        // rest of the atmosphere.
         DecoratedBox(
           key: const Key('now-playing-bg-scrim'),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.72),
+            color: Colors.black.withValues(alpha: 0.55),
           ),
         ),
         // Vignette — darkens the edges so the hero art (painted on top by
@@ -75,23 +79,40 @@ class NowPlayingBackground extends StatelessWidget {
             ),
           ),
         ),
-        if (tint != null)
-          AnimatedTint(
-            tint: brandBlend(tint),
-            builder: (BuildContext context, Color glow) => DecoratedBox(
-              key: const Key('now-playing-bg-glow'),
+        // Brand glow — always present (the design's atmosphere is magenta
+        // even before the palette resolves), blended toward the cover's
+        // extracted colour when one exists. Upper wash behind the hero art
+        // plus a softer lower wash behind the lyrics area.
+        AnimatedTint(
+          tint: tint != null ? brandBlend(tint) : heerrMagenta,
+          builder: (BuildContext context, Color glow) => DecoratedBox(
+            key: const Key('now-playing-bg-glow'),
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: const Alignment(0, -0.3),
+                radius: 1.1,
+                colors: <Color>[
+                  glow.withValues(alpha: 0.4),
+                  glow.withValues(alpha: 0.12),
+                  Colors.transparent,
+                ],
+                stops: const <double>[0.0, 0.55, 1.0],
+              ),
+            ),
+            child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: RadialGradient(
-                  center: const Alignment(0, -0.3),
-                  radius: 1.0,
+                  center: const Alignment(0.6, 0.9),
+                  radius: 0.9,
                   colors: <Color>[
-                    glow.withValues(alpha: 0.25),
+                    glow.withValues(alpha: 0.22),
                     Colors.transparent,
                   ],
                 ),
               ),
             ),
           ),
+        ),
         child,
       ],
     );
