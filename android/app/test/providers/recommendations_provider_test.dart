@@ -231,6 +231,7 @@ void main() {
             'artist': 'Other Artist',
             'source_url': 'https://music.youtube.com/watch?v=abc',
             'score': 0.91,
+            'cover_url': 'https://img.example/abc.jpg',
           },
           <String, dynamic>{
             'title': 'No Score',
@@ -253,9 +254,11 @@ void main() {
     expect(tracks[0].artist, 'Other Artist');
     expect(tracks[0].sourceUrl, 'https://music.youtube.com/watch?v=abc');
     expect(tracks[0].score, 0.91);
+    expect(tracks[0].coverUrl, 'https://img.example/abc.jpg');
     expect(tracks[0].inLibrary, false);
 
     expect(tracks[1].score, isNull);
+    expect(tracks[1].coverUrl, isNull);
   });
 
   test('still POSTs when seeds is empty (listenbrainz engine path)', () async {

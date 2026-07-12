@@ -21,6 +21,10 @@ class RecommendResultItem(BaseModel):
     artist: str
     source_url: str
     score: float | None = None
+    # Server-resolved public cover-art URL for the result (derived from the
+    # watch URL's video id). Null when the source URL carries no video id
+    # (e.g. album browse URLs) — clients fall back to a placeholder.
+    cover_url: str | None = None
 
 
 class RecommendResponse(BaseModel):

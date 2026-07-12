@@ -326,7 +326,8 @@ void main() {
       ]));
       await _pumpForBuild(tester);
 
-      expect(find.text('Engine: ytmusic'), findsOneWidget);
+      // Wire value 'ytmusic' is mapped to a generic display label.
+      expect(find.text('Engine: Online catalog'), findsOneWidget);
       expect(find.byKey(const Key('engine-chip-ok')), findsOneWidget);
       expect(find.byKey(const Key('engine-chip-degraded')), findsNothing);
       expect(find.byKey(const Key('engine-chip-fallback-active')),
@@ -348,7 +349,7 @@ void main() {
       ]));
       await _pumpForBuild(tester);
 
-      expect(find.text('Engine: lastfm'), findsOneWidget);
+      expect(find.text('Engine: Last.fm'), findsOneWidget);
       expect(find.byKey(const Key('engine-chip-degraded')), findsOneWidget);
       expect(find.byKey(const Key('engine-chip-fallback-active')),
           findsNothing);

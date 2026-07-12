@@ -61,48 +61,40 @@ void main() {
     },
   );
 
-  group('extractSourceVideoId', () {
-    test('music.youtube.com watch?v=...', () {
-      expect(
-        extractSourceVideoId('https://music.youtube.com/watch?v=abc123'),
-        'abc123',
+  testWidgets(
+    'coverUrl set → cover art loads from the server-provided URL',
+    (WidgetTester tester) async {
+      const RecommendedTrack t = RecommendedTrack(
+        title: 'Remote',
+        artist: 'X',
+        sourceUrl: 'https://music.youtube.com/watch?v=abc',
+        coverUrl: 'https://cover.example/abc.jpg',
       );
-    });
-    test('youtube.com watch?v=...', () {
-      expect(
-        extractSourceVideoId('https://www.youtube.com/watch?v=def456'),
-        'def456',
-      );
-    });
-    test('youtu.be short form', () {
-      expect(
-        extractSourceVideoId('https://youtu.be/xyz789'),
-        'xyz789',
-      );
-    });
-    test('empty string → null', () {
-      expect(extractSourceVideoId(''), isNull);
-    });
-    test('non-matching URL → null', () {
-      expect(
-        extractSourceVideoId('https://example.com/track/123'),
-        isNull,
-      );
-    });
-    test('watch URL missing v param → null', () {
-      expect(
-        extractSourceVideoId('https://music.youtube.com/watch?foo=bar'),
-        isNull,
-      );
-    });
-  });
+      await tester.pumpWidget(_wrap(child: const HomeRecommendationCard(track: t)));
 
-  test('remoteThumbnailUrl builds an img.youtube.com URL', () {
-    expect(
-      remoteThumbnailUrl('abc123'),
-      'https://img.youtube.com/vi/abc123/mqdefault.jpg',
-    );
-  });
+      final Finder netImg = find.byWidgetPredicate(
+          (Widget w) => w is Image && w.image is NetworkImage);
+      final Image img = tester.widget<Image>(netImg);
+      expect((img.image as NetworkImage).url, 'https://cover.example/abc.jpg');
+    },
+  );
+
+  testWidgets(
+    'coverUrl null → placeholder swatch, no network image',
+    (WidgetTester tester) async {
+      const RecommendedTrack t = RecommendedTrack(
+        title: 'Remote',
+        artist: 'X',
+        sourceUrl: 'https://music.youtube.com/watch?v=abc',
+      );
+      await tester.pumpWidget(_wrap(child: const HomeRecommendationCard(track: t)));
+
+      final Finder netImg = find.byWidgetPredicate(
+          (Widget w) => w is Image && w.image is NetworkImage);
+      expect(netImg, findsNothing);
+      expect(find.byIcon(Icons.music_note), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'inLibrary=false → renders download overlay and fires the dispatcher',

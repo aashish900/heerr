@@ -2926,3 +2926,12 @@ User review flagged four more issues:
 - **Version bump 4.12.1 → 4.13.0** across all 5 sync locations (`/CLAUDE.md` §3): `android/app/pubspec.yaml`, `backend/pyproject.toml`, `backend/app/main.py`, `android/docs/ROADMAP.md`, `backend/docs/ROADMAP.md`. Backend-side is a version-only bump — Android-only feature, per the established multi-app sync convention.
 - `android/docs/SETTINGSSCREEN.md` — status flipped to **IMPLEMENTED**; `android/docs/DEBT.md` — new "Settings redesign deferrals" section (dropped mockup sections, Auto Cleanup, unverified GitHub-link tap, on-device smoke pending).
 - Verification: `flutter analyze` clean; full `flutter test` green (986 tests). This closes out the SE1–SE7 Settings redesign (SETTINGSSCREEN.md).
+
+## 2026-07-13 — Play-compliance hardening: backend cover_url + generic engine label — v4.14.0
+
+- **`lib/models/recommended_track.dart`** — new `@JsonKey(name: 'cover_url') String? coverUrl` field mirroring the backend's new `RecommendResultItem.cover_url` (v4.14.0). Codegen regenerated.
+- **`lib/widgets/home_recommendation_card.dart`** — deleted `extractSourceVideoId` and `remoteThumbnailUrl`; `_CoverArt` step 2 now renders the backend-provided `coverUrl` via `Image.network` (placeholder fallback unchanged). The client no longer parses `sourceUrl` hostnames — no upstream host string literals remain in the shipped binary.
+- **`lib/screens/settings/settings_recommendations.dart`** — new `engineDisplayName(String)` maps wire engine identifiers (incl. comma chains) to display labels (`ytmusic` → "Online catalog", `lastfm` → "Last.fm", `listenbrainz` → "ListenBrainz", unknown → passthrough, chain joined with " → "). The Engine health tile renders the mapped label instead of the raw wire value.
+- **Tests** — `home_recommendation_card_test.dart`: URL-parsing unit tests replaced with two widget tests (coverUrl set → NetworkImage with that URL; coverUrl null → placeholder, no network image). `recommendations_provider_test.dart`: fixture + assertions for `cover_url` parse. `settings_screen_test.dart`: engine-label expectations updated ("Engine: Online catalog" / "Engine: Last.fm"). TDD: red first, then green. 981 passed, `flutter analyze` clean.
+- **Depends on backend v4.14.0** (`cover_url` in `POST /recommend`). Older backends return no `cover_url` → cards render the placeholder swatch (graceful degradation, no crash).
+- Version bump `4.13.0` → `4.14.0` across the five sync locations.

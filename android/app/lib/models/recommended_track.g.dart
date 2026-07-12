@@ -16,6 +16,7 @@ _$RecommendedTrackImpl _$$RecommendedTrackImplFromJson(
   inLibrary: json['in_library'] as bool? ?? false,
   subsonicSongId: json['subsonic_song_id'] as String?,
   coverArt: json['cover_art'] as String?,
+  coverUrl: json['cover_url'] as String?,
 );
 
 Map<String, dynamic> _$$RecommendedTrackImplToJson(
@@ -28,4 +29,5 @@ Map<String, dynamic> _$$RecommendedTrackImplToJson(
   'in_library': instance.inLibrary,
   if (instance.subsonicSongId case final value?) 'subsonic_song_id': value,
   if (instance.coverArt case final value?) 'cover_art': value,
+  if (instance.coverUrl case final value?) 'cover_url': value,
 };

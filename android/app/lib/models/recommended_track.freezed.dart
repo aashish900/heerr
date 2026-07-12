@@ -38,9 +38,16 @@ mixin _$RecommendedTrack {
   /// cross-reference returns the full Song, which carries `coverArt`).
   /// Threaded through to the Home "Picked for you" card so it can render
   /// the cached library cover instead of a placeholder.
-  /// Null for genuinely-online recommendations — those fall back to the
-  /// remote video thumbnail derived from `sourceUrl`.
+  /// Null for genuinely-online recommendations — those fall back to
+  /// [coverUrl].
   String? get coverArt => throw _privateConstructorUsedError;
+
+  /// Server-resolved public cover-art URL for remote results. The backend
+  /// derives it from the result's video id — the client no longer parses
+  /// `sourceUrl` itself. Null when the backend couldn't derive one; the
+  /// card then renders its placeholder swatch.
+  @JsonKey(name: 'cover_url')
+  String? get coverUrl => throw _privateConstructorUsedError;
 
   /// Serializes this RecommendedTrack to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -67,6 +74,7 @@ abstract class $RecommendedTrackCopyWith<$Res> {
     bool inLibrary,
     String? subsonicSongId,
     String? coverArt,
+    @JsonKey(name: 'cover_url') String? coverUrl,
   });
 }
 
@@ -92,6 +100,7 @@ class _$RecommendedTrackCopyWithImpl<$Res, $Val extends RecommendedTrack>
     Object? inLibrary = null,
     Object? subsonicSongId = freezed,
     Object? coverArt = freezed,
+    Object? coverUrl = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -123,6 +132,10 @@ class _$RecommendedTrackCopyWithImpl<$Res, $Val extends RecommendedTrack>
                 ? _value.coverArt
                 : coverArt // ignore: cast_nullable_to_non_nullable
                       as String?,
+            coverUrl: freezed == coverUrl
+                ? _value.coverUrl
+                : coverUrl // ignore: cast_nullable_to_non_nullable
+                      as String?,
           )
           as $Val,
     );
@@ -146,6 +159,7 @@ abstract class _$$RecommendedTrackImplCopyWith<$Res>
     bool inLibrary,
     String? subsonicSongId,
     String? coverArt,
+    @JsonKey(name: 'cover_url') String? coverUrl,
   });
 }
 
@@ -170,6 +184,7 @@ class __$$RecommendedTrackImplCopyWithImpl<$Res>
     Object? inLibrary = null,
     Object? subsonicSongId = freezed,
     Object? coverArt = freezed,
+    Object? coverUrl = freezed,
   }) {
     return _then(
       _$RecommendedTrackImpl(
@@ -201,6 +216,10 @@ class __$$RecommendedTrackImplCopyWithImpl<$Res>
             ? _value.coverArt
             : coverArt // ignore: cast_nullable_to_non_nullable
                   as String?,
+        coverUrl: freezed == coverUrl
+            ? _value.coverUrl
+            : coverUrl // ignore: cast_nullable_to_non_nullable
+                  as String?,
       ),
     );
   }
@@ -217,6 +236,7 @@ class _$RecommendedTrackImpl implements _RecommendedTrack {
     this.inLibrary = false,
     this.subsonicSongId,
     this.coverArt,
+    @JsonKey(name: 'cover_url') this.coverUrl,
   });
 
   factory _$RecommendedTrackImpl.fromJson(Map<String, dynamic> json) =>
@@ -246,14 +266,22 @@ class _$RecommendedTrackImpl implements _RecommendedTrack {
   /// cross-reference returns the full Song, which carries `coverArt`).
   /// Threaded through to the Home "Picked for you" card so it can render
   /// the cached library cover instead of a placeholder.
-  /// Null for genuinely-online recommendations — those fall back to the
-  /// remote video thumbnail derived from `sourceUrl`.
+  /// Null for genuinely-online recommendations — those fall back to
+  /// [coverUrl].
   @override
   final String? coverArt;
 
+  /// Server-resolved public cover-art URL for remote results. The backend
+  /// derives it from the result's video id — the client no longer parses
+  /// `sourceUrl` itself. Null when the backend couldn't derive one; the
+  /// card then renders its placeholder swatch.
+  @override
+  @JsonKey(name: 'cover_url')
+  final String? coverUrl;
+
   @override
   String toString() {
-    return 'RecommendedTrack(title: $title, artist: $artist, sourceUrl: $sourceUrl, score: $score, inLibrary: $inLibrary, subsonicSongId: $subsonicSongId, coverArt: $coverArt)';
+    return 'RecommendedTrack(title: $title, artist: $artist, sourceUrl: $sourceUrl, score: $score, inLibrary: $inLibrary, subsonicSongId: $subsonicSongId, coverArt: $coverArt, coverUrl: $coverUrl)';
   }
 
   @override
@@ -271,7 +299,9 @@ class _$RecommendedTrackImpl implements _RecommendedTrack {
             (identical(other.subsonicSongId, subsonicSongId) ||
                 other.subsonicSongId == subsonicSongId) &&
             (identical(other.coverArt, coverArt) ||
-                other.coverArt == coverArt));
+                other.coverArt == coverArt) &&
+            (identical(other.coverUrl, coverUrl) ||
+                other.coverUrl == coverUrl));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -285,6 +315,7 @@ class _$RecommendedTrackImpl implements _RecommendedTrack {
     inLibrary,
     subsonicSongId,
     coverArt,
+    coverUrl,
   );
 
   /// Create a copy of RecommendedTrack
@@ -313,6 +344,7 @@ abstract class _RecommendedTrack implements RecommendedTrack {
     final bool inLibrary,
     final String? subsonicSongId,
     final String? coverArt,
+    @JsonKey(name: 'cover_url') final String? coverUrl,
   }) = _$RecommendedTrackImpl;
 
   factory _RecommendedTrack.fromJson(Map<String, dynamic> json) =
@@ -341,10 +373,18 @@ abstract class _RecommendedTrack implements RecommendedTrack {
   /// cross-reference returns the full Song, which carries `coverArt`).
   /// Threaded through to the Home "Picked for you" card so it can render
   /// the cached library cover instead of a placeholder.
-  /// Null for genuinely-online recommendations — those fall back to the
-  /// remote video thumbnail derived from `sourceUrl`.
+  /// Null for genuinely-online recommendations — those fall back to
+  /// [coverUrl].
   @override
   String? get coverArt;
+
+  /// Server-resolved public cover-art URL for remote results. The backend
+  /// derives it from the result's video id — the client no longer parses
+  /// `sourceUrl` itself. Null when the backend couldn't derive one; the
+  /// card then renders its placeholder swatch.
+  @override
+  @JsonKey(name: 'cover_url')
+  String? get coverUrl;
 
   /// Create a copy of RecommendedTrack
   /// with the given fields replaced by the non-null parameter values.

@@ -242,6 +242,53 @@ async def test_recommend_returns_engine_results(client, make_token, fake_engine)
                 "artist": "OtherArtist",
                 "source_url": "https://music.youtube.com/watch?v=abc",
                 "score": 0.91,
+                "cover_url": "https://img.youtube.com/vi/abc/mqdefault.jpg",
             }
         ]
     }
+
+
+async def test_recommend_unparseable_source_url_gives_null_cover(client, make_token, fake_engine):
+    fake_engine.results = [
+        RecommendedTrack(
+            title="Album",
+            artist="Someone",
+            source_url="https://music.youtube.com/browse/MPREb_xyz",
+            score=None,
+        ),
+    ]
+    raw = await make_token(scopes=("read",))
+    resp = await client.post(
+        "/api/v1/recommend",
+        json=_VALID_BODY,
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["results"][0]["cover_url"] is None
+
+
+def test_cover_url_for_watch_url():
+    from app.services.recommenders.yt_resolver import cover_url_for_source_url
+
+    assert (
+        cover_url_for_source_url("https://music.youtube.com/watch?v=abc123")
+        == "https://img.youtube.com/vi/abc123/mqdefault.jpg"
+    )
+    assert (
+        cover_url_for_source_url("https://www.youtube.com/watch?v=def456")
+        == "https://img.youtube.com/vi/def456/mqdefault.jpg"
+    )
+    assert (
+        cover_url_for_source_url("https://youtu.be/xyz789")
+        == "https://img.youtube.com/vi/xyz789/mqdefault.jpg"
+    )
+
+
+def test_cover_url_for_bad_urls_is_none():
+    from app.services.recommenders.yt_resolver import cover_url_for_source_url
+
+    assert cover_url_for_source_url("") is None
+    assert cover_url_for_source_url("not a url") is None
+    assert cover_url_for_source_url("https://example.com/watch?v=abc") is None
+    assert cover_url_for_source_url("https://music.youtube.com/watch?foo=bar") is None
+    assert cover_url_for_source_url("https://music.youtube.com/browse/MPREb_1") is None

@@ -12,30 +12,6 @@ import 'download_icon.dart';
 import 'error_snackbar.dart';
 import 'library_cover_art.dart';
 
-/// Extracts the source `videoId` from a `music.youtube.com/watch?v=<id>` URL
-/// (or the youtube.com equivalent). Returns null if the URL is empty, not a
-/// recognized watch URL, or missing the `v` query param. Public for tests.
-String? extractSourceVideoId(String url) {
-  if (url.isEmpty) return null;
-  final Uri? uri = Uri.tryParse(url);
-  if (uri == null) return null;
-  if (!uri.host.contains('youtube.com') && !uri.host.contains('youtu.be')) {
-    return null;
-  }
-  if (uri.host.contains('youtu.be')) {
-    return uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
-  }
-  final String? v = uri.queryParameters['v'];
-  if (v == null || v.isEmpty) return null;
-  return v;
-}
-
-/// Remote thumbnail URL for a given videoId — public, no auth required.
-/// `mqdefault` is the medium-quality 320×180 thumbnail; always present even
-/// for tracks that have no upscaled `hqdefault`/`maxresdefault` variant.
-String remoteThumbnailUrl(String videoId) =>
-    'https://img.youtube.com/vi/$videoId/mqdefault.jpg';
-
 /// Vertical card used in the Home "Picked for you" / "Discover" section.
 ///
 /// Square colour-swatch placeholder on top, title + artist below, then a
@@ -202,9 +178,8 @@ class _OverlayAction extends StatelessWidget {
 /// Three-way cover resolution for a recommendation card:
 /// 1. Navidrome `coverArt` id present (in-library hit or Discover/random) →
 ///    use the cached [LibraryCoverArt] widget (disk + per-server cache).
-/// 2. `sourceUrl` parses as a recognized `watch?v=<id>` URL → load the public
-///    remote thumbnail via `Image.network`. No auth, falls back
-///    to the placeholder on error (e.g. offline / no connectivity).
+/// 2. Backend-provided `coverUrl` present → load it via `Image.network`.
+///    No auth, falls back to the placeholder on error (e.g. offline).
 /// 3. Otherwise → solid colour swatch with a music-note icon.
 class _CoverArt extends StatelessWidget {
   const _CoverArt({
@@ -242,10 +217,10 @@ class _CoverArt extends StatelessWidget {
         borderRadius: 0,
       );
     }
-    final String? videoId = extractSourceVideoId(track.sourceUrl);
-    if (videoId != null) {
+    final String? coverUrl = track.coverUrl;
+    if (coverUrl != null && coverUrl.isNotEmpty) {
       return Image.network(
-        remoteThumbnailUrl(videoId),
+        coverUrl,
         width: size,
         height: size,
         fit: BoxFit.cover,

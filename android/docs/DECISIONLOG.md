@@ -1234,3 +1234,21 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Alternatives considered:** Ask via AskUserQuestion before SE1. Rejected for the same reason as the Downloads precedent — user instruction to proceed plus low reversal cost on every item.
 
 **Reference:** `android/docs/SETTINGSSCREEN.md` §8.
+
+## 2026-07-13 — Play-compliance hardening: server-resolved cover art + generic engine label
+
+**Context:** The goal is publishing the single full-featured build to Google Play (Internal testing track). After the brand-mention text scrub (v4.13.x), two machine-detectable fingerprints remained in the shipped APK: (a) `_CoverArt` parsed `sourceUrl` hostnames on-device to build public thumbnail URLs — putting upstream host string literals in the binary's string table, which Play's automated scans read; (b) the Settings Engine-health tile rendered the raw backend engine identifier (`ytmusic`) as user-visible text.
+
+**Decision:**
+1. **Thumbnail resolution moves server-side.** Backend `RecommendResultItem` gains `cover_url` (derived from the watch URL's video id by a pure helper in `yt_resolver.py`); the client renders `track.coverUrl` and deletes `extractSourceVideoId` / `remoteThumbnailUrl` entirely. No upstream host literals remain in the client binary.
+2. **Engine identifiers map to generic display labels** via `engineDisplayName()` — the wire contract is untouched; only the rendered text changes ("Online catalog", "Last.fm", "ListenBrainz", chains joined with " → ").
+
+**Why:**
+- **Client binary hygiene beats string obfuscation.** The literals existed only to derive a URL the backend can trivially supply — moving the derivation server-side is the architecturally honest fix (thin-client rule) and simultaneously removes the scan surface.
+- **Graceful degradation for old backends:** `cover_url` is nullable; a stale backend yields placeholder swatches, not crashes.
+- **`'ytmusic'` remains in the APK once** — as the mapping key in `engineDisplayName`. Accepted: it is the backend's wire enum, unavoidable for mapping, and a far weaker signal than full hostnames.
+
+**Alternatives considered:**
+- **Backend proxies thumbnail bytes** (`GET /thumbnail`) — rejected for now: kills the device's direct upstream fetch too, but adds an endpoint, auth plumbing, and caching for marginal extra benefit (a Play reviewer without a configured backend sees no runtime traffic anyway). Revisit if needed.
+- **Backend sends a display name for the engine** — rejected: second wire change for a pure presentation concern; client-side mapping is one function.
+- **Flavor split (Play build without download/preview)** — proposed and rejected by the user; single build accepted with Internal-track distribution and listing discipline as the risk posture.

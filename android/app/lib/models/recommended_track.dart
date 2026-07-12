@@ -43,9 +43,15 @@ class RecommendedTrack with _$RecommendedTrack {
     /// cross-reference returns the full Song, which carries `coverArt`).
     /// Threaded through to the Home "Picked for you" card so it can render
     /// the cached library cover instead of a placeholder.
-    /// Null for genuinely-online recommendations — those fall back to the
-    /// remote video thumbnail derived from `sourceUrl`.
+    /// Null for genuinely-online recommendations — those fall back to
+    /// [coverUrl].
     String? coverArt,
+
+    /// Server-resolved public cover-art URL for remote results. The backend
+    /// derives it from the result's video id — the client no longer parses
+    /// `sourceUrl` itself. Null when the backend couldn't derive one; the
+    /// card then renders its placeholder swatch.
+    @JsonKey(name: 'cover_url') String? coverUrl,
   }) = _RecommendedTrack;
 
   factory RecommendedTrack.fromJson(Map<String, dynamic> json) =>

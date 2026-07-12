@@ -10,6 +10,7 @@ from app.schemas.recommend import (
 )
 from app.services.recommenders.base import RecommendationEngine, SeedTrack
 from app.services.recommenders.factory import get_recommendation_engine
+from app.services.recommenders.yt_resolver import cover_url_for_source_url
 
 router = APIRouter(tags=["recommend"])
 
@@ -29,6 +30,7 @@ async def recommend(
                 artist=r.artist,
                 source_url=r.source_url,
                 score=r.score,
+                cover_url=cover_url_for_source_url(r.source_url),
             )
             for r in results
         ]

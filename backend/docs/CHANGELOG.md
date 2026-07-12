@@ -937,3 +937,12 @@ Server half of issue #44 begins: in-place tag editing for library files. Files a
 ## 2026-07-12 — Version bump to 4.11.2 (Android Favorites tile count fix, sync only)
 
 - **`pyproject.toml`**, **`app/main.py`** — version → `4.11.2`. Android-side fix only (Library/Playlists Favorites tile song count); no backend code changes. Bumped per the version-sync convention — see `android/docs/CHANGELOG.md` 2026-07-12 for the actual fix.
+
+## 2026-07-13 — Server-resolved cover_url on /recommend results — v4.14.0
+
+- `app/schemas/recommend.py` — `RecommendResultItem` gains `cover_url: str | None` (server-resolved public cover-art URL; null when the source URL carries no video id).
+- `app/services/recommenders/yt_resolver.py` — new pure helper `cover_url_for_source_url(source_url)` — parses the watch URL's video id (watch?v=, short-form, or None for browse/unparseable URLs) and builds the public thumbnail URL.
+- `app/api/v1/recommend.py` — populates `cover_url` per result via the helper.
+- `tests/test_recommend.py` — endpoint test asserts `cover_url` in the response; null-cover test for browse URLs; 2 unit tests for the helper (valid forms + bad-URL matrix). TDD: red first, then green. 521 passed.
+- **Why:** the Android client previously derived thumbnails from `source_url` on-device, which required upstream host names in the client binary. Resolving server-side keeps that knowledge out of the shipped APK (Play-compliance hardening; see `android/docs/DECISIONLOG.md` 2026-07-13).
+- Version bump `4.13.0` → `4.14.0` across the five sync locations.

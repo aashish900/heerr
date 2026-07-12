@@ -1,5 +1,20 @@
 part of 'settings_screen.dart';
 
+/// Maps backend engine identifiers (wire values, possibly a comma-separated
+/// fallback chain like `lastfm,ytmusic`) to generic display labels. Unknown
+/// identifiers pass through unchanged.
+String engineDisplayName(String engine) {
+  return engine
+      .split(',')
+      .map((String e) => switch (e.trim()) {
+            'ytmusic' => 'Online catalog',
+            'lastfm' => 'Last.fm',
+            'listenbrainz' => 'ListenBrainz',
+            final String other => other,
+          })
+      .join(' → ');
+}
+
 class _RecommendationsSection extends ConsumerStatefulWidget {
   const _RecommendationsSection();
 
@@ -42,7 +57,7 @@ class _RecommendationsSectionState
               children: <Widget>[
                 ListTile(
                   leading: const Icon(Icons.recommend_outlined),
-                  title: Text('Engine: ${h.engine}'),
+                  title: Text('Engine: ${engineDisplayName(h.engine)}'),
                   subtitle: Row(
                     children: <Widget>[
                       _StatusChip(degraded: degraded),

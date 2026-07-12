@@ -1,10 +1,36 @@
 import asyncio
 import logging
 from typing import Any, Protocol, cast
+from urllib.parse import parse_qs, urlparse
 
 from ytmusicapi import YTMusic
 
 logger = logging.getLogger(__name__)
+
+
+def cover_url_for_source_url(source_url: str) -> str | None:
+    """Public cover-art URL for a resolved `watch?v=<id>` source URL.
+
+    Server-side counterpart of what the client used to derive locally —
+    resolving here keeps upstream host knowledge out of the client binary.
+    Returns None for empty/unparseable URLs or non-watch URLs (e.g. album
+    `browse/` URLs), in which case the client falls back to its placeholder.
+    """
+    if not source_url:
+        return None
+    try:
+        parsed = urlparse(source_url)
+    except ValueError:
+        return None
+    host = parsed.netloc.lower()
+    video_id: str | None = None
+    if host.endswith("youtu.be"):
+        video_id = parsed.path.lstrip("/").split("/")[0] or None
+    elif host.endswith("youtube.com"):
+        video_id = (parse_qs(parsed.query).get("v") or [None])[0]
+    if not video_id:
+        return None
+    return f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg"
 
 
 class _YTMusicLike(Protocol):
