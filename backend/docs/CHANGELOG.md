@@ -950,3 +950,7 @@ Server half of issue #44 begins: in-place tag editing for library files. Files a
 ## 2026-07-13 — Fix mypy list-item error in cover_url_for_source_url
 
 - `app/services/recommenders/yt_resolver.py` — `(parse_qs(...).get("v") or [None])[0]` failed strict mypy in CI (`List item 0 has incompatible type "None"; expected "str"`). Replaced with an explicit `v_values[0] if v_values else None` branch. Behavior identical; existing tests cover both paths. `poetry run mypy app/` clean (57 files), 17 recommend tests pass.
+
+## 2026-07-13 — v4.14.1: version bump for the mypy fix
+
+- Version bump `4.14.0` → `4.14.1` across the five sync locations (patch release carrying the `cover_url_for_source_url` type fix, commit `1690255`). No functional change.

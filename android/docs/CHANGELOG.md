@@ -2935,3 +2935,7 @@ User review flagged four more issues:
 - **Tests** — `home_recommendation_card_test.dart`: URL-parsing unit tests replaced with two widget tests (coverUrl set → NetworkImage with that URL; coverUrl null → placeholder, no network image). `recommendations_provider_test.dart`: fixture + assertions for `cover_url` parse. `settings_screen_test.dart`: engine-label expectations updated ("Engine: Online catalog" / "Engine: Last.fm"). TDD: red first, then green. 981 passed, `flutter analyze` clean.
 - **Depends on backend v4.14.0** (`cover_url` in `POST /recommend`). Older backends return no `cover_url` → cards render the placeholder swatch (graceful degradation, no crash).
 - Version bump `4.13.0` → `4.14.0` across the five sync locations.
+
+## 2026-07-13 — v4.14.1: backend-only mypy fix — version bumped for sync
+
+- No Android code changes. `pubspec.yaml` version bumped `4.14.0` → `4.14.1` to stay in sync with the backend patch release (strict-mypy type fix in `cover_url_for_source_url`; see `backend/docs/CHANGELOG.md` 2026-07-13).
