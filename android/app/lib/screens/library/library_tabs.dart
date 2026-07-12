@@ -507,7 +507,7 @@ class _PlaylistsTab extends ConsumerWidget {
                 ?.markedPlaylists ??
             const <String>{};
         final int? favoritesCount =
-            ref.watch(starredSongsProvider).valueOrNull?.length;
+            ref.watch(favouritesPlaylistProvider).valueOrNull?.songCount;
         final int cardCount = playlists.length > _kGridCap
             ? _kGridCap
             : playlists.length;

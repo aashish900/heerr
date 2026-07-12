@@ -933,3 +933,7 @@ Server half of issue #44 begins: in-place tag editing for library files. Files a
 - **`tests/test_migration_0012.py`** (new) — 4 tests: null defaults, text round-trips, binary avatar round-trip.
 - **`tests/test_profile.py`** (new) — 6 tests: GET null, PUT round-trip, GET-after-PUT, avatar PUT/GET, clear avatar, auth guard.
 - **`tests/test_auth_login.py`** — updated key-set assertion to include `"profile"`. All 518 tests pass.
+
+## 2026-07-12 — Version bump to 4.11.2 (Android Favorites tile count fix, sync only)
+
+- **`pyproject.toml`**, **`app/main.py`** — version → `4.11.2`. Android-side fix only (Library/Playlists Favorites tile song count); no backend code changes. Bumped per the version-sync convention — see `android/docs/CHANGELOG.md` 2026-07-12 for the actual fix.

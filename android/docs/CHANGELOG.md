@@ -2776,3 +2776,14 @@ User review flagged four more issues:
 ## 2026-07-12 — Version bump to 4.11.1 (Now Playing + Profile fix pass release)
 
 - **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.11.0 → 4.11.1 per the version-sync convention, covering the 2026-07-12 fix pass (profile nav crash, lyrics magenta accent, expanded-sheet restyle, background atmosphere). Android-side only; backend bumped for sync.
+
+## 2026-07-12 — Fix: Library/Playlists Favorites tile missing song count
+
+- **Root cause:** `screens/library/library_tabs.dart` computed `favoritesCount` from `starredSongsProvider` (`providers/library/starred_songs.dart`), which wraps the Subsonic `star.view`/`getStarred2.view` primitive. Since the `v4.8.2` repoint (favoriting now writes to a real Navidrome playlist named `Favourites` via `PlaylistMutations.toggleFavourite`, per `providers/library/favourites.dart`), nothing calls the star primitive anymore, so the starred list stayed empty and the count text (conditional on non-null in `playlist_grid_card.dart`'s `FavoritesGridCard`/`_GridCardShell`) never rendered.
+- **`screens/library/library_tabs.dart`** — `favoritesCount` now reads `ref.watch(favouritesPlaylistProvider).valueOrNull?.songCount` (the real Favourites playlist's own song count) instead of `starredSongsProvider.valueOrNull?.length`. Feeds both the Playlists-tab grid's `FavoritesGridCard` and the Playlists-tab list row.
+- **`screens/library/library_screen.dart`** — import swapped from `providers/library/starred_songs.dart` to `providers/library/favourites.dart`.
+- Verification: `flutter analyze` clean on both touched files.
+
+## 2026-07-12 — Version bump to 4.11.2 (Favorites tile count fix release)
+
+- **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.11.1 → 4.11.2 per the version-sync convention, covering the Favorites tile song-count fix above. Android-side only; backend bumped for sync.
