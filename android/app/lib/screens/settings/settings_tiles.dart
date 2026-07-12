@@ -46,14 +46,23 @@ class SettingsGroupCard extends StatelessWidget {
           border: Border.all(color: Colors.white10),
         ),
         clipBehavior: Clip.antiAlias,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            for (int i = 0; i < children.length; i++) ...<Widget>[
-              if (i > 0) const Divider(height: 1, indent: 20, endIndent: 20),
-              children[i],
+        // Plain `ListTile`s nested inside `children` (ProfilesSection,
+        // _RecommendationsSection) paint their ink/selection on the nearest
+        // Material ancestor. Without this explicit transparent Material,
+        // Flutter's debug assertion flags the DecoratedBox above as hiding
+        // that ink — give them a Material surface between the decoration
+        // and the tiles.
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              for (int i = 0; i < children.length; i++) ...<Widget>[
+                if (i > 0) const Divider(height: 1, indent: 20, endIndent: 20),
+                children[i],
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

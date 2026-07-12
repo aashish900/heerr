@@ -116,41 +116,21 @@ Future<void> _useTallSurface(WidgetTester tester) async {
   });
 }
 
-/// #17: each settings section is now a collapsible [ExpansionTile] keyed
-/// `settings-section-<title>` and collapsed by default (except Profiles).
-/// Tap the section header to reveal its body, then let the expand animation
-/// + async child builds settle.
-Future<void> _expandSection(WidgetTester tester, String title) async {
-  await tester.tap(find.byKey(Key('settings-section-$title')));
-  await _pumpForBuild(tester);
-}
-
 void main() {
-  group('Collapsible sections (#17)', () {
-    testWidgets('remaining section headers render (Downloads & Storage is flat, SE5)',
+  group('Flat sections (#17 retired D5, SE6)', () {
+    testWidgets('all section headers render and every body is visible without tapping',
         (WidgetTester tester) async {
       await _useTallSurface(tester);
       await tester.pumpWidget(_wrap(<Override>[..._storage(_InMemoryStorage())]));
       await _pumpForBuild(tester);
-      expect(find.byKey(const Key('settings-section-Profiles')), findsOneWidget);
-      expect(find.byKey(const Key('settings-section-Recommendations')),
-          findsOneWidget);
-      // Downloads & Storage was flattened in SE5 — a plain section header +
-      // always-visible SettingsGroupCard, no ExpansionTile.
+      // SE6: every section is a flat SettingsSectionHeader + SettingsGroupCard
+      // — no ExpansionTile, nothing collapsed by default.
+      expect(find.text('Profiles'), findsOneWidget);
       expect(find.text('Downloads & Storage'), findsOneWidget);
-    });
-
-    testWidgets('Profiles expanded by default; Recommendations collapsed',
-        (WidgetTester tester) async {
-      await _useTallSurface(tester);
-      await tester.pumpWidget(_wrap(<Override>[..._storage(_InMemoryStorage())]));
-      await _pumpForBuild(tester);
-      // Profiles body is visible without tapping (empty registry → Add row).
+      expect(find.text('Recommendations'), findsOneWidget);
       expect(find.text('Add profile'), findsOneWidget);
-      // Downloads & Storage is flat (SE5) — always visible now.
       expect(find.text('WiFi only'), findsOneWidget);
-      // Recommendations is still collapsible and hidden until expanded.
-      expect(find.text('Engine health'), findsNothing);
+      expect(find.text('Engine health'), findsOneWidget);
     });
   });
 
@@ -345,7 +325,6 @@ void main() {
                 ))),
       ]));
       await _pumpForBuild(tester);
-      await _expandSection(tester, 'Recommendations');
 
       expect(find.text('Engine: ytmusic'), findsOneWidget);
       expect(find.byKey(const Key('engine-chip-ok')), findsOneWidget);
@@ -368,7 +347,6 @@ void main() {
                 ))),
       ]));
       await _pumpForBuild(tester);
-      await _expandSection(tester, 'Recommendations');
 
       expect(find.text('Engine: lastfm'), findsOneWidget);
       expect(find.byKey(const Key('engine-chip-degraded')), findsOneWidget);
@@ -390,7 +368,6 @@ void main() {
                 ))),
       ]));
       await _pumpForBuild(tester);
-      await _expandSection(tester, 'Recommendations');
 
       expect(find.byKey(const Key('engine-chip-fallback-active')),
           findsOneWidget);
@@ -410,7 +387,6 @@ void main() {
                 ))),
       ]));
       await _pumpForBuild(tester);
-      await _expandSection(tester, 'Recommendations');
 
       // Help text not yet visible.
       expect(find.textContaining('Primary engine probe failed'),

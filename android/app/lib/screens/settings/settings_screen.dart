@@ -24,12 +24,12 @@ import 'settings_tiles.dart';
 part 'settings_recommendations.dart';
 part 'settings_offline.dart';
 
-/// Settings screen — "Control Center" redesign (docs/SETTINGSSCREEN.md, SE1).
-/// Shares the `BrandedAppBar` + headline/subtitle shell established by
-/// Home/Library/Downloads. D2: no greeting — the default (non-compact)
-/// `BrandedAppBar` renders the logo mark + wordmark only, same as Home.
-/// SE1 scope is the shell only; the sections below are rehosted unchanged
-/// (still `_CollapsibleSection`-based) and get restyled in SE2-SE6.
+/// Settings screen — "Control Center" redesign (docs/SETTINGSSCREEN.md,
+/// SE1-SE6). Shares the `BrandedAppBar` + headline/subtitle shell
+/// established by Home/Library/Downloads. D2: no greeting — the default
+/// (non-compact) `BrandedAppBar` renders the logo mark + wordmark only, same
+/// as Home. D5: every section is a flat, always-visible `SettingsGroupCard`
+/// under a `SettingsSectionHeader` — no collapsible `ExpansionTile`s.
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -65,24 +65,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SliverToBoxAdapter(child: ServerSyncCard()),
           SliverList(
             delegate: SliverChildListDelegate(const <Widget>[
-              Divider(height: 1),
-              // #17: each section is collapsible to keep the screen
-              // uncluttered. Profiles (the primary credential surface) stays
-              // open by default; the heavier Offline + Recommendations
-              // sections start collapsed.
-              _CollapsibleSection(
-                leading: Icon(Icons.people_outline, color: heerrMagenta),
-                title: 'Profiles',
-                initiallyExpanded: true,
-                child: ProfilesSection(),
-              ),
+              SettingsSectionHeader('Profiles'),
+              SettingsGroupCard(children: <Widget>[ProfilesSection()]),
               SettingsSectionHeader('Downloads & Storage'),
               _OfflineSection(),
-              _CollapsibleSection(
-                leading: Icon(Icons.recommend_outlined, color: heerrMagenta),
-                title: 'Recommendations',
-                child: _RecommendationsSection(),
-              ),
+              SettingsSectionHeader('Recommendations'),
+              SettingsGroupCard(children: <Widget>[_RecommendationsSection()]),
               _AppVersionTile(),
             ]),
           ),
@@ -142,41 +130,6 @@ class _AppVersionTile extends ConsumerWidget {
         style: TextStyle(fontWeight: FontWeight.w600),
       ),
       subtitle: Text(version),
-    );
-  }
-}
-
-/// #17: a collapsible settings section. Wraps [child] in an [ExpansionTile]
-/// with a leading [icon] + bold [title]. Keyed `settings-section-<title>` so
-/// widget tests can target the header. Collapsed by default unless
-/// [initiallyExpanded].
-class _CollapsibleSection extends StatelessWidget {
-  const _CollapsibleSection({
-    required this.leading,
-    required this.title,
-    required this.child,
-    this.initiallyExpanded = false,
-  });
-
-  final Widget leading;
-  final String title;
-  final Widget child;
-  final bool initiallyExpanded;
-
-  @override
-  Widget build(BuildContext context) {
-    return ExpansionTile(
-      key: Key('settings-section-$title'),
-      leading: leading,
-      title: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.w600),
-      ),
-      initiallyExpanded: initiallyExpanded,
-      shape: const Border(),
-      collapsedShape: const Border(),
-      childrenPadding: EdgeInsets.zero,
-      children: <Widget>[child],
     );
   }
 }
