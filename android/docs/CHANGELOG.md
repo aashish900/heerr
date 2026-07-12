@@ -2878,3 +2878,10 @@ User review flagged four more issues:
 - `test/router_test.dart` — Settings' AppBar title is no longer `Text('Settings')`, it's `HeerrLogo` (shared with Home). Added `_expectOnSettings()` helper (AppBar title type + body headline text) replacing the three `_activeTitle(tester) == 'Settings'` assertions that broke.
 - `test/screens/settings_screen_test.dart` — import path updated to `package:heerr/screens/settings/settings_screen.dart`.
 - Verification: `flutter analyze` clean; full `flutter test` green (971 tests).
+
+## 2026-07-12 — Settings redesign SE2: reusable settings tile system
+
+- New `lib/screens/settings/settings_tiles.dart`: `SettingsSectionHeader`, `SettingsGroupCard` (floating rounded card, `surfaceContainerHigh` fill, dividers between rows, none trailing/leading), `SettingsTile` (leading icon in solid `heerrMagenta` — matches existing icon usage in this screen rather than the plan doc's `GradientIcon` wording, which is reserved for hero accents elsewhere in the app), `SettingsSwitchTile`, `SettingsDropdownTile<T>`. Rows auto-key as `settings-tile-<slug>` via `settingsTileKey()`. Min row height 56dp (>=48dp a11y target).
+- Not yet wired into `settings_screen.dart` — SE3-SE6 consume this system section by section.
+- New `test/screens/settings/settings_tiles_test.dart` (9 tests): section header, group-card divider placement, tile anatomy/keying/tap/min-height, switch tile, dropdown tile.
+- Verification: `flutter analyze` clean; full `flutter test` green (980 tests).
