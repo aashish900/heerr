@@ -7,7 +7,7 @@ part of 'server_status.dart';
 // **************************************************************************
 
 String _$serverStatusNotifierHash() =>
-    r'8c6177874353e2862e4530c3c2c320954b8b80b2';
+    r'ca4e5221e64c19f88212477bc896a7049d7a4f23';
 
 /// Polls `BackendService.health()` every [_kPollInterval] while this
 /// provider has a listener (autoDispose — the Downloads screen is the only

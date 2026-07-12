@@ -23,6 +23,7 @@ import '../../widgets/library_cover_art.dart';
 import '../../widgets/library_result_tile.dart';
 import 'quick_action_cards.dart';
 import 'server_status_card.dart';
+import 'sync_activity_section.dart';
 
 part 'downloads_tabs.dart';
 
@@ -65,6 +66,7 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen>
             const SliverToBoxAdapter(child: _DownloadsTitle()),
             const SliverToBoxAdapter(child: ServerStatusCard()),
             const SliverToBoxAdapter(child: QuickActionCards()),
+            const SliverToBoxAdapter(child: SyncActivitySection()),
             SliverPersistentHeader(
               pinned: true,
               delegate: _DownloadsTabBarDelegate(tabs: _tabs),
