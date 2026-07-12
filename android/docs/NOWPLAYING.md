@@ -1,6 +1,6 @@
 # NOWPLAYING.md — Now Playing screen redesign plan
 
-Status: **PLANNED** 2026-07-11 — not yet implemented.
+Status: **IMPLEMENTED** 2026-07-11 (NP1–NP10, v4.11.0). NP10 shipped in reduced scope — see DECISIONLOG 2026-07-11.
 Reference mockup: `/Users/E1621/Documents/Personal/Android/Now Playing.png` (single-panel image: Starboy / The Weeknd). Consider copying to `android/docs/assets/now-playing.png` to version it.
 Milestone prefix: **NP** (NP1–NP10) — A–Z letters are exhausted (X went to the Library redesign), so this phase uses a two-letter prefix.
 

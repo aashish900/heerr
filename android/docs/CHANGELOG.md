@@ -2757,3 +2757,10 @@ User review flagged four more issues:
 - This is a **reduced-scope** implementation of the plan's NP10 spec — a discrete swipe-opens-the-existing-sheet gesture, not the full continuous drag-morph transition (hero art shrinking into a floating corner thumb, title/transport/pill fading, waveform crossfading into a progress line, all interactively scrubbable). See DECISIONLOG 2026-07-11 for the full scoping rationale — the plan itself pre-authorized this fallback ("timebox; if it slips, ship NP1–NP9 and log NP10 to DEBT"). Swipe-down-to-dismiss and the collapse chevron were already covered by `showModalBottomSheet`'s default drag-to-dismiss behaviour — no new code needed there.
 - New tests in `now_playing_lyrics_expand_test.dart`: swipe-up opens the sheet; a small vertical wobble does not.
 - Verification: `flutter analyze` clean; `flutter test` 922/922.
+
+## 2026-07-11 — Now Playing redesign NP11 — docs, roadmap, version bump to 4.11.0
+
+- `android/app/pubspec.yaml`, `backend/pyproject.toml`, `backend/app/main.py`, `android/docs/ROADMAP.md`, `backend/docs/ROADMAP.md` — version bump 4.10.0 → 4.11.0 per the version-sync convention, covering the Now Playing screen redesign (NP1–NP10). Android-side only; backend bumped for sync.
+- `android/docs/NOWPLAYING.md` status flipped to IMPLEMENTED (NP1–NP10, v4.11.0; NP10 noted as shipped in reduced scope).
+- `android/docs/DEBT.md`: new "Now Playing redesign deferrals" section — NP10's full continuous drag-morph, the §2.1 playing-from-context label, the §2.2 equalizer slot, the §2.4 single-song ad-hoc download, word-level lyric highlighting, and on-device smoke (pending — no device attached during implementation).
+- Verification: `flutter analyze` clean; `flutter test` 922/922 across the whole NP1–NP10 phase (up from 895 at NP1, i.e. +27 new tests through the phase).

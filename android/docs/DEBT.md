@@ -253,3 +253,12 @@ reliably supported in home-screen widgets); tapping the tile opens the app.
 - **"See all" on Most Played Artists** — the rail caps at 10 with no see-all surface; the full artists list is the same screen, so a dedicated most-played-ordered view was skipped.
 - **"Year" as a range filter** — Year ships as a sort option inside the sort chip, not the mockup's separate "Year ▾" range picker.
 - **On-device smoke pending** — X1–X6 verified by widget tests only; no device was attached during implementation (same status as the Home redesign smoke).
+
+## Now Playing redesign deferrals (2026-07-11, NOWPLAYING.md)
+
+- **NP10 full continuous drag-morph transition** — the plan's spec was an interactively-scrubbable transform (hero art shrinking into a floating corner thumb, title/transport/pill fading, waveform crossfading into a progress line, all in lockstep with drag progress, retiring `_ExpandedLyricsSheet` as a modal). Shipped instead as a discrete swipe-up-opens-the-existing-sheet gesture — see DECISIONLOG 2026-07-11 for the full rationale. Revisit only as its own scoped effort; the `onSwipeUp` callback on `_HeroArt` is the hook a future implementation would replace.
+- **"Playing from \<context\>" header label (§2.1)** — the player has no play-source context to show; header keeps the static "NOW PLAYING" label. Would need `playContext` threaded through every queue-dispatch call site (album/playlist/search/recommendations) into `MediaItem.extras` — deferred as disproportionate to a header label (DECISIONLOG 2026-07-11).
+- **Equalizer pill slot (§2.2)** — dropped; no in-app or system-EQ-intent feature exists. Pill ships as 4 slots (Queue/Lyrics/Timer/Add to playlist), not 5.
+- **Single-song ad-hoc download (§2.4)** — the hero-art download button reflects existing per-song offline state and offers `deleteSongLocally` when ready, but there's no "download just this track outside any album/playlist" mutation anywhere in the app. Would need new `OfflineManifest`/`OfflineSync` shape.
+- **Lyrics word-level karaoke highlight** — LRC lyric data is line-timed only; the active-line accent is a whole-line gradient, not word-by-word.
+- **On-device smoke pending** — NP1–NP10 verified by widget tests only (908→922 across the phase); no device was attached during implementation.
