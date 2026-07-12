@@ -270,3 +270,10 @@ reliably supported in home-screen widgets); tapping the tile opens the app.
 - **Artists tab dropped (D2)** — the brief's four tabs became three (Songs/Albums/Playlists); manifest artists already expand to albums, so a dedicated Artists browsing mode was redundant. Revisit only if a genuinely artist-specific offline view is requested.
 - **IPv6 status line replaced (D4)** — "IPv6 Connected" has no data source (the app never inspects the Tailscale connection directly); the hero shows hostname + "via Tailscale" instead.
 - **On-device smoke pending** — DL1–DL8 verified by widget/provider tests only (971 total); no device was attached during implementation.
+
+## Settings redesign deferrals (2026-07-12, SETTINGSSCREEN.md)
+
+- **Every mockup section with no real data source dropped (D1)** — Audio Quality, Playback/Crossfade, Equalizer, Lyrics settings, Background & Animations, Appearance, Notifications, Language, Devices, Backup, Import Music. Several are explicit ROADMAP "Out of scope" items (crossfade, equaliser, i18n, light theme, push notifications); the rest simply have no provider/backend behind them. No placeholder/"coming soon" rows were shipped.
+- **Auto Cleanup toggle (D4)** — the sync sweep runs automatically on every tick; there's no standalone on/off control. Mentioned in the offline master-switch subtitle instead of a dedicated row.
+- **GitHub link's platform-channel tap unverified** — `AboutFooter`'s "GitHub" row calls `url_launcher`'s `launchUrl`, which needs a real Android intent resolver; not exercisable in `flutter_test` (the widget test overrides the tap via an injectable `onGithubTap` callback instead).
+- **On-device smoke pending** — SE1–SE7 verified by widget tests only (986 total); no device was attached during implementation.

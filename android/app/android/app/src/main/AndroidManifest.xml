@@ -120,5 +120,12 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- SE7: url_launcher needs this to resolve https intents on
+             Android 11+ package-visibility rules (About footer's GitHub
+             link). -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
     </queries>
 </manifest>

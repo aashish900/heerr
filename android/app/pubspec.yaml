@@ -2,7 +2,7 @@ name: heerr
 description: heerr Android client — thin REST client for the heerr FastAPI backend.
 publish_to: 'none'
 
-version: 4.12.1
+version: 4.13.0
 
 environment:
   sdk: ^3.12.0
@@ -85,6 +85,9 @@ dependencies:
   flutter_svg: ^2.0.0
   home_widget: ^0.9.3
   package_info_plus: ^9.0.1
+
+  # SE7: opens the GitHub repo link from the Settings About footer.
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:

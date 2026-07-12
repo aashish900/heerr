@@ -1,6 +1,6 @@
 # SETTINGSSCREEN.md — Settings Screen redesign plan ("Control Center")
 
-Status: **PLANNED** 2026-07-12. Not yet implemented. Open decisions D1–D7 (§8) unconfirmed.
+Status: **IMPLEMENTED** 2026-07-12 on `main` (SE1–SE7, v4.13.0). D1–D7 adopted the plan's proposed defaults without a synchronous confirmation round (see DECISIONLOG.md, same pattern as the Downloads redesign). Remaining: on-device smoke (no device attached during implementation — see DEBT.md), url_launcher's GitHub-link tap (platform channel, not exercisable in widget tests).
 Reference mockup: `/Users/E1621/Documents/Personal/Android/Settings.png` (outside the repo — copy to `android/docs/assets/settings-screen.png` to version it).
 Milestone prefix: **SE** (SE1–SE7). A–Z, X, NP, DL are taken; Phase S (profiles) already owns the single letter S.
 
