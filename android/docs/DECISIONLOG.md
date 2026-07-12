@@ -1215,3 +1215,22 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Alternatives considered:** Ask via AskUserQuestion before DL1. Rejected for this session — user's instruction ("start implementing it") plus auto-mode guidance favors proceeding on reasonable defaults over pausing, and every default here is easily reversible.
 
 **Reference:** `android/docs/DOWNLOADSSCREEN.md` §8.
+
+## 2026-07-12 — Settings redesign D1–D7: adopted the plan's proposed defaults
+
+**Context:** SETTINGSSCREEN.md §8 listed seven open decisions blocking SE1. User asked to start implementing without a synchronous confirmation round.
+
+**Decision:** Adopted every "Proposed" option verbatim:
+- **D1** Drop all mockup rows with no data source or explicit ROADMAP out-of-scope status (Audio Quality, Playback/Crossfade, Equalizer, Lyrics settings, Background & Animations, Appearance, Notifications, Language, Devices, Backup, Import Music) rather than shipping placeholder/"coming soon" tiles.
+- **D2** `BrandedAppBar` trailing actions stay Queue + avatar (shared contract across Home/Library/Downloads); no settings-specific search action.
+- **D3** Reuse `StatusPill` + `heerrOnlineGreen` for the Server & Sync online indicator — same sanctioned status-green as the Downloads hero (DL2), not a new "subtle" indicator.
+- **D4** No standalone Auto Cleanup toggle; the sync sweep is mentioned in the offline-downloads master-switch subtitle instead.
+- **D5** Flat `SettingsGroupCard`s replace the current `ExpansionTile`-based collapsible sections (post-cut section count is short enough that collapsing adds friction, not clarity); retires `_CollapsibleSection`.
+- **D6** Wi-Fi only / Charging only / Sync interval rows live in the Downloads & Storage group, not the promoted Server & Sync card (they gate downloading, not connectivity).
+- **D7** Target version **4.13.0** at SE7.
+
+**Why:** Every option was pre-reasoned in the plan doc as "Proposed: X"; none commits to new backend/schema work, and all are cheap to reverse (card layout, row placement, version number) without touching provider contracts. Same rationale as the DL1–DL8 precedent (2026-07-12 entry above) — blocking seven tasks of implementation on synchronous Q&A costs more than a later cosmetic revision.
+
+**Alternatives considered:** Ask via AskUserQuestion before SE1. Rejected for the same reason as the Downloads precedent — user instruction to proceed plus low reversal cost on every item.
+
+**Reference:** `android/docs/SETTINGSSCREEN.md` §8.

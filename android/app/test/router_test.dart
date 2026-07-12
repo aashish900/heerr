@@ -63,6 +63,17 @@ void _expectOnHome(WidgetTester tester, {String? reason}) {
   expect(bar.title, isA<HeerrLogo>(), reason: reason);
 }
 
+/// Settings no longer titles its AppBar with `Text('Settings')` — the
+/// redesign shares the branded logo AppBar with Home (SETTINGSSCREEN.md
+/// SE1, D2: no greeting). Since Home's AppBar title is also `HeerrLogo`,
+/// distinguish Settings by its body headline instead of the AppBar title
+/// type alone.
+void _expectOnSettings(WidgetTester tester, {String? reason}) {
+  final AppBar bar = tester.widget<AppBar>(find.byType(AppBar));
+  expect(bar.title, isA<HeerrLogo>(), reason: reason);
+  expect(find.text('Settings'), findsWidgets, reason: reason);
+}
+
 void main() {
   testWidgets('boots on the Home route by default', (
     WidgetTester tester,
@@ -190,7 +201,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(_activeTitle(tester), 'Settings');
+    _expectOnSettings(tester);
   });
 
   testWidgets('navigation round-trip: Settings → Home returns to Home', (
@@ -206,7 +217,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(_activeTitle(tester), 'Settings');
+    _expectOnSettings(tester);
 
     await tester.tap(
       find.descendant(
@@ -318,7 +329,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(_activeTitle(tester), 'Settings');
+      _expectOnSettings(tester);
 
       // System back must be intercepted by the shell PopScope → route Home.
       final bool handled = await tester.binding.handlePopRoute();

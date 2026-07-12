@@ -2864,3 +2864,17 @@ User review flagged four more issues:
 ## 2026-07-12 — Version bump to 4.12.1 (Downloads hero fix pass release)
 
 - **`android/app/pubspec.yaml`**, **`backend/pyproject.toml`**, **`backend/app/main.py`**, **`android/docs/ROADMAP.md`**, **`backend/docs/ROADMAP.md`** — version bump 4.12.0 → 4.12.1 per the version-sync convention, covering the green Online pill + real server illustration fix above. Android-side only; backend bumped for sync.
+
+## 2026-07-12 — Settings redesign planning round (SE, docs only)
+
+- **`android/docs/SETTINGSSCREEN.md`** (new) — full redesign plan for the Settings screen ("Control Center"): target layout, mockup-vs-reality table (Audio Quality / Equalizer / Appearance / Notifications / Language / Devices / Backup rows dropped — no data source or explicit ROADMAP out-of-scope), promoted Server & Sync card reusing `serverStatusProvider` + `StatusPill`, reusable `SettingsTile` system, task breakdown SE1–SE7, open decisions D1–D7. No code changes.
+- Reference mockup at `/Users/E1621/Documents/Personal/Android/Settings.png` (not yet copied into the repo).
+
+## 2026-07-12 — Settings redesign SE1: restructure screen shell + header + title
+
+- Moved `lib/screens/settings_screen.dart` -> `lib/screens/settings/settings_screen.dart` (+ its part files `settings_offline.dart`, `settings_recommendations.dart`), matching the `screens/<feature>/` layout used by Home/Library/Downloads. Updated `lib/router.dart` import.
+- `SettingsScreen` now uses `CustomScrollView` with `BrandedAppBar()` (default, non-compact — logo mark + wordmark, no greeting per D2) and a new `_SettingsTitle` headline/subtitle sliver ("Settings" / "Customize heerr the way you like."), mirroring `_DownloadsTitle`.
+- Existing sections (Profile card, collapsible Profiles/Offline/Recommendations, app-version footer) rehosted unchanged — visual restyle is SE2-SE6.
+- `test/router_test.dart` — Settings' AppBar title is no longer `Text('Settings')`, it's `HeerrLogo` (shared with Home). Added `_expectOnSettings()` helper (AppBar title type + body headline text) replacing the three `_activeTitle(tester) == 'Settings'` assertions that broke.
+- `test/screens/settings_screen_test.dart` — import path updated to `package:heerr/screens/settings/settings_screen.dart`.
+- Verification: `flutter analyze` clean; full `flutter test` green (971 tests).

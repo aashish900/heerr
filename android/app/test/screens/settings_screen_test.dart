@@ -13,7 +13,7 @@ import 'package:heerr/offline/offline_size_estimator.dart';
 import 'package:heerr/providers/prefs_storage.dart';
 import 'package:heerr/providers/recommendations.dart';
 import 'package:heerr/providers/secure_storage.dart';
-import 'package:heerr/screens/settings_screen.dart';
+import 'package:heerr/screens/settings/settings_screen.dart';
 
 /// Stub estimator that returns a fixed byte count without walking the
 /// library — keeps the offline-section widget tree synchronous and avoids
