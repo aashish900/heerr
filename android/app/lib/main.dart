@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,8 +21,15 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Q1: initialize WorkManager so the Q2 scheduler has a callback to dispatch
   // periodic offline-sync ticks to. Registration of the actual periodic task
-  // lands at Q2 — this call only wires the dispatcher.
-  await Workmanager().initialize(backgroundSyncCallbackDispatcher);
+  // lands at Q2 — this call only wires the dispatcher. Fire-and-forget (not
+  // awaited): nothing needs it synchronously before first frame — the only
+  // call site (`BackgroundSyncScheduler.schedule`) fires from
+  // `LifecycleCoordinator` on foreground/background transitions, which can't
+  // happen before `runApp()` below has already mounted the tree. Blocking
+  // `runApp()` on this was adding to the (often already black, since the
+  // launch splash used to be plain black) delay a widget-triggered cold
+  // start sees before the first frame draws.
+  unawaited(Workmanager().initialize(backgroundSyncCallbackDispatcher));
   final HeerrAudioHandler handler = await AudioService.init(
     builder: HeerrAudioHandler.new,
     config: const AudioServiceConfig(

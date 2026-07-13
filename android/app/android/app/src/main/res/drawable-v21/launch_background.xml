@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
+<!-- Branded launch splash — was `?android:colorBackground`, which resolves
+     to solid black on this dark-only app's `LaunchTheme` (Theme.Black.
+     NoTitleBar), making any delay before runApp()'s first frame
+     (AudioService.init() etc.) indistinguishable from a hung/broken app.
+     Reuses the adaptive-icon foreground so the splash at least shows the
+     heerr mark while loading. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="?android:colorBackground" />
-
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
+    <item android:drawable="@android:color/black" />
+    <item>
         <bitmap
             android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+            android:src="@drawable/ic_launcher_foreground" />
+    </item>
 </layer-list>
