@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
@@ -153,6 +155,73 @@ void main() {
       await handler.moveQueueItem(0, 3);
       expect(handler.queue.value, const <MediaItem>[a, b, c]);
       verifyNever(() => player.moveAudioSource(any(), any()));
+    });
+  });
+
+  group('playSong / playAll reentrancy guard', () {
+    const MediaItem a = MediaItem(id: 'https://x/a', title: 'A');
+    const MediaItem b = MediaItem(id: 'https://x/b', title: 'B');
+
+    test(
+        'a second playSong call while the first is still loading is dropped',
+        () async {
+      final Completer<Duration?> gate = Completer<Duration?>();
+      when(() => player.setAudioSources(any(),
+              initialIndex: any(named: 'initialIndex'),
+              initialPosition: any(named: 'initialPosition')))
+          .thenAnswer((_) => gate.future);
+      when(() => player.play()).thenAnswer((_) async {});
+
+      final Future<void> first = handler.playSong(a);
+      final Future<void> second = handler.playSong(b);
+      gate.complete(null);
+      await first;
+      await second;
+
+      expect(handler.queue.value, const <MediaItem>[a]);
+      verify(() => player.setAudioSources(any(),
+          initialIndex: any(named: 'initialIndex'),
+          initialPosition: any(named: 'initialPosition'))).called(1);
+      verify(() => player.play()).called(1);
+    });
+
+    test('a second playAll call while the first is still loading is dropped',
+        () async {
+      final Completer<Duration?> gate = Completer<Duration?>();
+      when(() => player.setAudioSources(any(),
+              initialIndex: any(named: 'initialIndex'),
+              initialPosition: any(named: 'initialPosition')))
+          .thenAnswer((_) => gate.future);
+      when(() => player.play()).thenAnswer((_) async {});
+
+      final Future<void> first = handler.playAll(const <MediaItem>[a]);
+      final Future<void> second = handler.playAll(const <MediaItem>[b]);
+      gate.complete(null);
+      await first;
+      await second;
+
+      expect(handler.queue.value, const <MediaItem>[a]);
+      verify(() => player.setAudioSources(any(),
+          initialIndex: any(named: 'initialIndex'),
+          initialPosition: any(named: 'initialPosition'))).called(1);
+      verify(() => player.play()).called(1);
+    });
+
+    test('playSong is available again once the first call has settled',
+        () async {
+      when(() => player.setAudioSources(any(),
+              initialIndex: any(named: 'initialIndex'),
+              initialPosition: any(named: 'initialPosition')))
+          .thenAnswer((_) async => null);
+      when(() => player.play()).thenAnswer((_) async {});
+
+      await handler.playSong(a);
+      await handler.playSong(b);
+
+      expect(handler.queue.value, const <MediaItem>[b]);
+      verify(() => player.setAudioSources(any(),
+          initialIndex: any(named: 'initialIndex'),
+          initialPosition: any(named: 'initialPosition'))).called(2);
     });
   });
 

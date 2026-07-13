@@ -18,6 +18,18 @@ class HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   final AudioPlayer _player;
 
+  // Guards [playSong] / [playAll] / [restoreQueue] against overlapping calls
+  // to `_player.setAudioSources`. A double-tap on a Play button (or two
+  // near-simultaneous taps on different Play buttons) previously fired two
+  // concurrent `setAudioSources` calls on the same underlying ExoPlayer
+  // instance — the first call's MediaCodec teardown raced the second's
+  // codec allocation, leaking a MediaCodec whose async callback thread kept
+  // posting to an already-dead Handler and eventually froze the UI thread
+  // long enough to trip Android's ANR watchdog. Dropping the second call
+  // outright (rather than queuing it) matches the disabled-button UX the
+  // Download action already uses elsewhere.
+  bool _isLoadingSource = false;
+
   AudioServiceRepeatMode _repeatMode = AudioServiceRepeatMode.none;
   AudioServiceShuffleMode _shuffleMode = AudioServiceShuffleMode.none;
 
@@ -170,25 +182,41 @@ class HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   // Helpers for the UI
   // -------------------------------------------------------------------------
 
-  /// Replace the queue with a single song and start playback.
+  /// Replace the queue with a single song and start playback. A call that
+  /// arrives while a previous [playSong] / [playAll] / [restoreQueue] is
+  /// still loading its audio source is dropped — see [_isLoadingSource].
   Future<void> playSong(MediaItem item) async {
-    await updateQueue(<MediaItem>[item]);
-    await play();
+    if (_isLoadingSource) return;
+    _isLoadingSource = true;
+    try {
+      await updateQueue(<MediaItem>[item]);
+      await play();
+    } finally {
+      _isLoadingSource = false;
+    }
   }
 
   /// Replace the queue with [items], optionally seek to a specific index,
-  /// and start playback. Used by Library Album / Playlist "Play all".
+  /// and start playback. Used by Library Album / Playlist "Play all". A
+  /// call that arrives while a previous load is still in flight is dropped
+  /// — see [_isLoadingSource].
   Future<void> playAll(List<MediaItem> items, {int startIndex = 0}) async {
     if (items.isEmpty) return;
-    final int idx = startIndex.clamp(0, items.length - 1);
-    queue.add(items);
-    await _player.setAudioSources(
-      items.map(_toAudioSource).toList(),
-      initialIndex: idx,
-      initialPosition: Duration.zero,
-    );
-    mediaItem.add(items[idx]);
-    await play();
+    if (_isLoadingSource) return;
+    _isLoadingSource = true;
+    try {
+      final int idx = startIndex.clamp(0, items.length - 1);
+      queue.add(items);
+      await _player.setAudioSources(
+        items.map(_toAudioSource).toList(),
+        initialIndex: idx,
+        initialPosition: Duration.zero,
+      );
+      mediaItem.add(items[idx]);
+      await play();
+    } finally {
+      _isLoadingSource = false;
+    }
   }
 
   /// P1: restore a persisted queue from disk on cold start. Like [playAll]
@@ -204,14 +232,20 @@ class HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     Duration position = Duration.zero,
   }) async {
     if (items.isEmpty) return;
-    final int idx = currentIndex.clamp(0, items.length - 1);
-    queue.add(items);
-    await _player.setAudioSources(
-      items.map(_toAudioSource).toList(),
-      initialIndex: idx,
-      initialPosition: position,
-    );
-    mediaItem.add(items[idx]);
+    if (_isLoadingSource) return;
+    _isLoadingSource = true;
+    try {
+      final int idx = currentIndex.clamp(0, items.length - 1);
+      queue.add(items);
+      await _player.setAudioSources(
+        items.map(_toAudioSource).toList(),
+        initialIndex: idx,
+        initialPosition: position,
+      );
+      mediaItem.add(items[idx]);
+    } finally {
+      _isLoadingSource = false;
+    }
   }
 
   // -------------------------------------------------------------------------

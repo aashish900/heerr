@@ -1252,3 +1252,18 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **Backend proxies thumbnail bytes** (`GET /thumbnail`) — rejected for now: kills the device's direct upstream fetch too, but adds an endpoint, auth plumbing, and caching for marginal extra benefit (a Play reviewer without a configured backend sees no runtime traffic anyway). Revisit if needed.
 - **Backend sends a display name for the engine** — rejected: second wire change for a pure presentation concern; client-side mapping is one function.
 - **Flavor split (Play build without download/preview)** — proposed and rejected by the user; single build accepted with Internal-track distribution and listing discipline as the risk posture.
+
+## 2026-07-13 — ANR fix: drop reentrant play calls rather than queue them
+
+**Context:** User reported the app freezing and getting killed by Android's ANR watchdog ("heerr isn't responding") shortly after tapping Play. Diagnosed via `adb logcat` ANR traces (`Input dispatching timed out ... Waited 5000ms for MotionEvent`) plus a live `flutter run --profile` repro: two rapid taps on a Play button fired two concurrent `AudioPlayer.setAudioSources` calls on the same shared ExoPlayer instance (`HeerrAudioHandler` holds one `AudioPlayer` for the app's lifetime). The first call's MediaCodec teardown raced the second's allocation, leaking a codec whose async callback thread kept posting to an already-dead `Handler` — eventually starving the UI thread long enough to trip the watchdog.
+
+**Decision:** `HeerrAudioHandler.playSong` / `playAll` / `restoreQueue` gained a single `_isLoadingSource` boolean guard. A call that arrives while a previous one is still loading its audio source is **dropped outright** — not queued, not awaited, not merged.
+
+**Why:**
+- **Matches an existing UX pattern.** The Download action (`home_recommendation_card.dart`) already disables its button while in flight via `downloadDispatcherProvider`'s `inFlight` check; dropping is the Play-button equivalent without needing per-widget state threaded through every Play button in the app (Home cards, Album/Playlist "Play all", Artist play, Queue's job-done play).
+- **Single chokepoint.** Guarding at the audio handler (rather than each call site) protects every caller for free and can't be forgotten by a future screen that adds its own Play button.
+- **Dropping over queuing:** the user's *intent* with a rapid second tap is almost always "the first tap didn't register," not "play this after the first song finishes." Queuing would silently start a second, unwanted track once the first load completes.
+
+**Alternatives considered:**
+- **Per-widget `inFlight` state on every Play button** — rejected: correct but duplicates the same guard logic at every call site instead of once at the shared player.
+- **`await` / mutex-queue overlapping calls instead of dropping** — rejected: the queued call would still eventually fire and start a track the user didn't mean to request twice.

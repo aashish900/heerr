@@ -2947,3 +2947,12 @@ User review flagged four more issues:
 ## 2026-07-13 — v4.14.2: first release with the Play AAB artifact
 
 - No app code changes. `pubspec.yaml` version bumped `4.14.1` → `4.14.2` for sync. This tag is the first to run the updated publish workflow — the GitHub Release carries both `heerr-v4.14.2.apk` (direct install) and `heerr-v4.14.2.aab` (Play Console upload).
+
+## 2026-07-13 — fix: ANR on rapid Play taps — v4.14.3
+
+- Root-caused via `adb logcat` ANR traces + a live `flutter run --profile` repro on-device: tapping Play twice in quick succession (e.g. because the first tap looked unresponsive) fired two concurrent `AudioPlayer.setAudioSources` calls on the same shared ExoPlayer instance. The first call's MediaCodec (FLAC decoder) teardown raced the second's codec allocation — logcat showed 4 back-to-back `allocate(c2.android.flac.decoder)` calls with no clean teardown between them, then ~16 `Handler ... sending message to a Handler on a dead thread` errors from a leaked codec's async callback thread, then Android's ANR watchdog killed the app (`Input dispatching timed out ... Waited 5000ms for MotionEvent`).
+- **`lib/player/heerr_audio_handler.dart`** — added `_isLoadingSource` reentrancy guard to `HeerrAudioHandler.playSong`, `playAll`, and `restoreQueue`. A call that arrives while a previous one is still loading its audio source is dropped outright (matches the disabled-button UX the Download action already uses) rather than queued.
+- **`test/player/heerr_audio_handler_modes_test.dart`** — new `playSong / playAll reentrancy guard` group (3 tests, mocked `AudioPlayer` gated by a `Completer` to control timing): a second `playSong`/`playAll` call while the first is still in flight is dropped; the guard releases once the first call settles, allowing a subsequent call through. TDD: red first (confirmed the race reproduces at the unit level), then green.
+- The v4.14.0 `Image.network(coverUrl)` change on Home recommendation cards likely made this pre-existing race easier to hit (added per-card render jank that encourages a frustrated double-tap on Play) — the race itself predates v4.14.0 and isn't new to this diff.
+- Version bump `4.14.2` → `4.14.3` across all five sync locations (`/CLAUDE.md` §3).
+- Verification: `flutter analyze` clean; full `flutter test` green (987 tests, 3 new).
