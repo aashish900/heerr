@@ -1,4 +1,4 @@
-# Build and publish the heerr Android APK to a GitHub Release when a version tag is pushed.
+# Build and publish the heerr Android APK + AAB to a GitHub Release when a version tag is pushed.
 #
 # Trigger: push to any tag matching v* (e.g. git tag v0.1.2 && git push --tags)
 #
@@ -6,8 +6,9 @@
 #   1. Set up Java 17 + Flutter 3.44.0
 #   2. Install Dart deps + run codegen (freezed / riverpod_generator / json_serializable)
 #   3. Decode keystore, convert PKCS12 → JKS (Gradle compatibility), write key.properties
-#   4. flutter build apk --release
-#   5. Rename APK to heerr-<tag>.apk and attach to a GitHub Release
+#   4. flutter build apk --release  (direct-install artifact: GitHub / Obtainium)
+#   5. flutter build appbundle --release  (Play Console upload artifact)
+#   6. Rename to heerr-<tag>.apk / heerr-<tag>.aab and attach both to a GitHub Release
 #
 # Required GitHub repo secrets (Settings → Secrets and variables → Actions):
 #
@@ -122,14 +123,27 @@ jobs:
             --build-name="${GITHUB_REF_NAME#v}" \
             --build-number="${{ github.run_number }}"
 
-      - name: Rename APK (embed version in filename)
+      # Play Console only accepts App Bundles — the APK above is for direct
+      # installs (GitHub / Obtainium); this AAB is the Play upload artifact.
+      # Same signing config and version stamping as the APK build.
+      - name: Build release AAB (Play Console artifact)
+        run: |
+          flutter build appbundle --release \
+            --build-name="${GITHUB_REF_NAME#v}" \
+            --build-number="${{ github.run_number }}"
+
+      - name: Rename artifacts (embed version in filenames)
         run: |
           mv build/app/outputs/flutter-apk/app-release.apk \
              build/app/outputs/flutter-apk/heerr-${{ github.ref_name }}.apk
+          mv build/app/outputs/bundle/release/app-release.aab \
+             build/app/outputs/bundle/release/heerr-${{ github.ref_name }}.aab
 
-      - name: Create GitHub Release and attach APK
+      - name: Create GitHub Release and attach APK + AAB
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
           generate_release_notes: true
-          files: android/app/build/app/outputs/flutter-apk/heerr-${{ github.ref_name }}.apk
+          files: |
+            android/app/build/app/outputs/flutter-apk/heerr-${{ github.ref_name }}.apk
+            android/app/build/app/outputs/bundle/release/heerr-${{ github.ref_name }}.aab

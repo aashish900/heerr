@@ -2939,3 +2939,7 @@ User review flagged four more issues:
 ## 2026-07-13 — v4.14.1: backend-only mypy fix — version bumped for sync
 
 - No Android code changes. `pubspec.yaml` version bumped `4.14.0` → `4.14.1` to stay in sync with the backend patch release (strict-mypy type fix in `cover_url_for_source_url`; see `backend/docs/CHANGELOG.md` 2026-07-13).
+
+## 2026-07-13 — CI: publish workflow also builds the Play AAB
+
+- **`.github/workflows/android-publish.yml`** — on version tags, after the release APK the workflow now also runs `flutter build appbundle --release` (same signing config, same `--build-name`/`--build-number` stamping) and attaches `heerr-<tag>.aab` to the GitHub Release alongside `heerr-<tag>.apk`. The APK remains the direct-install artifact (GitHub / Obtainium); the AAB is the Play Console upload artifact. Takes effect on the next `v*` tag.
