@@ -116,6 +116,11 @@ class OfflineSync extends _$OfflineSync {
   bool _lastWifi = false;
   bool _paused = false;
   bool _running = false;
+  // Guards state writes from _publish* helpers against the initial build():
+  // AsyncNotifier.state can't be assigned before build()'s returned Future
+  // resolves, so the first-ever tick (inside build()) can't emit interim
+  // progress — only ticks after that are live-updated.
+  bool _initialized = false;
 
   @override
   Future<OfflineSyncStatus> build() async {
@@ -155,7 +160,10 @@ class OfflineSync extends _$OfflineSync {
     final OfflineSyncResult first = await _runTick();
     _scheduleNext();
     _subscribeWifi();
-    return _statusFromResult(first, await _countsFromManifest());
+    final OfflineSyncStatus result =
+        _statusFromResult(first, await _countsFromManifest());
+    _initialized = true;
+    return result;
   }
 
   /// A14: react to a Wi-Fi reconnect immediately. On a false→true transition,
@@ -188,6 +196,7 @@ class OfflineSync extends _$OfflineSync {
   /// Manual "Sync now" trigger from Settings. Returns the per-tick result so
   /// the caller can show a snackbar without re-reading the status field.
   Future<OfflineSyncResult> syncNow() async {
+    _publishRunning();
     final OfflineSyncResult r = await _runTick();
     state = AsyncValue<OfflineSyncStatus>.data(
       _statusFromResult(r, await _countsFromManifest()),
@@ -209,11 +218,54 @@ class OfflineSync extends _$OfflineSync {
 
   Future<void> _tick() async {
     if (_paused) return;
+    _publishRunning();
     final OfflineSyncResult r = await _runTick();
     state = AsyncValue<OfflineSyncStatus>.data(
       _statusFromResult(r, await _countsFromManifest()),
     );
     _scheduleNext();
+  }
+
+  /// Flips `running` on immediately, keeping the last known counts, so the
+  /// Downloads hero's progress bar appears as soon as a tick starts rather
+  /// than only after it (fully) completes. No-op during the initial build()
+  /// tick — see [_initialized].
+  void _publishRunning() {
+    if (!_initialized) return;
+    final OfflineSyncStatus? current = state.valueOrNull;
+    state = AsyncValue<OfflineSyncStatus>.data((
+      running: true,
+      targetCount: current?.targetCount ?? 0,
+      readyCount: current?.readyCount ?? 0,
+      failedCount: current?.failedCount ?? 0,
+      lastError: current?.lastError,
+      lastTickAt: current?.lastTickAt,
+    ));
+  }
+
+  /// Recomputes ready/failed counts from [songsState] and republishes a
+  /// `running: true` status — called as [_runTick] resolves targets and as
+  /// each download completes, so the progress bar/remaining-count move live
+  /// instead of jumping straight from 0 to the final tick result.
+  void _publishProgress(
+    Map<String, OfflineSongEntry> songsState,
+    int targetCount,
+  ) {
+    if (!_initialized) return;
+    int ready = 0;
+    int failed = 0;
+    for (final OfflineSongEntry e in songsState.values) {
+      if (e.state == OfflineSongState.ready) ready += 1;
+      if (e.state == OfflineSongState.failed) failed += 1;
+    }
+    state = AsyncValue<OfflineSyncStatus>.data((
+      running: true,
+      targetCount: targetCount,
+      readyCount: ready,
+      failedCount: failed,
+      lastError: null,
+      lastTickAt: state.valueOrNull?.lastTickAt,
+    ));
   }
 
   /// One reconciliation pass. Returns counts + an `error` string for the
@@ -317,6 +369,7 @@ class OfflineSync extends _$OfflineSync {
       int failedCount = 0;
 
       if (queue.isNotEmpty) {
+        _publishProgress(songsState, targetIds.length);
         final Dio dio = ref.read(offlineDownloadDioProvider);
         final List<Future<void>> workers =
             List<Future<void>>.generate(_kDownloadConcurrency, (_) async {
@@ -338,6 +391,7 @@ class OfflineSync extends _$OfflineSync {
             } else {
               failedCount += 1;
             }
+            _publishProgress(songsState, targetIds.length);
           }
         });
         await Future.wait(workers);

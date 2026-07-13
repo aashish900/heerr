@@ -2956,3 +2956,12 @@ User review flagged four more issues:
 - The v4.14.0 `Image.network(coverUrl)` change on Home recommendation cards likely made this pre-existing race easier to hit (added per-card render jank that encourages a frustrated double-tap on Play) — the race itself predates v4.14.0 and isn't new to this diff.
 - Version bump `4.14.2` → `4.14.3` across all five sync locations (`/CLAUDE.md` §3).
 - Verification: `flutter analyze` clean; full `flutter test` green (987 tests, 3 new).
+
+## 2026-07-13 — fix: Downloads hero image + missing sync-progress bar — v4.14.4
+
+- Diffed the live Downloads screen against the source mockup (`Downloads Screen.png`, user-supplied). Two gaps: the server illustration was a small 72px circular thumbnail instead of a large hero image, and the "Syncing library" progress bar / "N songs remaining" line never appeared even during an active sync.
+- **`lib/screens/downloads/server_glyph.dart`** — `ServerGlyph` no longer clips the image to a small circle; it now renders as a full-bleed rectangular hero (default width 130, height driven by the row) with a radial-gradient breathing glow instead of a circular `boxShadow`.
+- **`lib/screens/downloads/server_status_card.dart`** — the hero `Container` now clips its children (`Clip.antiAlias`) so the image can bleed flush to the card's left/top/bottom edges; text content moved into its own padded `Column` beside it. Wrapped the `Row` in `IntrinsicHeight` — `CrossAxisAlignment.stretch` inside a `SliverToBoxAdapter`-hosted `Row` otherwise hands the image an infinite-height constraint (`BoxConstraints forces an infinite height`), which was crashing 6 widget tests until the wrap was added.
+- **`lib/offline/offline_sync.dart`** — root cause of the missing progress bar: `OfflineSyncStatus.running` was hardcoded `false` everywhere (`_kIdle` and `_statusFromResult`), so `ServerStatusCard`'s `syncing` check was always false regardless of an in-flight tick. Added `_publishRunning()` (called at the start of `_tick()`/`syncNow()`) and `_publishProgress()` (called once targets resolve and after each song download completes) so the notifier emits `running: true` with live `targetCount`/`readyCount` while a tick is in flight. Guarded by a new `_initialized` flag so the very first tick inside `build()` doesn't attempt a `state =` write before `AsyncNotifier` finishes initializing.
+- Version bump `4.14.3` → `4.14.4` across all five sync locations (`/CLAUDE.md` §3).
+- Verification: `flutter analyze` clean (1 pre-existing, unrelated lint); full `flutter test` green (984 tests).

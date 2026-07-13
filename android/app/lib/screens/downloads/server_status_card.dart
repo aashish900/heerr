@@ -17,10 +17,12 @@ class ServerStatusCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<ServerStatus> statusAsync =
-        ref.watch(serverStatusNotifierProvider);
-    final AsyncValue<OfflineSyncStatus> syncAsync =
-        ref.watch(offlineSyncProvider);
+    final AsyncValue<ServerStatus> statusAsync = ref.watch(
+      serverStatusNotifierProvider,
+    );
+    final AsyncValue<OfflineSyncStatus> syncAsync = ref.watch(
+      offlineSyncProvider,
+    );
     final ServerCreds creds = ref.watch(serverCredsProvider);
 
     final bool online = statusAsync.valueOrNull?.online ?? false;
@@ -35,63 +37,72 @@ class ServerStatusCard extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: cs.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: online ? heerrMagenta.withValues(alpha: 0.25) : Colors.white10,
+            color: online
+                ? heerrMagenta.withValues(alpha: 0.25)
+                : Colors.white10,
           ),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            ServerGlyph(online: online),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Row(
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              ServerGlyph(online: online),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 20, 20, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      Text(
-                        'Home Server',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                      Row(
+                        children: <Widget>[
+                          Text(
+                            'Home Server',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(width: 8),
+                          _StatusPill(online: online),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      _StatusPill(online: online),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    online ? '$hostLabel • via Tailscale' : 'Server unreachable',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      const SizedBox(height: 4),
+                      Text(
+                        online
+                            ? '$hostLabel • via Tailscale'
+                            : 'Server unreachable',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: cs.onSurfaceVariant,
                         ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (syncing && sync != null)
+                        _SyncProgress(sync: sync)
+                      else
+                        Text(
+                          _idleCaption(sync, statusError),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  if (syncing && sync != null)
-                    _SyncProgress(sync: sync)
-                  else
-                    Text(
-                      _idleCaption(sync, statusError),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
-                    ),
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   String _hostLabel(String? navidromeBaseUrl) {
-    if (navidromeBaseUrl == null || navidromeBaseUrl.isEmpty) return 'Navidrome';
+    if (navidromeBaseUrl == null || navidromeBaseUrl.isEmpty) {
+      return 'Navidrome';
+    }
     final Uri? uri = Uri.tryParse(navidromeBaseUrl);
     return uri?.host.isNotEmpty == true ? uri!.host : 'Navidrome';
   }
@@ -131,9 +142,9 @@ class _StatusPill extends StatelessWidget {
       child: Text(
         online ? 'Online' : 'Offline',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -146,8 +157,13 @@ class _SyncProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ColorScheme cs = Theme.of(context).colorScheme;
-    final int remaining = (sync.targetCount - sync.readyCount).clamp(0, sync.targetCount);
-    final double progress = sync.targetCount == 0 ? 0 : sync.readyCount / sync.targetCount;
+    final int remaining = (sync.targetCount - sync.readyCount).clamp(
+      0,
+      sync.targetCount,
+    );
+    final double progress = sync.targetCount == 0
+        ? 0
+        : sync.readyCount / sync.targetCount;
     final int percent = (progress * 100).round();
 
     return Column(
@@ -155,9 +171,9 @@ class _SyncProgress extends StatelessWidget {
       children: <Widget>[
         Text(
           'Syncing library',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         WaveformStrip(
@@ -170,9 +186,9 @@ class _SyncProgress extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           '$remaining song${remaining == 1 ? '' : 's'} remaining • $percent%',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
         ),
       ],
     );

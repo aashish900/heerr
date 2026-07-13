@@ -958,3 +958,7 @@ Server half of issue #44 begins: in-place tag editing for library files. Files a
 ## 2026-07-13 — v4.14.2: CI-only release — version bumped for sync
 
 - No backend changes. Version bump `4.14.1` → `4.14.2` across the five sync locations; the release exists to exercise the new AAB step in the Android publish workflow (see `android/docs/CHANGELOG.md` 2026-07-13).
+
+## 2026-07-13 — v4.14.4: Android Downloads hero fix — version bumped for sync
+
+- No backend changes. Version bump `4.14.3` → `4.14.4` across the five sync locations for an Android-only fix (Downloads hero image + live sync-progress bar); see `android/docs/CHANGELOG.md` 2026-07-13.
