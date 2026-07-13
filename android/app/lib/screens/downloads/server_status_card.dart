@@ -8,6 +8,8 @@ import '../../theme.dart';
 import '../../widgets/waveform_strip.dart';
 import 'server_glyph.dart';
 
+const double _kHeroRadius = 24;
+
 /// Downloads "Sync Center" hero (DL2, DOWNLOADSSCREEN.md §2). Four states:
 /// online+idle, online+syncing (animated waveform progress), offline, and
 /// sync error. Reachability = backend `/health` only (D1) — the thin client
@@ -40,7 +42,7 @@ class ServerStatusCard extends ConsumerWidget {
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: cs.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(_kHeroRadius),
           border: Border.all(
             color: online
                 ? heerrMagenta.withValues(alpha: 0.25)
@@ -51,7 +53,35 @@ class ServerStatusCard extends ConsumerWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              ServerGlyph(online: online),
+              // Container.clipBehavior clips via Decoration.getClipPath, which
+              // is reliable on Skia (`flutter test` goldens) but the on-device
+              // Impeller/OpenGLES backend has shown corner-rounding misses for
+              // this exact bleed-to-edge-image shape — the left corners
+              // rendered square on a real Pixel 7 despite golden tests passing.
+              // An explicit ClipRRect on the image itself doesn't depend on
+              // that code path. Also fades the hero's right edge into the
+              // panel (ShaderMask + dstIn), mirroring the Home hero card's own
+              // art-edge fade (`continue_listening_card.dart`).
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(_kHeroRadius),
+                  bottomLeft: Radius.circular(_kHeroRadius),
+                ),
+                child: ShaderMask(
+                  blendMode: BlendMode.dstIn,
+                  shaderCallback: (Rect bounds) => const LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: <Color>[
+                      Colors.white,
+                      Colors.white,
+                      Colors.transparent,
+                    ],
+                    stops: <double>[0.0, 0.6, 1.0],
+                  ).createShader(bounds),
+                  child: ServerGlyph(online: online),
+                ),
+              ),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 20, 20, 20),
