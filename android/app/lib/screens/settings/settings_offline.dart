@@ -164,13 +164,18 @@ class _ClearAllTileState extends ConsumerState<_ClearAllTile> {
     if (ok != true || !mounted) return;
     setState(() => _busy = true);
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    // Pause the sync notifier so its own downloader can't drop a new file
+    // into `serverRoot` mid-delete (below) — one of several concurrent
+    // writers (cover art / library cache / lyrics caching also write here
+    // whenever the user is browsing) that can race `Directory.delete`.
+    ref.read(offlineSyncProvider.notifier).pause();
     try {
       final OfflinePaths paths =
           await ref.read(offlinePathsProvider.future);
       final ServerCreds settings = ref.read(serverCredsProvider);
       final Directory? serverRoot = paths.serverRoot(settings);
-      if (serverRoot != null && await serverRoot.exists()) {
-        await serverRoot.delete(recursive: true);
+      if (serverRoot != null) {
+        await deleteRecursiveWithRetry(serverRoot);
       }
       ref.invalidate(offlineManifestProvider);
       if (!mounted) return;
@@ -185,7 +190,10 @@ class _ClearAllTileState extends ConsumerState<_ClearAllTile> {
         content: Text('Failed to clear: $e'),
       ));
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        unawaited(ref.read(offlineSyncProvider.notifier).resume());
+        setState(() => _busy = false);
+      }
     }
   }
 }
