@@ -2943,3 +2943,7 @@ User review flagged four more issues:
 ## 2026-07-13 — CI: publish workflow also builds the Play AAB
 
 - **`.github/workflows/android-publish.yml`** — on version tags, after the release APK the workflow now also runs `flutter build appbundle --release` (same signing config, same `--build-name`/`--build-number` stamping) and attaches `heerr-<tag>.aab` to the GitHub Release alongside `heerr-<tag>.apk`. The APK remains the direct-install artifact (GitHub / Obtainium); the AAB is the Play Console upload artifact. Takes effect on the next `v*` tag.
+
+## 2026-07-13 — v4.14.2: first release with the Play AAB artifact
+
+- No app code changes. `pubspec.yaml` version bumped `4.14.1` → `4.14.2` for sync. This tag is the first to run the updated publish workflow — the GitHub Release carries both `heerr-v4.14.2.apk` (direct install) and `heerr-v4.14.2.aab` (Play Console upload).

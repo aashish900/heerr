@@ -954,3 +954,7 @@ Server half of issue #44 begins: in-place tag editing for library files. Files a
 ## 2026-07-13 — v4.14.1: version bump for the mypy fix
 
 - Version bump `4.14.0` → `4.14.1` across the five sync locations (patch release carrying the `cover_url_for_source_url` type fix, commit `1690255`). No functional change.
+
+## 2026-07-13 — v4.14.2: CI-only release — version bumped for sync
+
+- No backend changes. Version bump `4.14.1` → `4.14.2` across the five sync locations; the release exists to exercise the new AAB step in the Android publish workflow (see `android/docs/CHANGELOG.md` 2026-07-13).
