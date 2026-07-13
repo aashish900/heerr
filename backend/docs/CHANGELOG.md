@@ -970,3 +970,7 @@ Server half of issue #44 begins: in-place tag editing for library files. Files a
 ## 2026-07-13 — v4.14.6: Android black-screen-on-widget-launch fix — version bumped for sync
 
 - No backend changes. Version bump `4.14.5` → `4.14.6` across the five sync locations for an Android-only fix (black screen opening the app from the home-screen widget — deferred `Workmanager().initialize()` + branded launch splash); see `android/docs/CHANGELOG.md` 2026-07-13.
+
+## 2026-07-13 — v4.14.7: Android Downloads hero image width + new server illustration — version bumped for sync
+
+- No backend changes. Version bump `4.14.6` → `4.14.7` across the five sync locations for an Android-only fix (Downloads hero server illustration widened 5% and replaced with a new higher-resolution image supplied by the user); see `android/docs/CHANGELOG.md` 2026-07-13.

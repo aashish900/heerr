@@ -2992,3 +2992,11 @@ User review flagged four more issues:
 - **`lib/main.dart`** — `Workmanager().initialize(...)` is no longer awaited before `runApp()`. Confirmed safe: its only consumer, `BackgroundSyncScheduler.schedule()` (`registerPeriodicTask`), fires exclusively from `LifecycleCoordinator` on foreground/background transitions, which can't happen before the widget tree (built by `runApp()`) exists. `AudioService.init()` and the two credential migrations stay blocking — `audioHandlerProvider` is a synchronous, hard-throwing provider read from dozens of call sites with no async-aware fallback, and the migrations guard against a visible flash of the login screen for pre-Phase-S installs (deferring either is a much larger, separately-scoped refactor, not a quick win).
 - Verified end-to-end on a Pixel 7 emulator (debug build): cold-launched via `am start`, screenshotted the splash (now shows the gradient mark, not flat black) and confirmed it proceeds normally to the sign-in screen.
 - `flutter analyze` clean; full `flutter test` green (988 tests, no test count change — this is a native/bootstrap change with no Dart-testable surface).
+
+## 2026-07-13 — fix: Downloads hero image width + new server illustration
+
+- User feedback against the source mockup (`Downloads Screen.png`): the hero card's server illustration should occupy 5% more of the card's left side.
+- **`lib/screens/downloads/server_glyph.dart`** — `ServerGlyph.width` default bumped from `130` to `137` (130 * 1.05).
+- **`assets/images/downloads_server.png`** — replaced with a new, higher-resolution server illustration supplied by the user (was 286x252, now 494x406), same asset path so no other code changes needed.
+- Verified on a Pixel 7 emulator (debug build): rebuilt, reinstalled, signed in, confirmed the wider illustration and new artwork render correctly with the existing rounded corners + edge fade (from the `v4.14.5` fix) intact.
+- `flutter analyze` clean; full `flutter test` green (988 tests, no test count change — visual-only asset/constant change).

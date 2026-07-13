@@ -9,7 +9,7 @@ import '../../theme.dart';
 /// magenta glow breathes behind it while [online] is true; offline dims the
 /// image and drops the glow.
 class ServerGlyph extends StatefulWidget {
-  const ServerGlyph({required this.online, this.width = 130, super.key});
+  const ServerGlyph({required this.online, this.width = 137, super.key});
 
   final bool online;
   final double width;
