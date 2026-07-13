@@ -962,3 +962,7 @@ Server half of issue #44 begins: in-place tag editing for library files. Files a
 ## 2026-07-13 — v4.14.4: Android Downloads hero fix — version bumped for sync
 
 - No backend changes. Version bump `4.14.3` → `4.14.4` across the five sync locations for an Android-only fix (Downloads hero image + live sync-progress bar); see `android/docs/CHANGELOG.md` 2026-07-13.
+
+## 2026-07-13 — v4.14.5: Android hero corner/fade fix + Clear-all-downloads reliability fix — version bumped for sync
+
+- No backend changes. Version bump `4.14.4` → `4.14.5` across the five sync locations for two Android-only fixes (Downloads hero left-corner clipping + edge fade; "Clear all downloads" no longer needing multiple taps due to a concurrent-writer race against `Directory.delete`); see `android/docs/CHANGELOG.md` 2026-07-13.
