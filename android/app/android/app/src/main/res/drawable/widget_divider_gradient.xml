@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Divider next to the heerr logo. Tapers from full width at the top to a
+     thin point at the bottom, and fades out via alpha at the end, using the
+     heerr brand gradient (magenta -> purple -> violet, see lib/theme.dart
+     heerrGradient). Requires API 24+ to render the gradient fill on-device;
+     falls back to a solid black taper on older widget hosts. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="2dp"
+    android:height="52dp"
+    android:viewportWidth="10"
+    android:viewportHeight="260">
+    <path android:pathData="M0,0 L10,0 L7,260 L3,260 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="5"
+                android:startY="0"
+                android:endX="5"
+                android:endY="260"
+                android:startColor="#FFF533C8"
+                android:centerColor="#FFA93CF2"
+                android:centerY="0.5"
+                android:endColor="#006F4BF5" />
+        </aapt:attr>
+    </path>
+</vector>
