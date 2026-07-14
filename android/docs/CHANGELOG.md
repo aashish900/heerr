@@ -3008,3 +3008,10 @@ User review flagged four more issues:
 - **`android/app/android/app/src/main/res/drawable/widget_divider_gradient.xml`** (new) — vector drawable, a trapezoid path (wide at top, narrow at bottom) filled with a linear gradient using the `heerrGradient` brand colors (`lib/theme.dart`: `#F533C8` magenta → `#A93CF2` purple → `#6F4BF5` violet at alpha `00`), so the divider tapers to a point and fades to transparent going down. Requires API 24+ for the framework `RemoteViews` host to render the vector gradient fill; the project's effective `minSdkVersion` (`flutter.minSdkVersion`) wasn't verified against this, so older widget hosts may render a solid fallback instead of the gradient.
 - Version bump to `4.14.8` for sync: `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml`, both `ROADMAP.md` status lines.
 - Not verified on-device — no emulator/build run performed for this change.
+
+## 2026-07-14 — fix: widget divider tapers/fades on both ends
+
+- User feedback against the `v4.14.8` divider: it should trim and fade at both the top and bottom, not just the bottom.
+- **`android/app/android/app/src/main/res/drawable/widget_divider_gradient.xml`** — path changed from a top-wide/bottom-point trapezoid to a hexagon that points at both `y=0` and `y=260` (viewport), widening to full width by `y=40` and holding until `y=220`. The gradient fill switched from 3 implicit stops (`startColor`/`centerColor`/`endColor`) to 5 explicit `<item offset=... color=.../>` stops so alpha fades to transparent at both offset `0.0` and `1.0`, with the full magenta → purple → violet brand ramp in between.
+- Version bump to `4.14.9` for sync: `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml`, both `ROADMAP.md` status lines.
+- Not verified on-device — no emulator/build run performed for this change.
