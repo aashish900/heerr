@@ -1,18 +1,20 @@
 from typing import cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import and_, func, select
 from sqlalchemy import delete as sa_delete
-from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_scope
 from app.db import get_session
-from app.models import PodcastChannel, PodcastSubscription, Token
+from app.models import PodcastChannel, PodcastEpisode, PodcastProgress, PodcastSubscription, Token
 from app.schemas.podcast import (
     ChannelItem,
+    EpisodeItem,
+    EpisodeListResponse,
     PodcastChannelItem,
     PodcastSearchRequest,
     PodcastSearchResponse,
@@ -38,6 +40,26 @@ def _channel_item(channel: PodcastChannel) -> ChannelItem:
         author=channel.author,
         image_url=channel.image_url,
         description=channel.description,
+    )
+
+
+def _episode_item(episode: PodcastEpisode, progress: PodcastProgress | None) -> EpisodeItem:
+    return EpisodeItem(
+        id=episode.id,
+        channel_id=episode.channel_id,
+        guid=episode.guid,
+        title=episode.title,
+        description=episode.description,
+        published_at=episode.published_at,
+        duration_s=episode.duration_s,
+        enclosure_url=episode.enclosure_url,
+        enclosure_type=episode.enclosure_type,
+        image_url=episode.image_url,
+        episode_no=episode.episode_no,
+        season_no=episode.season_no,
+        downloaded=episode.downloaded_path is not None,
+        position_s=progress.position_s if progress else 0,
+        played=progress.played if progress else False,
     )
 
 
@@ -131,3 +153,58 @@ async def list_subscriptions(
     )
     channels = result.scalars().all()
     return SubscriptionsResponse(channels=[_channel_item(c) for c in channels])
+
+
+@router.get("/channels/{channel_id}/episodes", response_model=EpisodeListResponse)
+async def list_episodes(
+    channel_id: UUID,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    session: AsyncSession = Depends(get_session),
+    tok: Token = Depends(require_scope("read")),
+) -> EpisodeListResponse:
+    channel = await session.get(PodcastChannel, channel_id)
+    if channel is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="channel not found")
+
+    total = await session.scalar(
+        select(func.count())
+        .select_from(PodcastEpisode)
+        .where(PodcastEpisode.channel_id == channel_id)
+    )
+
+    result = await session.execute(
+        select(PodcastEpisode, PodcastProgress)
+        .outerjoin(
+            PodcastProgress,
+            and_(
+                PodcastProgress.episode_id == PodcastEpisode.id,
+                PodcastProgress.user_id == tok.user_id,
+            ),
+        )
+        .where(PodcastEpisode.channel_id == channel_id)
+        .order_by(PodcastEpisode.published_at.desc().nulls_last())
+        .limit(limit)
+        .offset(offset)
+    )
+    episodes = [_episode_item(ep, progress) for ep, progress in result.all()]
+    return EpisodeListResponse(episodes=episodes, total=total or 0)
+
+
+@router.post("/channels/{channel_id}/refresh", response_model=ChannelItem)
+async def refresh_channel(
+    channel_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _tok: Token = Depends(require_scope("read")),
+) -> ChannelItem:
+    channel = await session.get(PodcastChannel, channel_id)
+    if channel is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="channel not found")
+    try:
+        channel = await ingest_feed(session, channel.feed_url)
+    except FeedFetchError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"feed error: {e}",
+        ) from e
+    return _channel_item(channel)

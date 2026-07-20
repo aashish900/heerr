@@ -486,7 +486,7 @@ Design doc: `backend/docs/PODCASTS.md`. Scope locked by owner: **full podcast mo
 **Test gate:** 401/403; subscribe upserts channel+episodes and dedupes on re-subscribe; two users subscribing same feed share one channel row; unsubscribe scoped to caller; malformed/empty feed → clean error; ingest cap respected. Full suite green.
 **Commit:** `feat(backend): P3 — RSS ingest + subscribe/unsubscribe/list (#53)`
 
-### [ ] P4. Episode list + channel refresh
+### [x] P4. Episode list + channel refresh
 **Files:** `backend/app/api/v1/podcasts.py` (+2 routes), `backend/app/services/feeds.py` (refresh reuse), `backend/tests/test_podcast_episodes.py`.
 **Deliverable:** `GET /podcasts/channels/{id}/episodes?limit=&offset=` — paginated, newest-first, includes this user's `progress` (position/played) per episode and `downloaded` state. `POST /podcasts/channels/{id}/refresh` → conditional GET; 304 short-circuits (no re-parse); new episodes upserted. `require_scope("read")`.
 **Test gate:** pagination bounds; progress + downloaded fields correct per user; 304 path adds nothing; new-episode path inserts; 404 unknown channel. Full suite green.
