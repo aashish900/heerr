@@ -8,7 +8,11 @@ import '../api/endpoints.dart';
 import '../models/download_request.dart';
 import '../models/download_response.dart';
 import '../models/enums.dart';
+import '../models/episode_download_response.dart';
+import '../models/episode_list_response.dart';
+import '../models/episode_progress.dart';
 import '../models/job_view.dart';
+import '../models/podcast_channel.dart';
 import '../models/queue_response.dart';
 import '../models/recommend_health.dart';
 import '../models/recommended_track.dart';
@@ -173,6 +177,116 @@ class BackendService {
     return apiCall<void>(
       () => _dio.post<dynamic>(Endpoints.authLogout),
       (dynamic data) {},
+    );
+  }
+
+  /// `POST /podcasts/search` (Phase P, #53) → Podcast Index results. Not yet
+  /// ingested, so each [PodcastChannel] has a null `id`.
+  Future<List<PodcastChannel>> searchPodcasts(
+    String query, {
+    int limit = 20,
+  }) {
+    return apiCall<List<PodcastChannel>>(
+      () => _dio.post<dynamic>(
+        Endpoints.podcastSearch,
+        data: <String, dynamic>{'query': query, 'limit': limit},
+      ),
+      (dynamic data) {
+        final Map<String, dynamic> json = data as Map<String, dynamic>;
+        final List<dynamic> results = json['results'] as List<dynamic>;
+        return results
+            .map((dynamic e) =>
+                PodcastChannel.fromJson(e as Map<String, dynamic>))
+            .toList();
+      },
+    );
+  }
+
+  /// `POST /podcasts/subscribe` → ingests the feed (if new) and subscribes
+  /// the calling user, returning the ingested channel (`id` set).
+  Future<PodcastChannel> subscribePodcast(String feedUrl) {
+    return apiCall<PodcastChannel>(
+      () => _dio.post<dynamic>(
+        Endpoints.podcastSubscribe,
+        data: <String, dynamic>{'feed_url': feedUrl},
+      ),
+      (dynamic data) => PodcastChannel.fromJson(data as Map<String, dynamic>),
+    );
+  }
+
+  /// `DELETE /podcasts/subscribe/{channelId}`.
+  Future<void> unsubscribePodcast(String channelId) {
+    return apiCall<void>(
+      () => _dio.delete<dynamic>(Endpoints.podcastUnsubscribe(channelId)),
+      (dynamic data) {},
+    );
+  }
+
+  /// `GET /podcasts/subscriptions` → the calling user's subscribed channels.
+  Future<List<PodcastChannel>> podcastSubscriptions() {
+    return apiCall<List<PodcastChannel>>(
+      () => _dio.get<dynamic>(Endpoints.podcastSubscriptions),
+      (dynamic data) {
+        final Map<String, dynamic> json = data as Map<String, dynamic>;
+        final List<dynamic> channels = json['channels'] as List<dynamic>;
+        return channels
+            .map((dynamic e) =>
+                PodcastChannel.fromJson(e as Map<String, dynamic>))
+            .toList();
+      },
+    );
+  }
+
+  /// `GET /podcasts/channels/{channelId}/episodes` → a page of episodes,
+  /// newest-published first, with the calling user's progress joined in.
+  Future<EpisodeListResponse> podcastEpisodes(
+    String channelId, {
+    int limit = 20,
+    int offset = 0,
+  }) {
+    return apiCall<EpisodeListResponse>(
+      () => _dio.get<dynamic>(
+        Endpoints.podcastChannelEpisodes(channelId),
+        queryParameters: <String, dynamic>{'limit': limit, 'offset': offset},
+      ),
+      (dynamic data) =>
+          EpisodeListResponse.fromJson(data as Map<String, dynamic>),
+    );
+  }
+
+  /// `POST /podcasts/channels/{channelId}/refresh` → re-pulls the RSS feed
+  /// for new episodes.
+  Future<PodcastChannel> refreshPodcastChannel(String channelId) {
+    return apiCall<PodcastChannel>(
+      () => _dio.post<dynamic>(Endpoints.podcastChannelRefresh(channelId)),
+      (dynamic data) => PodcastChannel.fromJson(data as Map<String, dynamic>),
+    );
+  }
+
+  /// `POST /podcasts/episodes/{episodeId}/download` → enqueues an episode
+  /// download job (same `jobs` queue as song downloads, `source_type
+  /// == 'episode'`; reflected in [getQueue]).
+  Future<EpisodeDownloadResponse> downloadPodcastEpisode(String episodeId) {
+    return apiCall<EpisodeDownloadResponse>(
+      () => _dio.post<dynamic>(Endpoints.podcastEpisodeDownload(episodeId)),
+      (dynamic data) =>
+          EpisodeDownloadResponse.fromJson(data as Map<String, dynamic>),
+    );
+  }
+
+  /// `PUT /podcasts/episodes/{episodeId}/progress` → upserts the calling
+  /// user's resume position for the episode.
+  Future<EpisodeProgress> updateEpisodeProgress(
+    String episodeId, {
+    required int positionS,
+    required bool played,
+  }) {
+    return apiCall<EpisodeProgress>(
+      () => _dio.put<dynamic>(
+        Endpoints.podcastEpisodeProgress(episodeId),
+        data: <String, dynamic>{'position_s': positionS, 'played': played},
+      ),
+      (dynamic data) => EpisodeProgress.fromJson(data as Map<String, dynamic>),
     );
   }
 }

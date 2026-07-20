@@ -258,4 +258,180 @@ void main() {
       );
     });
   });
+
+  // PC1 (#53): podcast endpoint wrappers.
+
+  group('searchPodcasts', () {
+    test('issues POST /podcasts/search and parses results', () async {
+      final (BackendService service, _FakeAdapter adapter) = _service(
+        (_) => _json(
+          '{"results": [{"feed_url": "https://ex.com/f.xml", '
+          '"title": "Show", "author": null, "image_url": null, '
+          '"description": null}]}',
+          200,
+        ),
+      );
+
+      final result = await service.searchPodcasts('test query', limit: 10);
+
+      expect(adapter.lastRequest!.method, 'POST');
+      expect(adapter.lastRequest!.path, '/podcasts/search');
+      expect(
+        adapter.lastRequest!.data,
+        <String, dynamic>{'query': 'test query', 'limit': 10},
+      );
+      expect(result, hasLength(1));
+      expect(result.single.title, 'Show');
+      expect(result.single.id, isNull);
+    });
+  });
+
+  group('subscribePodcast', () {
+    test('issues POST /podcasts/subscribe with feed_url', () async {
+      final (BackendService service, _FakeAdapter adapter) = _service(
+        (_) => _json(
+          '{"id": "c1", "feed_url": "https://ex.com/f.xml", '
+          '"title": "Show", "author": null, "image_url": null, '
+          '"description": null}',
+          200,
+        ),
+      );
+
+      final channel =
+          await service.subscribePodcast('https://ex.com/f.xml');
+
+      expect(adapter.lastRequest!.method, 'POST');
+      expect(adapter.lastRequest!.path, '/podcasts/subscribe');
+      expect(
+        adapter.lastRequest!.data,
+        <String, dynamic>{'feed_url': 'https://ex.com/f.xml'},
+      );
+      expect(channel.id, 'c1');
+    });
+  });
+
+  group('unsubscribePodcast', () {
+    test('issues DELETE /podcasts/subscribe/{channelId}', () async {
+      final (BackendService service, _FakeAdapter adapter) = _service(
+        (_) => _noContent(),
+      );
+
+      await service.unsubscribePodcast('c1');
+
+      expect(adapter.lastRequest!.method, 'DELETE');
+      expect(adapter.lastRequest!.path, '/podcasts/subscribe/c1');
+    });
+
+    test('404 maps to NotFoundError', () async {
+      final (BackendService service, _) = _service(
+        (_) => _json('{"detail": "not subscribed to this channel"}', 404),
+      );
+      await expectLater(
+        service.unsubscribePodcast('c1'),
+        throwsA(isA<NotFoundError>()),
+      );
+    });
+  });
+
+  group('podcastSubscriptions', () {
+    test('issues GET /podcasts/subscriptions and parses channels', () async {
+      final (BackendService service, _FakeAdapter adapter) = _service(
+        (_) => _json(
+          '{"channels": [{"id": "c1", "feed_url": "https://ex.com/f.xml", '
+          '"title": "Show", "author": null, "image_url": null, '
+          '"description": null}]}',
+          200,
+        ),
+      );
+
+      final result = await service.podcastSubscriptions();
+
+      expect(adapter.lastRequest!.method, 'GET');
+      expect(adapter.lastRequest!.path, '/podcasts/subscriptions');
+      expect(result, hasLength(1));
+      expect(result.single.id, 'c1');
+    });
+  });
+
+  group('podcastEpisodes', () {
+    test('issues GET .../episodes with limit/offset query params', () async {
+      final (BackendService service, _FakeAdapter adapter) = _service(
+        (_) => _json('{"episodes": [], "total": 0}', 200),
+      );
+
+      final result =
+          await service.podcastEpisodes('c1', limit: 5, offset: 10);
+
+      expect(adapter.lastRequest!.method, 'GET');
+      expect(adapter.lastRequest!.path, '/podcasts/channels/c1/episodes');
+      expect(
+        adapter.lastRequest!.queryParameters,
+        <String, dynamic>{'limit': 5, 'offset': 10},
+      );
+      expect(result.total, 0);
+      expect(result.episodes, isEmpty);
+    });
+  });
+
+  group('refreshPodcastChannel', () {
+    test('issues POST /podcasts/channels/{channelId}/refresh', () async {
+      final (BackendService service, _FakeAdapter adapter) = _service(
+        (_) => _json(
+          '{"id": "c1", "feed_url": "https://ex.com/f.xml", '
+          '"title": "Show", "author": null, "image_url": null, '
+          '"description": null}',
+          200,
+        ),
+      );
+
+      final channel = await service.refreshPodcastChannel('c1');
+
+      expect(adapter.lastRequest!.method, 'POST');
+      expect(adapter.lastRequest!.path, '/podcasts/channels/c1/refresh');
+      expect(channel.id, 'c1');
+    });
+  });
+
+  group('downloadPodcastEpisode', () {
+    test('issues POST /podcasts/episodes/{episodeId}/download', () async {
+      final (BackendService service, _FakeAdapter adapter) = _service(
+        (_) => _json(
+          '{"job_id": "j1", "state": "queued", "deduped": false}',
+          202,
+        ),
+      );
+
+      final res = await service.downloadPodcastEpisode('e1');
+
+      expect(adapter.lastRequest!.method, 'POST');
+      expect(adapter.lastRequest!.path, '/podcasts/episodes/e1/download');
+      expect(res.jobId, 'j1');
+      expect(res.deduped, isFalse);
+    });
+  });
+
+  group('updateEpisodeProgress', () {
+    test('issues PUT .../progress with position_s + played', () async {
+      final (BackendService service, _FakeAdapter adapter) = _service(
+        (_) => _json(
+          '{"episode_id": "e1", "position_s": 90, "played": false}',
+          200,
+        ),
+      );
+
+      final res = await service.updateEpisodeProgress(
+        'e1',
+        positionS: 90,
+        played: false,
+      );
+
+      expect(adapter.lastRequest!.method, 'PUT');
+      expect(adapter.lastRequest!.path, '/podcasts/episodes/e1/progress');
+      expect(
+        adapter.lastRequest!.data,
+        <String, dynamic>{'position_s': 90, 'played': false},
+      );
+      expect(res.positionS, 90);
+    });
+  });
 }

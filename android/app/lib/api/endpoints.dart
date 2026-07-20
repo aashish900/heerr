@@ -49,4 +49,36 @@ class Endpoints {
   static const String profile = '/profile';
 
   static String status(String jobId) => '/status/$jobId';
+
+  /// Phase P podcasts (#53): backend `POST /podcasts/search` (Podcast Index).
+  static const String podcastSearch = '/podcasts/search';
+
+  /// `POST /podcasts/subscribe` — ingests the feed (if new) and subscribes
+  /// the calling user.
+  static const String podcastSubscribe = '/podcasts/subscribe';
+
+  /// `GET /podcasts/subscriptions` — the calling user's subscribed channels.
+  static const String podcastSubscriptions = '/podcasts/subscriptions';
+
+  static String podcastUnsubscribe(String channelId) =>
+      '/podcasts/subscribe/$channelId';
+
+  static String podcastChannelEpisodes(String channelId) =>
+      '/podcasts/channels/$channelId/episodes';
+
+  static String podcastChannelRefresh(String channelId) =>
+      '/podcasts/channels/$channelId/refresh';
+
+  static String podcastEpisodeDownload(String episodeId) =>
+      '/podcasts/episodes/$episodeId/download';
+
+  /// Range-capable audio stream for a downloaded episode. Built via
+  /// `player/podcast_audio_url.dart::buildPodcastAudioUrl` — just_audio
+  /// can't attach auth headers, so the bearer rides in `?token=` (same
+  /// pattern as [previewStream]).
+  static String podcastEpisodeAudio(String episodeId) =>
+      '/podcasts/episodes/$episodeId/audio';
+
+  static String podcastEpisodeProgress(String episodeId) =>
+      '/podcasts/episodes/$episodeId/progress';
 }

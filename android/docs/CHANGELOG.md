@@ -3020,3 +3020,17 @@ User review flagged four more issues:
 
 - No Android changes. The backend shipped Phase P (podcast discovery/subscribe/download/stream — see `backend/docs/CHANGELOG.md` 2026-07-20). Version bump `4.14.9` → `5.0.0` across all five sync locations per `/CLAUDE.md` §3.
 - The Android client for podcasts is Phase PC in `android/docs/ROADMAP.md` — not yet built.
+
+## 2026-07-20 — feat: PC1 — podcast models + API client (#53)
+
+- Backend Phase P (P1–P6) is deployed; this starts Phase PC against the frozen contract in `backend/app/schemas/podcast.py`.
+- **`android/app/lib/models/podcast_channel.dart`** (new) — `PodcastChannel` (freezed), covering both `PodcastChannelItem` (Podcast Index search results, `id` null) and `ChannelItem` (ingested/subscribed, `id` set). The backend has no distinct "subscription" entity — `GET /podcasts/subscriptions` returns this same shape — so no separate subscription model was added, deviating from the ROADMAP's literal file list.
+- **`android/app/lib/models/podcast_episode.dart`** (new) — `PodcastEpisode`, mirrors `EpisodeItem` including the per-user `downloaded`/`position_s`/`played` fields.
+- **`android/app/lib/models/episode_progress.dart`** (new) — `EpisodeProgress`, mirrors `EpisodeProgressResponse`.
+- **`android/app/lib/models/episode_list_response.dart`** (new) — `EpisodeListResponse` (`episodes` + `total`), same wrapper-response pattern as `queue_response.dart`; `total` is needed for PC3 pagination.
+- **`android/app/lib/models/episode_download_response.dart`** (new) — `EpisodeDownloadResponse`, same shape as the existing `DownloadResponse` (reuses the `JobState` enum) since episode downloads share the `jobs` queue.
+- **`android/app/lib/api/endpoints.dart`** — added the nine podcast routes (`search`, `subscribe`, `subscriptions`, `unsubscribe`, `channels/{id}/episodes`, `channels/{id}/refresh`, `episodes/{id}/download`, `episodes/{id}/audio`, `episodes/{id}/progress`).
+- **`android/app/lib/services/backend_service.dart`** — added `searchPodcasts`, `subscribePodcast`, `unsubscribePodcast`, `podcastSubscriptions`, `podcastEpisodes`, `refreshPodcastChannel`, `downloadPodcastEpisode`, `updateEpisodeProgress`, following the existing single-`BackendService` pattern (no separate `podcast_api.dart` — the codebase has one dio-backed service wrapper, not one file per domain).
+- **`android/app/lib/player/podcast_audio_url.dart`** (new) — `buildPodcastAudioUrl`, same `?token=` pattern as `preview_url.dart::buildPreviewStreamUrl` (just_audio can't set auth headers); only valid for already-downloaded episodes (PC5 wires it into playback).
+- Tests: `test/models/podcast_models_test.dart` (round-trip serialization, 6 tests), `test/player/podcast_audio_url_test.dart` (2 tests), and 8 new groups appended to `test/services/backend_service_test.dart` covering every new `BackendService` method (method/path/body assertions + response parsing, `_FakeAdapter` pattern, no `ProviderContainer`).
+- `flutter analyze` and `flutter test` (1005 tests) green before and after.

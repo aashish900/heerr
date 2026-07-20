@@ -23,7 +23,7 @@ final wifiCheckProvider = Provider<WifiCheck>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef WifiCheckRef = ProviderRef<WifiCheck>;
-String _$offlineSyncHash() => r'6c47d39e712f39c94c5552ad6f45f88546564c91';
+String _$offlineSyncHash() => r'4cee5546b9d2a8bda6b536f8d83ecf7e81529cc2';
 
 /// Reconciles the on-disk song set against the markers (or — at L4 — the
 /// full library when sync-all is on). Owns its own Timer; pause()/resume()

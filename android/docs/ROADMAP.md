@@ -894,7 +894,7 @@ Design doc: `backend/docs/PODCASTS.md`. Scope locked by owner: **full podcast mo
 
 **Order of execution: PC1 → PC2 → PC3 → PC4 → PC5, strictly in sequence, and only after backend Phase P is deployed.** Backend prerequisite per milestone is noted inline. Suggested version bump `v5.0.0` at PC5 (shared with backend P6 — version-sync rule, `/CLAUDE.md` §3).
 
-### [ ] PC1. Models + API client wiring
+### [x] PC1. Models + API client wiring
 **Backend prereq:** P2–P4 deployed. **Files:** `android/app/lib/models/{podcast_channel,podcast_episode,podcast_subscription,episode_progress}.dart` (`@freezed`), `android/app/lib/api/endpoints.dart` (+ podcast routes), `android/app/lib/api/podcast_api.dart`, `android/app/test/podcast_api_test.dart`.
 **Deliverable:** Freezed models + `fromJson`/`toJson` for channel/episode/subscription/progress; dio-backed API wrapper (search, subscribe, unsubscribe, subscriptions, episodes, refresh, download, progress, audio-url) routed through the existing auth interceptor.
 **Test gate:** model round-trip serialization; API wrapper builds requests with the right paths/verbs (dio mocked). `build_runner` clean; `flutter analyze` + `flutter test` green.
