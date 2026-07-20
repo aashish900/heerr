@@ -6,6 +6,7 @@ from app.api.v1 import (
     download,
     health,
     library,
+    podcasts,
     preview,
     profile,
     queue,
@@ -28,3 +29,4 @@ api_v1.include_router(recommend.router)
 api_v1.include_router(settings.router)
 api_v1.include_router(profile.router)
 api_v1.include_router(admin.router)
+api_v1.include_router(podcasts.router)

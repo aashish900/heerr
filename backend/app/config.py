@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     # lyrics from spotdl's default providers (Genius, AZLyrics, etc.).
     spotdl_embed_lyrics: bool = False
 
+    # Podcast Index API credentials (Phase P). Optional so Settings() doesn't
+    # fail for installs without the podcast feature enabled — PodcastIndexClient
+    # raises PodcastIndexNotConfigured at call time if either is unset.
+    podcastindex_key: str | None = None
+    podcastindex_secret: str | None = None
+
     @field_validator("navidrome_url")
     @classmethod
     def _validate_navidrome_url(cls, v: str) -> str:

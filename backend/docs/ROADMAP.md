@@ -468,13 +468,13 @@ Design doc: `backend/docs/PODCASTS.md`. Scope locked by owner: **full podcast mo
 
 **Order of execution: P1 → P2 → P3 → P4 → P5 → P6, strictly in sequence.** Each is one commit with a green gate. Suggested version bump `v5.0.0` at P6 (owner to confirm); the version-sync rule (`/CLAUDE.md` §3, five files) applies only at implementation, not at plan time.
 
-### [ ] P1. Data model + migration — channels, episodes, subscriptions, progress
+### [x] P1. Data model + migration — channels, episodes, subscriptions, progress
 **Files:** `backend/alembic/versions/00NN_podcasts.py`, `backend/app/models/{podcast_channel,podcast_episode,podcast_subscription,podcast_progress}.py`, `backend/app/models/__init__.py` (register), `backend/tests/test_migration_podcasts.py`, `backend/tests/test_models_match_schema.py` (extend).
 **Deliverable:** Four tables. `podcast_channel` (`id`, `feed_url` unique-normalized, `title`, `author`, `description`, `image_url`, `categories`, `last_fetched_at`, `http_etag`, `http_last_modified`); `podcast_episode` (`id`, `channel_id` FK, `guid` unique-per-channel, `title`, `description`, `published_at`, `duration_s`, `enclosure_url`, `enclosure_type`, `enclosure_bytes`, `image_url`, `episode_no`, `season_no`, `downloaded_path`/`downloaded_bytes`/`downloaded_at` nullable); `podcast_subscription` (`user_id`,`channel_id` unique, `subscribed_at`); `podcast_progress` (`user_id`,`episode_id` unique, `position_s`, `played`, `last_played_at`). Metadata shared; subscription+progress per-user (mirrors Phase J isolation). No endpoints.
 **Test gate:** migration round-trip; unique constraints (feed_url, per-channel guid, per-user subscription/progress) proven by catching the violation; `compare_metadata` clean; `alembic upgrade head` clean.
 **Commit:** `feat(db): P1 — podcast schema — channels, episodes, subscriptions, progress (#53)`
 
-### [ ] P2. Podcast Index client + `POST /api/v1/podcasts/search`
+### [x] P2. Podcast Index client + `POST /api/v1/podcasts/search`
 **Files:** `backend/app/services/podcastindex.py`, `backend/app/api/v1/podcasts.py` (new router, mounted in `app/main.py`), `backend/app/config.py` (`podcastindex_key`, `podcastindex_secret`), `/.env.example` (documented block), `backend/tests/test_podcast_search.py`.
 **Deliverable:** `podcastindex.py` — HMAC-SHA1-authed client (search shows, lookup feed by id). `POST /podcasts/search` body `{query}` → list of channels (`feed_url`, `title`, `author`, `image_url`, `description`); `require_scope("read")`. Service injected via a `get_podcastindex_client` dependency so tests override it (same pattern as `get_ytmusic_client`).
 **Test gate:** 401/403; happy-path search mapped correctly (client mocked at the boundary via `dependency_overrides`); upstream failure → 502 envelope; missing env keys surfaced clearly. Full suite green; ruff + mypy clean.
