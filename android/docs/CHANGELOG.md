@@ -3156,3 +3156,12 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - `flutter analyze` and `flutter test` (1093 tests) green before and after.
 - Version bump `5.3.1` → `5.3.2` across all five sync locations.
 - See `DECISIONLOG.md` 2026-07-20 "fix: Queue Retry sends episode jobs through the wrong endpoint + Queue Music/Podcasts switch (#53)".
+
+## 2026-07-20 — fix: CI-flaky `NowPlayingPersistence.dispose()` race (unrelated to #53)
+
+- **CI-reported:** `now_playing_persistence_test.dart`'s debounce test occasionally failed with `PathNotFoundException: Cannot rename file ...` — a pre-existing race, not introduced by the podcast work.
+- **`android/app/lib/player/now_playing_persistence.dart`** — `dispose()` now awaits `_pendingWrite` after canceling the debounce timer and trigger subscription, so a write already in flight (debounce timer fired before `dispose()` was called) genuinely finishes before `dispose()` returns — previously a caller (e.g. this suite's `tearDown`, which deletes the test's temp dir right after `dispose()`) could race the in-flight `NowPlayingStore.save()`'s tmp-file rename against its own cleanup.
+- **`android/app/test/player/now_playing_persistence_test.dart`** — new deterministic regression test using `_GatedStore` (a fake `NowPlayingStore` whose `save()` blocks on a `Completer` until released), proving `dispose()` waits for the gated write rather than returning early; timing-based tests alone can't reliably prove this fix without depending on real I/O speed.
+- `flutter analyze` and `flutter test` (1094 tests) green before and after; the affected test also run 5× locally with no flakes.
+- Version bump `5.3.2` → `5.3.3` across all five sync locations.
+- See `DECISIONLOG.md` 2026-07-20 "fix: `NowPlayingPersistence.dispose()` race with CI test teardown (unrelated to #53)".

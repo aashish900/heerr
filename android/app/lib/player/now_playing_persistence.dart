@@ -130,6 +130,16 @@ class NowPlayingPersistence {
     await _sub?.cancel();
     _sub = null;
     _build = null;
+    // Wait for any write already chained onto `_pendingWrite` (the debounce
+    // timer fired before dispose() was called) to actually finish. Without
+    // this, a caller that tears down resources the write depends on right
+    // after dispose() — e.g. a test deleting its temp directory — can race
+    // NowPlayingStore.save()'s tmp-file rename against that teardown and
+    // throw PathNotFoundException. Safe to await unconditionally: the timer
+    // cancel + subscription cancel above guarantee no *new* write can join
+    // the chain after this point, so this can only wait on writes already
+    // in flight.
+    await _pendingWrite;
   }
 }
 

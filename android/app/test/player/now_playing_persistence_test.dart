@@ -127,6 +127,48 @@ void main() {
     expect(builds, 0);
   });
 
+  test(
+      'dispose() waits for a write already in flight from the debounce '
+      'firing before returning', () async {
+    // Regression test for a CI flake: the debounce timer fires and starts
+    // NowPlayingStore.save() (write .tmp → rename), but dispose() used to
+    // return immediately without waiting for that write. A caller that
+    // tears down resources the write depends on right after dispose()
+    // (this suite's tearDown deletes `tmp`) could then race the in-flight
+    // rename and throw PathNotFoundException. Uses a gated fake store so
+    // the race is deterministic rather than timing-dependent.
+    final Completer<void> gate = Completer<void>();
+    bool writeCompleted = false;
+    final _GatedStore gatedStore = _GatedStore(
+      store.file,
+      gate.future,
+      onDone: () => writeCompleted = true,
+    );
+    final NowPlayingPersistence gatedPersistence = NowPlayingPersistence(
+      store: gatedStore,
+      debounce: const Duration(milliseconds: 5),
+    );
+    gatedPersistence.start(trigger: trigger.stream, build: makeSnapshot);
+    trigger.add(null);
+    // Let the debounce timer fire so the (gated) write actually starts.
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    bool disposed = false;
+    final Future<void> disposeFuture =
+        gatedPersistence.dispose().then((_) => disposed = true);
+
+    // The write is still gated shut — dispose() must still be waiting.
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(disposed, isFalse,
+        reason: 'dispose() returned before the in-flight write finished');
+    expect(writeCompleted, isFalse);
+
+    gate.complete();
+    await disposeFuture;
+    expect(disposed, isTrue);
+    expect(writeCompleted, isTrue);
+  });
+
   test('builder throws → save skipped, no file written, no crash', () async {
     persistence.start(
       trigger: trigger.stream,
@@ -190,4 +232,23 @@ void main() {
 
     await trigger2.close();
   });
+}
+
+/// A [NowPlayingStore] whose `save()` blocks on [_gate] before delegating
+/// to the real implementation — lets a test deterministically hold a write
+/// "in flight" instead of racing real timers/IO.
+class _GatedStore extends NowPlayingStore {
+  _GatedStore(super.file, this._gate, {required void Function() onDone})
+      // ignore: prefer_initializing_formals
+      : _onDone = onDone;
+
+  final Future<void> _gate;
+  final void Function() _onDone;
+
+  @override
+  Future<void> save(NowPlayingSnapshot snapshot) async {
+    await _gate;
+    await super.save(snapshot);
+    _onDone();
+  }
 }

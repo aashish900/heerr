@@ -1045,3 +1045,8 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 - **`app/api/v1/status.py`** — `to_view()` passes through `job.episode_id` (already existed on the ORM model since Phase P5's `kind` discriminator; just wasn't surfaced in the response).
 - Tests: `tests/test_podcast_download.py::test_queue_job_carries_episode_id` (new), `tests/test_status.py::test_queued_track_has_full_contract_shape` (updated — full-shape key set now includes `episode_id`; asserts null for a song job). 644 tests total, green; ruff + mypy clean.
 - Version bump `5.3.1` → `5.3.2` across all five sync locations. See `android/docs/CHANGELOG.md` 2026-07-20 "fix: Queue Retry endpoint bug + Music/Podcasts content switch (#53)" for the client-side fix this unblocks, and `DECISIONLOG.md` same date for the full rationale (including why the existing admin retry endpoint wasn't the fix).
+
+## 2026-07-20 — v5.3.3: Android — fix CI-flaky `NowPlayingPersistence.dispose()` race
+
+- No backend changes. A pre-existing (not introduced by the podcast work) race in `NowPlayingPersistence.dispose()` occasionally flaked CI: the debounce timer could fire and start a write, but `dispose()` returned before that write finished, letting a test's `tearDown` delete the temp directory mid-write and throw `PathNotFoundException`. See `android/docs/CHANGELOG.md` 2026-07-20 "fix: CI-flaky `NowPlayingPersistence.dispose()` race (unrelated to #53)".
+- Version bump `5.3.2` → `5.3.3` across all five sync locations per `/CLAUDE.md` §3.
