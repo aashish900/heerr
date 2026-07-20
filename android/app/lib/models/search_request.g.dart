@@ -24,4 +24,5 @@ const _$ContentTypeEnumMap = {
   ContentType.song: 'song',
   ContentType.album: 'album',
   ContentType.playlist: 'playlist',
+  ContentType.episode: 'episode',
 };

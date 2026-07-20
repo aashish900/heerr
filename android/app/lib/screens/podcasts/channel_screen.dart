@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/api_error.dart';
 import '../../models/podcast_channel.dart';
 import '../../models/podcast_episode.dart';
+import '../../providers/podcasts/podcast_episode_download.dart';
 import '../../providers/podcasts/podcast_episodes.dart';
 import '../../providers/podcasts/podcast_subscriptions.dart';
 import '../../widgets/empty_state.dart';
@@ -120,24 +121,91 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   }
 }
 
-class _EpisodeTile extends StatelessWidget {
+/// PC4 (#53): adds the per-episode Download action to the otherwise
+/// read-only PC3 row. Dispatched jobs reuse the existing `jobs` queue
+/// (`source_type == 'episode'`) — progress is surfaced by the existing
+/// Queue screen, not tracked inline here; a successful dispatch just shows
+/// a "Queued" snackbar, matching the online-search download affordance
+/// (`library_search_results.dart::_downloadOnly`). [episode.downloaded]
+/// renders as a static offline badge (not a button) once the job lands —
+/// re-fetched on the channel's next pull-to-refresh.
+class _EpisodeTile extends ConsumerWidget {
   const _EpisodeTile({required this.episode});
 
   final PodcastEpisode episode;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ColorScheme cs = Theme.of(context).colorScheme;
+    final bool dispatching = ref.watch(
+      podcastEpisodeDownloadDispatcherProvider
+          .select((Set<String> s) => s.contains(episode.id)),
+    );
+
     return ListTile(
       key: Key('podcast-episode-${episode.id}'),
       title: Text(episode.title, maxLines: 2, overflow: TextOverflow.ellipsis),
       subtitle: Text(_subtitle(episode)),
-      trailing: episode.played
-          ? Icon(Icons.check_circle, color: cs.primary)
-          : (episode.downloaded
-              ? Icon(Icons.download_done, color: cs.onSurfaceVariant)
-              : null),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (episode.played) Icon(Icons.check_circle, color: cs.primary),
+          _downloadTrailing(context, ref, cs, dispatching: dispatching),
+        ],
+      ),
     );
+  }
+
+  Widget _downloadTrailing(
+    BuildContext context,
+    WidgetRef ref,
+    ColorScheme cs, {
+    required bool dispatching,
+  }) {
+    if (episode.downloaded) {
+      return Padding(
+        padding: const EdgeInsets.only(left: 8),
+        child: Icon(
+          Icons.download_done,
+          color: cs.onSurfaceVariant,
+          semanticLabel: 'Downloaded',
+        ),
+      );
+    }
+    if (dispatching) {
+      return const Padding(
+        padding: EdgeInsets.only(left: 8),
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    return IconButton(
+      key: Key('podcast-episode-download-${episode.id}'),
+      icon: const Icon(Icons.download_outlined),
+      tooltip: 'Download',
+      onPressed: () => _download(context, ref),
+    );
+  }
+
+  Future<void> _download(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref
+          .read(podcastEpisodeDownloadDispatcherProvider.notifier)
+          .dispatch(episode.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: kSnackBarDuration,
+          content: Text('Queued: ${episode.title}'),
+        ),
+      );
+    } on ApiError catch (e) {
+      if (!context.mounted) return;
+      showApiError(context, e, action: 'download');
+    }
   }
 
   String _subtitle(PodcastEpisode ep) {

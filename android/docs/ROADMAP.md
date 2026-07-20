@@ -912,7 +912,7 @@ Design doc: `backend/docs/PODCASTS.md`. Scope locked by owner: **full podcast mo
 **Test gate:** widget tests — subscriptions render; episode list paginates; played/unplayed + resume indicators reflect progress fields. Analyze + test green.
 **Commit:** `feat(flutter): PC3 — subscriptions + channel episode list (#53)`
 
-### [ ] PC4. Episode download → Sync Center integration
+### [x] PC4. Episode download → Sync Center integration
 **Backend prereq:** P5. **Files:** episode-row download action, download/notifier wiring reusing the existing queue/Sync Center providers, `lib/screens/downloads/*` (surface episodes), tests.
 **Deliverable:** Per-episode Download action → `POST /podcasts/episodes/{id}/download`; progress shows in the existing Sync Center / queue UI (backend job `kind='episode'`); downloaded episodes get an offline badge; offline (`file://`) vs stream selection resolved per episode.
 **Test gate:** widget/unit test — download dispatch hits the endpoint; queue reflects an episode job; offline badge toggles on `downloaded`. Analyze + test green.

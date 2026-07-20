@@ -7,7 +7,7 @@ part of 'podcast_subscriptions.dart';
 // **************************************************************************
 
 String _$podcastSubscriptionsHash() =>
-    r'7b0914cd9884a988a710c12a2a538ef9f4b26b57';
+    r'ef49c1d0d84f7887347bc34a5ed6fe7b90b72869';
 
 /// The calling user's subscribed channels (`GET /podcasts/subscriptions`).
 ///

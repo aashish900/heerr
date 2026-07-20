@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:heerr/api/api_error.dart';
+import 'package:heerr/models/enums.dart';
+import 'package:heerr/models/episode_download_response.dart';
 import 'package:heerr/models/episode_list_response.dart';
 import 'package:heerr/models/podcast_channel.dart';
 import 'package:heerr/models/podcast_episode.dart';
@@ -14,12 +17,15 @@ class _StubBackend extends BackendService {
     this.channel,
     this.episodes = const <PodcastEpisode>[],
     this.total = 0,
+    this.downloadError,
   }) : super(Dio());
 
   final PodcastChannel? channel;
   final List<PodcastEpisode> episodes;
   final int total;
+  final Object? downloadError;
   int refreshCalls = 0;
+  final List<String> downloadCalls = <String>[];
 
   @override
   Future<List<PodcastChannel>> podcastSubscriptions() async =>
@@ -39,6 +45,20 @@ class _StubBackend extends BackendService {
     refreshCalls++;
     return channel ??
         PodcastChannel(id: channelId, feedUrl: 'https://a.com/f.xml', title: 'Show');
+  }
+
+  @override
+  Future<EpisodeDownloadResponse> downloadPodcastEpisode(
+    String episodeId,
+  ) async {
+    downloadCalls.add(episodeId);
+    final Object? err = downloadError;
+    if (err != null) throw err;
+    return const EpisodeDownloadResponse(
+      jobId: 'j1',
+      state: JobState.queued,
+      deduped: false,
+    );
   }
 }
 
@@ -156,5 +176,75 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(backend.refreshCalls, 1);
+  });
+
+  testWidgets('a not-yet-downloaded episode shows a Download button',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(
+      backend: _StubBackend(
+        channel: channelA,
+        episodes: <PodcastEpisode>[ep('1')],
+        total: 1,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('podcast-episode-download-1')), findsOneWidget);
+    expect(find.byIcon(Icons.download_done), findsNothing);
+  });
+
+  testWidgets('a downloaded episode shows a static badge, not a button',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(
+      backend: _StubBackend(
+        channel: channelA,
+        episodes: <PodcastEpisode>[ep('1', downloaded: true)],
+        total: 1,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.download_done), findsOneWidget);
+    expect(find.byKey(const Key('podcast-episode-download-1')), findsNothing);
+  });
+
+  testWidgets(
+      'tapping Download dispatches the episode download and shows a '
+      'Queued snackbar', (WidgetTester tester) async {
+    final _StubBackend backend = _StubBackend(
+      channel: channelA,
+      episodes: <PodcastEpisode>[ep('1')],
+      total: 1,
+    );
+    await tester.pumpWidget(_wrap(backend: backend));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('podcast-episode-download-1')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(backend.downloadCalls, <String>['1']);
+    expect(find.text('Queued: Episode 1'), findsOneWidget);
+  });
+
+  testWidgets('a download error shows the ApiError snackbar',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(
+      backend: _StubBackend(
+        channel: channelA,
+        episodes: <PodcastEpisode>[ep('1')],
+        total: 1,
+        downloadError: const ForbiddenError(detail: 'no download scope'),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('podcast-episode-download-1')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // ForbiddenError + action:'download' renders the action-aware copy,
+    // not the raw detail (see error_snackbar.dart::buildApiErrorSnackBar).
+    expect(find.textContaining('this token cannot download'), findsOneWidget);
   });
 }
