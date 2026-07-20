@@ -17,6 +17,13 @@ class JobView(BaseModel):
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    # `source_type == "episode"` jobs carry the originating episode id so a
+    # client can re-dispatch a failed download via
+    # `POST /podcasts/episodes/{episode_id}/download` — the song-download
+    # retry path (`POST /download` with `source_url`/`source_type`) doesn't
+    # apply to episodes, whose enclosure URL isn't a YouTube Music URL.
+    # Always null for song/album/playlist jobs.
+    episode_id: UUID | None = None
 
 
 class QueueResponse(BaseModel):

@@ -25,6 +25,7 @@ def to_view(job: Job, output_path: str | None) -> JobView:
         created_at=job.created_at,
         started_at=job.started_at,
         finished_at=job.finished_at,
+        episode_id=job.episode_id,
     )
 
 

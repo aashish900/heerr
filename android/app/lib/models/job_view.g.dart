@@ -23,6 +23,7 @@ _$JobViewImpl _$$JobViewImplFromJson(Map<String, dynamic> json) =>
       finishedAt: json['finished_at'] == null
           ? null
           : DateTime.parse(json['finished_at'] as String),
+      episodeId: json['episode_id'] as String?,
     );
 
 Map<String, dynamic> _$$JobViewImplToJson(_$JobViewImpl instance) =>
@@ -40,6 +41,7 @@ Map<String, dynamic> _$$JobViewImplToJson(_$JobViewImpl instance) =>
         'started_at': value,
       if (instance.finishedAt?.toIso8601String() case final value?)
         'finished_at': value,
+      if (instance.episodeId case final value?) 'episode_id': value,
     };
 
 const _$ContentTypeEnumMap = {

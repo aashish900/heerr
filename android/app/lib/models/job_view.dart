@@ -22,6 +22,11 @@ class JobView with _$JobView {
     required DateTime createdAt,
     DateTime? startedAt,
     DateTime? finishedAt,
+    // Set only for `sourceType == episode` jobs — the episode a failed
+    // download can be retried against via
+    // `POST /podcasts/episodes/{episodeId}/download` (the song-download
+    // retry path doesn't apply to episode enclosure URLs).
+    String? episodeId,
   }) = _JobView;
 
   factory JobView.fromJson(Map<String, dynamic> json) =>

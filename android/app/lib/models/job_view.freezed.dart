@@ -31,7 +31,12 @@ mixin _$JobView {
   String? get outputPath => throw _privateConstructorUsedError;
   DateTime get createdAt => throw _privateConstructorUsedError;
   DateTime? get startedAt => throw _privateConstructorUsedError;
-  DateTime? get finishedAt => throw _privateConstructorUsedError;
+  DateTime? get finishedAt =>
+      throw _privateConstructorUsedError; // Set only for `sourceType == episode` jobs — the episode a failed
+  // download can be retried against via
+  // `POST /podcasts/episodes/{episodeId}/download` (the song-download
+  // retry path doesn't apply to episode enclosure URLs).
+  String? get episodeId => throw _privateConstructorUsedError;
 
   /// Serializes this JobView to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -59,6 +64,7 @@ abstract class $JobViewCopyWith<$Res> {
     DateTime createdAt,
     DateTime? startedAt,
     DateTime? finishedAt,
+    String? episodeId,
   });
 }
 
@@ -88,6 +94,7 @@ class _$JobViewCopyWithImpl<$Res, $Val extends JobView>
     Object? createdAt = null,
     Object? startedAt = freezed,
     Object? finishedAt = freezed,
+    Object? episodeId = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -135,6 +142,10 @@ class _$JobViewCopyWithImpl<$Res, $Val extends JobView>
                 ? _value.finishedAt
                 : finishedAt // ignore: cast_nullable_to_non_nullable
                       as DateTime?,
+            episodeId: freezed == episodeId
+                ? _value.episodeId
+                : episodeId // ignore: cast_nullable_to_non_nullable
+                      as String?,
           )
           as $Val,
     );
@@ -161,6 +172,7 @@ abstract class _$$JobViewImplCopyWith<$Res> implements $JobViewCopyWith<$Res> {
     DateTime createdAt,
     DateTime? startedAt,
     DateTime? finishedAt,
+    String? episodeId,
   });
 }
 
@@ -189,6 +201,7 @@ class __$$JobViewImplCopyWithImpl<$Res>
     Object? createdAt = null,
     Object? startedAt = freezed,
     Object? finishedAt = freezed,
+    Object? episodeId = freezed,
   }) {
     return _then(
       _$JobViewImpl(
@@ -236,6 +249,10 @@ class __$$JobViewImplCopyWithImpl<$Res>
             ? _value.finishedAt
             : finishedAt // ignore: cast_nullable_to_non_nullable
                   as DateTime?,
+        episodeId: freezed == episodeId
+            ? _value.episodeId
+            : episodeId // ignore: cast_nullable_to_non_nullable
+                  as String?,
       ),
     );
   }
@@ -256,6 +273,7 @@ class _$JobViewImpl implements _JobView {
     required this.createdAt,
     this.startedAt,
     this.finishedAt,
+    this.episodeId,
   });
 
   factory _$JobViewImpl.fromJson(Map<String, dynamic> json) =>
@@ -283,10 +301,16 @@ class _$JobViewImpl implements _JobView {
   final DateTime? startedAt;
   @override
   final DateTime? finishedAt;
+  // Set only for `sourceType == episode` jobs — the episode a failed
+  // download can be retried against via
+  // `POST /podcasts/episodes/{episodeId}/download` (the song-download
+  // retry path doesn't apply to episode enclosure URLs).
+  @override
+  final String? episodeId;
 
   @override
   String toString() {
-    return 'JobView(jobId: $jobId, sourceUrl: $sourceUrl, sourceType: $sourceType, state: $state, displayName: $displayName, progress: $progress, error: $error, outputPath: $outputPath, createdAt: $createdAt, startedAt: $startedAt, finishedAt: $finishedAt)';
+    return 'JobView(jobId: $jobId, sourceUrl: $sourceUrl, sourceType: $sourceType, state: $state, displayName: $displayName, progress: $progress, error: $error, outputPath: $outputPath, createdAt: $createdAt, startedAt: $startedAt, finishedAt: $finishedAt, episodeId: $episodeId)';
   }
 
   @override
@@ -312,7 +336,9 @@ class _$JobViewImpl implements _JobView {
             (identical(other.startedAt, startedAt) ||
                 other.startedAt == startedAt) &&
             (identical(other.finishedAt, finishedAt) ||
-                other.finishedAt == finishedAt));
+                other.finishedAt == finishedAt) &&
+            (identical(other.episodeId, episodeId) ||
+                other.episodeId == episodeId));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -330,6 +356,7 @@ class _$JobViewImpl implements _JobView {
     createdAt,
     startedAt,
     finishedAt,
+    episodeId,
   );
 
   /// Create a copy of JobView
@@ -359,6 +386,7 @@ abstract class _JobView implements JobView {
     required final DateTime createdAt,
     final DateTime? startedAt,
     final DateTime? finishedAt,
+    final String? episodeId,
   }) = _$JobViewImpl;
 
   factory _JobView.fromJson(Map<String, dynamic> json) = _$JobViewImpl.fromJson;
@@ -384,7 +412,12 @@ abstract class _JobView implements JobView {
   @override
   DateTime? get startedAt;
   @override
-  DateTime? get finishedAt;
+  DateTime? get finishedAt; // Set only for `sourceType == episode` jobs — the episode a failed
+  // download can be retried against via
+  // `POST /podcasts/episodes/{episodeId}/download` (the song-download
+  // retry path doesn't apply to episode enclosure URLs).
+  @override
+  String? get episodeId;
 
   /// Create a copy of JobView
   /// with the given fields replaced by the non-null parameter values.

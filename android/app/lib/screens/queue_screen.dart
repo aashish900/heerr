@@ -15,11 +15,14 @@ import '../router.dart';
 import '../theme.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_snackbar.dart';
+import '../widgets/gradient_tab_indicator.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/status_pill.dart';
 
 /// Polled queue view. Two sections (Active / Recent), each a list of
-/// `JobView` tiles with a colour-coded `StatusPill`.
+/// `JobView` tiles with a colour-coded `StatusPill`. A Music/Podcasts
+/// content switch (#53) filters both sections by `job.sourceType` — same
+/// pattern as Home/Library's content switches.
 ///
 /// Lifecycle binding: `WidgetsBindingObserver` forwards background/foreground
 /// transitions to the provider's `pause()` / `resume()` per PLAN.md §8.
@@ -31,16 +34,28 @@ class QueueScreen extends ConsumerStatefulWidget {
 }
 
 class _QueueScreenState extends ConsumerState<QueueScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  late final TabController _contentController;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Both tabs read the same already-fetched `queueProvider` snapshot (just
+    // filtered client-side by sourceType), so — unlike Home/Library's
+    // content switches — there's no extra network call to avoid by delaying
+    // the Podcasts tab's build. A manual TabController is still used so the
+    // switch stays visually consistent with Home's/Library's.
+    _contentController = TabController(length: 2, vsync: this);
+    _contentController.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _contentController.dispose();
     super.dispose();
   }
 
@@ -68,37 +83,93 @@ class _QueueScreenState extends ConsumerState<QueueScreen>
         reactToApiError<QueueResponse>(context, prev, next);
       },
     );
+    final bool podcasts = _contentController.index == 1;
     return Scaffold(
       appBar: AppBar(title: const Text('Queue')),
-      body: queueAsync.when(
-        loading: () => const SkeletonList(count: 4),
-        error: (Object e, _) =>
-            Center(child: Text(e is ApiError ? e.message : 'Error: $e')),
-        data: (QueueResponse r) {
-          if (r.active.isEmpty && r.recent.isEmpty) {
-            return const EmptyState(
-              icon: Icons.queue_music,
-              title: 'No jobs yet',
-              subtitle: 'Search and tap a track to queue a download',
-            );
-          }
-          return RefreshIndicator(
-            onRefresh: () => ref.read(queueProvider.notifier).resume(),
-            child: ListView(
-              children: <Widget>[
-                if (r.active.isNotEmpty) ...<Widget>[
-                  const _SectionHeader(label: 'Active'),
-                  for (final JobView j in r.active) _JobTile(job: j),
-                ],
-                if (r.recent.isNotEmpty) ...<Widget>[
-                  const _SectionHeader(label: 'Recent'),
-                  for (final JobView j in r.recent) _JobTile(job: j),
-                ],
-              ],
+      body: Column(
+        children: <Widget>[
+          _QueueContentSwitch(controller: _contentController),
+          Expanded(
+            child: queueAsync.when(
+              loading: () => const SkeletonList(count: 4),
+              error: (Object e, _) =>
+                  Center(child: Text(e is ApiError ? e.message : 'Error: $e')),
+              data: (QueueResponse r) {
+                bool matches(JobView j) =>
+                    (j.sourceType == ContentType.episode) == podcasts;
+                final List<JobView> active = r.active.where(matches).toList();
+                final List<JobView> recent = r.recent.where(matches).toList();
+
+                if (active.isEmpty && recent.isEmpty) {
+                  return RefreshIndicator(
+                    onRefresh: () => ref.read(queueProvider.notifier).resume(),
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: <Widget>[
+                        SizedBox(
+                          height: MediaQuery.sizeOf(context).height * 0.5,
+                          child: Center(
+                            child: EmptyState(
+                              icon: podcasts
+                                  ? Icons.podcasts
+                                  : Icons.queue_music,
+                              title: 'No jobs yet',
+                              subtitle: podcasts
+                                  ? 'Download a podcast episode to see it here'
+                                  : 'Search and tap a track to queue a download',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return RefreshIndicator(
+                  onRefresh: () => ref.read(queueProvider.notifier).resume(),
+                  child: ListView(
+                    children: <Widget>[
+                      if (active.isNotEmpty) ...<Widget>[
+                        const _SectionHeader(label: 'Active'),
+                        for (final JobView j in active) _JobTile(job: j),
+                      ],
+                      if (recent.isNotEmpty) ...<Widget>[
+                        const _SectionHeader(label: 'Recent'),
+                        for (final JobView j in recent) _JobTile(job: j),
+                      ],
+                    ],
+                  ),
+                );
+              },
             ),
-          );
-        },
+          ),
+        ],
       ),
+    );
+  }
+}
+
+/// Music / Podcasts top-level switch — same visual pattern as Home's
+/// `_HomeContentSwitch` / Library's `_LibraryContentSwitch`
+/// (`GradientTabIndicator` + `heerrMagenta`).
+class _QueueContentSwitch extends StatelessWidget {
+  const _QueueContentSwitch({required this.controller});
+
+  final TabController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return TabBar(
+      controller: controller,
+      indicator: const GradientTabIndicator(),
+      indicatorSize: TabBarIndicatorSize.tab,
+      dividerColor: Colors.transparent,
+      labelColor: heerrMagenta,
+      unselectedLabelColor: cs.onSurfaceVariant,
+      tabs: const <Tab>[
+        Tab(height: 46, child: Text('Music')),
+        Tab(height: 46, child: Text('Podcasts')),
+      ],
     );
   }
 }
@@ -168,14 +239,33 @@ class _JobTile extends ConsumerWidget {
     );
   }
 
+  /// Retries a failed job. Episode jobs (`sourceType == episode`) can't be
+  /// retried via the song-download endpoint — their `sourceUrl` is a
+  /// podcast enclosure URL, not a YouTube/YouTube Music URL, so
+  /// `POST /download` rejects it with a 422. Episode jobs instead
+  /// re-dispatch via `POST /podcasts/episodes/{episodeId}/download`, the
+  /// same idempotent-create path the original Download button uses.
   Future<void> _retry(BuildContext context, WidgetRef ref) async {
     try {
       final BackendService svc = await ref.read(backendServiceProvider.future);
-      await svc.download(
-        sourceUrl: job.sourceUrl,
-        sourceType: job.sourceType.name,
-        displayName: job.displayName,
-      );
+      if (job.sourceType == ContentType.episode) {
+        final String? episodeId = job.episodeId;
+        if (episodeId == null) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            duration: kSnackBarDuration,
+            content: Text("Can't retry: missing episode id"),
+          ));
+          return;
+        }
+        await svc.downloadPodcastEpisode(episodeId);
+      } else {
+        await svc.download(
+          sourceUrl: job.sourceUrl,
+          sourceType: job.sourceType.name,
+          displayName: job.displayName,
+        );
+      }
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()

@@ -534,3 +534,17 @@ Sub-decisions locked across J1–J10:
 - **Boolean `played` sort partition without a secondary "newest" tiebreaker** — rejected during test-writing: an unplayed backlog would otherwise render in undefined/insertion order within the bucket, which is worse UX than newest-first per bucket.
 
 **Reference:** `backend/app/api/v1/podcasts.py::list_episode_feed` / `::list_episodes`, `backend/app/schemas/podcast.py::EpisodeWithChannelItem`/`EpisodeFeedResponse`, `backend/tests/test_podcast_feeds.py`, `backend/tests/test_podcast_episodes.py` (sort tests).
+
+## 2026-07-20 — `episode_id` on `JobView`: fixing the Queue Retry bug (#53)
+
+**Context:** User-reported bug — retrying a failed podcast episode download from the Android Queue screen 422'd with `source_url must be a YouTube or YouTube Music URL`. Root cause was entirely client-side: `queue_screen.dart`'s Retry action pre-dates the podcast feature and always re-dispatches via `POST /download` (`sourceUrl`/`sourceType`/`displayName`) regardless of job kind — for a song job that's correct (song `source_url`s *are* YouTube Music URLs), but an episode job's `source_url` is its RSS enclosure URL, which `POST /download`'s `DownloadRequest` schema rejects outright.
+
+**Decision:** Added `episode_id: UUID | None` to `JobView` (`GET /queue`, `GET /status/{id}`) — always null for song/album/playlist jobs, set to the originating episode for episode jobs. The Android fix uses this to route retry through `POST /podcasts/episodes/{episode_id}/download` for episode jobs, mirroring the exact mechanism the original Download button already uses (idempotent re-create, not a stateful "retry this row" operation) — see `android/docs/DECISIONLOG.md` same date for the client-side half.
+
+**Why:** `Job.episode_id` already existed on the ORM model (Phase P5, the download-worker `kind` discriminator) — it just wasn't surfaced in the API response the client actually reads. Exposing it is the minimal change that lets the client tell job kinds apart without a second lookup.
+
+**Alternatives considered:**
+- **Fix retry server-side via the existing `POST /admin/jobs/{id}/retry` endpoint** (which already re-enqueues in place) — rejected: that endpoint is `require_admin`-gated, so it was never reachable by a normal user's token in the first place; the Android app has in fact never called it — the "Retry" button has always worked by re-submitting a fresh `POST /download` request, not by hitting the admin endpoint. Making retry work for regular users via that path would mean either dropping the admin gate (a much bigger blast-radius change than this bug warrants) or adding a parallel non-admin retry endpoint — more surface area than adding one nullable field to an existing response.
+- **Route retry entirely server-side by kind** (have `/admin/jobs/{id}/retry` dispatch `PodcastJobEnqueuer` vs `JobEnqueuer` based on `job.source_type`) — noted as a real latent bug in that endpoint (it's hardcoded to the song `JobEnqueuer` regardless of kind) but out of scope here since the Android client doesn't call it at all; left as `DEBT.md`-worthy if that endpoint is ever exposed to non-admin users.
+
+**Reference:** `backend/app/schemas/job.py::JobView`, `backend/app/api/v1/status.py::to_view`, `backend/tests/test_podcast_download.py::test_queue_job_carries_episode_id`, `backend/tests/test_status.py::test_queued_track_has_full_contract_shape`.

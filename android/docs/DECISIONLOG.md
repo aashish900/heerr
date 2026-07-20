@@ -1339,3 +1339,21 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **Give the aggregate feed a `sort` param too, so the Library Episodes tab could offer the same sort menu** — rejected as a mismatch with backend Phase PA's actual design (PA2 scoped `sort` to the per-channel endpoint only); revisit only if a real need for cross-show sorting surfaces.
 
 **Reference:** `android/app/lib/providers/podcasts/podcast_episode_feed.dart`, `android/app/lib/models/episode_with_channel.dart`, `android/app/lib/screens/home/home_podcasts_body.dart`, `android/app/lib/screens/podcasts/podcast_episode_feed_list.dart`, `android/app/lib/providers/podcasts/podcast_episodes.dart::setSort`.
+
+## 2026-07-20 — fix: Queue Retry sends episode jobs through the wrong endpoint + Queue Music/Podcasts switch (#53)
+
+**Context:** User-reported bug — tapping Retry on a failed podcast episode download produced `source_url must be a YouTube or YouTube Music URL`. `queue_screen.dart::_JobTile._retry` pre-dates the podcast feature: for *every* failed job it unconditionally called `BackendService.download(sourceUrl: job.sourceUrl, ...)` — `POST /download`, whose schema only accepts YouTube/YouTube Music URLs. A podcast episode job's `sourceUrl` is its RSS enclosure URL (e.g. an Anchor.fm-hosted CDN link), which that endpoint rejects outright.
+
+**Decision:**
+1. **`_retry` now branches on `job.sourceType`.** Episode jobs (`ContentType.episode`) call the already-existing `BackendService.downloadPodcastEpisode(episodeId)` — the exact call the original Download button on an episode row makes — instead of `download(...)`. Song/album/playlist jobs are unchanged.
+2. **`JobView` gained an `episodeId` field**, sourced from the backend's new `JobView.episode_id` (`backend/docs/DECISIONLOG.md` same date) — the client needs the episode id to build the retry request, and `GET /queue`/`GET /status/{id}` didn't expose it before this fix.
+3. **A defensive null-check on `episodeId`** (should be impossible per the backend contract, but the field is nullable in the type system) shows an inline error snackbar instead of throwing, rather than silently no-op-ing or crashing.
+4. **Added a Music/Podcasts content switch to the Queue screen**, same `GradientTabIndicator`/manual-`TabController` visual pattern as Home's and Library's — filtering the existing Active/Recent sections client-side by `job.sourceType == ContentType.episode`. Unlike Home/Library's switches, this one doesn't need the lazy-build-avoidance reasoning those two required: both tabs read the same already-fetched `queueProvider` snapshot (just filtered), so there's no extra network call at stake either way — the manual `TabController` is used purely for visual consistency with the other two switches, not to gate a provider.
+
+**Why:** Bundling the Retry fix with the content-switch request together makes sense here — both touch the same screen and the switch makes the now-correctly-separated episode jobs easier to find (mixed in with song jobs in one long Active/Recent list otherwise).
+
+**Alternatives considered:**
+- **Route retry through the backend's `POST /admin/jobs/{id}/retry`** — not viable: that endpoint requires `require_admin`, which a normal user's token never has; the app has never called it. See `backend/docs/DECISIONLOG.md` same date for the fuller reasoning (including a latent bug found there: that endpoint hardcodes the song-job enqueuer regardless of job kind — out of scope here since the client doesn't call it).
+- **A `podcastEpisodeFeedProvider`-style separate provider per Queue tab** — rejected: the Queue already has one polling provider (`queueProvider`) returning everything; splitting it into two providers would mean polling the same `GET /queue` endpoint twice for no benefit, when a client-side filter does the same job for free.
+
+**Reference:** `android/app/lib/models/job_view.dart`, `android/app/lib/screens/queue_screen.dart`, `android/app/test/screens/queue_screen_test.dart` (`retry (#53)` + `Music / Podcasts content switch (#53)` groups).

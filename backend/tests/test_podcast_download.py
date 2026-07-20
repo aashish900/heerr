@@ -142,3 +142,19 @@ async def test_download_job_appears_in_queue(client, make_token, episode_id):
     assert q.status_code == 200
     ids = {j["job_id"] for j in q.json()["active"]}
     assert job_id in ids
+
+
+async def test_queue_job_carries_episode_id(client, make_token, episode_id):
+    """The client needs `episode_id` on the job view to retry a failed
+    episode download via `POST /podcasts/episodes/{episode_id}/download` —
+    the song-download retry path doesn't apply to episode enclosure URLs."""
+    raw = await make_token()
+    r = await client.post(
+        f"/api/v1/podcasts/episodes/{episode_id}/download",
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    job_id = r.json()["job_id"]
+
+    q = await client.get("/api/v1/queue", headers={"Authorization": f"Bearer {raw}"})
+    job = next(j for j in q.json()["active"] if j["job_id"] == job_id)
+    assert job["episode_id"] == str(episode_id)

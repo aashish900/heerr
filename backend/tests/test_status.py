@@ -167,6 +167,7 @@ async def test_queued_track_has_full_contract_shape(client, make_token, app_sm, 
         "created_at",
         "started_at",
         "finished_at",
+        "episode_id",
     }
     assert body["state"] == "queued"
     assert body["display_name"] is None
@@ -175,6 +176,9 @@ async def test_queued_track_has_full_contract_shape(client, make_token, app_sm, 
     assert body["output_path"] is None
     assert body["started_at"] is None
     assert body["finished_at"] is None
+    # A song job never carries an episode_id — only episode-kind jobs do
+    # (see tests/test_podcast_download.py::test_queue_job_carries_episode_id).
+    assert body["episode_id"] is None
 
 
 async def test_status_returns_stored_display_name(client, make_token, app_sm, cleanup):

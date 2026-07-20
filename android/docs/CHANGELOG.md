@@ -3146,3 +3146,13 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - Tests: `test/screens/home/home_screen_test.dart` (+1) — button renders and pushes Discover; test router gained a `/podcasts/discover` sink to match.
 - `flutter analyze` and `flutter test` (1088 tests) green before and after.
 - Version bump `5.3.0` → `5.3.1` across all five sync locations.
+
+## 2026-07-20 — fix: Queue Retry endpoint bug + Music/Podcasts content switch (#53)
+
+- **User-reported:** retrying a failed podcast episode download from the Queue screen 422'd with `source_url must be a YouTube or YouTube Music URL` — `_JobTile._retry` always re-dispatched via `POST /download` (song downloads) regardless of job kind.
+- **`android/app/lib/models/job_view.dart`** — new `episodeId` field, sourced from the backend's new `JobView.episode_id`.
+- **`android/app/lib/screens/queue_screen.dart`** — `_retry` now branches on `job.sourceType`: episode jobs call `BackendService.downloadPodcastEpisode(episodeId)` (the same call the Download button already uses) instead of `download(...)`; a defensive snackbar covers the (contract-impossible) case of a null `episodeId`. Also added a Music/Podcasts content switch (`_QueueContentSwitch`, same `GradientTabIndicator` pattern as Home/Library) filtering the Active/Recent sections by `job.sourceType` — no extra network call, both tabs read the same already-polled `queueProvider` snapshot.
+- Tests: `test/screens/queue_screen_test.dart` (+5) — song-job retry still calls `download`, episode-job retry calls `downloadPodcastEpisode` (not `download`), null-`episodeId` shows the error snackbar and dispatches nothing, Music/Podcasts tab filtering, podcast-specific empty state.
+- `flutter analyze` and `flutter test` (1093 tests) green before and after.
+- Version bump `5.3.1` → `5.3.2` across all five sync locations.
+- See `DECISIONLOG.md` 2026-07-20 "fix: Queue Retry sends episode jobs through the wrong endpoint + Queue Music/Podcasts switch (#53)".

@@ -1037,3 +1037,11 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 
 - No backend changes. Home's Podcasts content was missing a "Discover podcasts" button in its no-subscriptions empty state — every other empty-subscriptions surface already has one. See `android/docs/CHANGELOG.md` 2026-07-20 "fix: Home Podcasts empty state missing the Discover button (#53)".
 - Version bump `5.3.0` → `5.3.1` across all five sync locations per `/CLAUDE.md` §3.
+
+## 2026-07-20 — v5.3.2: `episode_id` on `JobView` — fixes Android Queue Retry (#53)
+
+- **User-reported bug** (root cause traced to the Android client, fixed here at the API level): `GET /queue`/`GET /status/{id}` didn't expose which episode an episode-kind job belonged to, so the Android Retry button couldn't tell episode jobs apart from song jobs and always retried via the song-download endpoint — which rejects a podcast enclosure URL.
+- **`app/schemas/job.py`** — `JobView` gained `episode_id: UUID | None = None` (always null for song/album/playlist jobs).
+- **`app/api/v1/status.py`** — `to_view()` passes through `job.episode_id` (already existed on the ORM model since Phase P5's `kind` discriminator; just wasn't surfaced in the response).
+- Tests: `tests/test_podcast_download.py::test_queue_job_carries_episode_id` (new), `tests/test_status.py::test_queued_track_has_full_contract_shape` (updated — full-shape key set now includes `episode_id`; asserts null for a song job). 644 tests total, green; ruff + mypy clean.
+- Version bump `5.3.1` → `5.3.2` across all five sync locations. See `android/docs/CHANGELOG.md` 2026-07-20 "fix: Queue Retry endpoint bug + Music/Podcasts content switch (#53)" for the client-side fix this unblocks, and `DECISIONLOG.md` same date for the full rationale (including why the existing admin retry endpoint wasn't the fix).
