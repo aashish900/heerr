@@ -311,6 +311,37 @@ class HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
         AudioServiceRepeatMode.group || AudioServiceRepeatMode.all => LoopMode.all,
       };
 
+  /// PR2 (#53): playback-speed control for the podcast player. Not exposed
+  /// on the music transport (`_Transport`) — only the podcast layout offers
+  /// a speed picker. `_player.setSpeed` already causes `just_audio` to emit
+  /// a `PlaybackEvent`, which `_broadcastPlaybackState` picks up via
+  /// `speed: _player.speed` — but that emission isn't always synchronous
+  /// with the call returning, so the state is rebroadcast explicitly here
+  /// too, keeping `PlaybackState.speed` (and therefore
+  /// `PlayerSnapshot.state.speed`) authoritative immediately after the call
+  /// resolves, not just eventually.
+  @override
+  Future<void> setSpeed(double speed) async {
+    await _player.setSpeed(speed);
+    playbackState.add(playbackState.value.copyWith(speed: _player.speed));
+  }
+
+  /// PR2 (#53): podcast transport skip-back/forward, a fixed 30s interval
+  /// per the design (distinct from music's prev/next track skip). Clamped
+  /// to `[Duration.zero, duration]` so it can't seek past either end.
+  Future<void> skipBack30() => _seekByOffset(const Duration(seconds: -30));
+
+  Future<void> skipForward30() => _seekByOffset(const Duration(seconds: 30));
+
+  Future<void> _seekByOffset(Duration offset) async {
+    final Duration current = _player.position;
+    final Duration? duration = _player.duration;
+    Duration target = current + offset;
+    if (target < Duration.zero) target = Duration.zero;
+    if (duration != null && target > duration) target = duration;
+    await _player.seek(target);
+  }
+
   /// Combined snapshot stream for the mini-player + Now Playing (J2).
   /// Emits a [PlayerSnapshot] whenever the current item or transport state
   /// changes.

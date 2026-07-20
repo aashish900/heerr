@@ -3105,3 +3105,14 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - `flutter analyze` and `flutter test` (1065 tests) green before and after.
 - Version bump `5.0.2` → `5.1.0` across all five sync locations (Android-only change; no backend changes) — a new content switch is a user-visible surface change, not a fix.
 - See `DECISIONLOG.md` 2026-07-20 "PR1: podcasts move into Library + Show Detail redesign (#53)".
+
+## 2026-07-20 — feat: PR2 — podcast player redesign (#53)
+
+- **`android/app/lib/player/heerr_audio_handler.dart`** — new `setSpeed(double)` (an `AudioHandler` override; calls `_player.setSpeed` then rebroadcasts `PlaybackState.speed`), `skipBack30()`/`skipForward30()` (seek `position ± 30s`, clamped to `[Duration.zero, duration]`).
+- **`android/app/lib/player/episode_to_media_item.dart`** — new `channelIdFromMediaItem` helper (mirrors `episodeIdFromMediaItem`), used by the new show-name link.
+- **`android/app/lib/screens/player/now_playing_podcast_transport.dart`** (new) — `_PodcastScrubber` (plain `Slider`, not the waveform), `_PodcastTransport` (skip-back-30/play-pause/skip-forward-30), `_PodcastActionPill` (Queue/Speed/Timer), `_SpeedPickerSheet` (1.0×–2.0× presets), `_PodcastShowLink` (tappable show name, resolved via `podcastSubscriptionsProvider`).
+- **`android/app/lib/screens/player/now_playing_screen.dart`** — `_Body` now branches on `isEpisodeMediaItem(item)` and delegates to a new sibling `_PodcastBody` for episodes; the music layout (`_Body`'s existing body) is unchanged.
+- Tests: `test/player/heerr_audio_handler_modes_test.dart` (+7: `setSpeed` broadcast, skip±30 seek math + clamping at both ends + unknown-duration passthrough), `test/screens/player/now_playing_screen_test.dart` (+4: podcast layout renders with no waveform/lyrics/add-to-playlist, show-name link, skip±30 taps call the handler, speed picker selects and calls `setSpeed`).
+- `flutter analyze` and `flutter test` (1075 tests) green before and after.
+- Version bump `5.1.0` → `5.2.0` across all five sync locations (Android-only change; no backend changes).
+- See `DECISIONLOG.md` 2026-07-20 "PR2: podcast player redesign (#53)".

@@ -4,13 +4,16 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
+import '../../models/podcast_channel.dart';
 import '../../models/seed_track.dart';
 import '../../models/subsonic/lyrics.dart';
 import '../../models/subsonic/song.dart';
 import '../../offline/offline_manifest.dart';
 import '../../offline/offline_marker.dart';
+import '../../player/episode_to_media_item.dart';
 import '../../player/heerr_audio_handler.dart';
 import '../../player/player_provider.dart';
 import '../../player/sleep_timer.dart';
@@ -18,7 +21,9 @@ import '../../player/song_to_media_item.dart';
 import '../../providers/library/favourites.dart';
 import '../../providers/library/lyrics.dart';
 import '../../providers/library/playlist_mutations.dart';
+import '../../providers/podcasts/podcast_subscriptions.dart';
 import '../../providers/queue.dart';
+import '../../router.dart';
 import '../../theme.dart';
 import '../../utils/palette.dart';
 import '../../widgets/add_to_playlist_sheet.dart';
@@ -32,6 +37,7 @@ import '../../widgets/waveform_seek_bar.dart';
 
 part 'now_playing_lyrics.dart';
 part 'now_playing_transport.dart';
+part 'now_playing_podcast_transport.dart';
 part 'now_playing_sleep_timer.dart';
 part 'now_playing_action_pill.dart';
 
@@ -102,6 +108,14 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       context: context,
       showDragHandle: true,
       builder: (BuildContext sheetContext) => const _SleepTimerSheet(),
+    );
+  }
+
+  void _openSpeedPickerSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext sheetContext) => const _SpeedPickerSheet(),
     );
   }
 
@@ -210,6 +224,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               onQueueTap: () => _openQueueSheet(context),
               onSleepTap: () => _openSleepTimerSheet(context),
               onAddToPlaylist: () => _openAddToPlaylist(context),
+              onSpeedTap: () => _openSpeedPickerSheet(context),
             ),
           );
         },
@@ -298,6 +313,7 @@ class _Body extends ConsumerWidget {
     required this.onQueueTap,
     required this.onSleepTap,
     required this.onAddToPlaylist,
+    required this.onSpeedTap,
   });
 
   final PlayerSnapshot snapshot;
@@ -309,10 +325,23 @@ class _Body extends ConsumerWidget {
   final VoidCallback onQueueTap;
   final VoidCallback onSleepTap;
   final VoidCallback onAddToPlaylist;
+  final VoidCallback onSpeedTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final MediaItem item = snapshot.item!;
+    if (isEpisodeMediaItem(item)) {
+      return _PodcastBody(
+        snapshot: snapshot,
+        scrubOverride: scrubOverride,
+        onSeekStart: onSeekStart,
+        onSeekUpdate: onSeekUpdate,
+        onSeekEnd: onSeekEnd,
+        onQueueTap: onQueueTap,
+        onSleepTap: onSleepTap,
+        onSpeedTap: onSpeedTap,
+      );
+    }
     final Duration duration = item.duration ?? Duration.zero;
     final Duration position = scrubOverride ?? snapshot.state.position;
     final Song? currentSong = !isPreviewMediaItem(item)
@@ -393,6 +422,92 @@ class _Body extends ConsumerWidget {
             title: item.title,
             position: position,
             tintColor: tintColor,
+          ),
+          SizedBox(height: MediaQuery.paddingOf(context).bottom + 16),
+        ],
+      ),
+    );
+  }
+}
+
+/// PR2 (#53): the podcast-flavored counterpart of the music `_Body` layout
+/// above — big cover art (no on-art download button; episodes have no
+/// on-device download affordance), title + tappable show name, a plain
+/// scrubber, skip±30s transport, and a Queue/Speed/Timer action pill.
+/// Deliberately drops favourite, lyrics, and add-to-playlist — none apply
+/// to a single podcast episode.
+class _PodcastBody extends ConsumerWidget {
+  const _PodcastBody({
+    required this.snapshot,
+    required this.scrubOverride,
+    required this.onSeekStart,
+    required this.onSeekUpdate,
+    required this.onSeekEnd,
+    required this.onQueueTap,
+    required this.onSleepTap,
+    required this.onSpeedTap,
+  });
+
+  final PlayerSnapshot snapshot;
+  final Duration? scrubOverride;
+  final ValueChanged<Duration> onSeekStart;
+  final ValueChanged<Duration> onSeekUpdate;
+  final ValueChanged<Duration> onSeekEnd;
+  final VoidCallback onQueueTap;
+  final VoidCallback onSleepTap;
+  final VoidCallback onSpeedTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final MediaItem item = snapshot.item!;
+    final Duration duration = item.duration ?? Duration.zero;
+    final Duration position = scrubOverride ?? snapshot.state.position;
+    final Duration? sleepRemaining = ref.watch(sleepTimerNotifierProvider);
+    final String? channelId = channelIdFromMediaItem(item);
+    final double speed = snapshot.state.speed;
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const SafeArea(bottom: false, child: _Header()),
+          _HeroArt(artUri: item.artUri, tintColor: null, song: null),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  item.title,
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineMedium
+                      ?.copyWith(fontWeight: FontWeight.w800),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (channelId != null) ...<Widget>[
+                  const SizedBox(height: 6),
+                  _PodcastShowLink(channelId: channelId),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          _PodcastScrubber(
+            position: position,
+            duration: duration,
+            onSeekStart: onSeekStart,
+            onSeekUpdate: onSeekUpdate,
+            onSeekEnd: onSeekEnd,
+          ),
+          _PodcastTransport(playing: snapshot.isPlaying),
+          _PodcastActionPill(
+            onQueueTap: onQueueTap,
+            onSpeedTap: onSpeedTap,
+            onTimerTap: onSleepTap,
+            speed: speed,
+            sleepRemaining: sleepRemaining,
           ),
           SizedBox(height: MediaQuery.paddingOf(context).bottom + 16),
         ],

@@ -1014,3 +1014,8 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 
 - No backend changes. Phase PR1 (#53) of the podcast-flow redesign: podcasts are now reachable as a Library "Podcasts" content switch (Shows/Episodes/Downloads), with a richer show-detail screen replacing the plain channel list. See `android/docs/CHANGELOG.md` 2026-07-20 "feat: PR1 — podcasts move into Library + Show Detail redesign (#53)" and `android/docs/DECISIONLOG.md` same date.
 - Version bump `5.0.2` → `5.1.0` across all five sync locations per `/CLAUDE.md` §3.
+
+## 2026-07-20 — v5.2.0: Android — PR2, podcast player redesign (#53)
+
+- No backend changes. Phase PR2 (#53): the Now Playing screen now renders a podcast-specific layout for episode playback — skip±30s transport, a working playback-speed control, and a plain scrubber instead of the music waveform. See `android/docs/CHANGELOG.md` 2026-07-20 "feat: PR2 — podcast player redesign (#53)" and `android/docs/DECISIONLOG.md` same date.
+- Version bump `5.1.0` → `5.2.0` across all five sync locations per `/CLAUDE.md` §3.

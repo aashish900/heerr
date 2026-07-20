@@ -11,9 +11,11 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:heerr/api/subsonic_client.dart';
 import 'package:heerr/models/job_view.dart';
+import 'package:heerr/models/podcast_channel.dart';
 import 'package:heerr/models/queue_response.dart';
 import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/player/heerr_audio_handler.dart';
+import 'package:heerr/services/backend_service.dart';
 import 'package:heerr/services/lyrics_service.dart';
 import 'package:heerr/player/player_provider.dart';
 import 'package:heerr/providers/queue.dart';
@@ -86,6 +88,36 @@ MediaItem _item({
   );
 }
 
+/// PR2 (#53): an episode `MediaItem`, distinguished from [_item] by the
+/// `episodeId`/`channelId` extras `episode_to_media_item.dart` stamps on
+/// every episode it builds.
+MediaItem _episodeItem({
+  String id = 'http://backend/podcasts/episodes/e1/audio',
+  String title = 'Episode 1',
+  Duration duration = const Duration(minutes: 10),
+  String episodeId = 'e1',
+  String channelId = 'c1',
+}) {
+  return MediaItem(
+    id: id,
+    title: title,
+    duration: duration,
+    extras: <String, dynamic>{'episodeId': episodeId, 'channelId': channelId},
+  );
+}
+
+/// PR2 (#53): stub `BackendService` so `_PodcastShowLink`'s
+/// `podcastSubscriptionsProvider` watch resolves without a real network call.
+class _StubBackend extends BackendService {
+  _StubBackend({this.channel}) : super(Dio());
+
+  final PodcastChannel? channel;
+
+  @override
+  Future<List<PodcastChannel>> podcastSubscriptions() async =>
+      channel == null ? const <PodcastChannel>[] : <PodcastChannel>[channel!];
+}
+
 /// #35: queue-mutation tests need a real handler behind the rows' swipe /
 /// drag / tap gestures. Everything is stubbed via mocktail.
 class _StubHandler extends Mock implements HeerrAudioHandler {}
@@ -94,6 +126,7 @@ Widget _wrap({
   required PlayerSnapshot snapshot,
   List<MediaItem> queue = const <MediaItem>[],
   HeerrAudioHandler? handler,
+  List<Override> extraOverrides = const <Override>[],
 }) {
   return ProviderScope(
     overrides: <Override>[
@@ -130,6 +163,7 @@ Widget _wrap({
             Stream<MediaItem?>.value(snapshot.item),
       ),
       queueProvider.overrideWith(_StubQueue.new),
+      ...extraOverrides,
     ],
     child: const MaterialApp(home: NowPlayingScreen()),
   );
@@ -535,5 +569,108 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('open player'), findsOneWidget);
     expect(find.byKey(const Key('now-playing-collapse')), findsNothing);
+  });
+
+  group('PR2 podcast player (#53)', () {
+    List<Override> episodeOverrides({PodcastChannel? channel}) {
+      return <Override>[
+        backendServiceProvider.overrideWith(
+          (BackendServiceRef ref) async => _StubBackend(channel: channel),
+        ),
+      ];
+    }
+
+    testWidgets(
+        'renders the podcast layout: title, plain scrubber, skip±30s, '
+        'speed pill — no waveform/lyrics/add-to-playlist',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(
+        snapshot: _snap(item: _episodeItem(), playing: false),
+        extraOverrides: episodeOverrides(),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Episode 1'), findsWidgets);
+      expect(find.byKey(const Key('now-playing-podcast-scrubber')),
+          findsOneWidget);
+      expect(find.byType(WaveformSeekBar), findsNothing);
+      expect(find.byKey(const Key('now-playing-podcast-skip-back')),
+          findsOneWidget);
+      expect(find.byKey(const Key('now-playing-podcast-skip-forward')),
+          findsOneWidget);
+      expect(find.byKey(const Key('now-playing-podcast-speed')),
+          findsOneWidget);
+      expect(find.text('1x'), findsOneWidget);
+      expect(find.byKey(const Key('now-playing-pill-lyrics')), findsNothing);
+      expect(find.byKey(const Key('now-playing-add-to-playlist')),
+          findsNothing);
+      expect(find.byKey(const Key('now-playing-queue-button')),
+          findsOneWidget);
+    });
+
+    testWidgets('shows the show name link for the episode\'s channel',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(
+        snapshot: _snap(item: _episodeItem(), playing: false),
+        extraOverrides: episodeOverrides(
+          channel: const PodcastChannel(
+            id: 'c1',
+            feedUrl: 'https://a.com/f.xml',
+            title: 'Darknet Diaries',
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Darknet Diaries'), findsOneWidget);
+    });
+
+    testWidgets('tapping skip-back/forward calls the handler',
+        (WidgetTester tester) async {
+      final _StubHandler handler = _StubHandler();
+      when(() => handler.skipBack30()).thenAnswer((_) async {});
+      when(() => handler.skipForward30()).thenAnswer((_) async {});
+
+      await tester.pumpWidget(_wrap(
+        snapshot: _snap(item: _episodeItem(), playing: false),
+        handler: handler,
+        extraOverrides: episodeOverrides(),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(
+          find.byKey(const Key('now-playing-podcast-skip-back')));
+      await tester.tap(find.byKey(const Key('now-playing-podcast-skip-back')));
+      await tester
+          .tap(find.byKey(const Key('now-playing-podcast-skip-forward')));
+      await tester.pumpAndSettle();
+
+      verify(() => handler.skipBack30()).called(1);
+      verify(() => handler.skipForward30()).called(1);
+    });
+
+    testWidgets('speed pill opens a picker; selecting a speed calls setSpeed',
+        (WidgetTester tester) async {
+      final _StubHandler handler = _StubHandler();
+      when(() => handler.setSpeed(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(_wrap(
+        snapshot: _snap(item: _episodeItem(), playing: false),
+        handler: handler,
+        extraOverrides: episodeOverrides(),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(
+          find.byKey(const Key('now-playing-podcast-speed')));
+      await tester.tap(find.byKey(const Key('now-playing-podcast-speed')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Playback speed'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('now-playing-speed-1.5x')));
+      await tester.pumpAndSettle();
+
+      verify(() => handler.setSpeed(1.5)).called(1);
+    });
   });
 }

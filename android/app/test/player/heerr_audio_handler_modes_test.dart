@@ -240,4 +240,68 @@ void main() {
           AudioServiceShuffleMode.none);
     });
   });
+
+  group('setSpeed (PR2, #53)', () {
+    test('forwards to the player and broadcasts the new speed', () async {
+      when(() => player.setSpeed(any())).thenAnswer((_) async {});
+      when(() => player.speed).thenReturn(1.5);
+
+      await handler.setSpeed(1.5);
+
+      verify(() => player.setSpeed(1.5)).called(1);
+      expect(handler.playbackState.value.speed, 1.5);
+    });
+  });
+
+  group('skipBack30 / skipForward30 (PR2, #53)', () {
+    setUp(() {
+      when(() => player.seek(any())).thenAnswer((_) async {});
+    });
+
+    test('skipBack30 seeks 30s earlier', () async {
+      when(() => player.position).thenReturn(const Duration(seconds: 50));
+      when(() => player.duration).thenReturn(const Duration(minutes: 10));
+
+      await handler.skipBack30();
+
+      verify(() => player.seek(const Duration(seconds: 20))).called(1);
+    });
+
+    test('skipBack30 clamps at zero near the start', () async {
+      when(() => player.position).thenReturn(const Duration(seconds: 10));
+      when(() => player.duration).thenReturn(const Duration(minutes: 10));
+
+      await handler.skipBack30();
+
+      verify(() => player.seek(Duration.zero)).called(1);
+    });
+
+    test('skipForward30 seeks 30s later', () async {
+      when(() => player.position).thenReturn(const Duration(seconds: 50));
+      when(() => player.duration).thenReturn(const Duration(minutes: 10));
+
+      await handler.skipForward30();
+
+      verify(() => player.seek(const Duration(seconds: 80))).called(1);
+    });
+
+    test('skipForward30 clamps at duration near the end', () async {
+      when(() => player.position)
+          .thenReturn(const Duration(minutes: 9, seconds: 50));
+      when(() => player.duration).thenReturn(const Duration(minutes: 10));
+
+      await handler.skipForward30();
+
+      verify(() => player.seek(const Duration(minutes: 10))).called(1);
+    });
+
+    test('skipForward30 with an unknown duration does not clamp', () async {
+      when(() => player.position).thenReturn(const Duration(seconds: 50));
+      when(() => player.duration).thenReturn(null);
+
+      await handler.skipForward30();
+
+      verify(() => player.seek(const Duration(seconds: 80))).called(1);
+    });
+  });
 }

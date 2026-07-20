@@ -65,3 +65,11 @@ String? episodeIdFromMediaItem(MediaItem? item) {
   final dynamic raw = item?.extras?['episodeId'];
   return raw is String && raw.isNotEmpty ? raw : null;
 }
+
+/// The `PodcastChannel.id` [item]'s episode belongs to, or `null` when
+/// [item] is not an episode item. PR2 (#53) uses this to render a tappable
+/// show-name link on the podcast player.
+String? channelIdFromMediaItem(MediaItem? item) {
+  final dynamic raw = item?.extras?['channelId'];
+  return raw is String && raw.isNotEmpty ? raw : null;
+}
