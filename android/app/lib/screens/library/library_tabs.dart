@@ -623,9 +623,9 @@ class _PlaylistsTab extends ConsumerWidget {
 // ---------------------------------------------------------------------------
 
 /// Shows / Episodes / Downloads sub-tabs under the Library "Podcasts"
-/// content. Shows is real data (the PC3 subscriptions grid, extracted to
-/// [PodcastShowsGrid]); Episodes/Downloads are placeholders until Phase PR3
-/// ships the cross-subscription backend feeds they need.
+/// content. Shows is the PC3 subscriptions grid ([PodcastShowsGrid]);
+/// Episodes/Downloads are the PR3 (#53) cross-subscription feeds
+/// (`filter=latest`/`downloaded`), rendered via [PodcastEpisodeFeedList].
 class _PodcastsSection extends StatelessWidget {
   const _PodcastsSection();
 
@@ -640,20 +640,18 @@ class _PodcastsSection extends StatelessWidget {
             child: TabBarView(
               children: <Widget>[
                 PodcastShowsGrid(),
-                // Phase PR3 (#53): backed by GET /podcasts/episodes?filter=latest.
-                _PodcastsComingSoonTab(
-                  icon: Icons.podcasts_outlined,
-                  title: 'Episodes',
-                  subtitle:
-                      'Coming soon — episodes across all your shows will '
-                      'appear here.',
+                PodcastEpisodeFeedList(
+                  filter: 'latest',
+                  emptyIcon: Icons.podcasts_outlined,
+                  emptyTitle: 'No episodes yet',
+                  emptySubtitle:
+                      'Subscribe to a podcast to see its episodes here.',
                 ),
-                // Phase PR3 (#53): backed by GET /podcasts/episodes?filter=downloaded.
-                _PodcastsComingSoonTab(
-                  icon: Icons.download_done_outlined,
-                  title: 'Downloads',
-                  subtitle:
-                      'Coming soon — downloaded episodes will appear here.',
+                PodcastEpisodeFeedList(
+                  filter: 'downloaded',
+                  emptyIcon: Icons.download_done_outlined,
+                  emptyTitle: 'No downloads yet',
+                  emptySubtitle: 'Downloaded episodes will appear here.',
                 ),
               ],
             ),
@@ -703,27 +701,6 @@ class _PodcastsSegmentedTabs extends StatelessWidget {
   }
 }
 
-class _PodcastsComingSoonTab extends StatelessWidget {
-  const _PodcastsComingSoonTab({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: EmptyState(icon: icon, title: title, subtitle: subtitle),
-      ),
-    );
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Shared little widgets

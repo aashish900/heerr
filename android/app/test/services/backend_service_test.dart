@@ -371,6 +371,64 @@ void main() {
       expect(result.total, 0);
       expect(result.episodes, isEmpty);
     });
+
+    test('PA2 (#53): includes sort in the query when provided', () async {
+      final (BackendService service, _FakeAdapter adapter) = _service(
+        (_) => _json('{"episodes": [], "total": 0}', 200),
+      );
+
+      await service.podcastEpisodes('c1', sort: 'oldest');
+
+      expect(
+        adapter.lastRequest!.queryParameters,
+        <String, dynamic>{'limit': 20, 'offset': 0, 'sort': 'oldest'},
+      );
+    });
+  });
+
+  group('podcastEpisodeFeed (PA1/PR3, #53)', () {
+    test('issues GET /podcasts/episodes with filter/limit/offset', () async {
+      final (BackendService service, _FakeAdapter adapter) = _service(
+        (_) => _json('{"episodes": [], "total": 0}', 200),
+      );
+
+      final result = await service.podcastEpisodeFeed(
+        'in_progress',
+        limit: 5,
+        offset: 10,
+      );
+
+      expect(adapter.lastRequest!.method, 'GET');
+      expect(adapter.lastRequest!.path, '/podcasts/episodes');
+      expect(
+        adapter.lastRequest!.queryParameters,
+        <String, dynamic>{'filter': 'in_progress', 'limit': 5, 'offset': 10},
+      );
+      expect(result.total, 0);
+      expect(result.episodes, isEmpty);
+    });
+
+    test('parses channel title/art alongside each episode', () async {
+      final (BackendService service, _) = _service(
+        (_) => _json(
+          '{"episodes": [{"id": "e1", "channel_id": "c1", '
+          '"channel_title": "Show A", "channel_image_url": "https://a/art.png", '
+          '"guid": "g1", "title": "Episode 1", "description": null, '
+          '"published_at": null, "duration_s": null, '
+          '"enclosure_url": "https://a/e1.mp3", "enclosure_type": null, '
+          '"image_url": null, "episode_no": null, "season_no": null, '
+          '"downloaded": false, "position_s": 0, "played": false}], '
+          '"total": 1}',
+          200,
+        ),
+      );
+
+      final result = await service.podcastEpisodeFeed('latest');
+
+      expect(result.total, 1);
+      expect(result.episodes.single.channelTitle, 'Show A');
+      expect(result.episodes.single.channelImageUrl, 'https://a/art.png');
+    });
   });
 
   group('refreshPodcastChannel', () {

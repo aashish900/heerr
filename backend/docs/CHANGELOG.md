@@ -1028,3 +1028,7 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 - Tests: `tests/test_podcast_feeds.py` (new, 9 tests — auth, missing/bad `filter`, each of the three filters, pagination, no-subscriptions empty, per-user isolation), `tests/test_podcast_episodes.py` (+4 — `sort=oldest`/`unplayed`/default-matches-`newest`/bad-value-422). 643 tests total, green; ruff + mypy clean.
 - Version bump `5.2.0` → `5.3.0` across all five sync locations — this is the backend prerequisite for Android Phase PR3 (`android/docs/ROADMAP.md`), which is not yet built; `android/app/pubspec.yaml` bumped for sync now so PR3 can land against this same version without a redundant bump.
 - See `DECISIONLOG.md` 2026-07-20 "PA1/PA2: podcast aggregate feeds (#53)".
+
+## 2026-07-20 — Android Phase PR3 shipped against v5.3.0 (#53)
+
+- No backend changes. Android Phase PR3 (#53) — the final phase of the podcast-flow redesign — shipped against this same `v5.3.0`: Home's Music/Podcasts content switch (Continue Listening carousel + Latest Episodes list), Library's Episodes/Downloads sub-tabs wired to the PA1 feeds, and a Newest/Oldest/Unplayed sort menu on the Show Detail screen backed by PA2. See `android/docs/CHANGELOG.md` 2026-07-20 "feat: PR3 — Home podcast sections + Library Episodes/Downloads + Show Detail sort (#53)" and `android/docs/DECISIONLOG.md` same date. This closes out the podcast-flow redesign (Phases PR1–PR3 / PA1–PA2).

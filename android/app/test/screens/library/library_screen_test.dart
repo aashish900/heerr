@@ -1,9 +1,13 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:heerr/models/episode_feed_response.dart';
+import 'package:heerr/models/episode_with_channel.dart';
+import 'package:heerr/models/podcast_channel.dart';
 import 'package:heerr/models/search_response.dart';
 import 'package:heerr/models/search_result_item.dart';
 import 'package:heerr/models/subsonic/album.dart';
@@ -26,6 +30,7 @@ import 'package:heerr/providers/search.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/screens/library/album_grid_card.dart';
 import 'package:heerr/screens/library/library_screen.dart';
+import 'package:heerr/services/backend_service.dart';
 import 'package:heerr/widgets/empty_state.dart';
 import 'package:heerr/widgets/result_tile.dart';
 import 'package:heerr/widgets/skeleton.dart';
@@ -712,4 +717,88 @@ void main() {
       },
     );
   });
+
+  group('PR3 podcasts content (#53)', () {
+    Future<void> goToPodcastsContent(WidgetTester tester) async {
+      await tester.tap(find.text('Podcasts'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('Episodes sub-tab renders the latest cross-subscription feed',
+        (WidgetTester tester) async {
+      final _StubPodcastBackend backend = _StubPodcastBackend(
+        latest: const EpisodeFeedResponse(
+          episodes: <EpisodeWithChannel>[
+            EpisodeWithChannel(
+              id: 'e1',
+              channelId: 'c1',
+              channelTitle: 'Show A',
+              guid: 'g1',
+              title: 'Episode 1',
+              enclosureUrl: 'https://a.com/e1.mp3',
+              downloaded: false,
+              positionS: 0,
+              played: false,
+            ),
+          ],
+          total: 1,
+        ),
+      );
+      await tester.pumpWidget(_wrap(<Override>[
+        ..._defaultsExcept(),
+        backendServiceProvider.overrideWith((_) async => backend),
+      ]));
+      await tester.pumpAndSettle();
+
+      await goToPodcastsContent(tester);
+      await tester.tap(find.text('Episodes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Episode 1'), findsOneWidget);
+      expect(find.text('Show A'), findsOneWidget);
+    });
+
+    testWidgets('Downloads sub-tab shows an empty state with none downloaded',
+        (WidgetTester tester) async {
+      final _StubPodcastBackend backend = _StubPodcastBackend(
+        downloaded: const EpisodeFeedResponse(episodes: <EpisodeWithChannel>[], total: 0),
+      );
+      await tester.pumpWidget(_wrap(<Override>[
+        ..._defaultsExcept(),
+        backendServiceProvider.overrideWith((_) async => backend),
+      ]));
+      await tester.pumpAndSettle();
+
+      await goToPodcastsContent(tester);
+      await tester.tap(find.text('Downloads'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No downloads yet'), findsOneWidget);
+    });
+  });
+}
+
+/// PR3 (#53): stub for the Library Podcasts content's provider tree —
+/// Shows (subscriptions), Episodes (`filter=latest`), Downloads
+/// (`filter=downloaded`).
+class _StubPodcastBackend extends BackendService {
+  _StubPodcastBackend({
+    this.latest = const EpisodeFeedResponse(episodes: <EpisodeWithChannel>[], total: 0),
+    this.downloaded = const EpisodeFeedResponse(episodes: <EpisodeWithChannel>[], total: 0),
+  }) : super(Dio());
+
+  final EpisodeFeedResponse latest;
+  final EpisodeFeedResponse downloaded;
+
+  @override
+  Future<List<PodcastChannel>> podcastSubscriptions() async => const <PodcastChannel>[];
+
+  @override
+  Future<EpisodeFeedResponse> podcastEpisodeFeed(
+    String filter, {
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    return filter == 'downloaded' ? downloaded : latest;
+  }
 }

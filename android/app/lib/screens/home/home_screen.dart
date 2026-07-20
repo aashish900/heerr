@@ -9,9 +9,12 @@ import '../../player/player_provider.dart';
 import '../../providers/home/home_providers.dart';
 import '../../providers/library/library_search_query.dart';
 import '../../router.dart' show Routes;
+import '../../theme.dart';
 import '../../widgets/branded_header.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/gradient_tab_indicator.dart';
 import 'continue_listening_card.dart';
+import 'home_podcasts_body.dart';
 import 'quick_access_row.dart';
 import 'recently_added_section.dart';
 
@@ -20,21 +23,51 @@ import 'recently_added_section.dart';
 // existing imports/tests keep resolving it from here.
 export '../../widgets/branded_header.dart' show greetingForHour;
 
-/// Home screen — 2026-07 redesign (docs/HOMESCREEN.md).
+/// Home screen — 2026-07 redesign (docs/HOMESCREEN.md), extended PR3 (#53)
+/// with a Music/Podcasts content switch.
 ///
 /// Layout (top → bottom):
 ///   - AppBar: brand logo + Queue shortcut + profile avatar.
-///   - Search affordance (chokepoint into Library search).
-///   - Greeting block (nickname-aware).
-///   - "Continue Listening" hero card (player-driven; hidden when idle).
-///   - Quick Access shortcut row (static 4 cards).
-///   - "Recently Added" vertical list (newest albums) — or the empty-state
-///     when the library is empty and nothing is queued.
+///   - Music/Podcasts content switch.
+///   - Music: search affordance, greeting block, "Continue Listening" hero
+///     card, Quick Access row, "Recently Added" list — all unchanged from
+///     the pre-PR3 layout, just relocated under this switch's Music tab.
+///   - Podcasts: "Continue Listening" carousel + "Latest Episodes" list
+///     (`screens/home/home_podcasts_body.dart`), both cross-subscription
+///     feeds from backend Phase PA.
 ///
 /// The pre-redesign sections (recently-played grid, "Jump back in",
 /// "Most played", "Picked for you") were removed — DECISIONLOG 2026-07-11.
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _contentController;
+
+  @override
+  void initState() {
+    super.initState();
+    // PR3 (#53): a manual TabController (not DefaultTabController), same
+    // reasoning as the Library content switch (library_screen.dart) — the
+    // unselected content subtree is swapped by plain conditional rendering
+    // rather than an eagerly-built TabBarView, so idling on Music never
+    // fires the podcast feed providers' network calls.
+    _contentController = TabController(length: 2, vsync: this);
+    _contentController.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _contentController.dispose();
+    super.dispose();
+  }
 
   Future<void> _refresh(WidgetRef ref) async {
     // homeNewest is Home's only network-bound section now; the hero card is
@@ -48,13 +81,48 @@ class HomeScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: const BrandedAppBar(),
-      body: RefreshIndicator(
-        onRefresh: () => _refresh(ref),
-        child: const _HomeBody(),
+      body: Column(
+        children: <Widget>[
+          _HomeContentSwitch(controller: _contentController),
+          Expanded(
+            child: _contentController.index == 0
+                ? RefreshIndicator(
+                    onRefresh: () => _refresh(ref),
+                    child: const _HomeBody(),
+                  )
+                : const HomePodcastsBody(),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+/// Music / Podcasts top-level switch — visually matches Library's
+/// `_LibraryContentSwitch` (`GradientTabIndicator` + `heerrMagenta`), driven
+/// by an explicit [controller] for the same lazy-build reason.
+class _HomeContentSwitch extends StatelessWidget {
+  const _HomeContentSwitch({required this.controller});
+
+  final TabController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return TabBar(
+      controller: controller,
+      indicator: const GradientTabIndicator(),
+      indicatorSize: TabBarIndicatorSize.tab,
+      dividerColor: Colors.transparent,
+      labelColor: heerrMagenta,
+      unselectedLabelColor: cs.onSurfaceVariant,
+      tabs: const <Tab>[
+        Tab(height: 46, child: Text('Music')),
+        Tab(height: 46, child: Text('Podcasts')),
+      ],
     );
   }
 }

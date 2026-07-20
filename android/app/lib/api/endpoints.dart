@@ -60,6 +60,10 @@ class Endpoints {
   /// `GET /podcasts/subscriptions` — the calling user's subscribed channels.
   static const String podcastSubscriptions = '/podcasts/subscriptions';
 
+  /// `GET /podcasts/episodes?filter=...` (PA1/PR3, #53) — episodes across
+  /// every show the calling user is subscribed to.
+  static const String podcastEpisodeFeed = '/podcasts/episodes';
+
   static String podcastUnsubscribe(String channelId) =>
       '/podcasts/subscribe/$channelId';
 

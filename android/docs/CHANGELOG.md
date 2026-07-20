@@ -3120,3 +3120,21 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 ## 2026-07-20 — chore: version bumped for sync (backend Phase PA, #53)
 
 - No Android changes yet. Backend `v5.3.0` (Phase PA) adds `GET /podcasts/episodes` (cross-subscription feeds) and a `sort` param on the per-channel episode list — see `backend/docs/CHANGELOG.md` 2026-07-20 and `backend/docs/DECISIONLOG.md` 2026-07-20 "PA1/PA2: podcast aggregate feeds." This is the backend prerequisite for Android Phase PR3, which is not yet built. Version bump `5.2.0` → `5.3.0` across all five sync locations.
+
+## 2026-07-20 — feat: PR3 — Home podcast sections + Library Episodes/Downloads + Show Detail sort (#53)
+
+- **`android/app/lib/models/episode_with_channel.dart`** (new) — `EpisodeWithChannel` (backend `EpisodeWithChannelItem` contract) + a `toPodcastEpisode()` extension so cross-show feed rows reuse `playEpisode`/the download dispatcher unchanged.
+- **`android/app/lib/models/episode_feed_response.dart`** (new) — `EpisodeFeedResponse` (`GET /podcasts/episodes` response body).
+- **`android/app/lib/services/backend_service.dart`** — new `podcastEpisodeFeed(filter, {limit, offset})`; `podcastEpisodes` gained an optional `sort` param (omitted from the request when `null`, matching the backend's own default — the existing limit/offset-only test stays green unchanged).
+- **`android/app/lib/providers/podcasts/podcast_episode_feed.dart`** (new) — `podcastEpisodeFeedProvider(filter)`, family-keyed by `in_progress`/`latest`/`downloaded`, shared by every PR3 call site.
+- **`android/app/lib/providers/podcasts/podcast_episodes.dart`** — `PodcastEpisodesNotifier` gained `setSort(String)`, reloading page 1 under a new per-channel sort (`newest`/`oldest`/`unplayed`); fetches directly rather than `ref.invalidateSelf()` so the chosen sort (an instance field, not part of the family key) survives.
+- **`android/app/lib/screens/home/home_podcasts_body.dart`** (new) — `HomePodcastsBody`: a "Continue Listening" horizontal carousel (`filter=in_progress`) + a "Latest Episodes" list capped at 5 rows (`filter=latest`), both tap-to-play.
+- **`android/app/lib/screens/home/home_screen.dart`** — `HomeScreen` converted to `ConsumerStatefulWidget`; new Music/Podcasts content switch (manual `TabController`, same lazy-build pattern as Library's) above the existing body.
+- **`android/app/lib/screens/podcasts/podcast_episode_feed_list.dart`** (new) — `PodcastEpisodeFeedList`, the shared Episodes/Downloads tab renderer.
+- **`android/app/lib/screens/library/library_tabs.dart`** — Library's Episodes/Downloads sub-tabs now render `PodcastEpisodeFeedList` (`filter=latest`/`downloaded`) in place of the PR1 "Coming soon" placeholders (`_PodcastsComingSoonTab` deleted, now unused).
+- **`android/app/lib/screens/podcasts/podcast_show_detail_screen.dart`** — new Newest/Oldest/Unplayed sort menu (`PopupMenuButton`) beside the Episodes/About tabs, calling `PodcastEpisodesNotifier.setSort`.
+- Tests: `test/services/backend_service_test.dart` (+3), `test/providers/podcasts/podcast_episode_feed_test.dart` (new, 2), `test/providers/podcasts/podcast_episodes_test.dart` (+2, `setSort`), `test/screens/home/home_screen_test.dart` (+2, Podcasts content + idle-Music-never-calls-backend), `test/screens/library/library_screen_test.dart` (+2, Episodes/Downloads sub-tabs), `test/screens/podcasts/podcast_show_detail_screen_test.dart` (+1, sort menu).
+- Fixed a real layout bug caught by the new Home tests: `SkeletonList` (an unbounded-height `ListView.builder`) was nested directly inside `HomePodcastsBody`'s outer `ListView` for both loading states — wrapped each in a bounded `SizedBox`.
+- `flutter analyze` and `flutter test` (1087 tests) green before and after.
+- Version: already at `v5.3.0` (bumped at backend Phase PA, ahead of this Android milestone) — no further bump needed; this entry documents Phase PR3's completion against that version, closing out the podcast-flow redesign (PR1–PR3).
+- See `DECISIONLOG.md` 2026-07-20 "PR3: Home podcast sections + Library Episodes/Downloads + Show Detail sort (#53)".

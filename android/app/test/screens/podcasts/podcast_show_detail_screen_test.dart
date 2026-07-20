@@ -38,6 +38,7 @@ class _StubBackend extends BackendService {
   int refreshCalls = 0;
   final List<String> downloadCalls = <String>[];
   final List<String> unsubscribeCalls = <String>[];
+  final List<String?> sortsSeen = <String?>[];
 
   @override
   Future<List<PodcastChannel>> podcastSubscriptions() async =>
@@ -48,7 +49,9 @@ class _StubBackend extends BackendService {
     String channelId, {
     int limit = 20,
     int offset = 0,
+    String? sort,
   }) async {
+    sortsSeen.add(sort);
     return EpisodeListResponse(episodes: episodes, total: total);
   }
 
@@ -418,5 +421,23 @@ void main() {
     // snippet, once as the About tab's full body (TabBarView builds both
     // tab bodies up front, so both are present in the tree).
     expect(find.text('A show about things.'), findsNWidgets(2));
+  });
+
+  testWidgets('sort menu selects Oldest and reloads with sort=oldest',
+      (WidgetTester tester) async {
+    final _StubBackend backend = _StubBackend(
+      channel: channelA,
+      episodes: <PodcastEpisode>[ep('1')],
+      total: 1,
+    );
+    await tester.pumpWidget(_wrap(backend: backend));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('podcast-episodes-sort')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('podcast-episodes-sort-oldest')));
+    await tester.pumpAndSettle();
+
+    expect(backend.sortsSeen, <String?>[null, 'oldest']);
   });
 }

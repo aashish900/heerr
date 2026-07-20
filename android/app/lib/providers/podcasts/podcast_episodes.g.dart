@@ -7,7 +7,7 @@ part of 'podcast_episodes.dart';
 // **************************************************************************
 
 String _$podcastEpisodesNotifierHash() =>
-    r'26564d74b9bc5a3cd2538f14e6171da936ab6924';
+    r'ac4c68852b938172eaad5b1f01082dec3811fa48';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -42,7 +42,9 @@ abstract class _$PodcastEpisodesNotifier
 /// [refresh] re-pulls the RSS feed server-side
 /// (`POST /podcasts/channels/{id}/refresh`) before reloading page 1, so
 /// pull-to-refresh actually picks up newly-published episodes rather than
-/// just re-reading the same cached rows.
+/// just re-reading the same cached rows. [setSort] (PA2/PR3, #53) reloads
+/// page 1 under a new `sort` — `newest`/`oldest`/`unplayed`, matching the
+/// backend's `GET .../episodes?sort=` param.
 ///
 /// Copied from [PodcastEpisodesNotifier].
 @ProviderFor(PodcastEpisodesNotifier)
@@ -53,7 +55,9 @@ const podcastEpisodesNotifierProvider = PodcastEpisodesNotifierFamily();
 /// [refresh] re-pulls the RSS feed server-side
 /// (`POST /podcasts/channels/{id}/refresh`) before reloading page 1, so
 /// pull-to-refresh actually picks up newly-published episodes rather than
-/// just re-reading the same cached rows.
+/// just re-reading the same cached rows. [setSort] (PA2/PR3, #53) reloads
+/// page 1 under a new `sort` — `newest`/`oldest`/`unplayed`, matching the
+/// backend's `GET .../episodes?sort=` param.
 ///
 /// Copied from [PodcastEpisodesNotifier].
 class PodcastEpisodesNotifierFamily
@@ -63,7 +67,9 @@ class PodcastEpisodesNotifierFamily
   /// [refresh] re-pulls the RSS feed server-side
   /// (`POST /podcasts/channels/{id}/refresh`) before reloading page 1, so
   /// pull-to-refresh actually picks up newly-published episodes rather than
-  /// just re-reading the same cached rows.
+  /// just re-reading the same cached rows. [setSort] (PA2/PR3, #53) reloads
+  /// page 1 under a new `sort` — `newest`/`oldest`/`unplayed`, matching the
+  /// backend's `GET .../episodes?sort=` param.
   ///
   /// Copied from [PodcastEpisodesNotifier].
   const PodcastEpisodesNotifierFamily();
@@ -73,7 +79,9 @@ class PodcastEpisodesNotifierFamily
   /// [refresh] re-pulls the RSS feed server-side
   /// (`POST /podcasts/channels/{id}/refresh`) before reloading page 1, so
   /// pull-to-refresh actually picks up newly-published episodes rather than
-  /// just re-reading the same cached rows.
+  /// just re-reading the same cached rows. [setSort] (PA2/PR3, #53) reloads
+  /// page 1 under a new `sort` — `newest`/`oldest`/`unplayed`, matching the
+  /// backend's `GET .../episodes?sort=` param.
   ///
   /// Copied from [PodcastEpisodesNotifier].
   PodcastEpisodesNotifierProvider call(String channelId) {
@@ -107,7 +115,9 @@ class PodcastEpisodesNotifierFamily
 /// [refresh] re-pulls the RSS feed server-side
 /// (`POST /podcasts/channels/{id}/refresh`) before reloading page 1, so
 /// pull-to-refresh actually picks up newly-published episodes rather than
-/// just re-reading the same cached rows.
+/// just re-reading the same cached rows. [setSort] (PA2/PR3, #53) reloads
+/// page 1 under a new `sort` — `newest`/`oldest`/`unplayed`, matching the
+/// backend's `GET .../episodes?sort=` param.
 ///
 /// Copied from [PodcastEpisodesNotifier].
 class PodcastEpisodesNotifierProvider
@@ -121,7 +131,9 @@ class PodcastEpisodesNotifierProvider
   /// [refresh] re-pulls the RSS feed server-side
   /// (`POST /podcasts/channels/{id}/refresh`) before reloading page 1, so
   /// pull-to-refresh actually picks up newly-published episodes rather than
-  /// just re-reading the same cached rows.
+  /// just re-reading the same cached rows. [setSort] (PA2/PR3, #53) reloads
+  /// page 1 under a new `sort` — `newest`/`oldest`/`unplayed`, matching the
+  /// backend's `GET .../episodes?sort=` param.
   ///
   /// Copied from [PodcastEpisodesNotifier].
   PodcastEpisodesNotifierProvider(String channelId)

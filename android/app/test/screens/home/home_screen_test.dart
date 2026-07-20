@@ -6,6 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:dio/dio.dart';
+
+import 'package:heerr/models/episode_feed_response.dart';
+import 'package:heerr/models/episode_with_channel.dart';
 import 'package:heerr/models/profile_meta.dart';
 import 'package:heerr/player/heerr_audio_handler.dart';
 import 'package:heerr/player/player_provider.dart';
@@ -17,6 +21,7 @@ import 'package:heerr/providers/profiles/profile_meta.dart';
 import 'package:heerr/screens/home/home_screen.dart';
 import 'package:heerr/screens/home/quick_access_row.dart';
 import 'package:heerr/screens/home/recently_added_section.dart';
+import 'package:heerr/services/backend_service.dart';
 import 'package:heerr/theme.dart';
 import 'package:heerr/widgets/heerr_logo.dart';
 
@@ -119,6 +124,15 @@ void main() {
     'regression: with a live track, hero card AND all sections render '
     '(the unbounded-height card used to kill everything below it)',
     (WidgetTester tester) async {
+      // PR3 (#53) added a content-switch TabBar above the Music body,
+      // shrinking the ListView's viewport on the default ~600px test
+      // surface enough to push RecentlyAddedSection out of the lazily-built
+      // range. Same fix as settings_screen_test.dart's `_useTallSurface`.
+      await tester.binding.setSurfaceSize(const Size(800, 1400));
+      addTearDown(() async {
+        await tester.binding.setSurfaceSize(null);
+      });
+
       const MediaItem item = MediaItem(
         id: 'http://stream/1',
         title: 'Live Track',
@@ -305,4 +319,91 @@ void main() {
       expect(find.byType(ListView), findsWidgets);
     });
   });
+
+  group('PR3 podcasts content (#53)', () {
+    testWidgets(
+        'switching to Podcasts renders Continue Listening + Latest Episodes',
+        (WidgetTester tester) async {
+      final _StubPodcastBackend backend = _StubPodcastBackend(
+        inProgress: const EpisodeFeedResponse(
+          episodes: <EpisodeWithChannel>[
+            EpisodeWithChannel(
+              id: 'e1',
+              channelId: 'c1',
+              channelTitle: 'Show A',
+              guid: 'g1',
+              title: 'In Progress Episode',
+              enclosureUrl: 'https://a.com/e1.mp3',
+              downloaded: false,
+              positionS: 30,
+              played: false,
+            ),
+          ],
+          total: 1,
+        ),
+        latest: const EpisodeFeedResponse(
+          episodes: <EpisodeWithChannel>[
+            EpisodeWithChannel(
+              id: 'e2',
+              channelId: 'c2',
+              channelTitle: 'Show B',
+              guid: 'g2',
+              title: 'Latest Episode',
+              enclosureUrl: 'https://b.com/e2.mp3',
+              downloaded: false,
+              positionS: 0,
+              played: false,
+            ),
+          ],
+          total: 1,
+        ),
+      );
+      await tester.pumpWidget(_wrap(overrides: <Override>[
+        ..._homeOverrides(),
+        backendServiceProvider.overrideWith((_) async => backend),
+      ]));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Podcasts'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Continue Listening'), findsOneWidget);
+      expect(find.text('In Progress Episode'), findsOneWidget);
+      expect(find.text('Latest Episodes'), findsOneWidget);
+      expect(find.text('Latest Episode'), findsOneWidget);
+    });
+
+    testWidgets('idling on Music never calls the podcast feed backend',
+        (WidgetTester tester) async {
+      final _StubPodcastBackend backend = _StubPodcastBackend();
+      await tester.pumpWidget(_wrap(overrides: <Override>[
+        ..._homeOverrides(),
+        backendServiceProvider.overrideWith((_) async => backend),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(backend.filtersRequested, isEmpty);
+    });
+  });
+}
+
+class _StubPodcastBackend extends BackendService {
+  _StubPodcastBackend({
+    this.inProgress = const EpisodeFeedResponse(episodes: <EpisodeWithChannel>[], total: 0),
+    this.latest = const EpisodeFeedResponse(episodes: <EpisodeWithChannel>[], total: 0),
+  }) : super(Dio());
+
+  final EpisodeFeedResponse inProgress;
+  final EpisodeFeedResponse latest;
+  final List<String> filtersRequested = <String>[];
+
+  @override
+  Future<EpisodeFeedResponse> podcastEpisodeFeed(
+    String filter, {
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    filtersRequested.add(filter);
+    return filter == 'in_progress' ? inProgress : latest;
+  }
 }

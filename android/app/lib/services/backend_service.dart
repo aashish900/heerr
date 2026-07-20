@@ -9,6 +9,7 @@ import '../models/download_request.dart';
 import '../models/download_response.dart';
 import '../models/enums.dart';
 import '../models/episode_download_response.dart';
+import '../models/episode_feed_response.dart';
 import '../models/episode_list_response.dart';
 import '../models/episode_progress.dart';
 import '../models/job_view.dart';
@@ -240,19 +241,50 @@ class BackendService {
   }
 
   /// `GET /podcasts/channels/{channelId}/episodes` → a page of episodes,
-  /// newest-published first, with the calling user's progress joined in.
+  /// newest-published first (or per [sort] — PA2, #53: `newest` (default,
+  /// omitted from the request to match the backend's own default) /
+  /// `oldest` / `unplayed`), with the calling user's progress joined in.
   Future<EpisodeListResponse> podcastEpisodes(
     String channelId, {
     int limit = 20,
     int offset = 0,
+    String? sort,
   }) {
+    final Map<String, dynamic> query = <String, dynamic>{
+      'limit': limit,
+      'offset': offset,
+    };
+    if (sort != null) query['sort'] = sort;
     return apiCall<EpisodeListResponse>(
       () => _dio.get<dynamic>(
         Endpoints.podcastChannelEpisodes(channelId),
-        queryParameters: <String, dynamic>{'limit': limit, 'offset': offset},
+        queryParameters: query,
       ),
       (dynamic data) =>
           EpisodeListResponse.fromJson(data as Map<String, dynamic>),
+    );
+  }
+
+  /// `GET /podcasts/episodes?filter=in_progress|latest|downloaded` (PA1/PR3,
+  /// #53) — episodes across every show the calling user is subscribed to.
+  /// Backs Home's Continue Listening/Latest Episodes sections and the
+  /// Library Episodes/Downloads tabs.
+  Future<EpisodeFeedResponse> podcastEpisodeFeed(
+    String filter, {
+    int limit = 20,
+    int offset = 0,
+  }) {
+    return apiCall<EpisodeFeedResponse>(
+      () => _dio.get<dynamic>(
+        Endpoints.podcastEpisodeFeed,
+        queryParameters: <String, dynamic>{
+          'filter': filter,
+          'limit': limit,
+          'offset': offset,
+        },
+      ),
+      (dynamic data) =>
+          EpisodeFeedResponse.fromJson(data as Map<String, dynamic>),
     );
   }
 

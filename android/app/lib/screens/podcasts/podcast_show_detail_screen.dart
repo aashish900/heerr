@@ -102,16 +102,53 @@ class _PodcastShowDetailScreenState
           _ShowHero(channel: channel, episodeCount: async.valueOrNull?.total),
           _ActionRow(channel: channel, episodes: episodes),
           _MiniSections(episodes: episodes),
-          TabBar(
-            controller: _tabController,
-            indicator: const GradientTabIndicator(),
-            indicatorSize: TabBarIndicatorSize.tab,
-            dividerColor: Colors.transparent,
-            labelColor: heerrMagenta,
-            unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
-            tabs: const <Tab>[
-              Tab(text: 'Episodes'),
-              Tab(text: 'About'),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: TabBar(
+                  controller: _tabController,
+                  indicator: const GradientTabIndicator(),
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  dividerColor: Colors.transparent,
+                  labelColor: heerrMagenta,
+                  unselectedLabelColor:
+                      Theme.of(context).colorScheme.onSurfaceVariant,
+                  tabs: const <Tab>[
+                    Tab(text: 'Episodes'),
+                    Tab(text: 'About'),
+                  ],
+                ),
+              ),
+              // PA2/PR3 (#53): sort control for the Episodes tab, backed by
+              // the per-channel `sort=newest|oldest|unplayed` param. Lives
+              // beside the tabs (not inside the Episodes tab body) so it
+              // stays put across a RefreshIndicator pull.
+              PopupMenuButton<String>(
+                key: const Key('podcast-episodes-sort'),
+                icon: const Icon(Icons.sort),
+                tooltip: 'Sort',
+                onSelected: (String sort) => ref
+                    .read(podcastEpisodesNotifierProvider(widget.channelId)
+                        .notifier)
+                    .setSort(sort),
+                itemBuilder: (BuildContext context) => const <PopupMenuEntry<String>>[
+                  PopupMenuItem<String>(
+                    key: Key('podcast-episodes-sort-newest'),
+                    value: 'newest',
+                    child: Text('Newest'),
+                  ),
+                  PopupMenuItem<String>(
+                    key: Key('podcast-episodes-sort-oldest'),
+                    value: 'oldest',
+                    child: Text('Oldest'),
+                  ),
+                  PopupMenuItem<String>(
+                    key: Key('podcast-episodes-sort-unplayed'),
+                    value: 'unplayed',
+                    child: Text('Unplayed first'),
+                  ),
+                ],
+              ),
             ],
           ),
           Expanded(

@@ -24,14 +24,17 @@ class _StubBackend extends BackendService {
   final List<EpisodeListResponse> _pages;
   int calls = 0;
   final List<int> offsetsSeen = <int>[];
+  final List<String?> sortsSeen = <String?>[];
 
   @override
   Future<EpisodeListResponse> podcastEpisodes(
     String channelId, {
     int limit = 20,
     int offset = 0,
+    String? sort,
   }) async {
     offsetsSeen.add(offset);
+    sortsSeen.add(sort);
     final EpisodeListResponse page = _pages[calls];
     calls++;
     return page;
@@ -126,5 +129,52 @@ void main() {
         container.read(podcastEpisodesNotifierProvider('c1')).valueOrNull!;
     expect(page.episodes, hasLength(2));
     expect(backend.offsetsSeen, <int>[0, 0]);
+  });
+
+  group('setSort (PA2/PR3, #53)', () {
+    test('reloads page 1 with the new sort', () async {
+      final _StubBackend backend = _StubBackend(<EpisodeListResponse>[
+        EpisodeListResponse(episodes: <PodcastEpisode>[_ep('1'), _ep('2')], total: 2),
+        EpisodeListResponse(episodes: <PodcastEpisode>[_ep('2'), _ep('1')], total: 2),
+      ]);
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          backendServiceProvider.overrideWith((_) async => backend),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(podcastEpisodesNotifierProvider('c1').future);
+      await container
+          .read(podcastEpisodesNotifierProvider('c1').notifier)
+          .setSort('oldest');
+
+      final PodcastEpisodePage page =
+          container.read(podcastEpisodesNotifierProvider('c1')).valueOrNull!;
+      expect(page.episodes.map((PodcastEpisode e) => e.id), <String>['2', '1']);
+      expect(backend.sortsSeen, <String?>[null, 'oldest']);
+      expect(backend.offsetsSeen, <int>[0, 0]);
+    });
+
+    test('setting the same sort twice is a no-op', () async {
+      final _StubBackend backend = _StubBackend(<EpisodeListResponse>[
+        EpisodeListResponse(episodes: <PodcastEpisode>[_ep('1')], total: 1),
+        EpisodeListResponse(episodes: <PodcastEpisode>[_ep('1')], total: 1),
+      ]);
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          backendServiceProvider.overrideWith((_) async => backend),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(podcastEpisodesNotifierProvider('c1').future);
+      final PodcastEpisodesNotifier notifier =
+          container.read(podcastEpisodesNotifierProvider('c1').notifier);
+      await notifier.setSort('oldest');
+      await notifier.setSort('oldest');
+
+      expect(backend.calls, 2);
+    });
   });
 }

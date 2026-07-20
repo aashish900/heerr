@@ -26,10 +26,13 @@ class PodcastEpisodePage {
 /// [refresh] re-pulls the RSS feed server-side
 /// (`POST /podcasts/channels/{id}/refresh`) before reloading page 1, so
 /// pull-to-refresh actually picks up newly-published episodes rather than
-/// just re-reading the same cached rows.
+/// just re-reading the same cached rows. [setSort] (PA2/PR3, #53) reloads
+/// page 1 under a new `sort` — `newest`/`oldest`/`unplayed`, matching the
+/// backend's `GET .../episodes?sort=` param.
 @riverpod
 class PodcastEpisodesNotifier extends _$PodcastEpisodesNotifier {
   late String _channelId;
+  String? _sort;
 
   @override
   Future<PodcastEpisodePage> build(String channelId) async {
@@ -40,6 +43,7 @@ class PodcastEpisodesNotifier extends _$PodcastEpisodesNotifier {
       channelId,
       limit: kEpisodePageSize,
       offset: 0,
+      sort: _sort,
     );
     return PodcastEpisodePage(episodes: result.episodes, total: result.total);
   }
@@ -56,6 +60,7 @@ class PodcastEpisodesNotifier extends _$PodcastEpisodesNotifier {
       _channelId,
       limit: kEpisodePageSize,
       offset: current.episodes.length,
+      sort: _sort,
     );
     state = AsyncData<PodcastEpisodePage>(
       PodcastEpisodePage(
@@ -73,4 +78,34 @@ class PodcastEpisodesNotifier extends _$PodcastEpisodesNotifier {
     ref.invalidateSelf();
     await future;
   }
+
+  /// PA2/PR3 (#53): switches sort order and reloads from page 1. A no-op
+  /// when [sort] already matches the current sort. Fetches directly (like
+  /// [loadMore]) rather than `ref.invalidateSelf()` — invalidating rebuilds
+  /// a fresh notifier instance, which would silently drop [_sort] (it isn't
+  /// part of the family key, so it wouldn't survive the rebuild).
+  Future<void> setSort(String sort) async {
+    if (_sort == sort) return;
+    _sort = sort;
+    state = const AsyncLoading<PodcastEpisodePage>();
+    try {
+      final BackendService backend =
+          await ref.read(backendServiceProvider.future);
+      final result = await backend.podcastEpisodes(
+        _channelId,
+        limit: kEpisodePageSize,
+        offset: 0,
+        sort: sort,
+      );
+      state = AsyncData<PodcastEpisodePage>(
+        PodcastEpisodePage(episodes: result.episodes, total: result.total),
+      );
+    } catch (e, st) {
+      state = AsyncError<PodcastEpisodePage>(e, st);
+    }
+  }
+
+  /// The sort currently applied, or `null` for the server default
+  /// (`newest`).
+  String? get currentSort => _sort;
 }
