@@ -22,6 +22,7 @@ ytmusicapi = ">=0.25"
 yt-dlp = ">=2025.1"
 mutagen = "^1.47"
 python-multipart = "^0.0.32"
+feedparser = "^6.0.12"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3"
@@ -77,7 +78,7 @@ exclude = ["alembic/versions", "tests/"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["testcontainers.*", "spotdl.*", "ytmusicapi.*", "yt_dlp.*"]
+module = ["testcontainers.*", "spotdl.*", "ytmusicapi.*", "yt_dlp.*", "feedparser.*"]
 ignore_missing_imports = true
 
 [build-system]

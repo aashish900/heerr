@@ -480,7 +480,7 @@ Design doc: `backend/docs/PODCASTS.md`. Scope locked by owner: **full podcast mo
 **Test gate:** 401/403; happy-path search mapped correctly (client mocked at the boundary via `dependency_overrides`); upstream failure → 502 envelope; missing env keys surfaced clearly. Full suite green; ruff + mypy clean.
 **Commit:** `feat(backend): P2 — Podcast Index search — POST /podcasts/search (#53)`
 
-### [ ] P3. RSS ingest + subscribe/unsubscribe/list
+### [x] P3. RSS ingest + subscribe/unsubscribe/list
 **Files:** `backend/app/services/feeds.py` (feedparser ingest), `backend/app/api/v1/podcasts.py` (+3 routes), `backend/pyproject.toml` (`feedparser`), `backend/tests/test_podcast_subscribe.py`.
 **Deliverable:** `feeds.py` — fetch feed (conditional GET using stored etag/last-modified), parse via `feedparser`, upsert channel + newest-N episodes (dedupe by `guid`, cap ingest). `POST /podcasts/subscribe` body `{feed_url}` → ingest + create per-user subscription → `{channel}`; `DELETE /podcasts/subscribe/{channel_id}` (per-user, scoped); `GET /podcasts/subscriptions` → this user's channels. `require_scope("read")` (subscribe may use `read`; downloads gate on `download` at P5).
 **Test gate:** 401/403; subscribe upserts channel+episodes and dedupes on re-subscribe; two users subscribing same feed share one channel row; unsubscribe scoped to caller; malformed/empty feed → clean error; ingest cap respected. Full suite green.
