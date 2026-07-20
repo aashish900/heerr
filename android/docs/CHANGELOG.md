@@ -3015,3 +3015,8 @@ User review flagged four more issues:
 - **`android/app/android/app/src/main/res/drawable/widget_divider_gradient.xml`** — path changed from a top-wide/bottom-point trapezoid to a hexagon that points at both `y=0` and `y=260` (viewport), widening to full width by `y=40` and holding until `y=220`. The gradient fill switched from 3 implicit stops (`startColor`/`centerColor`/`endColor`) to 5 explicit `<item offset=... color=.../>` stops so alpha fades to transparent at both offset `0.0` and `1.0`, with the full magenta → purple → violet brand ramp in between.
 - Version bump to `4.14.9` for sync: `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml`, both `ROADMAP.md` status lines.
 - Not verified on-device — no emulator/build run performed for this change.
+
+## 2026-07-20 — chore: version bumped for sync (backend Phase P — podcasts, #53)
+
+- No Android changes. The backend shipped Phase P (podcast discovery/subscribe/download/stream — see `backend/docs/CHANGELOG.md` 2026-07-20). Version bump `4.14.9` → `5.0.0` across all five sync locations per `/CLAUDE.md` §3.
+- The Android client for podcasts is Phase PC in `android/docs/ROADMAP.md` — not yet built.

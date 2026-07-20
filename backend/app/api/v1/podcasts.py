@@ -1,14 +1,18 @@
+import os
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import cast
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import and_, func, select
 from sqlalchemy import delete as sa_delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_scope
+from app.api.deps import require_scope, require_scope_query_or_header
 from app.db import get_session
 from app.models import PodcastChannel, PodcastEpisode, PodcastProgress, PodcastSubscription, Token
 from app.schemas.podcast import (
@@ -16,6 +20,8 @@ from app.schemas.podcast import (
     EpisodeDownloadResponse,
     EpisodeItem,
     EpisodeListResponse,
+    EpisodeProgressRequest,
+    EpisodeProgressResponse,
     PodcastChannelItem,
     PodcastSearchRequest,
     PodcastSearchResponse,
@@ -30,9 +36,19 @@ from app.services.podcastindex import (
     PodcastIndexNotConfigured,
     get_podcastindex_client,
 )
+from app.services.range_file import InvalidRangeError, iter_file_range, parse_range
 from app.services.workers import PodcastJobEnqueuer, get_podcast_enqueuer
 
 router = APIRouter(prefix="/podcasts", tags=["podcasts"])
+
+_AUDIO_CONTENT_TYPES = {
+    ".mp3": "audio/mpeg",
+    ".m4a": "audio/mp4",
+    ".aac": "audio/aac",
+    ".ogg": "audio/ogg",
+    ".opus": "audio/opus",
+    ".wav": "audio/wav",
+}
 
 
 def _channel_item(channel: PodcastChannel) -> ChannelItem:
@@ -246,3 +262,88 @@ async def download_episode_endpoint(
         enqueue(bg, job.id)
 
     return EpisodeDownloadResponse(job_id=job.id, state=job.state, deduped=deduped)
+
+
+@router.get("/episodes/{episode_id}/audio")
+async def stream_episode_audio(
+    episode_id: UUID,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    _tok: Token = Depends(require_scope_query_or_header("read")),
+) -> StreamingResponse:
+    """Serve a downloaded episode's audio with HTTP Range support (seek/resume).
+
+    Not-yet-downloaded episodes are NOT proxied here — `EpisodeItem.enclosure_url`
+    (already public) is what the client streams on-demand instead (see
+    backend/docs/PODCASTS.md 2.5: no backend proxy for already-public URLs).
+    """
+    episode = await session.get(PodcastEpisode, episode_id)
+    if episode is None or episode.downloaded_path is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="episode not downloaded — stream via its enclosure_url instead",
+        )
+    if not os.path.exists(episode.downloaded_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="downloaded file missing on disk",
+        )
+
+    file_size = os.path.getsize(episode.downloaded_path)
+    media_type = _AUDIO_CONTENT_TYPES.get(
+        Path(episode.downloaded_path).suffix.lower(), "application/octet-stream"
+    )
+
+    try:
+        rng = parse_range(request.headers.get("range"), file_size)
+    except InvalidRangeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_416_RANGE_NOT_SATISFIABLE,
+            detail=str(exc),
+            headers={"Content-Range": f"bytes */{file_size}"},
+        ) from exc
+
+    start, end = rng if rng is not None else (0, file_size - 1)
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Length": str(end - start + 1),
+    }
+    if rng is not None:
+        headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+
+    return StreamingResponse(
+        iter_file_range(episode.downloaded_path, start, end),
+        status_code=status.HTTP_206_PARTIAL_CONTENT if rng is not None else status.HTTP_200_OK,
+        media_type=media_type,
+        headers=headers,
+    )
+
+
+@router.put("/episodes/{episode_id}/progress", response_model=EpisodeProgressResponse)
+async def update_episode_progress(
+    episode_id: UUID,
+    req: EpisodeProgressRequest,
+    session: AsyncSession = Depends(get_session),
+    tok: Token = Depends(require_scope("read")),
+) -> EpisodeProgressResponse:
+    episode = await session.get(PodcastEpisode, episode_id)
+    if episode is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="episode not found")
+
+    values = {
+        "user_id": tok.user_id,
+        "episode_id": episode_id,
+        "position_s": req.position_s,
+        "played": req.played,
+        "last_played_at": datetime.now(UTC),
+    }
+    stmt = (
+        pg_insert(PodcastProgress)
+        .values(**values)
+        .on_conflict_do_update(index_elements=["user_id", "episode_id"], set_=values)
+    )
+    await session.execute(stmt)
+
+    return EpisodeProgressResponse(
+        episode_id=episode_id, position_s=req.position_s, played=req.played
+    )

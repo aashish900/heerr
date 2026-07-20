@@ -73,3 +73,16 @@ class EpisodeDownloadResponse(BaseModel):
     job_id: UUID
     state: str
     deduped: bool
+
+
+class EpisodeProgressRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    position_s: int = Field(..., ge=0)
+    played: bool = False
+
+
+class EpisodeProgressResponse(BaseModel):
+    episode_id: UUID
+    position_s: int
+    played: bool

@@ -468,4 +468,29 @@ Sub-decisions locked across J1–J10:
 - **Editing tags via Navidrome.** No Subsonic/native API for tag writes exists; Navidrome is deliberately read-only over its library.
 - **Support `.wav`.** Rejected — mutagen can write RIFF INFO/ID3-in-WAV chunks but player/indexer support is inconsistent; not worth the risk for a format spotDL doesn't emit by default.
 
+## 2026-07-20 — Podcasts: own data model, Podcast Index + RSS, backend-served audio (#53)
+
+**Context:** Feasibility study (`backend/docs/PODCASTS.md`) for adding podcast discovery/download. Owner-locked scope: full podcast model (not piggybacked on the music library) + Podcast Index/RSS discovery.
+
+**Decision:**
+1. **Backend owns podcast metadata, storage, and audio serving — Navidrome is not involved.** Four new tables (`podcast_channel`, `podcast_episode`, `podcast_subscription`, `podcast_progress`); channel/episode metadata shared and deduped (`feed_url`, per-channel `guid`), subscription/progress per-user — mirrors the Phase J shared-library/per-user-isolation pattern.
+2. **Discovery via Podcast Index (HMAC-signed) + RSS (`feedparser`)**, not YouTube Music. Ingest is on-demand only (subscribe / open-channel / manual refresh) — no scheduler, consistent with "no Celery until outgrown."
+3. **Episode downloads are a plain streamed HTTP GET of the enclosure URL** (temp file → fsync → atomic rename) into a **new `PODCAST_OUTPUT_DIR`, deliberately not `MUSIC_OUTPUT_DIR`** — Navidrome must never index episodes as songs. spotDL/yt-dlp are not involved.
+4. **Reused the existing job queue** rather than building a parallel one: `jobs.source_type` gained an `'episode'` value and a nullable `episode_id` FK (`ON DELETE SET NULL`); `create_job_idempotent`/`mark_running`/`mark_done`/`mark_failed` are unchanged and shared. A new `run_podcast_episode_job` function in `workers.py` (not a branch inside `run_job`) drives the download — its Phase-3 bookkeeping writes to `podcast_episode.downloaded_*`, not the shared `downloads` table, since episodes aren't part of the Navidrome-indexed library.
+5. **Audio serving is backend-owned with real HTTP Range support** (`GET /podcasts/episodes/{id}/audio`, 206/416, `?token=` for `just_audio` — same constraint as `/preview/stream`) for downloaded episodes. **Not-yet-downloaded episodes are never proxied** — `EpisodeItem.enclosure_url` (already a public URL) is what the client streams on-demand directly; proxying it would add backend load for no security benefit and doesn't cross the Tailscale boundary (the client fetching a public podcast MP3 isn't backend ingress).
+6. **Per-user resume position/played state** via `PUT /podcasts/episodes/{id}/progress` — last-write-wins upsert on `(user_id, episode_id)`, adequate for single-device v1.
+
+**Why:**
+- Navidrome does not implement the Subsonic podcast API server-side (upstream issue [navidrome#793](https://github.com/navidrome/navidrome/issues/793), still open) — there is no library path to hand this off to.
+- RSS enclosures are already direct audio URLs; routing them through spotDL/yt-dlp would add unnecessary extraction machinery that exists only to handle YouTube's indirection, which doesn't apply here.
+- Reusing the job-state-machine and `/queue` UI means the app's existing Sync Center screen covers podcast downloads for free — no parallel progress/polling surface to build or maintain.
+
+**Alternatives considered:**
+- **Piggyback episodes into the music library** (write to `MUSIC_OUTPUT_DIR`, let Navidrome index them as songs). Rejected — no episode ordering, no played/resume state, no subscription concept; episodes would show up as loose, badly-sorted "songs."
+- **YouTube Music as the discovery source** (reuse `ytmusicapi`/yt-dlp). Rejected by owner — smaller catalogue, episodes as opaque `videoId`s instead of real feed metadata, no open podcast ecosystem.
+- **Proxy on-demand (not-yet-downloaded) episode streams through the backend**, matching the preview-proxy pattern. Rejected v1 — the URL is already public; proxying only adds backend load and latency with no confidentiality gain. Revisit only if a feed ever requires auth headers the device can't send itself.
+- **New parallel job/queue table for episode downloads.** Rejected — `jobs` already has the exact state machine (queued/running/done/failed, partial-unique-index idempotency) needed; widening `source_type` and adding a nullable FK is far less code than a parallel system, and the app gets the existing Sync Center UI for free.
+
+**Reference:** `backend/docs/PODCASTS.md` (full design), `backend/docs/ROADMAP.md` Phase P (P1–P6), `android/docs/ROADMAP.md` Phase PC (PC1–PC5, not yet built), migrations `0013_podcasts.py` / `0014_jobs_episode.py`, `backend/app/services/{podcastindex,feeds,podcast_download,range_file}.py`, `backend/app/api/v1/podcasts.py`. CHANGELOG `2026-07-20 — P1–P6`.
+
 **Trade-off:** After an edit the library shows stale metadata until Navidrome's next scan (~1 min) — same accepted lag as Phase N deletes; the client snackbar says so.

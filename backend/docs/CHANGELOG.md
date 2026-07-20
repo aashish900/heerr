@@ -974,3 +974,22 @@ Server half of issue #44 begins: in-place tag editing for library files. Files a
 ## 2026-07-13 — v4.14.7: Android Downloads hero image width + new server illustration — version bumped for sync
 
 - No backend changes. Version bump `4.14.6` → `4.14.7` across the five sync locations for an Android-only fix (Downloads hero server illustration widened 5% and replaced with a new higher-resolution image supplied by the user); see `android/docs/CHANGELOG.md` 2026-07-13.
+
+## 2026-07-20 — v5.0.0: Phase P — podcasts (#53)
+
+- New: `backend/alembic/versions/0013_podcasts.py` — `podcast_channel`, `podcast_episode`, `podcast_subscription`, `podcast_progress` tables. `backend/alembic/versions/0014_jobs_episode.py` — widens `jobs.source_type` to allow `'episode'` and adds a nullable `episode_id` FK (`ON DELETE SET NULL`).
+- New: `backend/app/models/podcast_{channel,episode,subscription,progress}.py`; registered in `backend/app/models/__init__.py`.
+- New: `backend/app/services/podcastindex.py` — HMAC-signed Podcast Index client (discovery).
+- New: `backend/app/services/feeds.py` — `feedparser`-based RSS ingest with conditional GET (etag/last-modified), 300-episode ingestion cap, upsert-by-`feed_url`/`guid` so re-ingest never clobbers download state.
+- New: `backend/app/services/podcast_download.py` — episode download via plain streamed HTTP GET of the enclosure (temp file → fsync → atomic rename); no spotDL/yt-dlp.
+- New: `backend/app/services/range_file.py` — HTTP byte-range parsing/streaming for locally downloaded files.
+- Modified: `backend/app/services/workers.py` — new `run_podcast_episode_job` + `PodcastJobEnqueuer`/`get_podcast_enqueuer`, additive (spotDL's `run_job` untouched). `backend/app/services/jobs.py` — `create_job_idempotent` gained an optional `episode_id` kwarg.
+- New: `backend/app/api/v1/podcasts.py` — `POST /podcasts/search`, `POST /podcasts/subscribe`, `DELETE /podcasts/subscribe/{channel_id}`, `GET /podcasts/subscriptions`, `GET /podcasts/channels/{id}/episodes`, `POST /podcasts/channels/{id}/refresh`, `POST /podcasts/episodes/{id}/download`, `GET /podcasts/episodes/{id}/audio` (Range, 206/416), `PUT /podcasts/episodes/{id}/progress`.
+- New: `backend/app/schemas/podcast.py`. Modified: `backend/app/schemas/job.py` — `JobView.source_type` widened to accept `'episode'` (fixes `/queue`/`/status` 500 on an episode job).
+- Modified: `backend/app/config.py` — `podcastindex_key`/`podcastindex_secret` (optional), `podcast_output_dir` (default `/data/media/podcasts`, deliberately not Navidrome-watched). `/.env.example` and `docker-compose.snippet.yml` updated (new mount, not merged into `MUSIC_OUTPUT_DIR`).
+- New dependency: `feedparser` (`^6.0.12`).
+- Tests: `test_migration_podcasts.py`, `test_podcast_search.py`, `test_podcastindex_client.py`, `test_feeds.py`, `test_podcast_subscribe.py`, `test_podcast_episodes.py`, `test_podcast_download_service.py`, `test_podcast_workers.py`, `test_podcast_download.py`, `test_range_file.py`, `test_podcast_stream.py`, `test_podcast_progress.py`. 629 tests total, green; ruff + mypy clean.
+- Version bump `4.14.7` → `5.0.0` across all five sync locations (large feature, no backend-breaking change to existing endpoints).
+- Android client (Phase PC) not yet built — see `android/docs/ROADMAP.md`.
+
+See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no server-side podcast support; own data model; job-queue reuse; no on-demand proxy).
