@@ -3138,3 +3138,11 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - `flutter analyze` and `flutter test` (1087 tests) green before and after.
 - Version: already at `v5.3.0` (bumped at backend Phase PA, ahead of this Android milestone) — no further bump needed; this entry documents Phase PR3's completion against that version, closing out the podcast-flow redesign (PR1–PR3).
 - See `DECISIONLOG.md` 2026-07-20 "PR3: Home podcast sections + Library Episodes/Downloads + Show Detail sort (#53)".
+
+## 2026-07-20 — fix: Home Podcasts empty state missing the Discover button (#53)
+
+- **User-reported:** on Home's Podcasts content, when there's nothing to show (no subscriptions), the "No episodes yet" empty state had no way to get to Discover — every other empty-subscriptions surface (`PodcastShowsGrid`'s "No subscriptions yet", used by both the Library Shows tab and the standalone Subscriptions screen) already offers a "Discover podcasts" button.
+- **`android/app/lib/screens/home/home_podcasts_body.dart`** — `_LatestEpisodesSection`'s empty branch now renders a `FilledButton` below the `EmptyState`, pushing `Routes.podcastsDiscover` (same action as `PodcastShowsGrid`'s button).
+- Tests: `test/screens/home/home_screen_test.dart` (+1) — button renders and pushes Discover; test router gained a `/podcasts/discover` sink to match.
+- `flutter analyze` and `flutter test` (1088 tests) green before and after.
+- Version bump `5.3.0` → `5.3.1` across all five sync locations.

@@ -1032,3 +1032,8 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 ## 2026-07-20 — Android Phase PR3 shipped against v5.3.0 (#53)
 
 - No backend changes. Android Phase PR3 (#53) — the final phase of the podcast-flow redesign — shipped against this same `v5.3.0`: Home's Music/Podcasts content switch (Continue Listening carousel + Latest Episodes list), Library's Episodes/Downloads sub-tabs wired to the PA1 feeds, and a Newest/Oldest/Unplayed sort menu on the Show Detail screen backed by PA2. See `android/docs/CHANGELOG.md` 2026-07-20 "feat: PR3 — Home podcast sections + Library Episodes/Downloads + Show Detail sort (#53)" and `android/docs/DECISIONLOG.md` same date. This closes out the podcast-flow redesign (Phases PR1–PR3 / PA1–PA2).
+
+## 2026-07-20 — v5.3.1: Android — Home Podcasts empty state Discover button (#53)
+
+- No backend changes. Home's Podcasts content was missing a "Discover podcasts" button in its no-subscriptions empty state — every other empty-subscriptions surface already has one. See `android/docs/CHANGELOG.md` 2026-07-20 "fix: Home Podcasts empty state missing the Discover button (#53)".
+- Version bump `5.3.0` → `5.3.1` across all five sync locations per `/CLAUDE.md` §3.

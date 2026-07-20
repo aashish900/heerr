@@ -40,6 +40,10 @@ GoRouter _testRouter() {
         builder: (_, _) => const Scaffold(body: Text('RECENTLY_ADDED_SCREEN')),
       ),
       GoRoute(
+        path: '/podcasts/discover',
+        builder: (_, _) => const Scaffold(body: Text('DISCOVER_SCREEN')),
+      ),
+      GoRoute(
         path: '/queue',
         builder: (_, _) => const Scaffold(body: Text('Queue page')),
       ),
@@ -383,6 +387,29 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(backend.filtersRequested, isEmpty);
+    });
+
+    testWidgets(
+        'no subscriptions → empty state with a Discover button that '
+        'pushes Discover', (WidgetTester tester) async {
+      final _StubPodcastBackend backend = _StubPodcastBackend();
+      await tester.pumpWidget(_wrap(overrides: <Override>[
+        ..._homeOverrides(),
+        backendServiceProvider.overrideWith((_) async => backend),
+      ]));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Podcasts'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No episodes yet'), findsOneWidget);
+      expect(find.byKey(const Key('home-podcasts-discover-action')),
+          findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('home-podcasts-discover-action')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('DISCOVER_SCREEN'), findsOneWidget);
     });
   });
 }

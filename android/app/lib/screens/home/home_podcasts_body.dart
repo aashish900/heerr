@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../api/api_error.dart';
 import '../../models/episode_feed_response.dart';
 import '../../models/episode_with_channel.dart';
 import '../../player/podcast_playback_actions.dart';
 import '../../providers/podcasts/podcast_episode_feed.dart';
+import '../../router.dart';
 import '../../theme.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_snackbar.dart';
@@ -196,12 +198,27 @@ class _LatestEpisodesSection extends ConsumerWidget {
       ),
       data: (EpisodeFeedResponse feed) {
         if (feed.episodes.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: EmptyState(
-              icon: Icons.podcasts,
-              title: 'No episodes yet',
-              subtitle: 'Subscribe to a podcast to see its latest episodes.',
+          // Matches the empty-state + Discover CTA pattern used elsewhere
+          // (PodcastShowsGrid's "No subscriptions yet") — most of the time
+          // this branch means the user has no subscriptions at all.
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Column(
+              children: <Widget>[
+                const EmptyState(
+                  icon: Icons.podcasts,
+                  title: 'No episodes yet',
+                  subtitle: 'Subscribe to a podcast to see its latest episodes.',
+                ),
+                const SizedBox(height: 16),
+                Center(
+                  child: FilledButton(
+                    key: const Key('home-podcasts-discover-action'),
+                    onPressed: () => context.push(Routes.podcastsDiscover),
+                    child: const Text('Discover podcasts'),
+                  ),
+                ),
+              ],
             ),
           );
         }
