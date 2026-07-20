@@ -21,8 +21,8 @@ import 'screens/library/favorites_screen.dart';
 import 'screens/library/recently_added_screen.dart';
 import 'screens/library/recently_played_screen.dart';
 import 'screens/player/now_playing_screen.dart';
-import 'screens/podcasts/channel_screen.dart';
 import 'screens/podcasts/discover_screen.dart';
+import 'screens/podcasts/podcast_show_detail_screen.dart';
 import 'screens/podcasts/subscriptions_screen.dart';
 import 'screens/profile/edit_server_details_screen.dart';
 import 'screens/profile/profile_edit_screen.dart';
@@ -244,7 +244,7 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
       GoRoute(
         path: '/podcasts/channel/:id',
         builder: (BuildContext context, GoRouterState state) =>
-            ChannelScreen(channelId: state.pathParameters['id']!),
+            PodcastShowDetailScreen(channelId: state.pathParameters['id']!),
       ),
       // Profile page (#37, Phase Z redesign) — top-level full-screen push,
       // like Now Playing. The display screen lives at /profile; the edit

@@ -123,8 +123,17 @@ void main() {
     GoRouter.of(ctx).go('/library?tab=playlists');
     await tester.pumpAndSettle();
 
-    final TabController controller =
-        DefaultTabController.of(tester.element(find.byType(TabBar)));
+    // PR1 (#53) added a Music/Podcasts content-switch TabBar above the
+    // Albums/Artists/Playlists one, so `find.byType(TabBar)` alone is
+    // ambiguous — scope via a label only the segmented sub-tabs carry.
+    final TabController controller = DefaultTabController.of(
+      tester.element(
+        find.ancestor(
+          of: find.text('Playlists'),
+          matching: find.byType(TabBar),
+        ),
+      ),
+    );
     expect(controller.index, 2);
   });
 

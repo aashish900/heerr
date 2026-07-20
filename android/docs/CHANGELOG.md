@@ -3091,3 +3091,17 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - Tests: 4 new cases in `test/screens/podcasts/discover_screen_test.dart` (successful subscribe + field-clear, invalid-URL inline error, empty-field no-op, `ApiError` snackbar on failure).
 - `flutter analyze` and `flutter test` (1060 tests) green before and after.
 - Version bump `5.0.1` → `5.0.2` across all five sync locations (Android-only change; no backend changes).
+
+## 2026-07-20 — feat: PR1 — podcasts move into Library + Show Detail redesign (#53)
+
+- **`android/app/lib/screens/podcasts/podcast_shows_grid.dart`** (new) — `PodcastShowsGrid`/`PodcastShowCard`, extracted from `subscriptions_screen.dart`'s grid so it renders identically standalone (`/podcasts/subscriptions`, unchanged, reachable from Profile) and inside the new Library tab.
+- **`android/app/lib/screens/podcasts/subscriptions_screen.dart`** — shrunk to a thin `Scaffold` wrapper around `PodcastShowsGrid`.
+- **`android/app/lib/screens/podcasts/channel_screen.dart`** — deleted, replaced by:
+- **`android/app/lib/screens/podcasts/podcast_show_detail_screen.dart`** (new) — `PodcastShowDetailScreen` at the same route (`/podcasts/channel/:id`): hero art + title/author/episode-count/description, a Continue-or-Play + Following action row, client-derived Continue Listening + Latest Episode mini-sections, Episodes/About tabs, and richer episode rows (leading art, gradient progress bar for in-progress episodes, the existing PC4 download-state machine). No Chapters/Transcript/Notes/Bookmark/Related — out of scope per the plan.
+- **`android/app/lib/router.dart`** — `ChannelScreen` → `PodcastShowDetailScreen` at the same path.
+- **`android/app/lib/screens/library/library_screen.dart`** — new `LibraryContent` enum (Music/Podcasts) + a `_LibraryContentSwitch` `TabBar` above the existing Albums/Artists/Playlists tabs, driven by a manually-created `TabController` (not `DefaultTabController`) so the unselected content subtree is never built (avoids firing `podcastSubscriptionsProvider`'s network call while browsing Music). Existing Music body extracted unchanged into `_MusicSection`.
+- **`android/app/lib/screens/library/library_tabs.dart`** — new `_PodcastsSection` (Shows/Episodes/Downloads sub-tabs): Shows renders `PodcastShowsGrid`; Episodes/Downloads render `EmptyState` "Coming soon" placeholders pending backend Phase PA's aggregate episode feeds.
+- Tests: `test/screens/podcasts/podcast_show_detail_screen_test.dart` (renamed from `channel_screen_test.dart`, 16 cases — added hero/mini-section/Continue/Following/About coverage), `subscriptions_screen_test.dart` unchanged and still green. `test/screens/library/library_screen_test.dart` and `test/router_test.dart` — two `find.byType(TabBar)` lookups scoped via `find.ancestor(of: find.text(...), matching: find.byType(TabBar))` now that two TabBars coexist on the Library screen.
+- `flutter analyze` and `flutter test` (1065 tests) green before and after.
+- Version bump `5.0.2` → `5.1.0` across all five sync locations (Android-only change; no backend changes) — a new content switch is a user-visible surface change, not a fix.
+- See `DECISIONLOG.md` 2026-07-20 "PR1: podcasts move into Library + Show Detail redesign (#53)".

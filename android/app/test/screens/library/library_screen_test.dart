@@ -172,11 +172,16 @@ void main() {
         (WidgetTester tester) async {
       await tester.pumpWidget(_wrap(_defaultsExcept()));
       await tester.pumpAndSettle();
-      final TabBar bar = tester.widget<TabBar>(find.byType(TabBar));
+      // PR1 (#53) added a Music/Podcasts content-switch TabBar above this
+      // one, so `find.byType(TabBar)` alone is ambiguous — scope to the
+      // segmented sub-tabs TabBar via a label only it carries.
+      final Finder segmentedTabBar =
+          find.ancestor(of: find.text('Playlists'), matching: find.byType(TabBar));
+      final TabBar bar = tester.widget<TabBar>(segmentedTabBar);
       expect(bar.tabs, hasLength(3));
       // Label order inside the TabBar.
       final Finder labels = find.descendant(
-        of: find.byType(TabBar),
+        of: segmentedTabBar,
         matching: find.byType(Text),
       );
       final List<String> texts = tester

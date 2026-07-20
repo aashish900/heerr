@@ -16,7 +16,7 @@ import 'package:heerr/models/profile.dart';
 import 'package:heerr/player/heerr_audio_handler.dart';
 import 'package:heerr/player/player_provider.dart';
 import 'package:heerr/providers/profiles/active_profile.dart';
-import 'package:heerr/screens/podcasts/channel_screen.dart';
+import 'package:heerr/screens/podcasts/podcast_show_detail_screen.dart';
 import 'package:heerr/services/backend_service.dart';
 
 class _FakeHandler extends Mock implements HeerrAudioHandler {}
@@ -37,6 +37,7 @@ class _StubBackend extends BackendService {
   final Object? downloadError;
   int refreshCalls = 0;
   final List<String> downloadCalls = <String>[];
+  final List<String> unsubscribeCalls = <String>[];
 
   @override
   Future<List<PodcastChannel>> podcastSubscriptions() async =>
@@ -71,6 +72,11 @@ class _StubBackend extends BackendService {
       deduped: false,
     );
   }
+
+  @override
+  Future<void> unsubscribePodcast(String channelId) async {
+    unsubscribeCalls.add(channelId);
+  }
 }
 
 Profile _profile() => Profile(
@@ -97,7 +103,7 @@ Widget _wrap({
       if (handler != null) audioHandlerProvider.overrideWithValue(handler),
       if (profile != null) activeProfileProvider.overrideWithValue(profile),
     ],
-    child: MaterialApp(home: ChannelScreen(channelId: channelId)),
+    child: MaterialApp(home: PodcastShowDetailScreen(channelId: channelId)),
   );
 }
 
@@ -111,6 +117,13 @@ void main() {
     id: 'c1',
     feedUrl: 'https://a.com/f.xml',
     title: 'Show A',
+  );
+
+  const PodcastChannel channelWithAuthor = PodcastChannel(
+    id: 'c1',
+    feedUrl: 'https://a.com/f.xml',
+    title: 'Show A',
+    author: 'Author X',
   );
 
   PodcastEpisode ep(
@@ -134,7 +147,7 @@ void main() {
         publishedAt: publishedAt,
       );
 
-  testWidgets('renders the channel title as the app bar title',
+  testWidgets('renders the channel title in the hero',
       (WidgetTester tester) async {
     await tester.pumpWidget(
       _wrap(backend: _StubBackend(channel: channelA)),
@@ -142,6 +155,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Show A'), findsOneWidget);
+  });
+
+  testWidgets('hero shows author and episode count',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(
+      backend: _StubBackend(
+        channel: channelWithAuthor,
+        episodes: <PodcastEpisode>[ep('1')],
+        total: 1,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Author X • 1 episodes'), findsOneWidget);
   });
 
   testWidgets('renders an empty state when there are no episodes',
@@ -163,7 +190,9 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('Episode 1'), findsOneWidget);
+    // The lone episode also surfaces as "Latest Episode" in the mini
+    // section, so its title legitimately renders twice on this screen.
+    expect(find.text('Episode 1'), findsWidgets);
     expect(find.text('1:30'), findsOneWidget);
   });
 
@@ -179,6 +208,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Resume at 1:05'), findsOneWidget);
+  });
+
+  testWidgets('an in-progress episode shows a Continue Listening mini row',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(
+      backend: _StubBackend(
+        channel: channelA,
+        episodes: <PodcastEpisode>[ep('1', positionS: 65, durationS: 120)],
+        total: 1,
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Continue Listening'), findsOneWidget);
   });
 
   testWidgets('shows a check mark for a played episode',
@@ -302,12 +345,78 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Episode 1'));
+    // Keyed lookup, not find.text('Episode 1') — the title also renders in
+    // the Continue Listening mini row for an in-progress episode.
+    await tester.tap(find.byKey(const Key('podcast-episode-1')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
     verify(() => handler.playSong(any())).called(1);
     verify(() => player.seek(const Duration(seconds: 42))).called(1);
     expect(find.text('Playing: Episode 1'), findsOneWidget);
+  });
+
+  testWidgets('tapping Continue plays the in-progress episode',
+      (WidgetTester tester) async {
+    final _FakeHandler handler = _FakeHandler();
+    final _FakePlayer player = _FakePlayer();
+    when(() => handler.playSong(any())).thenAnswer((_) async {});
+    when(() => handler.player).thenReturn(player);
+    when(() => player.seek(any())).thenAnswer((_) async {});
+
+    await tester.pumpWidget(_wrap(
+      backend: _StubBackend(
+        channel: channelA,
+        episodes: <PodcastEpisode>[ep('1', positionS: 10, durationS: 100)],
+        total: 1,
+      ),
+      handler: handler,
+      profile: _profile(),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Continue'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('podcast-show-continue')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    verify(() => handler.playSong(any())).called(1);
+  });
+
+  testWidgets('Following toggle shows "Following" for a subscribed show '
+      'and unsubscribes on tap', (WidgetTester tester) async {
+    final _StubBackend backend = _StubBackend(channel: channelA);
+    await tester.pumpWidget(_wrap(backend: backend));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Following'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('podcast-show-following-toggle')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(backend.unsubscribeCalls, <String>['c1']);
+  });
+
+  testWidgets('About tab shows the channel description',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(
+      backend: _StubBackend(
+        channel: const PodcastChannel(
+          id: 'c1',
+          feedUrl: 'https://a.com/f.xml',
+          title: 'Show A',
+          description: 'A show about things.',
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('About'));
+    await tester.pumpAndSettle();
+
+    // Renders twice on this screen — once as the hero's description
+    // snippet, once as the About tab's full body (TabBarView builds both
+    // tab bodies up front, so both are present in the tree).
+    expect(find.text('A show about things.'), findsNWidgets(2));
   });
 }

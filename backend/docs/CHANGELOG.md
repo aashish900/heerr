@@ -1009,3 +1009,8 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 
 - No backend changes. `POST /podcasts/subscribe` already accepted a raw `feed_url` (Phase P3) — the Android Discover screen now exposes that path directly via a new "paste a feed URL" bar, alongside search. See `android/docs/CHANGELOG.md` 2026-07-20 "feat: subscribe by feed URL on the Discover screen (#53)".
 - Version bump `5.0.1` → `5.0.2` across all five sync locations per `/CLAUDE.md` §3.
+
+## 2026-07-20 — v5.1.0: Android — PR1, podcasts move into Library + Show Detail redesign (#53)
+
+- No backend changes. Phase PR1 (#53) of the podcast-flow redesign: podcasts are now reachable as a Library "Podcasts" content switch (Shows/Episodes/Downloads), with a richer show-detail screen replacing the plain channel list. See `android/docs/CHANGELOG.md` 2026-07-20 "feat: PR1 — podcasts move into Library + Show Detail redesign (#53)" and `android/docs/DECISIONLOG.md` same date.
+- Version bump `5.0.2` → `5.1.0` across all five sync locations per `/CLAUDE.md` §3.

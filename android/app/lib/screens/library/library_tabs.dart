@@ -619,6 +619,113 @@ class _PlaylistsTab extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Podcasts content (PR1, #53)
+// ---------------------------------------------------------------------------
+
+/// Shows / Episodes / Downloads sub-tabs under the Library "Podcasts"
+/// content. Shows is real data (the PC3 subscriptions grid, extracted to
+/// [PodcastShowsGrid]); Episodes/Downloads are placeholders until Phase PR3
+/// ships the cross-subscription backend feeds they need.
+class _PodcastsSection extends StatelessWidget {
+  const _PodcastsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return const DefaultTabController(
+      length: 3,
+      child: Column(
+        children: <Widget>[
+          _PodcastsSegmentedTabs(),
+          Expanded(
+            child: TabBarView(
+              children: <Widget>[
+                PodcastShowsGrid(),
+                // Phase PR3 (#53): backed by GET /podcasts/episodes?filter=latest.
+                _PodcastsComingSoonTab(
+                  icon: Icons.podcasts_outlined,
+                  title: 'Episodes',
+                  subtitle:
+                      'Coming soon — episodes across all your shows will '
+                      'appear here.',
+                ),
+                // Phase PR3 (#53): backed by GET /podcasts/episodes?filter=downloaded.
+                _PodcastsComingSoonTab(
+                  icon: Icons.download_done_outlined,
+                  title: 'Downloads',
+                  subtitle:
+                      'Coming soon — downloaded episodes will appear here.',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PodcastsSegmentedTabs extends StatelessWidget {
+  const _PodcastsSegmentedTabs();
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return TabBar(
+      indicator: const GradientTabIndicator(),
+      indicatorSize: TabBarIndicatorSize.tab,
+      dividerColor: Colors.transparent,
+      labelColor: heerrMagenta,
+      unselectedLabelColor: cs.onSurfaceVariant,
+      tabs: const <Tab>[
+        Tab(
+          height: 46,
+          child: _SegmentedTabLabel(
+            icon: Icons.grid_view_outlined,
+            label: 'Shows',
+          ),
+        ),
+        Tab(
+          height: 46,
+          child: _SegmentedTabLabel(
+            icon: Icons.podcasts_outlined,
+            label: 'Episodes',
+          ),
+        ),
+        Tab(
+          height: 46,
+          child: _SegmentedTabLabel(
+            icon: Icons.download_done_outlined,
+            label: 'Downloads',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PodcastsComingSoonTab extends StatelessWidget {
+  const _PodcastsComingSoonTab({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: EmptyState(icon: icon, title: title, subtitle: subtitle),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Shared little widgets
 // ---------------------------------------------------------------------------
 

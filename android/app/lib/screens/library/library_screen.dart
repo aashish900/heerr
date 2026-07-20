@@ -40,6 +40,7 @@ import '../../widgets/library_result_tile.dart';
 import '../../widgets/playlist_dialogs.dart';
 import '../../widgets/result_tile.dart';
 import '../../widgets/skeleton.dart';
+import '../podcasts/podcast_shows_grid.dart';
 import 'album_grid_card.dart';
 import 'playlist_grid_card.dart';
 
@@ -48,31 +49,65 @@ import 'playlist_grid_card.dart';
 part 'library_search_results.dart';
 part 'library_tabs.dart';
 
-/// Library tab — 2026-07 redesign (docs/LIBRARYSCREEN.md). When idle, shows
-/// the shared branded header, a "Your Library" headline and segmented tabs
-/// of Albums / Artists / Playlists driven by Subsonic. When the user enters
-/// search mode (search icon in the AppBar), the tab UI is hidden and the
-/// combined-search results render: "In your library" (Subsonic search3)
-/// above "Online results" (heerr backend search, auto-fired on empty
-/// library or manually).
+/// Library top-level content switch (PR1, #53): Music (the existing
+/// Albums/Artists/Playlists body) vs Podcasts (Shows/Episodes/Downloads).
+/// See the plan's scope decisions — Audiobooks was dropped, so this is a
+/// two-way switch, not the three-way one in the source mockup.
+enum LibraryContent { music, podcasts }
+
+/// Library tab — 2026-07 redesign (docs/LIBRARYSCREEN.md), extended PR1
+/// (#53) with the Music/Podcasts content switch. When idle, shows the
+/// shared branded header, a "Your Library" headline, the content switch,
+/// and — under Music — segmented tabs of Albums / Artists / Playlists
+/// driven by Subsonic (under Podcasts — Shows / Episodes / Downloads, see
+/// `library_tabs.dart::_PodcastsSection`). When the user enters search mode
+/// (search icon in the AppBar), the tab UI is hidden and the combined-search
+/// results render: "In your library" (Subsonic search3) above "Online
+/// results" (heerr backend search, auto-fired on empty library or manually).
+/// Search stays music-only — podcasts have their own Discover flow.
 class LibraryScreen extends ConsumerStatefulWidget {
-  const LibraryScreen({this.initialTabIndex = 0, super.key});
+  const LibraryScreen({
+    this.initialTabIndex = 0,
+    this.initialContent = LibraryContent.music,
+    super.key,
+  });
 
   /// Which sub-tab (0=Albums, 1=Artists, 2=Playlists — X1 mockup order) to
   /// open on. Set via the `/library?tab=` query param (Phase Z Profile
   /// "Playlists" deep link) — see `_tabIndexFor` in router.dart.
   final int initialTabIndex;
 
+  /// Which top-level content (Music/Podcasts) to open on. Defaults to Music
+  /// — nothing currently deep-links into Podcasts (PR3 may add one).
+  final LibraryContent initialContent;
+
   @override
   ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
 }
 
-class _LibraryScreenState extends ConsumerState<LibraryScreen> {
+class _LibraryScreenState extends ConsumerState<LibraryScreen>
+    with SingleTickerProviderStateMixin {
   late final TextEditingController _searchController;
+  late final TabController _contentController;
 
   @override
   void initState() {
     super.initState();
+    // A manual TabController (not DefaultTabController) driving the
+    // Music/Podcasts switch: the two content subtrees are swapped via plain
+    // conditional rendering (not TabBarView), so an unfocused Podcasts
+    // section never gets built — and never fires its network calls — while
+    // the user is browsing Music (and vice versa).
+    _contentController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialContent == LibraryContent.podcasts ? 1 : 0,
+    );
+    _contentController.addListener(() {
+      if (!mounted) return;
+      setState(() {});
+    });
+
     final String initial = ref.read(librarySearchQueryProvider);
     _searchController = TextEditingController(text: initial);
     final bool autoFocusRequested =
@@ -99,6 +134,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _contentController.dispose();
     super.dispose();
   }
 
@@ -136,44 +172,107 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         onExit: _exitSearch,
       );
     }
+    return Scaffold(
+      appBar: BrandedAppBar(
+        compactGreeting: true,
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: 'Search',
+            onPressed: _enterSearch,
+          ),
+        ],
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Text(
+              'Your Library',
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+          ),
+          _LibraryContentSwitch(controller: _contentController),
+          Expanded(
+            child: _contentController.index == 0
+                ? _MusicSection(initialTabIndex: widget.initialTabIndex)
+                : const _PodcastsSection(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Music / Podcasts top-level switch — visually matches
+/// `_LibrarySegmentedTabs` (`GradientTabIndicator` + `heerrMagenta`), but is
+/// driven by an explicit [controller] rather than `DefaultTabController` so
+/// the two content subtrees can be swapped by plain conditional rendering
+/// (see `_LibraryScreenState.build`) instead of an eagerly-built
+/// `TabBarView`.
+class _LibraryContentSwitch extends StatelessWidget {
+  const _LibraryContentSwitch({required this.controller});
+
+  final TabController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    return TabBar(
+      controller: controller,
+      indicator: const GradientTabIndicator(),
+      indicatorSize: TabBarIndicatorSize.tab,
+      dividerColor: Colors.transparent,
+      labelColor: heerrMagenta,
+      unselectedLabelColor: cs.onSurfaceVariant,
+      tabs: const <Tab>[
+        Tab(
+          height: 46,
+          child: _SegmentedTabLabel(
+            icon: Icons.library_music_outlined,
+            label: 'Music',
+          ),
+        ),
+        Tab(
+          height: 46,
+          child: _SegmentedTabLabel(
+            icon: Icons.podcasts_outlined,
+            label: 'Podcasts',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The pre-PR1 Music body (Albums/Artists/Playlists), unchanged, just
+/// extracted so it can sit behind the new content switch.
+class _MusicSection extends StatelessWidget {
+  const _MusicSection({required this.initialTabIndex});
+
+  final int initialTabIndex;
+
+  @override
+  Widget build(BuildContext context) {
     return DefaultTabController(
       length: 3,
-      initialIndex: widget.initialTabIndex,
-      child: Scaffold(
-        appBar: BrandedAppBar(
-          compactGreeting: true,
-          actions: <Widget>[
-            IconButton(
-              icon: const Icon(Icons.search),
-              tooltip: 'Search',
-              onPressed: _enterSearch,
+      initialIndex: initialTabIndex,
+      child: const Column(
+        children: <Widget>[
+          _LibrarySegmentedTabs(),
+          Expanded(
+            child: TabBarView(
+              children: <Widget>[
+                _AlbumsTab(),
+                _ArtistsTab(),
+                _PlaylistsTab(),
+              ],
             ),
-          ],
-        ),
-        body: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Text(
-                'Your Library',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-              ),
-            ),
-            const _LibrarySegmentedTabs(),
-            const Expanded(
-              child: TabBarView(
-                children: <Widget>[
-                  _AlbumsTab(),
-                  _ArtistsTab(),
-                  _PlaylistsTab(),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
