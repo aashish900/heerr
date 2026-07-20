@@ -1019,3 +1019,12 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 
 - No backend changes. Phase PR2 (#53): the Now Playing screen now renders a podcast-specific layout for episode playback — skip±30s transport, a working playback-speed control, and a plain scrubber instead of the music waveform. See `android/docs/CHANGELOG.md` 2026-07-20 "feat: PR2 — podcast player redesign (#53)" and `android/docs/DECISIONLOG.md` same date.
 - Version bump `5.1.0` → `5.2.0` across all five sync locations per `/CLAUDE.md` §3.
+
+## 2026-07-20 — v5.3.0: Phase PA — podcast aggregate feeds (#53)
+
+- **`app/api/v1/podcasts.py`** — new `GET /podcasts/episodes?filter=in_progress|latest|downloaded&limit=&offset=` (`list_episode_feed`, scope `read`), joining `podcast_subscription` → `podcast_channel` → `podcast_episode` with a left-join to the caller's own `podcast_progress`, scoped to `tok.user_id`. The existing per-channel `GET /podcasts/channels/{id}/episodes` (`list_episodes`) gained a `sort=newest|oldest|unplayed` query param (default `newest`, unchanged behavior).
+- **`app/schemas/podcast.py`** — new `EpisodeWithChannelItem` (an `EpisodeItem` plus `channel_title`/`channel_image_url`, so the client can render a cross-show list without a second call per row) and `EpisodeFeedResponse`.
+- No migration — pure query work over the Phase P1 schema; every field these feeds need already existed.
+- Tests: `tests/test_podcast_feeds.py` (new, 9 tests — auth, missing/bad `filter`, each of the three filters, pagination, no-subscriptions empty, per-user isolation), `tests/test_podcast_episodes.py` (+4 — `sort=oldest`/`unplayed`/default-matches-`newest`/bad-value-422). 643 tests total, green; ruff + mypy clean.
+- Version bump `5.2.0` → `5.3.0` across all five sync locations — this is the backend prerequisite for Android Phase PR3 (`android/docs/ROADMAP.md`), which is not yet built; `android/app/pubspec.yaml` bumped for sync now so PR3 can land against this same version without a redundant bump.
+- See `DECISIONLOG.md` 2026-07-20 "PA1/PA2: podcast aggregate feeds (#53)".

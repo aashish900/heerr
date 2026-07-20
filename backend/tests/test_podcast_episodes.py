@@ -168,6 +168,79 @@ async def test_list_episodes_progress_scoped_to_current_user(
     assert ep0["played"] is True
 
 
+# ---- sort param (PA2, #53) --------------------------------------------------
+
+
+async def test_list_episodes_sort_oldest(client, make_token, seeded_channel):
+    channel_id, _ = seeded_channel
+    raw = await make_token()
+    r = await client.get(
+        f"/api/v1/podcasts/channels/{channel_id}/episodes?sort=oldest",
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert r.status_code == 200
+    assert [e["title"] for e in r.json()["episodes"]] == [
+        "Episode 2",
+        "Episode 1",
+        "Episode 0",
+    ]
+
+
+async def test_list_episodes_sort_defaults_to_newest(client, make_token, seeded_channel):
+    channel_id, _ = seeded_channel
+    raw = await make_token()
+    with_default = await client.get(
+        f"/api/v1/podcasts/channels/{channel_id}/episodes",
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    with_explicit = await client.get(
+        f"/api/v1/podcasts/channels/{channel_id}/episodes?sort=newest",
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert with_default.json()["episodes"] == with_explicit.json()["episodes"]
+
+
+async def test_list_episodes_sort_unplayed_first(client, make_token, seeded_channel, app_sm):
+    channel_id, episode_ids = seeded_channel
+    raw = await make_token()
+
+    async with app_sm() as s:
+        r = await s.execute(text("SELECT system_admin_user_id()"))
+        user_id = r.scalar_one()
+        # Episode 0 (newest) marked played — should sort after the two
+        # unplayed episodes despite being newest.
+        s.add(
+            PodcastProgress(
+                user_id=user_id,
+                episode_id=episode_ids[0],
+                position_s=90,
+                played=True,
+            )
+        )
+        await s.commit()
+
+    r = await client.get(
+        f"/api/v1/podcasts/channels/{channel_id}/episodes?sort=unplayed",
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert r.status_code == 200
+    assert [e["title"] for e in r.json()["episodes"]] == [
+        "Episode 1",
+        "Episode 2",
+        "Episode 0",
+    ]
+
+
+async def test_list_episodes_sort_rejects_bad_value(client, make_token, seeded_channel):
+    channel_id, _ = seeded_channel
+    raw = await make_token()
+    r = await client.get(
+        f"/api/v1/podcasts/channels/{channel_id}/episodes?sort=bogus",
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert r.status_code == 422
+
+
 # ---- POST /podcasts/channels/{id}/refresh ----------------------------------
 
 

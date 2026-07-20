@@ -69,6 +69,36 @@ class EpisodeListResponse(BaseModel):
     total: int
 
 
+class EpisodeWithChannelItem(BaseModel):
+    """PA1 (#53): an `EpisodeItem` plus its show's title/art, for the
+    cross-subscription feeds (`GET /podcasts/episodes`) that render episodes
+    from many shows in one list — the client would otherwise need a second
+    round-trip per show to label each row."""
+
+    id: UUID
+    channel_id: UUID
+    channel_title: str
+    channel_image_url: str | None
+    guid: str
+    title: str
+    description: str | None
+    published_at: datetime | None
+    duration_s: int | None
+    enclosure_url: str
+    enclosure_type: str | None
+    image_url: str | None
+    episode_no: int | None
+    season_no: int | None
+    downloaded: bool
+    position_s: int
+    played: bool
+
+
+class EpisodeFeedResponse(BaseModel):
+    episodes: list[EpisodeWithChannelItem]
+    total: int
+
+
 class EpisodeDownloadResponse(BaseModel):
     job_id: UUID
     state: str

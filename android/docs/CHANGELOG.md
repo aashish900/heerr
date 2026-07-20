@@ -3116,3 +3116,7 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - `flutter analyze` and `flutter test` (1075 tests) green before and after.
 - Version bump `5.1.0` → `5.2.0` across all five sync locations (Android-only change; no backend changes).
 - See `DECISIONLOG.md` 2026-07-20 "PR2: podcast player redesign (#53)".
+
+## 2026-07-20 — chore: version bumped for sync (backend Phase PA, #53)
+
+- No Android changes yet. Backend `v5.3.0` (Phase PA) adds `GET /podcasts/episodes` (cross-subscription feeds) and a `sort` param on the per-channel episode list — see `backend/docs/CHANGELOG.md` 2026-07-20 and `backend/docs/DECISIONLOG.md` 2026-07-20 "PA1/PA2: podcast aggregate feeds." This is the backend prerequisite for Android Phase PR3, which is not yet built. Version bump `5.2.0` → `5.3.0` across all five sync locations.

@@ -516,3 +516,21 @@ Sub-decisions locked across J1–J10:
 - **Switch to Listen Notes or another indexed catalog** — not evaluated in depth; most third-party podcast directories require their own paid/keyed API. iTunes Search was chosen specifically because it needs nothing at all.
 
 **Reference:** `backend/app/services/podcast_search.py`, `backend/app/api/v1/podcasts.py::search_podcasts`, `backend/tests/test_podcast_search_client.py`, `backend/tests/test_podcast_search.py`. Supersedes the discovery-source half of the 2026-07-20 "Podcasts: own data model, Podcast Index + RSS, backend-served audio" ADR above — the RSS/data-model/serving decisions there are unaffected.
+
+## 2026-07-20 — PA1/PA2: podcast aggregate feeds (#53)
+
+**Context:** A user-supplied podcast-flow design triggered a redesign of the Android podcast UI (Phase PR, `android/docs/DECISIONLOG.md` 2026-07-20 entries). Its Home "Continue Listening"/"Latest Episodes" sections and Library Episodes/Downloads tabs need episodes drawn from *every* show a user is subscribed to — the existing `GET /podcasts/channels/{id}/episodes` only ever lists one channel's episodes. No new tables were needed; this is pure query work over the Phase P schema.
+
+**Decision:**
+1. **`GET /podcasts/episodes?filter=in_progress|latest|downloaded`** (new, `PA1`) joins `podcast_subscription` → `podcast_channel` → `podcast_episode`, left-joins the caller's own `podcast_progress` row per episode, and scopes everything to `PodcastSubscription.user_id == tok.user_id`. Each `EpisodeWithChannelItem` inlines `channel_title`/`channel_image_url` so the client can render a row without a second call per show. `filter` is a required `Literal` query param (no default) — there's no sensible "give me everything" mode for a screen that always needs one of the three specific slices.
+2. **`sort=newest|oldest|unplayed`** (new, `PA2`) was added to the existing per-channel `list_episodes` rather than spun out as a new endpoint — same query, same auth, same response shape; only the `ORDER BY` changes. `unplayed` orders by `played` ascending (unplayed first — a missing progress row counts as unplayed via `COALESCE(played, false)`) then newest among ties, not a strict two-bucket partition, so a mostly-listened backlog still surfaces recent items sensibly within each bucket.
+3. **Count via `select_from(query.subquery())`** rather than a hand-rolled parallel count query per filter — the three filters have different WHERE clauses, and duplicating each one into a second count-only query risked the two drifting out of sync. The subquery-count pattern guarantees the count always matches exactly what the data query would return.
+
+**Why:** No schema change was needed — `podcast_progress`/`podcast_channel`/`podcast_episode`/`podcast_subscription` (Phase P1) already carry every field these feeds need. Reusing the existing per-user-scoping pattern (`tok.user_id`, the same `require_scope("read")` dependency, the same `_episode_item`-style row-mapping helper) keeps this consistent with every other podcast endpoint rather than introducing a parallel convention.
+
+**Alternatives considered:**
+- **A generic `GET /podcasts/episodes?sort=...` with no `filter` and client-side slicing** — rejected: would ship far more rows than any single screen needs (Home's Continue Listening wants a handful of in-progress episodes, not the caller's entire subscribed catalog) and pushes filtering logic the database is much better at onto the client.
+- **Separate endpoints per filter** (`/podcasts/episodes/in-progress`, `/podcasts/episodes/latest`, `/podcasts/episodes/downloaded`) — rejected: three endpoints sharing 90% of the same query is more surface area to keep in sync than one endpoint with a required query param.
+- **Boolean `played` sort partition without a secondary "newest" tiebreaker** — rejected during test-writing: an unplayed backlog would otherwise render in undefined/insertion order within the bucket, which is worse UX than newest-first per bucket.
+
+**Reference:** `backend/app/api/v1/podcasts.py::list_episode_feed` / `::list_episodes`, `backend/app/schemas/podcast.py::EpisodeWithChannelItem`/`EpisodeFeedResponse`, `backend/tests/test_podcast_feeds.py`, `backend/tests/test_podcast_episodes.py` (sort tests).

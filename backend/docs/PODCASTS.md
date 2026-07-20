@@ -12,6 +12,12 @@ Scope decision (locked by owner): **Full podcast model** + **Podcast Index / RSS
 > history — the shipped discovery source is iTunes Search (`app/services/podcast_search.py`).
 > See `DECISIONLOG.md` 2026-07-20 "Podcast discovery: Podcast Index -> iTunes Search."
 
+> **2026-07-20 update:** a user-supplied design ("Podcast Flow") triggered a follow-on redesign
+> round (Android Phase PR + backend Phase PA) promoting podcasts to a first-class Library/Home
+> surface. Backend Phase PA (`v5.3.0`) added `GET /podcasts/episodes` (cross-subscription feeds)
+> and a `sort` param on the per-channel episode list — both in `app/api/v1/podcasts.py`. See
+> `DECISIONLOG.md` 2026-07-20 "PA1/PA2: podcast aggregate feeds."
+
 This is a cross-cutting feature (backend backbone + Android client). It lives here because
 backend-first is the project rule (`/CLAUDE.md` §3). Android phases depend on the backend
 endpoints existing and curl-testable first.

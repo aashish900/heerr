@@ -37,7 +37,7 @@ def create_app() -> FastAPI:
     log_spotdl_version()
     app = FastAPI(
         title="heerr backend",
-        version="5.2.0",
+        version="5.3.0",
         openapi_url=None,
         docs_url=None,
         redoc_url=None,

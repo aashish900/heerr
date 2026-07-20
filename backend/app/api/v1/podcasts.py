@@ -1,7 +1,7 @@
 import os
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
@@ -18,10 +18,12 @@ from app.models import PodcastChannel, PodcastEpisode, PodcastProgress, PodcastS
 from app.schemas.podcast import (
     ChannelItem,
     EpisodeDownloadResponse,
+    EpisodeFeedResponse,
     EpisodeItem,
     EpisodeListResponse,
     EpisodeProgressRequest,
     EpisodeProgressResponse,
+    EpisodeWithChannelItem,
     PodcastChannelItem,
     PodcastSearchRequest,
     PodcastSearchResponse,
@@ -65,6 +67,32 @@ def _episode_item(episode: PodcastEpisode, progress: PodcastProgress | None) -> 
     return EpisodeItem(
         id=episode.id,
         channel_id=episode.channel_id,
+        guid=episode.guid,
+        title=episode.title,
+        description=episode.description,
+        published_at=episode.published_at,
+        duration_s=episode.duration_s,
+        enclosure_url=episode.enclosure_url,
+        enclosure_type=episode.enclosure_type,
+        image_url=episode.image_url,
+        episode_no=episode.episode_no,
+        season_no=episode.season_no,
+        downloaded=episode.downloaded_path is not None,
+        position_s=progress.position_s if progress else 0,
+        played=progress.played if progress else False,
+    )
+
+
+def _episode_with_channel_item(
+    episode: PodcastEpisode,
+    channel: PodcastChannel,
+    progress: PodcastProgress | None,
+) -> EpisodeWithChannelItem:
+    return EpisodeWithChannelItem(
+        id=episode.id,
+        channel_id=episode.channel_id,
+        channel_title=channel.title,
+        channel_image_url=channel.image_url,
         guid=episode.guid,
         title=episode.title,
         description=episode.description,
@@ -168,11 +196,63 @@ async def list_subscriptions(
     return SubscriptionsResponse(channels=[_channel_item(c) for c in channels])
 
 
+@router.get("/episodes", response_model=EpisodeFeedResponse)
+async def list_episode_feed(
+    filter: Literal["in_progress", "latest", "downloaded"] = Query(...),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    session: AsyncSession = Depends(get_session),
+    tok: Token = Depends(require_scope("read")),
+) -> EpisodeFeedResponse:
+    """PA1 (#53): episodes across every show the caller is subscribed to —
+    backs the Android redesign's Home "Continue Listening"/"Latest Episodes"
+    sections and the Library Episodes/Downloads tabs (`android/docs/ROADMAP.md`
+    Phase PR3), none of which the per-channel `list_episodes` below can serve.
+    """
+    query = (
+        select(PodcastEpisode, PodcastChannel, PodcastProgress)
+        .join(PodcastChannel, PodcastChannel.id == PodcastEpisode.channel_id)
+        .join(
+            PodcastSubscription,
+            PodcastSubscription.channel_id == PodcastChannel.id,
+        )
+        .outerjoin(
+            PodcastProgress,
+            and_(
+                PodcastProgress.episode_id == PodcastEpisode.id,
+                PodcastProgress.user_id == tok.user_id,
+            ),
+        )
+        .where(PodcastSubscription.user_id == tok.user_id)
+    )
+
+    if filter == "in_progress":
+        query = query.where(
+            PodcastProgress.position_s > 0,
+            PodcastProgress.played.is_(False),
+        ).order_by(PodcastProgress.last_played_at.desc().nulls_last())
+    elif filter == "latest":
+        query = query.order_by(PodcastEpisode.published_at.desc().nulls_last())
+    else:  # downloaded
+        query = query.where(PodcastEpisode.downloaded_path.is_not(None)).order_by(
+            PodcastEpisode.downloaded_at.desc().nulls_last()
+        )
+
+    total = await session.scalar(select(func.count()).select_from(query.subquery()))
+    result = await session.execute(query.limit(limit).offset(offset))
+    episodes = [
+        _episode_with_channel_item(episode, channel, progress)
+        for episode, channel, progress in result.all()
+    ]
+    return EpisodeFeedResponse(episodes=episodes, total=total or 0)
+
+
 @router.get("/channels/{channel_id}/episodes", response_model=EpisodeListResponse)
 async def list_episodes(
     channel_id: UUID,
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    sort: Literal["newest", "oldest", "unplayed"] = Query(default="newest"),
     session: AsyncSession = Depends(get_session),
     tok: Token = Depends(require_scope("read")),
 ) -> EpisodeListResponse:
@@ -186,7 +266,7 @@ async def list_episodes(
         .where(PodcastEpisode.channel_id == channel_id)
     )
 
-    result = await session.execute(
+    query = (
         select(PodcastEpisode, PodcastProgress)
         .outerjoin(
             PodcastProgress,
@@ -196,10 +276,23 @@ async def list_episodes(
             ),
         )
         .where(PodcastEpisode.channel_id == channel_id)
-        .order_by(PodcastEpisode.published_at.desc().nulls_last())
-        .limit(limit)
-        .offset(offset)
     )
+    # PA2 (#53): backs the Android redesign's Episodes-list sort control
+    # (`android/docs/ROADMAP.md` Phase PR1/PR3). "unplayed" is unplayed
+    # episodes first (a missing progress row counts as unplayed), newest
+    # among ties — not a strict boolean partition, since a fully-listened
+    # backlog would otherwise render in an unhelpful oldest-first order.
+    if sort == "oldest":
+        query = query.order_by(PodcastEpisode.published_at.asc().nulls_last())
+    elif sort == "unplayed":
+        query = query.order_by(
+            func.coalesce(PodcastProgress.played, False).asc(),
+            PodcastEpisode.published_at.desc().nulls_last(),
+        )
+    else:  # newest
+        query = query.order_by(PodcastEpisode.published_at.desc().nulls_last())
+
+    result = await session.execute(query.limit(limit).offset(offset))
     episodes = [_episode_item(ep, progress) for ep, progress in result.all()]
     return EpisodeListResponse(episodes=episodes, total=total or 0)
 
