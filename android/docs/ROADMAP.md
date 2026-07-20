@@ -900,7 +900,7 @@ Design doc: `backend/docs/PODCASTS.md`. Scope locked by owner: **full podcast mo
 **Test gate:** model round-trip serialization; API wrapper builds requests with the right paths/verbs (dio mocked). `build_runner` clean; `flutter analyze` + `flutter test` green.
 **Commit:** `feat(flutter): PC1 — podcast models + API client (#53)`
 
-### [ ] PC2. Discover screen — Podcast Index search + subscribe
+### [x] PC2. Discover screen — Podcast Index search + subscribe
 **Backend prereq:** P2, P3. **Files:** `android/app/lib/screens/podcasts/discover_screen.dart`, provider(s) under `lib/providers/podcasts/`, router entry, `android/app/test/podcast_discover_test.dart`.
 **Deliverable:** Search box → Podcast Index results (art, title, author); tap → channel preview → Subscribe/Unsubscribe. Error UX per CONTEXT.md table (502 = "podcast search error").
 **Test gate:** widget test — query renders results (provider mocked); subscribe toggles state. Analyze + test green.

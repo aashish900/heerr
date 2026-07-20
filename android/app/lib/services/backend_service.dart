@@ -185,11 +185,13 @@ class BackendService {
   Future<List<PodcastChannel>> searchPodcasts(
     String query, {
     int limit = 20,
+    CancelToken? cancelToken,
   }) {
     return apiCall<List<PodcastChannel>>(
       () => _dio.post<dynamic>(
         Endpoints.podcastSearch,
         data: <String, dynamic>{'query': query, 'limit': limit},
+        cancelToken: cancelToken,
       ),
       (dynamic data) {
         final Map<String, dynamic> json = data as Map<String, dynamic>;

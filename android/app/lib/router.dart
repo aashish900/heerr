@@ -21,6 +21,7 @@ import 'screens/library/favorites_screen.dart';
 import 'screens/library/recently_added_screen.dart';
 import 'screens/library/recently_played_screen.dart';
 import 'screens/player/now_playing_screen.dart';
+import 'screens/podcasts/discover_screen.dart';
 import 'screens/profile/edit_server_details_screen.dart';
 import 'screens/profile/profile_edit_screen.dart';
 import 'screens/profile/profile_screen.dart';
@@ -61,6 +62,11 @@ class Routes {
 
   // Job-detail lands at D3; route shape defined here to lock the URL.
   static String job(String id) => '/job/$id';
+
+  // Phase PC podcasts (#53). Discover is reachable standalone for now;
+  // PC3 adds the "Podcasts" nav/Profile entry point plus subscriptions +
+  // channel-detail routes under this same /podcasts prefix.
+  static const String podcastsDiscover = '/podcasts/discover';
 }
 
 /// Maps the `/library?tab=` query param to [LibraryScreen]'s tab order
@@ -215,6 +221,14 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
         path: '/player',
         builder: (BuildContext context, GoRouterState state) =>
             const NowPlayingScreen(),
+      ),
+      // Podcasts Discover (PC2, #53) — top-level push, same as Now Playing.
+      // No nav-tab entry point yet (PC3 wires that in); reachable via
+      // context.push(Routes.podcastsDiscover) until then.
+      GoRoute(
+        path: Routes.podcastsDiscover,
+        builder: (BuildContext context, GoRouterState state) =>
+            const DiscoverScreen(),
       ),
       // Profile page (#37, Phase Z redesign) — top-level full-screen push,
       // like Now Playing. The display screen lives at /profile; the edit
