@@ -492,7 +492,7 @@ Design doc: `backend/docs/PODCASTS.md`. Scope locked by owner: **full podcast mo
 **Test gate:** pagination bounds; progress + downloaded fields correct per user; 304 path adds nothing; new-episode path inserts; 404 unknown channel. Full suite green.
 **Commit:** `feat(backend): P4 — episode list (paginated) + channel refresh (#53)`
 
-### [ ] P5. Episode download worker + `POST /podcasts/episodes/{id}/download`
+### [x] P5. Episode download worker + `POST /podcasts/episodes/{id}/download`
 **Files:** `backend/app/services/podcast_download.py`, `backend/app/services/workers.py` (dispatch on job `kind`), `backend/app/models/job.py` (+`kind` discriminator `song|episode`, nullable `episode_id`), `backend/alembic/versions/00NN_job_kind.py`, `backend/app/api/v1/podcasts.py` (+route), `backend/app/config.py` (`podcast_output_dir`), `/.env.example`, `docker-compose.snippet.yml` (mount `PODCAST_OUTPUT_DIR`, NOT Navidrome-watched), `backend/tests/test_podcast_download.py`.
 **Deliverable:** Worker streams `enclosure_url` → temp → fsync → move into `PODCAST_OUTPUT_DIR` (never `MUSIC_OUTPUT_DIR`); sets `downloaded_path/bytes/at`. `POST /podcasts/episodes/{id}/download` enqueues via the existing job table (reuses `/queue` + Sync Center UI) with `kind='episode'`; `require_scope("download")`; idempotent per episode via the partial-unique-index pattern. spotDL/yt-dlp NOT involved.
 **Test gate:** 401/403; enqueue → worker writes file to podcast dir + marks episode downloaded (subprocess/network mocked at boundary); dedupe (no duplicate active job per episode); appears in `/queue`; failed enclosure → job `failed` with error. Full suite green; ruff + mypy clean.

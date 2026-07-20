@@ -1,7 +1,7 @@
 from typing import cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import and_, func, select
 from sqlalchemy import delete as sa_delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -13,6 +13,7 @@ from app.db import get_session
 from app.models import PodcastChannel, PodcastEpisode, PodcastProgress, PodcastSubscription, Token
 from app.schemas.podcast import (
     ChannelItem,
+    EpisodeDownloadResponse,
     EpisodeItem,
     EpisodeListResponse,
     PodcastChannelItem,
@@ -22,12 +23,14 @@ from app.schemas.podcast import (
     SubscriptionsResponse,
 )
 from app.services.feeds import FeedFetchError, ingest_feed
+from app.services.jobs import create_job_idempotent
 from app.services.podcastindex import (
     PodcastIndexClient,
     PodcastIndexError,
     PodcastIndexNotConfigured,
     get_podcastindex_client,
 )
+from app.services.workers import PodcastJobEnqueuer, get_podcast_enqueuer
 
 router = APIRouter(prefix="/podcasts", tags=["podcasts"])
 
@@ -208,3 +211,38 @@ async def refresh_channel(
             detail=f"feed error: {e}",
         ) from e
     return _channel_item(channel)
+
+
+@router.post(
+    "/episodes/{episode_id}/download",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=EpisodeDownloadResponse,
+)
+async def download_episode_endpoint(
+    episode_id: UUID,
+    bg: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    enqueue: PodcastJobEnqueuer = Depends(get_podcast_enqueuer),
+    tok: Token = Depends(require_scope("download")),
+) -> EpisodeDownloadResponse:
+    episode = await session.get(PodcastEpisode, episode_id)
+    if episode is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="episode not found")
+
+    job, deduped = await create_job_idempotent(
+        session,
+        source_url=episode.enclosure_url,
+        source_type="episode",
+        token_id=tok.id,
+        user_id=tok.user_id,
+        display_name=episode.title,
+        episode_id=episode.id,
+    )
+    # Commit before enqueuing: BackgroundTasks run before the get_session
+    # dependency commits on teardown, so the worker would find no row otherwise
+    # (same ordering constraint as POST /download).
+    await session.commit()
+    if not deduped:
+        enqueue(bg, job.id)
+
+    return EpisodeDownloadResponse(job_id=job.id, state=job.state, deduped=deduped)

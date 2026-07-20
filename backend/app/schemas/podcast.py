@@ -67,3 +67,9 @@ class EpisodeItem(BaseModel):
 class EpisodeListResponse(BaseModel):
     episodes: list[EpisodeItem]
     total: int
+
+
+class EpisodeDownloadResponse(BaseModel):
+    job_id: UUID
+    state: str
+    deduped: bool

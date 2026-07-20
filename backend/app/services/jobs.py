@@ -61,6 +61,7 @@ async def create_job_idempotent(
     token_id: UUID,
     user_id: UUID,
     display_name: str | None = None,
+    episode_id: UUID | None = None,
 ) -> tuple[Job, bool]:
     """Return (job, deduped).
 
@@ -85,6 +86,7 @@ async def create_job_idempotent(
         display_name=display_name,
         created_by_token_id=token_id,
         user_id=user_id,
+        episode_id=episode_id,
     )
     session.add(job)
     try:

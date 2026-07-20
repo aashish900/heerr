@@ -8,7 +8,7 @@ from pydantic import BaseModel
 class JobView(BaseModel):
     job_id: UUID
     source_url: str
-    source_type: Literal["song", "album", "playlist"]
+    source_type: Literal["song", "album", "playlist", "episode"]
     state: Literal["queued", "running", "done", "failed"]
     display_name: str | None
     progress: None = None  # v1: always null per PLAN; reserved for future

@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     podcastindex_key: str | None = None
     podcastindex_secret: str | None = None
 
+    # Where downloaded podcast episodes are written (Phase P5). Deliberately
+    # NOT music_output_dir — Navidrome does not watch this directory, so
+    # episodes never get indexed as songs.
+    podcast_output_dir: str = "/data/media/podcasts"
+
     @field_validator("navidrome_url")
     @classmethod
     def _validate_navidrome_url(cls, v: str) -> str:

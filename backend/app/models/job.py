@@ -28,7 +28,7 @@ class Job(Base):
             name="jobs_state_valid",
         ),
         sa.CheckConstraint(
-            "source_type IN ('song','album','playlist')",
+            "source_type IN ('song','album','playlist','episode')",
             name="jobs_source_type_valid",
         ),
         sa.Index(
@@ -51,6 +51,13 @@ class Job(Base):
             name="jobs_user_id_fkey",
         ),
         sa.Index("jobs_user_idx", "user_id"),
+        sa.ForeignKeyConstraint(
+            ["episode_id"],
+            ["podcast_episode.id"],
+            ondelete="SET NULL",
+            name="jobs_episode_id_fkey",
+        ),
+        sa.Index("jobs_episode_idx", "episode_id"),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -78,5 +85,6 @@ class Job(Base):
         postgresql.UUID(as_uuid=True),
         nullable=False,
     )
+    episode_id: Mapped[UUID | None] = mapped_column(postgresql.UUID(as_uuid=True), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="jobs")

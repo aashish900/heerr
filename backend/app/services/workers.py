@@ -1,6 +1,7 @@
 import functools
 import logging
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import BackgroundTasks
@@ -8,18 +9,20 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.config import get_settings
 from app.db import _sessionmaker
-from app.models import Download, Job
+from app.models import Download, Job, PodcastEpisode
 from app.services.jobs import (
     InvalidStateTransition,
     mark_done,
     mark_failed,
     mark_running,
 )
+from app.services.podcast_download import DownloadedEpisode, download_episode
 from app.services.spotdl_runner import DownloadedFile, run_spotdl
 
 logger = logging.getLogger(__name__)
 
 SpotdlRunner = Callable[[str, str], Awaitable[list[DownloadedFile]]]
+PodcastDownloader = Callable[..., Awaitable[DownloadedEpisode]]
 
 _ERROR_MSG_MAX = 2000
 
@@ -134,4 +137,102 @@ def get_enqueuer() -> JobEnqueuer:
         sm=_sessionmaker(),
         runner=functools.partial(run_spotdl, embed_lyrics=settings.spotdl_embed_lyrics),
         output_dir=settings.music_output_dir,
+    )
+
+
+async def run_podcast_episode_job(
+    job_id: UUID,
+    *,
+    sm: async_sessionmaker,
+    downloader: PodcastDownloader,
+    output_dir: str,
+) -> None:
+    """Drive an episode-download job through queued -> running -> (done | failed).
+
+    Separate from `run_job` (spotDL path) rather than a branch inside it: an
+    episode enclosure is a plain HTTP fetch, not a spotDL invocation, and the
+    Phase-3 bookkeeping writes to `podcast_episode`, not `downloads`. Keeping
+    this as its own function means the spotDL path (song/album/playlist) is
+    untouched.
+    """
+    # Phase 1: load job + episode + transition queued -> running
+    async with sm() as s:
+        job = await s.get(Job, job_id)
+        if job is None or job.episode_id is None:
+            logger.warning("run_podcast_episode_job: job %s missing or not an episode", job_id)
+            return
+        episode = await s.get(PodcastEpisode, job.episode_id)
+        if episode is None:
+            logger.warning("run_podcast_episode_job: episode %s missing", job.episode_id)
+            await _safe_mark_failed(sm, job_id, "episode no longer exists")
+            return
+        enclosure_url = episode.enclosure_url
+        enclosure_type = episode.enclosure_type
+        episode_id = episode.id
+        try:
+            await mark_running(s, job_id)
+        except InvalidStateTransition:
+            logger.warning("run_podcast_episode_job: job %s not in queued state", job_id)
+            return
+        await s.commit()
+
+    # Phase 2: fetch the enclosure
+    try:
+        downloaded = await downloader(
+            enclosure_url,
+            output_dir,
+            episode_id=episode_id,
+            enclosure_type=enclosure_type,
+        )
+    except Exception as e:
+        msg = f"{type(e).__name__}: {e}"[-_ERROR_MSG_MAX:]
+        await _safe_mark_failed(sm, job_id, msg)
+        logger.exception("run_podcast_episode_job: download failed for %s", job_id)
+        return
+
+    # Phase 3: record the episode's download state + transition running -> done
+    try:
+        async with sm() as s:
+            ep = await s.get(PodcastEpisode, episode_id)
+            if ep is not None:
+                ep.downloaded_path = downloaded.path
+                ep.downloaded_bytes = downloaded.size_bytes
+                ep.downloaded_at = datetime.now(UTC)
+            await mark_done(s, job_id)
+            await s.commit()
+    except Exception as e:
+        msg = f"bookkeeping failed: {type(e).__name__}: {e}"[-_ERROR_MSG_MAX:]
+        await _safe_mark_failed(sm, job_id, msg)
+        logger.exception("run_podcast_episode_job: post-download bookkeeping failed for %s", job_id)
+
+
+class PodcastJobEnqueuer:
+    """Schedules `run_podcast_episode_job` to execute via FastAPI BackgroundTasks."""
+
+    def __init__(
+        self,
+        sm: async_sessionmaker,
+        downloader: PodcastDownloader,
+        output_dir: str,
+    ):
+        self._sm = sm
+        self._downloader = downloader
+        self._output_dir = output_dir
+
+    def __call__(self, bg: BackgroundTasks, job_id: UUID) -> None:
+        bg.add_task(
+            run_podcast_episode_job,
+            job_id,
+            sm=self._sm,
+            downloader=self._downloader,
+            output_dir=self._output_dir,
+        )
+
+
+def get_podcast_enqueuer() -> PodcastJobEnqueuer:
+    settings = get_settings()
+    return PodcastJobEnqueuer(
+        sm=_sessionmaker(),
+        downloader=download_episode,
+        output_dir=settings.podcast_output_dir,
     )

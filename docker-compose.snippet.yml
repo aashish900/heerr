@@ -93,6 +93,9 @@ services:
     volumes:
       # Navidrome watches the host path and indexes new files within ~1 min.
       - /data/media/music:/data/media/music:rw
+      # Podcast episodes (Phase P, #53) — deliberately NOT Navidrome-watched;
+      # the backend serves this audio itself (GET /podcasts/episodes/{id}/audio).
+      - /data/media/podcasts:/data/media/podcasts:rw
     healthcheck:
       # Python urllib is in the slim image; avoids adding curl just for this.
       test:
