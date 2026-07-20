@@ -49,6 +49,12 @@ class PodcastSubscriptions extends _$PodcastSubscriptions {
       current.where((PodcastChannel c) => c.id != channelId).toList(),
     );
   }
+
+  /// Pull-to-refresh (PC3 Subscriptions screen) — re-fetches the list.
+  Future<void> refresh() async {
+    ref.invalidateSelf();
+    await future;
+  }
 }
 
 /// True when [feedUrl] appears (by exact match) in the current subscription

@@ -80,6 +80,14 @@ class ProfileScreen extends ConsumerWidget {
             label: 'Playlists',
             onTap: () => context.go(Routes.libraryPlaylistsTab),
           ),
+          _ProfileActionCard(
+            key: const Key('profile-row-podcasts'),
+            icon: Icons.podcasts_outlined,
+            label: 'Podcasts',
+            // push, not go: podcasts routes are top-level (like /player),
+            // not ShellRoute-nested, so there's no duplicated-page-key risk.
+            onTap: () => context.push(Routes.podcastsSubscriptions),
+          ),
           const SizedBox(height: 20),
           const _SectionHeader('Settings'),
           const SizedBox(height: 8),

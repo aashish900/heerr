@@ -21,7 +21,9 @@ import 'screens/library/favorites_screen.dart';
 import 'screens/library/recently_added_screen.dart';
 import 'screens/library/recently_played_screen.dart';
 import 'screens/player/now_playing_screen.dart';
+import 'screens/podcasts/channel_screen.dart';
 import 'screens/podcasts/discover_screen.dart';
+import 'screens/podcasts/subscriptions_screen.dart';
 import 'screens/profile/edit_server_details_screen.dart';
 import 'screens/profile/profile_edit_screen.dart';
 import 'screens/profile/profile_screen.dart';
@@ -67,6 +69,9 @@ class Routes {
   // PC3 adds the "Podcasts" nav/Profile entry point plus subscriptions +
   // channel-detail routes under this same /podcasts prefix.
   static const String podcastsDiscover = '/podcasts/discover';
+  static const String podcastsSubscriptions = '/podcasts/subscriptions';
+  static String podcastsChannel(String channelId) =>
+      '/podcasts/channel/$channelId';
 }
 
 /// Maps the `/library?tab=` query param to [LibraryScreen]'s tab order
@@ -229,6 +234,17 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
         path: Routes.podcastsDiscover,
         builder: (BuildContext context, GoRouterState state) =>
             const DiscoverScreen(),
+      ),
+      // PC3: subscriptions list + channel-detail episode list.
+      GoRoute(
+        path: Routes.podcastsSubscriptions,
+        builder: (BuildContext context, GoRouterState state) =>
+            const SubscriptionsScreen(),
+      ),
+      GoRoute(
+        path: '/podcasts/channel/:id',
+        builder: (BuildContext context, GoRouterState state) =>
+            ChannelScreen(channelId: state.pathParameters['id']!),
       ),
       // Profile page (#37, Phase Z redesign) — top-level full-screen push,
       // like Now Playing. The display screen lives at /profile; the edit

@@ -130,6 +130,11 @@ void main() {
           builder: (BuildContext context, GoRouterState state) =>
               const Scaffold(body: Text('SETTINGS_SCREEN')),
         ),
+        GoRoute(
+          path: '/podcasts/subscriptions',
+          builder: (BuildContext context, GoRouterState state) =>
+              const Scaffold(body: Text('PODCASTS_SCREEN')),
+        ),
       ],
     );
     return ProviderScope(
@@ -275,6 +280,15 @@ void main() {
     expect(find.text('LIBRARY_SCREEN tab=playlists'), findsOneWidget);
   });
 
+  testWidgets('Podcasts card pushes /podcasts/subscriptions',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(wrap());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('profile-row-podcasts')));
+    await tester.pumpAndSettle();
+    expect(find.text('PODCASTS_SCREEN'), findsOneWidget);
+  });
+
   testWidgets('Settings card goes to /settings', (WidgetTester tester) async {
     await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
@@ -324,6 +338,9 @@ void main() {
     await tester.scrollUntilVisible(
         find.byKey(const Key('profile-logout')), 300,
         scrollable: find.byType(Scrollable).first);
+    // Same "clears the pinned AppBar" nudge as the Settings-card test.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -80));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('profile-logout')));
     await tester.pumpAndSettle();
     expect(find.text('Log out?'), findsOneWidget);
@@ -348,6 +365,9 @@ void main() {
     await tester.scrollUntilVisible(
         find.byKey(const Key('profile-logout')), 300,
         scrollable: find.byType(Scrollable).first);
+    // Same "clears the pinned AppBar" nudge as the Settings-card test.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -80));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('profile-logout')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Log out'));
@@ -370,6 +390,9 @@ void main() {
     await tester.scrollUntilVisible(
         find.byKey(const Key('profile-logout')), 300,
         scrollable: find.byType(Scrollable).first);
+    // Same "clears the pinned AppBar" nudge as the Settings-card test.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -80));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('profile-logout')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Log out'));

@@ -906,7 +906,7 @@ Design doc: `backend/docs/PODCASTS.md`. Scope locked by owner: **full podcast mo
 **Test gate:** widget test — query renders results (provider mocked); subscribe toggles state. Analyze + test green.
 **Commit:** `feat(flutter): PC2 — podcast discover + subscribe (#53)`
 
-### [ ] PC3. Subscriptions + Channel-detail episode list
+### [x] PC3. Subscriptions + Channel-detail episode list
 **Backend prereq:** P3, P4. **Files:** `android/app/lib/screens/podcasts/{subscriptions_screen,channel_screen}.dart`, providers, router entries, tests.
 **Deliverable:** Subscriptions grid/list of subscribed channels; Channel detail = paginated episode list with published date, duration, **played badge + resume position** (from backend progress), pull-to-refresh → `POST …/refresh`. "Podcasts" entry in nav/Profile.
 **Test gate:** widget tests — subscriptions render; episode list paginates; played/unplayed + resume indicators reflect progress fields. Analyze + test green.
