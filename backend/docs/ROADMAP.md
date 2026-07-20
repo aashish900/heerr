@@ -462,6 +462,51 @@ Passes `--lyrics` to spotDL when enabled so downloaded MP3s carry embedded lyric
 
 ---
 
+## Phase P — Podcasts (Podcast Index + RSS) — full podcast model (#53)
+
+Design doc: `backend/docs/PODCASTS.md`. Scope locked by owner: **full podcast model** (own tables — the app does NOT piggyback on the Navidrome music library) + **Podcast Index / RSS** discovery. Navidrome does not serve podcasts server-side ([navidrome#793](https://github.com/navidrome/navidrome/issues/793) OPEN), so the backend owns podcast metadata, storage, and audio serving. Backend-first: every Android podcast phase (`android/docs/ROADMAP.md` Phase PC) depends on these endpoints existing and being curl-testable.
+
+**Order of execution: P1 → P2 → P3 → P4 → P5 → P6, strictly in sequence.** Each is one commit with a green gate. Suggested version bump `v5.0.0` at P6 (owner to confirm); the version-sync rule (`/CLAUDE.md` §3, five files) applies only at implementation, not at plan time.
+
+### [ ] P1. Data model + migration — channels, episodes, subscriptions, progress
+**Files:** `backend/alembic/versions/00NN_podcasts.py`, `backend/app/models/{podcast_channel,podcast_episode,podcast_subscription,podcast_progress}.py`, `backend/app/models/__init__.py` (register), `backend/tests/test_migration_podcasts.py`, `backend/tests/test_models_match_schema.py` (extend).
+**Deliverable:** Four tables. `podcast_channel` (`id`, `feed_url` unique-normalized, `title`, `author`, `description`, `image_url`, `categories`, `last_fetched_at`, `http_etag`, `http_last_modified`); `podcast_episode` (`id`, `channel_id` FK, `guid` unique-per-channel, `title`, `description`, `published_at`, `duration_s`, `enclosure_url`, `enclosure_type`, `enclosure_bytes`, `image_url`, `episode_no`, `season_no`, `downloaded_path`/`downloaded_bytes`/`downloaded_at` nullable); `podcast_subscription` (`user_id`,`channel_id` unique, `subscribed_at`); `podcast_progress` (`user_id`,`episode_id` unique, `position_s`, `played`, `last_played_at`). Metadata shared; subscription+progress per-user (mirrors Phase J isolation). No endpoints.
+**Test gate:** migration round-trip; unique constraints (feed_url, per-channel guid, per-user subscription/progress) proven by catching the violation; `compare_metadata` clean; `alembic upgrade head` clean.
+**Commit:** `feat(db): P1 — podcast schema — channels, episodes, subscriptions, progress (#53)`
+
+### [ ] P2. Podcast Index client + `POST /api/v1/podcasts/search`
+**Files:** `backend/app/services/podcastindex.py`, `backend/app/api/v1/podcasts.py` (new router, mounted in `app/main.py`), `backend/app/config.py` (`podcastindex_key`, `podcastindex_secret`), `/.env.example` (documented block), `backend/tests/test_podcast_search.py`.
+**Deliverable:** `podcastindex.py` — HMAC-SHA1-authed client (search shows, lookup feed by id). `POST /podcasts/search` body `{query}` → list of channels (`feed_url`, `title`, `author`, `image_url`, `description`); `require_scope("read")`. Service injected via a `get_podcastindex_client` dependency so tests override it (same pattern as `get_ytmusic_client`).
+**Test gate:** 401/403; happy-path search mapped correctly (client mocked at the boundary via `dependency_overrides`); upstream failure → 502 envelope; missing env keys surfaced clearly. Full suite green; ruff + mypy clean.
+**Commit:** `feat(backend): P2 — Podcast Index search — POST /podcasts/search (#53)`
+
+### [ ] P3. RSS ingest + subscribe/unsubscribe/list
+**Files:** `backend/app/services/feeds.py` (feedparser ingest), `backend/app/api/v1/podcasts.py` (+3 routes), `backend/pyproject.toml` (`feedparser`), `backend/tests/test_podcast_subscribe.py`.
+**Deliverable:** `feeds.py` — fetch feed (conditional GET using stored etag/last-modified), parse via `feedparser`, upsert channel + newest-N episodes (dedupe by `guid`, cap ingest). `POST /podcasts/subscribe` body `{feed_url}` → ingest + create per-user subscription → `{channel}`; `DELETE /podcasts/subscribe/{channel_id}` (per-user, scoped); `GET /podcasts/subscriptions` → this user's channels. `require_scope("read")` (subscribe may use `read`; downloads gate on `download` at P5).
+**Test gate:** 401/403; subscribe upserts channel+episodes and dedupes on re-subscribe; two users subscribing same feed share one channel row; unsubscribe scoped to caller; malformed/empty feed → clean error; ingest cap respected. Full suite green.
+**Commit:** `feat(backend): P3 — RSS ingest + subscribe/unsubscribe/list (#53)`
+
+### [ ] P4. Episode list + channel refresh
+**Files:** `backend/app/api/v1/podcasts.py` (+2 routes), `backend/app/services/feeds.py` (refresh reuse), `backend/tests/test_podcast_episodes.py`.
+**Deliverable:** `GET /podcasts/channels/{id}/episodes?limit=&offset=` — paginated, newest-first, includes this user's `progress` (position/played) per episode and `downloaded` state. `POST /podcasts/channels/{id}/refresh` → conditional GET; 304 short-circuits (no re-parse); new episodes upserted. `require_scope("read")`.
+**Test gate:** pagination bounds; progress + downloaded fields correct per user; 304 path adds nothing; new-episode path inserts; 404 unknown channel. Full suite green.
+**Commit:** `feat(backend): P4 — episode list (paginated) + channel refresh (#53)`
+
+### [ ] P5. Episode download worker + `POST /podcasts/episodes/{id}/download`
+**Files:** `backend/app/services/podcast_download.py`, `backend/app/services/workers.py` (dispatch on job `kind`), `backend/app/models/job.py` (+`kind` discriminator `song|episode`, nullable `episode_id`), `backend/alembic/versions/00NN_job_kind.py`, `backend/app/api/v1/podcasts.py` (+route), `backend/app/config.py` (`podcast_output_dir`), `/.env.example`, `docker-compose.snippet.yml` (mount `PODCAST_OUTPUT_DIR`, NOT Navidrome-watched), `backend/tests/test_podcast_download.py`.
+**Deliverable:** Worker streams `enclosure_url` → temp → fsync → move into `PODCAST_OUTPUT_DIR` (never `MUSIC_OUTPUT_DIR`); sets `downloaded_path/bytes/at`. `POST /podcasts/episodes/{id}/download` enqueues via the existing job table (reuses `/queue` + Sync Center UI) with `kind='episode'`; `require_scope("download")`; idempotent per episode via the partial-unique-index pattern. spotDL/yt-dlp NOT involved.
+**Test gate:** 401/403; enqueue → worker writes file to podcast dir + marks episode downloaded (subprocess/network mocked at boundary); dedupe (no duplicate active job per episode); appears in `/queue`; failed enclosure → job `failed` with error. Full suite green; ruff + mypy clean.
+**Commit:** `feat(backend): P5 — podcast episode download worker + POST /podcasts/episodes/{id}/download (#53)`
+
+### [ ] P6. Episode audio serving (Range) + progress + version bump
+**Files:** `backend/app/api/v1/podcasts.py` (+2 routes), `backend/tests/test_podcast_stream.py`, `backend/tests/test_podcast_progress.py`, docs (`DECISIONLOG.md` new ADR, `CONTEXT.md` podcast surface, `CHANGELOG.md` P1–P6), version files per `/CLAUDE.md` §3.
+**Deliverable:** `GET /podcasts/episodes/{id}/audio` — streams the local downloaded file with **HTTP Range** support (206 on `Range:`; required for seek/resume); bearer auth, token may ride in `?token=` (just_audio limitation, redacted in logs — same as `/preview/stream`). For not-yet-downloaded episodes, responses carry the public `enclosure_url` for direct on-demand streaming (no backend proxy — does not expose the backend). `PUT /podcasts/episodes/{id}/progress` body `{position_s, played}` → upsert per-user progress (last-write-wins). ADR records: why backend serves audio (Navidrome can't), why enclosure passthrough for on-demand, the Range/resume contract, the token-in-URL tradeoff.
+**Test gate:** Range/206 + full-200 correct; bad range → 416; resume position round-trips; `played` toggles; auth 401/403; not-downloaded returns enclosure_url. Full suite green; ruff + mypy clean.
+**Smoke (home server):** subscribe to a real feed → episodes list → download one → `GET …/audio` with `Range:` returns 206 and plays; progress PUT round-trips; on-demand enclosure plays; file lands in `PODCAST_OUTPUT_DIR` and is NOT indexed by Navidrome.
+**Commit:** `feat(backend): P6 — podcast audio serving (Range) + progress + v5.0.0 (#53)`
+
+---
+
 ## Cross-cutting reminders
 
 - **`.env` never committed.** Only `.env.example`.
@@ -482,7 +527,7 @@ Passes `--lyrics` to spotDL when enabled so downloaded MP3s carry embedded lyric
 
 ## Roadmap complete when
 
-1. All milestone boxes checked (A1–H1, I1–I5, J1–J12, K1–K5, L1, N1).
+1. All milestone boxes checked (A1–H1, I1–I5, J1–J12, K1–K5, L1, N1, O1–O2, P1–P6).
 2. Every test gate green at its milestone.
 3. H1 smoke succeeds against the real home stack.
 4. J12 multi-user smoke succeeds against the real home stack.

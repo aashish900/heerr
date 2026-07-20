@@ -888,6 +888,45 @@ Fires only when the shell route is the top route (pushed detail screens pop them
 
 ---
 
+## Phase PC — Podcasts (discover / subscribe / download / play) (#53)
+
+Design doc: `backend/docs/PODCASTS.md`. Scope locked by owner: **full podcast model** + **Podcast Index / RSS** discovery. Pure-client slices — **all backend endpoints ship first** in `backend/docs/ROADMAP.md` Phase P (P1–P6) and must be curl-testable before the matching PC milestone starts. Reuse the locked stack (dio / riverpod / freezed / go_router); no new auth path, no new download engine on-device.
+
+**Order of execution: PC1 → PC2 → PC3 → PC4 → PC5, strictly in sequence, and only after backend Phase P is deployed.** Backend prerequisite per milestone is noted inline. Suggested version bump `v5.0.0` at PC5 (shared with backend P6 — version-sync rule, `/CLAUDE.md` §3).
+
+### [ ] PC1. Models + API client wiring
+**Backend prereq:** P2–P4 deployed. **Files:** `android/app/lib/models/{podcast_channel,podcast_episode,podcast_subscription,episode_progress}.dart` (`@freezed`), `android/app/lib/api/endpoints.dart` (+ podcast routes), `android/app/lib/api/podcast_api.dart`, `android/app/test/podcast_api_test.dart`.
+**Deliverable:** Freezed models + `fromJson`/`toJson` for channel/episode/subscription/progress; dio-backed API wrapper (search, subscribe, unsubscribe, subscriptions, episodes, refresh, download, progress, audio-url) routed through the existing auth interceptor.
+**Test gate:** model round-trip serialization; API wrapper builds requests with the right paths/verbs (dio mocked). `build_runner` clean; `flutter analyze` + `flutter test` green.
+**Commit:** `feat(flutter): PC1 — podcast models + API client (#53)`
+
+### [ ] PC2. Discover screen — Podcast Index search + subscribe
+**Backend prereq:** P2, P3. **Files:** `android/app/lib/screens/podcasts/discover_screen.dart`, provider(s) under `lib/providers/podcasts/`, router entry, `android/app/test/podcast_discover_test.dart`.
+**Deliverable:** Search box → Podcast Index results (art, title, author); tap → channel preview → Subscribe/Unsubscribe. Error UX per CONTEXT.md table (502 = "podcast search error").
+**Test gate:** widget test — query renders results (provider mocked); subscribe toggles state. Analyze + test green.
+**Commit:** `feat(flutter): PC2 — podcast discover + subscribe (#53)`
+
+### [ ] PC3. Subscriptions + Channel-detail episode list
+**Backend prereq:** P3, P4. **Files:** `android/app/lib/screens/podcasts/{subscriptions_screen,channel_screen}.dart`, providers, router entries, tests.
+**Deliverable:** Subscriptions grid/list of subscribed channels; Channel detail = paginated episode list with published date, duration, **played badge + resume position** (from backend progress), pull-to-refresh → `POST …/refresh`. "Podcasts" entry in nav/Profile.
+**Test gate:** widget tests — subscriptions render; episode list paginates; played/unplayed + resume indicators reflect progress fields. Analyze + test green.
+**Commit:** `feat(flutter): PC3 — subscriptions + channel episode list (#53)`
+
+### [ ] PC4. Episode download → Sync Center integration
+**Backend prereq:** P5. **Files:** episode-row download action, download/notifier wiring reusing the existing queue/Sync Center providers, `lib/screens/downloads/*` (surface episodes), tests.
+**Deliverable:** Per-episode Download action → `POST /podcasts/episodes/{id}/download`; progress shows in the existing Sync Center / queue UI (backend job `kind='episode'`); downloaded episodes get an offline badge; offline (`file://`) vs stream selection resolved per episode.
+**Test gate:** widget/unit test — download dispatch hits the endpoint; queue reflects an episode job; offline badge toggles on `downloaded`. Analyze + test green.
+**Commit:** `feat(flutter): PC4 — podcast episode download via Sync Center (#53)`
+
+### [ ] PC5. Player integration + progress sync + docs/version
+**Backend prereq:** P6. **Files:** `lib/audio/*` (episode `MediaItem` builder — 4th URI kind), progress-reporter, `DECISIONLOG.md` ADR, `PLAN.md` update, `CHANGELOG.md`, version files (`/CLAUDE.md` §3), this ROADMAP status line.
+**Deliverable:** New `MediaItem` kind for episodes alongside file / subsonic / preview (see Cross-cutting "MediaItem.id is the playback URI"): `file://` when downloaded, else the backend `/podcasts/episodes/{id}/audio?token=` (Range-capable, seek/resume) or public enclosure URL; `extras['episodeId']` to distinguish. Throttled progress `PUT` (~every 15 s + on pause/stop/seek-end) and resume-from-position on open. Docs + `v5.0.0`.
+**Test gate:** unit test — episode `MediaItem` builder produces the right id per state; progress reporter throttles + fires on pause/stop. Analyze + full `flutter test` green.
+**Smoke (on-device):** subscribe → download an episode → play offline with seek/resume; stream an undownloaded episode; kill + reopen resumes at saved position; progress reflected on the episode row.
+**Commit:** `feat(flutter): PC5 — podcast player + progress sync + v5.0.0 (#53)`
+
+---
+
 ## Cross-cutting reminders
 
 - **`flutter analyze` green before declaring any milestone done.**
@@ -924,8 +963,8 @@ Items scheduled into v1.5.0 (Phase P) or v2.0.0 (Phase Q) are no longer here —
 
 ## Roadmap complete when
 
-1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5, P1–P4, Q1–Q4, R1, S1–S11, T1–T5, U1, V1, W1, X1–X7, Y1–Y2, Z1–Z6).
+1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5, P1–P4, Q1–Q4, R1, S1–S11, T1–T5, U1, V1, W1, X1–X7, Y1–Y2, Z1–Z6, PC1–PC5).
 2. Every test gate green at its milestone.
-3. G1, K2, L6, M5, N5, O5, P4, Q4, R1, S11, and T5 manual smokes verified on-device.
+3. G1, K2, L6, M5, N5, O5, P4, Q4, R1, S11, T5, and PC5 manual smokes verified on-device.
 4. CHANGELOG entries exist for each milestone group.
 5. `git log --oneline android/` reads as a clean A→U progression under the `feat(flutter):` / `chore(flutter):` Conventional-Commits cadence.
