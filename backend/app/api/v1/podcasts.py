@@ -30,11 +30,10 @@ from app.schemas.podcast import (
 )
 from app.services.feeds import FeedFetchError, ingest_feed
 from app.services.jobs import create_job_idempotent
-from app.services.podcastindex import (
-    PodcastIndexClient,
-    PodcastIndexError,
-    PodcastIndexNotConfigured,
-    get_podcastindex_client,
+from app.services.podcast_search import (
+    PodcastSearchClient,
+    PodcastSearchError,
+    get_podcast_search_client,
 )
 from app.services.range_file import InvalidRangeError, iter_file_range, parse_range
 from app.services.workers import PodcastJobEnqueuer, get_podcast_enqueuer
@@ -85,20 +84,15 @@ def _episode_item(episode: PodcastEpisode, progress: PodcastProgress | None) -> 
 @router.post("/search", response_model=PodcastSearchResponse)
 async def search_podcasts(
     req: PodcastSearchRequest,
-    client: PodcastIndexClient = Depends(get_podcastindex_client),
+    client: PodcastSearchClient = Depends(get_podcast_search_client),
     _tok: Token = Depends(require_scope("read")),
 ) -> PodcastSearchResponse:
     try:
         results = await client.search(req.query, req.limit)
-    except PodcastIndexNotConfigured as e:
+    except PodcastSearchError as e:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Podcast Index not configured: {e}",
-        ) from e
-    except PodcastIndexError as e:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Podcast Index error: {e}",
+            detail=f"podcast search error: {e}",
         ) from e
 
     items = [

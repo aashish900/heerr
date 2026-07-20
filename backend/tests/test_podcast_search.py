@@ -4,35 +4,35 @@ from httpx import ASGITransport, AsyncClient
 
 from app.api.v1.router import api_v1
 from app.db import get_session
-from app.services.podcastindex import (
-    PodcastIndexError,
-    PodcastIndexResult,
-    get_podcastindex_client,
+from app.services.podcast_search import (
+    PodcastSearchError,
+    PodcastSearchResult,
+    get_podcast_search_client,
 )
 
 
-class FakePodcastIndex:
+class FakePodcastSearch:
     def __init__(self):
-        self.results: list[PodcastIndexResult] = []
+        self.results: list[PodcastSearchResult] = []
         self.raise_error: bool = False
         self.last_query: str | None = None
         self.last_limit: int | None = None
 
-    async def search(self, query: str, limit: int) -> list[PodcastIndexResult]:
+    async def search(self, query: str, limit: int) -> list[PodcastSearchResult]:
         self.last_query = query
         self.last_limit = limit
         if self.raise_error:
-            raise PodcastIndexError("upstream down")
+            raise PodcastSearchError("upstream down")
         return list(self.results)
 
 
 @pytest.fixture
-async def fake_podcastindex():
-    return FakePodcastIndex()
+async def fake_podcast_search():
+    return FakePodcastSearch()
 
 
 @pytest.fixture
-async def podcast_app(app_sm, fake_podcastindex):
+async def podcast_app(app_sm, fake_podcast_search):
     app = FastAPI()
 
     async def override_get_session():
@@ -45,7 +45,7 @@ async def podcast_app(app_sm, fake_podcastindex):
                 raise
 
     app.dependency_overrides[get_session] = override_get_session
-    app.dependency_overrides[get_podcastindex_client] = lambda: fake_podcastindex
+    app.dependency_overrides[get_podcast_search_client] = lambda: fake_podcast_search
     app.include_router(api_v1)
     yield app
 
@@ -57,8 +57,8 @@ async def client(podcast_app):
         yield c
 
 
-def _result(feed_url: str, title: str = "Show") -> PodcastIndexResult:
-    return PodcastIndexResult(
+def _result(feed_url: str, title: str = "Show") -> PodcastSearchResult:
+    return PodcastSearchResult(
         feed_url=feed_url,
         title=title,
         author="Host",
@@ -121,9 +121,9 @@ async def test_limit_out_of_range_returns_422(client, make_token):
 # ---- contract shape --------------------------------------------------------
 
 
-async def test_search_returns_contract_fields(client, make_token, fake_podcastindex):
+async def test_search_returns_contract_fields(client, make_token, fake_podcast_search):
     raw = await make_token()
-    fake_podcastindex.results = [_result("https://example.com/feed.xml", title="Daily News")]
+    fake_podcast_search.results = [_result("https://example.com/feed.xml", title="Daily News")]
     r = await client.post(
         "/api/v1/podcasts/search",
         json={"query": "news"},
@@ -142,23 +142,23 @@ async def test_search_returns_contract_fields(client, make_token, fake_podcastin
     ]
 
 
-async def test_query_and_limit_passed_to_client(client, make_token, fake_podcastindex):
+async def test_query_and_limit_passed_to_client(client, make_token, fake_podcast_search):
     raw = await make_token()
     await client.post(
         "/api/v1/podcasts/search",
         json={"query": "space exploration", "limit": 5},
         headers={"Authorization": f"Bearer {raw}"},
     )
-    assert fake_podcastindex.last_query == "space exploration"
-    assert fake_podcastindex.last_limit == 5
+    assert fake_podcast_search.last_query == "space exploration"
+    assert fake_podcast_search.last_limit == 5
 
 
 # ---- upstream failure -------------------------------------------------------
 
 
-async def test_upstream_error_returns_502(client, make_token, fake_podcastindex):
+async def test_upstream_error_returns_502(client, make_token, fake_podcast_search):
     raw = await make_token()
-    fake_podcastindex.raise_error = True
+    fake_podcast_search.raise_error = True
     r = await client.post(
         "/api/v1/podcasts/search",
         json={"query": "news"},

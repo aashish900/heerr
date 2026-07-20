@@ -1,8 +1,16 @@
 # PODCASTS.md — Podcast discovery + download (feasibility + plan)
 
-Status: **PLAN ONLY — nothing implemented.** Drafted 2026-07-20.
+Status: **SHIPPED** (backend P1–P6, Android PC1–PC5, `v5.0.0`). Drafted 2026-07-20 as a
+pre-implementation plan; kept as-is below for historical context except where noted — see
+`DECISIONLOG.md` for what actually shipped and where it deviated from this plan.
 Tracking issue: [#53](https://github.com/aashish900/heerr/issues/53).
 Scope decision (locked by owner): **Full podcast model** + **Podcast Index / RSS** discovery.
+
+> **2026-07-20 update:** discovery was swapped from Podcast Index to **Apple's iTunes Search
+> API** after Podcast Index's signup form began rejecting free-email-provider addresses (no key
+> was ever obtained). Every "Podcast Index" reference below is the original plan, kept for
+> history — the shipped discovery source is iTunes Search (`app/services/podcast_search.py`).
+> See `DECISIONLOG.md` 2026-07-20 "Podcast discovery: Podcast Index -> iTunes Search."
 
 This is a cross-cutting feature (backend backbone + Android client). It lives here because
 backend-first is the project rule (`/CLAUDE.md` §3). Android phases depend on the backend

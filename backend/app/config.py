@@ -28,12 +28,6 @@ class Settings(BaseSettings):
     # lyrics from spotdl's default providers (Genius, AZLyrics, etc.).
     spotdl_embed_lyrics: bool = False
 
-    # Podcast Index API credentials (Phase P). Optional so Settings() doesn't
-    # fail for installs without the podcast feature enabled — PodcastIndexClient
-    # raises PodcastIndexNotConfigured at call time if either is unset.
-    podcastindex_key: str | None = None
-    podcastindex_secret: str | None = None
-
     # Where downloaded podcast episodes are written (Phase P5). Deliberately
     # NOT music_output_dir — Navidrome does not watch this directory, so
     # episodes never get indexed as songs.

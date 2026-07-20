@@ -993,3 +993,14 @@ Server half of issue #44 begins: in-place tag editing for library files. Files a
 - Android client (Phase PC) not yet built — see `android/docs/ROADMAP.md`.
 
 See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no server-side podcast support; own data model; job-queue reuse; no on-demand proxy).
+
+## 2026-07-20 — v5.0.1: podcast discovery swap — Podcast Index → iTunes Search (#53)
+
+- **User-reported blocker:** Podcast Index's signup form rejects free-email-provider (Gmail/Outlook) addresses; no `PODCASTINDEX_KEY`/`SECRET` was ever obtained, so `POST /podcasts/search` has never actually worked in this deployment.
+- **`app/services/podcast_search.py`** (new, replaces `app/services/podcastindex.py`, deleted) — `PodcastSearchClient.search(query, limit)` hits Apple's `GET https://itunes.apple.com/search?media=podcast` — no auth, no signup, no key. Response mapping (`feed_url`/`title`/`author`/`image_url`/`description`) deliberately mirrors the old `PodcastIndexResult` shape exactly.
+- **`app/api/v1/podcasts.py`** — `search_podcasts` now depends on `get_podcast_search_client`; the `PodcastIndexNotConfigured` 502 branch is gone (iTunes needs no config, so search always works once deployed).
+- **`app/config.py`** — removed `podcastindex_key`/`podcastindex_secret` (unused now). `.env.example`'s Podcasts block updated to note there's nothing to configure for discovery.
+- **No client-visible contract change** — `PodcastSearchResponse`/`PodcastChannelItem` (the wire shape Android consumes) are byte-identical; `description` is now usually `null` from search results (iTunes' search endpoint doesn't return one; the real description still arrives once a user subscribes and `ingest_feed` parses the RSS feed itself). **Android needed zero changes for this swap.**
+- Tests: `tests/test_podcast_search_client.py` (new, 4 tests, replaces the deleted `test_podcastindex_client.py`), `tests/test_podcast_search.py` (renamed fakes/imports, dropped the "not configured" 502 case). 630 tests total, green; ruff + mypy clean.
+- Version bump `5.0.0` → `5.0.1` across all five sync locations — a public endpoint's failure mode changed (no more always-502 for an unconfigured feature) even though its shape didn't.
+- See `DECISIONLOG.md` 2026-07-20 "Podcast discovery: Podcast Index -> iTunes Search" for the full rationale + alternatives considered.

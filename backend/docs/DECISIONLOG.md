@@ -494,3 +494,25 @@ Sub-decisions locked across J1–J10:
 **Reference:** `backend/docs/PODCASTS.md` (full design), `backend/docs/ROADMAP.md` Phase P (P1–P6), `android/docs/ROADMAP.md` Phase PC (PC1–PC5, not yet built), migrations `0013_podcasts.py` / `0014_jobs_episode.py`, `backend/app/services/{podcastindex,feeds,podcast_download,range_file}.py`, `backend/app/api/v1/podcasts.py`. CHANGELOG `2026-07-20 — P1–P6`.
 
 **Trade-off:** After an edit the library shows stale metadata until Navidrome's next scan (~1 min) — same accepted lag as Phase N deletes; the client snackbar says so.
+
+## 2026-07-20 — Podcast discovery: Podcast Index -> iTunes Search
+
+**Context:** `POST /podcasts/search` (Phase P2) was built against Podcast Index (`podcastindex.org`), requiring a free registered key+secret (HMAC-SHA1-signed requests). At implementation-adjacent time the owner attempted to register and Podcast Index's signup form rejected free-email-provider addresses (Gmail/Outlook) with no immediate alternative — no key was ever obtained, so the feature has never actually been exercised against real Podcast Index credentials.
+
+**Decision:** Replaced `app/services/podcastindex.py` (`PodcastIndexClient`) with `app/services/podcast_search.py` (`PodcastSearchClient`), backed by Apple's **iTunes Search API** (`GET https://itunes.apple.com/search?media=podcast`). No signup, no key, no auth headers — a plain unauthenticated GET.
+
+1. **The client-visible contract is unchanged.** `PodcastSearchResult`/`PodcastSearchClient.search(query, limit)` return the same `feed_url`/`title`/`author`/`image_url`/`description` shape the old `PodcastIndexResult` did, so `PodcastChannelItem`/`PodcastSearchResponse` (the wire contract to Android) and every Android model/provider built in PC1–PC2 needed **zero changes**.
+2. **`PODCASTINDEX_KEY`/`PODCASTINDEX_SECRET` removed entirely** from `app/config.py` and `.env.example` — nothing needs them anymore, and the "not configured" 502 branch is gone since iTunes always works.
+3. **`description` is now usually `null`** — iTunes' search endpoint doesn't return one (only its `lookup` endpoint or the RSS feed itself does). `PodcastChannelItem.description` was already nullable, so this is a silent quality reduction on the preview sheet's description text, not a contract break. Once a user subscribes, `ingest_feed` pulls the real description from the RSS feed itself (`PodcastChannel.description`), so this only affects the pre-subscribe search-result preview.
+
+**Why:**
+- **Coverage is close enough.** iTunes indexes podcasts submitted to Apple's own directory — the overwhelming majority of public shows, since Apple Podcasts is one of the two or three largest podcast platforms. The gap (very obscure/self-hosted feeds never submitted to Apple) is real but narrow.
+- **Zero operational dependency beats a blocked signup.** The feature was fully built and tested but non-functional in production for lack of credentials, with no clear timeline to get them (a workaround — buying a domain for a compliant email — was explored and rejected as unnecessary friction for a free discovery API).
+- **No Android churn.** Deliberately kept `PodcastSearchResult`'s field names/shapes identical to the old `PodcastIndexResult` specifically so this swap stays backend-only.
+
+**Alternatives considered:**
+- **Get a Podcast Index key via a purchased domain / borrowed email** — rejected as the long-term fix: adds a recurring dependency (domain renewal) and an external account for a feature with a free, keyless alternative available.
+- **Keep Podcast Index, add iTunes as a fallback** — rejected: two discovery clients to maintain for one search box is not worth it while Podcast Index remains completely unconfigured (0% real usage).
+- **Switch to Listen Notes or another indexed catalog** — not evaluated in depth; most third-party podcast directories require their own paid/keyed API. iTunes Search was chosen specifically because it needs nothing at all.
+
+**Reference:** `backend/app/services/podcast_search.py`, `backend/app/api/v1/podcasts.py::search_podcasts`, `backend/tests/test_podcast_search_client.py`, `backend/tests/test_podcast_search.py`. Supersedes the discovery-source half of the 2026-07-20 "Podcasts: own data model, Podcast Index + RSS, backend-served audio" ADR above — the RSS/data-model/serving decisions there are unaffected.
