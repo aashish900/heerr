@@ -1,7 +1,10 @@
+import 'package:audio_service/audio_service.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:mocktail/mocktail.dart';
 
 import 'package:heerr/api/api_error.dart';
 import 'package:heerr/models/enums.dart';
@@ -9,8 +12,16 @@ import 'package:heerr/models/episode_download_response.dart';
 import 'package:heerr/models/episode_list_response.dart';
 import 'package:heerr/models/podcast_channel.dart';
 import 'package:heerr/models/podcast_episode.dart';
+import 'package:heerr/models/profile.dart';
+import 'package:heerr/player/heerr_audio_handler.dart';
+import 'package:heerr/player/player_provider.dart';
+import 'package:heerr/providers/profiles/active_profile.dart';
 import 'package:heerr/screens/podcasts/channel_screen.dart';
 import 'package:heerr/services/backend_service.dart';
+
+class _FakeHandler extends Mock implements HeerrAudioHandler {}
+
+class _FakePlayer extends Mock implements AudioPlayer {}
 
 class _StubBackend extends BackendService {
   _StubBackend({
@@ -62,16 +73,40 @@ class _StubBackend extends BackendService {
   }
 }
 
-Widget _wrap({required BackendService backend, String channelId = 'c1'}) {
+Profile _profile() => Profile(
+      id: 'p1',
+      displayName: 'Alice',
+      heerrBaseUrl: 'http://h',
+      heerrBearerToken: 't',
+      navidromeBaseUrl: 'http://n',
+      navidromeUsername: 'alice-nd',
+      navidromePassword: 'pw',
+      createdAt: DateTime.utc(2026),
+      lastUsedAt: DateTime.utc(2026),
+    );
+
+Widget _wrap({
+  required BackendService backend,
+  String channelId = 'c1',
+  HeerrAudioHandler? handler,
+  Profile? profile,
+}) {
   return ProviderScope(
     overrides: <Override>[
       backendServiceProvider.overrideWith((_) async => backend),
+      if (handler != null) audioHandlerProvider.overrideWithValue(handler),
+      if (profile != null) activeProfileProvider.overrideWithValue(profile),
     ],
     child: MaterialApp(home: ChannelScreen(channelId: channelId)),
   );
 }
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(const MediaItem(id: '', title: ''));
+    registerFallbackValue(Duration.zero);
+  });
+
   const PodcastChannel channelA = PodcastChannel(
     id: 'c1',
     feedUrl: 'https://a.com/f.xml',
@@ -246,5 +281,33 @@ void main() {
     // ForbiddenError + action:'download' renders the action-aware copy,
     // not the raw detail (see error_snackbar.dart::buildApiErrorSnackBar).
     expect(find.textContaining('this token cannot download'), findsOneWidget);
+  });
+
+  testWidgets('tapping an episode row plays it and seeks to its resume position',
+      (WidgetTester tester) async {
+    final _FakeHandler handler = _FakeHandler();
+    final _FakePlayer player = _FakePlayer();
+    when(() => handler.playSong(any())).thenAnswer((_) async {});
+    when(() => handler.player).thenReturn(player);
+    when(() => player.seek(any())).thenAnswer((_) async {});
+
+    await tester.pumpWidget(_wrap(
+      backend: _StubBackend(
+        channel: channelA,
+        episodes: <PodcastEpisode>[ep('1', positionS: 42)],
+        total: 1,
+      ),
+      handler: handler,
+      profile: _profile(),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Episode 1'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    verify(() => handler.playSong(any())).called(1);
+    verify(() => player.seek(const Duration(seconds: 42))).called(1);
+    expect(find.text('Playing: Episode 1'), findsOneWidget);
   });
 }

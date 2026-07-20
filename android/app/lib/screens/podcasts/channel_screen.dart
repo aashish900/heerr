@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/api_error.dart';
 import '../../models/podcast_channel.dart';
 import '../../models/podcast_episode.dart';
+import '../../player/podcast_playback_actions.dart';
 import '../../providers/podcasts/podcast_episode_download.dart';
 import '../../providers/podcasts/podcast_episodes.dart';
 import '../../providers/podcasts/podcast_subscriptions.dart';
@@ -121,7 +122,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   }
 }
 
-/// PC4 (#53): adds the per-episode Download action to the otherwise
+/// PC4 (#53) added the per-episode Download action to the otherwise
 /// read-only PC3 row. Dispatched jobs reuse the existing `jobs` queue
 /// (`source_type == 'episode'`) — progress is surfaced by the existing
 /// Queue screen, not tracked inline here; a successful dispatch just shows
@@ -129,6 +130,9 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
 /// (`library_search_results.dart::_downloadOnly`). [episode.downloaded]
 /// renders as a static offline badge (not a button) once the job lands —
 /// re-fetched on the channel's next pull-to-refresh.
+///
+/// PC5 (#53) adds tap-to-play: [playEpisode] resolves the right playback
+/// URI per [episode.downloaded] and resumes from [episode.positionS].
 class _EpisodeTile extends ConsumerWidget {
   const _EpisodeTile({required this.episode});
 
@@ -146,6 +150,7 @@ class _EpisodeTile extends ConsumerWidget {
       key: Key('podcast-episode-${episode.id}'),
       title: Text(episode.title, maxLines: 2, overflow: TextOverflow.ellipsis),
       subtitle: Text(_subtitle(episode)),
+      onTap: () => playEpisode(ref, context, episode),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[

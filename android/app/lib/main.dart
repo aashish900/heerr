@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:workmanager/workmanager.dart';
 
 import 'offline/background_sync.dart';
+import 'player/episode_progress_provider.dart';
 import 'player/heerr_audio_handler.dart';
 import 'player/now_playing_persistence.dart';
 import 'player/player_provider.dart';
@@ -111,6 +112,11 @@ class _HeerrAppState extends ConsumerState<HeerrApp> {
     // are now safe because the router is held in state, not recreated.
     ref.watch(nowPlayingPersistenceProvider);
     ref.watch(nowPlayingRestoreProvider);
+
+    // PC5 (#53): throttled podcast-episode resume-position sync. Keep-alive
+    // side-effect provider — watched only for the subscription, same shape
+    // as scrobbleProvider above.
+    ref.watch(episodeProgressProvider);
 
     // #20: mirror live playback onto the home-screen widget. Keep-alive
     // side-effect provider — watched only for the subscription.

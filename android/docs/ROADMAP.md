@@ -918,7 +918,7 @@ Design doc: `backend/docs/PODCASTS.md`. Scope locked by owner: **full podcast mo
 **Test gate:** widget/unit test — download dispatch hits the endpoint; queue reflects an episode job; offline badge toggles on `downloaded`. Analyze + test green.
 **Commit:** `feat(flutter): PC4 — podcast episode download via Sync Center (#53)`
 
-### [ ] PC5. Player integration + progress sync + docs/version
+### [x] PC5. Player integration + progress sync + docs/version
 **Backend prereq:** P6. **Files:** `lib/audio/*` (episode `MediaItem` builder — 4th URI kind), progress-reporter, `DECISIONLOG.md` ADR, `PLAN.md` update, `CHANGELOG.md`, version files (`/CLAUDE.md` §3), this ROADMAP status line.
 **Deliverable:** New `MediaItem` kind for episodes alongside file / subsonic / preview (see Cross-cutting "MediaItem.id is the playback URI"): `file://` when downloaded, else the backend `/podcasts/episodes/{id}/audio?token=` (Range-capable, seek/resume) or public enclosure URL; `extras['episodeId']` to distinguish. Throttled progress `PUT` (~every 15 s + on pause/stop/seek-end) and resume-from-position on open. Docs + `v5.0.0`.
 **Test gate:** unit test — episode `MediaItem` builder produces the right id per state; progress reporter throttles + fires on pause/stop. Analyze + full `flutter test` green.
