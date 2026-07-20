@@ -1004,3 +1004,8 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 - Tests: `tests/test_podcast_search_client.py` (new, 4 tests, replaces the deleted `test_podcastindex_client.py`), `tests/test_podcast_search.py` (renamed fakes/imports, dropped the "not configured" 502 case). 630 tests total, green; ruff + mypy clean.
 - Version bump `5.0.0` → `5.0.1` across all five sync locations — a public endpoint's failure mode changed (no more always-502 for an unconfigured feature) even though its shape didn't.
 - See `DECISIONLOG.md` 2026-07-20 "Podcast discovery: Podcast Index -> iTunes Search" for the full rationale + alternatives considered.
+
+## 2026-07-20 — v5.0.2: Android — subscribe by feed URL (#53)
+
+- No backend changes. `POST /podcasts/subscribe` already accepted a raw `feed_url` (Phase P3) — the Android Discover screen now exposes that path directly via a new "paste a feed URL" bar, alongside search. See `android/docs/CHANGELOG.md` 2026-07-20 "feat: subscribe by feed URL on the Discover screen (#53)".
+- Version bump `5.0.1` → `5.0.2` across all five sync locations per `/CLAUDE.md` §3.

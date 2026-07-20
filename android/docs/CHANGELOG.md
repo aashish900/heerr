@@ -3083,3 +3083,11 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 ## 2026-07-20 — chore: version bumped for sync (backend podcast discovery swap, #53)
 
 - No Android changes. Backend `v5.0.1` swaps podcast discovery from Podcast Index to Apple's iTunes Search API — see `backend/docs/CHANGELOG.md` 2026-07-20 and `backend/docs/DECISIONLOG.md` 2026-07-20 "Podcast discovery: Podcast Index -> iTunes Search." The `POST /podcasts/search` response shape is unchanged (`PodcastChannel.feedUrl`/`title`/`author`/`imageUrl`/`description`), so nothing in `lib/providers/podcasts/podcast_search.dart` or `lib/models/podcast_channel.dart` needed to change. Version bump `5.0.0` → `5.0.1` across all five sync locations per `/CLAUDE.md` §3.
+
+## 2026-07-20 — feat: subscribe by feed URL on the Discover screen (#53)
+
+- **User request:** `POST /podcasts/subscribe` has always accepted a raw `feed_url` — nothing backend-side gates a subscribe to only feeds that came back from search. This exposes that path from the UI, both as a fallback for shows the discovery source doesn't index and as a direct route for a user who already has the feed URL.
+- **`android/app/lib/screens/podcasts/discover_screen.dart`** — new `_SubscribeByUrlBar` (a `TextField` + icon button) rendered below the search field, always visible. Validates the input is a parseable `http`/`https` URL before dispatching; on success, clears the field and shows a "Subscribed: `<title>`" snackbar; on failure, routes through the existing `showApiError` convention. Calls `podcastSubscriptionsProvider.notifier.subscribe(feedUrl)` — the same method PC2's preview-sheet Subscribe button already uses, so subscriptions from either path land in the same state and the same list on the Subscriptions screen.
+- Tests: 4 new cases in `test/screens/podcasts/discover_screen_test.dart` (successful subscribe + field-clear, invalid-URL inline error, empty-field no-op, `ApiError` snackbar on failure).
+- `flutter analyze` and `flutter test` (1060 tests) green before and after.
+- Version bump `5.0.1` → `5.0.2` across all five sync locations (Android-only change; no backend changes).

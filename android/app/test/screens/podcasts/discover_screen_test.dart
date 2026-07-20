@@ -206,4 +206,89 @@ void main() {
     expect(backend.unsubscribeCalls, <String>['c1']);
     expect(find.text('Subscribe'), findsOneWidget);
   });
+
+  group('subscribe by URL', () {
+    testWidgets('entering a feed URL and tapping the button subscribes',
+        (WidgetTester tester) async {
+      final _StubBackend backend = _StubBackend();
+      await tester.pumpWidget(_wrap(backend: backend));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('podcast-subscribe-by-url-field')),
+        'https://feeds.example.com/show.xml',
+      );
+      await tester.tap(find.byKey(const Key('podcast-subscribe-by-url-button')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(backend.subscribeCalls, <String>['https://feeds.example.com/show.xml']);
+      expect(find.text('Subscribed: Subscribed'), findsOneWidget);
+      // The field clears after a successful subscribe.
+      final TextField field = tester.widget<TextField>(
+        find.byKey(const Key('podcast-subscribe-by-url-field')),
+      );
+      expect(field.controller!.text, isEmpty);
+    });
+
+    testWidgets('an invalid URL shows an inline error and does not call the backend',
+        (WidgetTester tester) async {
+      final _StubBackend backend = _StubBackend();
+      await tester.pumpWidget(_wrap(backend: backend));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('podcast-subscribe-by-url-field')),
+        'not a url',
+      );
+      await tester.tap(find.byKey(const Key('podcast-subscribe-by-url-button')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(backend.subscribeCalls, isEmpty);
+      expect(find.text('Enter a valid http(s) feed URL'), findsOneWidget);
+    });
+
+    testWidgets('an empty field does nothing on tap',
+        (WidgetTester tester) async {
+      final _StubBackend backend = _StubBackend();
+      await tester.pumpWidget(_wrap(backend: backend));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('podcast-subscribe-by-url-button')));
+      await tester.pump();
+
+      expect(backend.subscribeCalls, isEmpty);
+    });
+
+    testWidgets('a subscribe error shows the ApiError snackbar',
+        (WidgetTester tester) async {
+      final _ThrowingSubscribeBackend backend = _ThrowingSubscribeBackend();
+      await tester.pumpWidget(_wrap(backend: backend));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('podcast-subscribe-by-url-field')),
+        'https://feeds.example.com/show.xml',
+      );
+      await tester.tap(find.byKey(const Key('podcast-subscribe-by-url-button')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.textContaining('this token cannot subscribe'), findsOneWidget);
+    });
+  });
+}
+
+class _ThrowingSubscribeBackend extends BackendService {
+  _ThrowingSubscribeBackend() : super(Dio());
+
+  @override
+  Future<List<PodcastChannel>> podcastSubscriptions() async =>
+      const <PodcastChannel>[];
+
+  @override
+  Future<PodcastChannel> subscribePodcast(String feedUrl) async {
+    throw const ForbiddenError(detail: 'no download scope');
+  }
 }
