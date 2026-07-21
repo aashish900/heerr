@@ -1050,3 +1050,11 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 
 - No backend changes. A pre-existing (not introduced by the podcast work) race in `NowPlayingPersistence.dispose()` occasionally flaked CI: the debounce timer could fire and start a write, but `dispose()` returned before that write finished, letting a test's `tearDown` delete the temp directory mid-write and throw `PathNotFoundException`. See `android/docs/CHANGELOG.md` 2026-07-20 "fix: CI-flaky `NowPlayingPersistence.dispose()` race (unrelated to #53)".
 - Version bump `5.3.2` → `5.3.3` across all five sync locations per `/CLAUDE.md` §3.
+
+## 2026-07-21 — v5.3.4: `heerr-podcasts-init` — fix "Permission denied" on `/data/media/podcasts`
+
+- **User-reported:** episode downloads failed with a filesystem permission error writing to `/data/media/podcasts`. The backend container runs as non-root UID 1000, but unlike `/data/postgres` (which has a `heerr-postgres-init` one-shot chown container since Phase A), nothing ever chowned this newer bind-mount path — Docker auto-creates it as `root:root` on first `docker compose up`.
+- **`docker-compose.snippet.yml`** — new `heerr-podcasts-init` service (`alpine:3.20`, `mkdir -p /data/media/podcasts && chown -R 1000:1000 /data/media/podcasts`), mirroring `heerr-postgres-init`; `heerr-backend` now depends on it completing first. Top-of-file operator instructions updated with the new service + a note for already-deployed installs (run the chown by hand, or `docker compose up -d heerr-podcasts-init` to recreate `heerr-backend` automatically).
+- **`backend/docs/CONTEXT.md`** — deployment-shape bullet list updated (staleness rule: also removed a stale `PODCASTINDEX_KEY`/`SECRET` mention left over from the 2026-07-20 iTunes Search discovery swap).
+- Out of TDD scope (`docker-compose.yml` per `backend/CLAUDE.md`) — verified via `python3 -c "import yaml; yaml.safe_load(...)"` (valid YAML) and manual review against the existing `heerr-postgres-init` pattern; full `docker compose up` verification requires the real arr-stack host.
+- Version bump `5.3.3` → `5.3.4` across all five sync locations. See `DECISIONLOG.md` 2026-07-21 "`heerr-podcasts-init`: fixing \"Permission denied\" on `/data/media/podcasts`".

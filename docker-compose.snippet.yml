@@ -1,10 +1,16 @@
 # heerr — arr-stack integration snippet
 # ==========================================================================
 # These services append to your existing arr-stack docker-compose.yml
-# (~/docker/arr-stack/docker-compose.yml). Copy the four services below +
+# (~/docker/arr-stack/docker-compose.yml). Copy the services below +
 # the `networks:` block into the arr-stack file, copy `.env.example` to
 # `.env` next to the merged compose file, fill in real values, and run:
-#   docker compose up -d heerr-postgres-init heerr-postgres heerr-migrate heerr-backend
+#   docker compose up -d heerr-postgres-init heerr-podcasts-init heerr-postgres heerr-migrate heerr-backend
+#
+# Already deployed and hitting "Permission denied" writing to
+# /data/media/podcasts (#53)? heerr-podcasts-init is new — pull this file,
+# then either `docker compose up -d heerr-podcasts-init` (recreates
+# heerr-backend automatically via the new depends_on) or run the chown by
+# hand: `mkdir -p /data/media/podcasts && chown -R 1000:1000 /data/media/podcasts`.
 #
 # Connectivity: Tailscale-only — no host port publication. The arr-stack
 # subnet (172.39.0.0/24) is expected to be Tailscale-routable from the
@@ -33,6 +39,26 @@ services:
       - "mkdir -p /data/postgres && chown -R 999:999 /data/postgres"
     volumes:
       - /data/postgres:/data/postgres
+    restart: "no"
+
+  # One-shot: chown the podcast-episode bind-mount dir to the backend
+  # image's non-root user (UID/GID 1000, see backend/Dockerfile) so
+  # heerr-backend can write downloaded episodes. Required for the same
+  # reason as heerr-postgres-init above — the bind mount is created with
+  # root ownership on first `docker compose up`, and (unlike
+  # /data/media/music, whose ownership predates this backend and is
+  # managed by the existing arr-stack/Navidrome setup) nothing else on the
+  # host ever chowns this newer path. Missing this step is the root cause
+  # of "Permission denied" writing to /data/media/podcasts (#53).
+  heerr-podcasts-init:
+    image: alpine:3.20
+    container_name: heerr-podcasts-init
+    command:
+      - sh
+      - -c
+      - "mkdir -p /data/media/podcasts && chown -R 1000:1000 /data/media/podcasts"
+    volumes:
+      - /data/media/podcasts:/data/media/podcasts
     restart: "no"
 
   heerr-postgres:
@@ -109,6 +135,8 @@ services:
       start_period: 15s
     depends_on:
       heerr-migrate:
+        condition: service_completed_successfully
+      heerr-podcasts-init:
         condition: service_completed_successfully
     logging:
       driver: json-file

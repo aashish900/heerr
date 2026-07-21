@@ -548,3 +548,17 @@ Sub-decisions locked across J1–J10:
 - **Route retry entirely server-side by kind** (have `/admin/jobs/{id}/retry` dispatch `PodcastJobEnqueuer` vs `JobEnqueuer` based on `job.source_type`) — noted as a real latent bug in that endpoint (it's hardcoded to the song `JobEnqueuer` regardless of kind) but out of scope here since the Android client doesn't call it at all; left as `DEBT.md`-worthy if that endpoint is ever exposed to non-admin users.
 
 **Reference:** `backend/app/schemas/job.py::JobView`, `backend/app/api/v1/status.py::to_view`, `backend/tests/test_podcast_download.py::test_queue_job_carries_episode_id`, `backend/tests/test_status.py::test_queued_track_has_full_contract_shape`.
+
+## 2026-07-21 — `heerr-podcasts-init`: fixing "Permission denied" on `/data/media/podcasts`
+
+**Context:** User-reported bug, surfaced only after the 2026-07-20 Queue-retry fix started correctly routing episode retries to the real podcast download endpoint: episode downloads failed with a filesystem permission error writing to `/data/media/podcasts`. Root cause traced to `docker-compose.snippet.yml` — the backend container runs as non-root UID 1000 (`backend/Dockerfile`), and Docker creates a bind-mounted host directory as `root:root` on first `docker compose up` if it doesn't already exist. `/data/media/podcasts` was added in Phase P (podcasts) with no corresponding ownership fix, unlike `/data/postgres`, which has had a `heerr-postgres-init` one-shot chown container since Phase A. `/data/media/music` never needed this because its ownership predates this backend entirely (managed by the pre-existing arr-stack/Navidrome setup) — it was never a Docker-bind-mount-created-fresh path the way `/data/media/podcasts` was.
+
+**Decision:** Added `heerr-podcasts-init` to `docker-compose.snippet.yml`, an `alpine:3.20` one-shot service running `mkdir -p /data/media/podcasts && chown -R 1000:1000 /data/media/podcasts`, mirroring `heerr-postgres-init` exactly. `heerr-backend` now `depends_on: heerr-podcasts-init: condition: service_completed_successfully`, same pattern as its existing dependency on `heerr-migrate`.
+
+**Why:** This is a straightforward gap-fill, not a design change — the fix for `/data/postgres` already established the correct pattern (bind-mount ownership is the operator's/compose's job, not the app's) three phases before podcasts existed; podcasts just never got the same treatment.
+
+**Alternatives considered:**
+- **Have the backend `chown` its own mount at boot** — rejected: the container runs as non-root (`USER app` in the Dockerfile) specifically so a compromised process can't own arbitrary host paths; granting it permission to `chown` would undermine that boundary. A dedicated root-running one-shot init container (torn down after running) keeps the privilege escalation scoped and temporary, matching the existing Postgres precedent.
+- **Document a manual `chown` step in the README instead of an init container** — rejected: `/data/postgres` already proved the init-container pattern is more reliable than a docs-only instruction (operators forget manual steps; `docker compose up` can't forget a `depends_on`).
+
+**Reference:** `docker-compose.snippet.yml` (`heerr-podcasts-init` service + `heerr-backend`'s `depends_on`), `backend/docs/CONTEXT.md` (deployment-shape bullet list, updated in the same commit per the staleness rule).

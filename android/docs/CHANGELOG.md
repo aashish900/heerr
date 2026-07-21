@@ -3165,3 +3165,7 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - `flutter analyze` and `flutter test` (1094 tests) green before and after; the affected test also run 5× locally with no flakes.
 - Version bump `5.3.2` → `5.3.3` across all five sync locations.
 - See `DECISIONLOG.md` 2026-07-20 "fix: `NowPlayingPersistence.dispose()` race with CI test teardown (unrelated to #53)".
+
+## 2026-07-21 — chore: version bumped for sync (backend `heerr-podcasts-init` infra fix)
+
+- No Android changes. Backend `v5.3.4` fixes a "Permission denied" error writing to `/data/media/podcasts` — `docker-compose.snippet.yml` gains a `heerr-podcasts-init` chown step. See `backend/docs/CHANGELOG.md` 2026-07-21 and `backend/docs/DECISIONLOG.md` same date. Version bump `5.3.3` → `5.3.4` across all five sync locations.
