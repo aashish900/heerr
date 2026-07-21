@@ -30,7 +30,7 @@ testcontainers = {version = "^4.8", extras = ["postgres"]}
 psycopg = {version = "^3.2", extras = ["binary"]}
 pytest-asyncio = "^0.24"
 ruff = "^0.7"
-mypy = "^1.13"
+mypy = ">=1.13,<3.0"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
