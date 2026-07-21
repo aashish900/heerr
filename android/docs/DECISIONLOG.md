@@ -1371,3 +1371,13 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **Have `tearDown` wait longer before deleting `tmp`** — rejected: papers over the actual bug (an unbounded write can still be in flight arbitrarily long under load) rather than fixing it, and doesn't help the real, non-test dispose-then-recreate scenario above.
 
 **Reference:** `android/app/lib/player/now_playing_persistence.dart::dispose`, `android/app/test/player/now_playing_persistence_test.dart` (`_GatedStore` + the new dispose-waits-for-in-flight-write test).
+
+## 2026-07-21 — `job_detail_screen.dart` had its own unfixed Retry (#53)
+
+**Context:** User-reported follow-up to the 2026-07-20 Queue Retry fix: tapping into a failed episode job's detail screen and tapping "Retry download" there still produced the old `source_url must be a YouTube or YouTube Music URL` error, even though the Queue list's own Retry icon was already fixed. Root cause: `job_detail_screen.dart::_JobBody._retry` is a **separate, independently-written copy** of the same retry logic `queue_screen.dart::_JobTile._retry` has — it was never touched by the earlier fix because nothing connects the two beyond both calling `BackendService`.
+
+**Decision:** Applied the identical fix (branch on `job.sourceType == ContentType.episode`, call `downloadPodcastEpisode(episodeId)` instead of `download(...)`) to `job_detail_screen.dart`. Grepped the rest of `lib/` for other `.download(` call sites to rule out a third copy — `providers/download.dart` is the legitimate song-search dispatcher (search results are never episodes) and `offline/offline_downloader.dart`'s `.download()` is Dio's unrelated file-download API; neither needed changes.
+
+**Why:** This wasn't a regression from the first fix — it was a pre-existing duplicate of the same bug in a code path the first investigation didn't check. Two screens both offer a "Retry" affordance for a failed job and both had grown their own copy of the dispatch logic rather than sharing one; the DEBT-worthy follow-up (not undertaken here, out of scope for a bug-fix turn) would be to extract a single `retryJob(WidgetRef, JobView)` helper both screens call, so a future job-kind bug fix can't be applied to only one of the two call sites again.
+
+**Reference:** `android/app/lib/screens/job_detail_screen.dart::_JobBody._retry`, `android/app/test/screens/job_detail_screen_test.dart` (`retry (#53)` group).

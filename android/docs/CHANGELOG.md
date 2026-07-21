@@ -3169,3 +3169,13 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 ## 2026-07-21 — chore: version bumped for sync (backend `heerr-podcasts-init` infra fix)
 
 - No Android changes. Backend `v5.3.4` fixes a "Permission denied" error writing to `/data/media/podcasts` — `docker-compose.snippet.yml` gains a `heerr-podcasts-init` chown step. See `backend/docs/CHANGELOG.md` 2026-07-21 and `backend/docs/DECISIONLOG.md` same date. Version bump `5.3.3` → `5.3.4` across all five sync locations.
+
+## 2026-07-21 — fix: job_detail_screen.dart had its own unfixed Retry (#53)
+
+- **User-reported follow-up:** retrying a failed episode job from its job-detail screen still hit the old `source_url must be a YouTube or YouTube Music URL` error even after the Queue list's Retry was fixed — `job_detail_screen.dart::_JobBody._retry` turned out to be a separate, independently-written copy of the same logic, never touched by the earlier fix.
+- **`android/app/lib/screens/job_detail_screen.dart`** — `_retry` now branches on `job.sourceType` the same way `queue_screen.dart` does: episode jobs call `downloadPodcastEpisode(episodeId)`, others call `download(...)`.
+- Grepped `lib/` for other `.download(` call sites to rule out a third copy — none found (`providers/download.dart` is the song-search dispatcher; `offline_downloader.dart`'s `.download()` is Dio's unrelated file-download API).
+- Tests: `test/screens/job_detail_screen_test.dart` (+3) — song-job retry, episode-job retry (asserts `downloadPodcastEpisode` called, not `download`), null-`episodeId` error snackbar.
+- `flutter analyze` and `flutter test` (1097 tests) green before and after.
+- Version bump `5.3.4` → `5.3.5` across all five sync locations.
+- See `DECISIONLOG.md` 2026-07-21 "`job_detail_screen.dart` had its own unfixed Retry (#53)".

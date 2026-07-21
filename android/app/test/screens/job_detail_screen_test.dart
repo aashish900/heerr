@@ -1,15 +1,19 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:heerr/api/api_error.dart';
+import 'package:heerr/models/download_response.dart';
 import 'package:heerr/models/enums.dart';
+import 'package:heerr/models/episode_download_response.dart';
 import 'package:heerr/models/job_view.dart';
 import 'package:heerr/providers/job_status.dart';
 import 'package:heerr/screens/job_detail_screen.dart';
+import 'package:heerr/services/backend_service.dart';
 import 'package:heerr/widgets/skeleton.dart';
 import 'package:heerr/widgets/status_pill.dart';
 
@@ -46,6 +50,8 @@ JobView _job({
   String jobId = 'abc12345-rest-of-uuid',
   JobState state = JobState.running,
   String uri = 'https://www.youtube.com/watch?v=test',
+  ContentType sourceType = ContentType.song,
+  String? episodeId,
   DateTime? createdAt,
   DateTime? startedAt,
   DateTime? finishedAt,
@@ -55,14 +61,48 @@ JobView _job({
   return JobView(
     jobId: jobId,
     sourceUrl: uri,
-    sourceType: ContentType.song,
+    sourceType: sourceType,
     state: state,
     createdAt: createdAt ?? DateTime.utc(2026, 6, 9, 12),
     startedAt: startedAt,
     finishedAt: finishedAt,
     outputPath: outputPath,
     error: error,
+    episodeId: episodeId,
   );
+}
+
+class _StubBackend extends BackendService {
+  _StubBackend() : super(Dio());
+
+  final List<String> downloadSourceUrls = <String>[];
+  final List<String> downloadPodcastEpisodeIds = <String>[];
+
+  @override
+  Future<DownloadResponse> download({
+    required String sourceUrl,
+    required String sourceType,
+    String? displayName,
+  }) async {
+    downloadSourceUrls.add(sourceUrl);
+    return const DownloadResponse(
+      jobId: 'new-job',
+      state: JobState.queued,
+      deduped: false,
+    );
+  }
+
+  @override
+  Future<EpisodeDownloadResponse> downloadPodcastEpisode(
+    String episodeId,
+  ) async {
+    downloadPodcastEpisodeIds.add(episodeId);
+    return const EpisodeDownloadResponse(
+      jobId: 'new-episode-job',
+      state: JobState.queued,
+      deduped: false,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -198,5 +238,78 @@ void main() {
     expect(find.text('STARTED'), findsNothing);
     expect(find.text('FINISHED'), findsNothing);
     expect(find.text('queued'), findsOneWidget);
+  });
+
+  group('retry (#53)', () {
+    testWidgets('retrying a failed song job re-dispatches via POST /download',
+        (WidgetTester tester) async {
+      final _StubBackend backend = _StubBackend();
+      final JobView j = _job(
+        state: JobState.failed,
+        uri: 'https://www.youtube.com/watch?v=song1',
+        error: 'boom',
+      );
+      await tester.pumpWidget(_wrap(j.jobId, <Override>[
+        _jobValue(j.jobId, AsyncData<JobView>(j)),
+        backendServiceProvider.overrideWith((_) async => backend),
+      ]));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Retry download'));
+      await tester.pumpAndSettle();
+
+      expect(backend.downloadSourceUrls, <String>['https://www.youtube.com/watch?v=song1']);
+      expect(backend.downloadPodcastEpisodeIds, isEmpty);
+      expect(find.text('Queued'), findsOneWidget);
+    });
+
+    testWidgets(
+        'retrying a failed episode job re-dispatches via '
+        'POST /podcasts/episodes/{id}/download, not /download',
+        (WidgetTester tester) async {
+      final _StubBackend backend = _StubBackend();
+      final JobView j = _job(
+        state: JobState.failed,
+        sourceType: ContentType.episode,
+        episodeId: 'ep-1',
+        uri: 'https://feeds.fountain.fm/x/items/y/files/AUDIO.mp3',
+        error: "PermissionError: [Errno 13] Permission denied: '/data/media/podcasts'",
+      );
+      await tester.pumpWidget(_wrap(j.jobId, <Override>[
+        _jobValue(j.jobId, AsyncData<JobView>(j)),
+        backendServiceProvider.overrideWith((_) async => backend),
+      ]));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Retry download'));
+      await tester.pumpAndSettle();
+
+      expect(backend.downloadPodcastEpisodeIds, <String>['ep-1']);
+      expect(backend.downloadSourceUrls, isEmpty);
+      expect(find.text('Queued'), findsOneWidget);
+    });
+
+    testWidgets(
+        'retrying a failed episode job with no episodeId shows an error, '
+        'dispatches nothing', (WidgetTester tester) async {
+      final _StubBackend backend = _StubBackend();
+      final JobView j = _job(
+        state: JobState.failed,
+        sourceType: ContentType.episode,
+        error: 'boom',
+      );
+      await tester.pumpWidget(_wrap(j.jobId, <Override>[
+        _jobValue(j.jobId, AsyncData<JobView>(j)),
+        backendServiceProvider.overrideWith((_) async => backend),
+      ]));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Retry download'));
+      await tester.pumpAndSettle();
+
+      expect(backend.downloadPodcastEpisodeIds, isEmpty);
+      expect(backend.downloadSourceUrls, isEmpty);
+      expect(find.text("Can't retry: missing episode id"), findsOneWidget);
+    });
   });
 }
