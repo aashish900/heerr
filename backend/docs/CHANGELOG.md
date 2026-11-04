@@ -1084,3 +1084,9 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 ## 2026-11-04 — Dockerfile: drop the base image's system pip (Trivy vendored-lib findings)
 
 - **`backend/Dockerfile`** — runtime stage runs `/usr/local/bin/python -m pip uninstall -y pip` after the spotdl venv is built. CI's remaining 5 HIGH findings (msgpack 1.1.2, urllib3 2.7.0 x2, setuptools 70.3.0) were pip 26.2.2's own vendored copies in the base image's `/usr/local/lib/python3.13/site-packages/pip/_vendor` — unfixable until pip re-vendors, and unused at runtime (both venvs carry their own pip). Reproduced locally only after `docker build --pull` (a stale local base image had pip 26.0.1 and hid it). Verified: fresh-base rebuild, `spotdl --version` = 4.5.0, `import app.main` ok, `trivy image` (v0.76.1, CI flags) exit 0.
+
+## 2026-11-04 — v5.3.7: preview proxy chunk size 4 MiB → 1 MiB
+
+- **User-reported:** v5.3.6 still 502'd (googlevideo 403 on the first fetch). Replaying the proxy's request in the container with the resolved URL: yt-dlp headers + `bytes=0-4194303` → 403, `bytes=0-1048575` → 206 (same with and without yt-dlp headers) — so the limit is range size, not headers.
+- **`backend/app/api/v1/preview.py`** — `_CHUNK` 4 MiB → 1 MiB with a comment recording the measurement (the earlier "yt-dlp chunks at 10 MiB" comment was wrong for these URLs). Backend suite 647 passed; ruff clean.
+- Version bump `5.3.6` → `5.3.7` across all five sync locations per `/CLAUDE.md` §3.

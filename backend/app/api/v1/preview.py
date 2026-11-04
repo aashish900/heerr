@@ -38,8 +38,9 @@ router = APIRouter(tags=["preview"])
 # trickles for the length of the track.
 _UPSTREAM_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=10.0, pool=10.0)
 _STREAMABLE_STATUS = {status.HTTP_200_OK, status.HTTP_206_PARTIAL_CONTENT}
-# Upstream fetch size; yt-dlp itself chunks googlevideo at 10 MiB.
-_CHUNK = 4 * 1024 * 1024
+# Upstream fetch size. Measured against googlevideo (ANDROID_VR urls): a 1 MiB
+# bounded range answers 206, a 4 MiB one 403s. Don't raise without re-testing.
+_CHUNK = 1024 * 1024
 _RANGE_RE = re.compile(r"bytes=(\d+)-(\d*)$")
 
 PreviewResolver = Callable[[str], Awaitable[ResolvedPreview]]
