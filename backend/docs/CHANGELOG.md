@@ -1063,3 +1063,11 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 
 - No backend changes. The Queue Retry fix (`v5.3.2`) missed a second copy of the same bug: `job_detail_screen.dart` has its own independently-written `_retry` implementation that still unconditionally re-dispatched via the song-download endpoint. Fixed to match `queue_screen.dart`'s branching. See `android/docs/CHANGELOG.md` 2026-07-21 and `android/docs/DECISIONLOG.md` same date.
 - Version bump `5.3.4` → `5.3.5` across all five sync locations per `/CLAUDE.md` §3.
+
+## 2026-11-04 — preview proxy: fetch googlevideo in bounded Range chunks (fixes "Play Failed (0) Source Error")
+
+- **User-reported:** streaming a song not in the library failed on-device with "Play Failed (0) Source Error". Backend log showed `/preview/stream` -> 502 right after `GET googlevideo.com/videoplayback ... 403 Forbidden`. Diagnosed in-container with `httpx` against a freshly resolved URL (yt-dlp 2026.06.09, `c=ANDROID_VR`): no Range -> 403, `bytes=0-` -> 403, `bytes=0-1048575` -> 206.
+- **`backend/app/api/v1/preview.py`** — client Range is now translated into bounded `_CHUNK` (4 MiB) upstream fetches (`_open_chunk`) stitched into one response; total size comes from the first chunk's `Content-Range`. No client Range -> 200 full body; `bytes=N-` / `bytes=N-M` -> 206 with a correct `Content-Range`/`Content-Length`; start past end -> 416. Previously the client's (usually absent or open-ended) Range was forwarded verbatim.
+- **`backend/tests/test_preview.py`** — fake upstream now 403s unbounded Range like the real one; added tests for open-ended stitching, no-Range stitching, and 416. Full suite 647 passed; ruff + mypy clean.
+- Not changed: yt-dlp is still `>=2025.1` (installed 2026.06.09, >90 days old; no JS runtime in the image). Not the cause of this failure per the in-container test, but a separate staleness risk.
+- Version bump `5.3.5` → `5.3.6` across all five sync locations per `/CLAUDE.md` §3.

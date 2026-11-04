@@ -5,6 +5,8 @@ never touch yt-dlp or the network. The DB (testcontainers) is real — auth reso
 a real token row minted via the `make_token` fixture.
 """
 
+import re
+
 import httpx
 import pytest
 from fastapi import FastAPI
@@ -55,6 +57,8 @@ def _resolver_raising(exc: Exception):
 
 
 def _make_handler(seen: list[httpx.Request], *, audio_status: int = 200):
+    """Fake googlevideo: like the real one, it 403s any fetch without a *bounded* Range."""
+
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
         url = str(request.url)
@@ -63,21 +67,18 @@ def _make_handler(seen: list[httpx.Request], *, audio_status: int = 200):
         if url == _FAKE_STREAM:
             if audio_status >= 400:
                 return httpx.Response(audio_status, text="gone")
-            rng = request.headers.get("range")
-            if rng:
-                return httpx.Response(
-                    206,
-                    content=_BODY[:1024],
-                    headers={
-                        "content-type": "audio/webm",
-                        "content-range": f"bytes 0-1023/{len(_BODY)}",
-                        "accept-ranges": "bytes",
-                    },
-                )
+            m = re.fullmatch(r"bytes=(\d+)-(\d+)", request.headers.get("range", ""))
+            if not m:
+                return httpx.Response(403, text="needs bounded range")
+            start, end = int(m[1]), min(int(m[2]), len(_BODY) - 1)
             return httpx.Response(
-                200,
-                content=_BODY,
-                headers={"content-type": "audio/webm", "accept-ranges": "bytes"},
+                206,
+                content=_BODY[start : end + 1],
+                headers={
+                    "content-type": "audio/webm",
+                    "content-range": f"bytes {start}-{end}/{len(_BODY)}",
+                    "accept-ranges": "bytes",
+                },
             )
         return httpx.Response(404, text="unexpected url")
 
@@ -131,7 +132,6 @@ async def test_auth_via_header_streams_body(app_sm, make_token):
     assert r.headers["content-type"].startswith("audio/webm")
     # resolver-provided headers reach the upstream request.
     assert seen[-1].headers.get("user-agent") == "ytdlp/1"
-    assert "range" not in {k.lower() for k in seen[-1].headers}
 
 
 async def test_auth_via_query_token_streams_body(app_sm, make_token):
@@ -184,7 +184,54 @@ async def test_range_is_forwarded_and_206_passes_through(app_sm, make_token):
     assert r.content == _BODY[:1024]
     assert r.headers["content-range"] == f"bytes 0-1023/{len(_BODY)}"
     assert r.headers["accept-ranges"] == "bytes"
+    assert r.headers["content-length"] == "1024"
     assert seen[-1].headers.get("range") == "bytes=0-1023"
+
+
+async def test_open_ended_range_is_stitched_from_bounded_chunks(app_sm, make_token, monkeypatch):
+    # googlevideo 403s open-ended/absent Range; the proxy must fetch bounded chunks.
+    monkeypatch.setattr("app.api.v1.preview._CHUNK", 1000)
+    raw = await make_token(scopes=("read",))
+    seen: list[httpx.Request] = []
+    app = _build_app(app_sm, _resolver_returning(_ok_resolved()), _make_handler(seen))
+    async with await _client(app) as c:
+        r = await c.get(
+            "/api/v1/preview/stream",
+            params={"source_url": _WATCH, "token": raw},
+            headers={"Range": "bytes=100-"},
+        )
+    assert r.status_code == 206
+    assert r.content == _BODY[100:]
+    assert r.headers["content-range"] == f"bytes 100-{len(_BODY) - 1}/{len(_BODY)}"
+    assert r.headers["content-length"] == str(len(_BODY) - 100)
+    assert len(seen) > 1
+    assert all(re.fullmatch(r"bytes=\d+-\d+", q.headers["range"]) for q in seen)
+
+
+async def test_no_range_is_stitched_into_200(app_sm, make_token, monkeypatch):
+    monkeypatch.setattr("app.api.v1.preview._CHUNK", 1000)
+    raw = await make_token(scopes=("read",))
+    seen: list[httpx.Request] = []
+    app = _build_app(app_sm, _resolver_returning(_ok_resolved()), _make_handler(seen))
+    async with await _client(app) as c:
+        r = await c.get("/api/v1/preview/stream", params={"source_url": _WATCH, "token": raw})
+    assert r.status_code == 200
+    assert r.content == _BODY
+    assert r.headers["content-length"] == str(len(_BODY))
+    assert "content-range" not in r.headers
+
+
+async def test_range_past_end_is_416(app_sm, make_token):
+    raw = await make_token(scopes=("read",))
+    seen: list[httpx.Request] = []
+    app = _build_app(app_sm, _resolver_returning(_ok_resolved()), _make_handler(seen))
+    async with await _client(app) as c:
+        r = await c.get(
+            "/api/v1/preview/stream",
+            params={"source_url": _WATCH, "token": raw},
+            headers={"Range": "bytes=999999-"},
+        )
+    assert r.status_code == 416
 
 
 async def test_follows_upstream_redirect(app_sm, make_token):
