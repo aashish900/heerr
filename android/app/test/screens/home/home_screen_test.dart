@@ -23,6 +23,7 @@ import 'package:heerr/screens/home/quick_access_row.dart';
 import 'package:heerr/screens/home/recently_added_section.dart';
 import 'package:heerr/services/backend_service.dart';
 import 'package:heerr/theme.dart';
+import 'package:heerr/widgets/branded_header.dart';
 import 'package:heerr/widgets/heerr_logo.dart';
 
 // Minimal router with a Home root + sinks for every Home navigation target.
@@ -105,6 +106,27 @@ void main() {
         w.data!.startsWith('Good ') &&
         !w.data!.contains('heerr'));
     expect(greeting, findsOneWidget);
+  });
+
+  testWidgets('Shuffle-all button sits beside the greeting and runs the action',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(overrides: _homeOverrides()));
+    await tester.pumpAndSettle();
+
+    final Finder button = find.byKey(const Key('home-shuffle-all-button'));
+    expect(button, findsOneWidget);
+    expect(find.byTooltip('Shuffle all'), findsOneWidget);
+    // Same row as the greeting, to its right.
+    final Offset b = tester.getCenter(button);
+    final Offset g = tester.getCenter(find.byType(GreetingBlock));
+    expect(b.dx, greaterThan(g.dx));
+    expect((b.dy - g.dy).abs(), lessThan(60));
+
+    // No Navidrome creds in the test container -> the real action bails with
+    // the creds-missing snackbar (proves the tap is wired, no stubs needed).
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Navidrome creds missing'), findsOneWidget);
   });
 
   testWidgets('body renders search bar, Quick Access and Recently Added',

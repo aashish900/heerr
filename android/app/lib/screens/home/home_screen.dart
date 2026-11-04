@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../models/subsonic/album.dart';
+import '../../player/playback_actions.dart';
 import '../../player/player_provider.dart';
 import '../../providers/home/home_providers.dart';
 import '../../providers/library/library_search_query.dart';
@@ -209,7 +210,7 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
       padding: const EdgeInsets.only(bottom: 24),
       children: <Widget>[
         const _HomeSearchBar(),
-        const GreetingBlock(),
+        const _GreetingRow(),
         const ContinueListeningCard(),
         const QuickAccessRow(),
         if (libraryEmpty && playerIdle)
@@ -226,6 +227,60 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
         else
           const RecentlyAddedSection(),
       ],
+    );
+  }
+}
+
+/// Greeting on the left, "Shuffle all" on the right.
+class _GreetingRow extends StatelessWidget {
+  const _GreetingRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      children: <Widget>[
+        Expanded(child: GreetingBlock()),
+        Padding(
+          padding: EdgeInsets.only(right: 16),
+          child: _ShuffleAllButton(),
+        ),
+      ],
+    );
+  }
+}
+
+class _ShuffleAllButton extends ConsumerStatefulWidget {
+  const _ShuffleAllButton();
+
+  @override
+  ConsumerState<_ShuffleAllButton> createState() => _ShuffleAllButtonState();
+}
+
+class _ShuffleAllButtonState extends ConsumerState<_ShuffleAllButton> {
+  bool _busy = false;
+
+  Future<void> _run() async {
+    setState(() => _busy = true);
+    try {
+      await shuffleAllSongsFromSubsonic(ref, context);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton.filledTonal(
+      key: const Key('home-shuffle-all-button'),
+      tooltip: 'Shuffle all',
+      onPressed: _busy ? null : _run,
+      icon: _busy
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.shuffle_rounded),
     );
   }
 }

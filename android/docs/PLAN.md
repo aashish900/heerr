@@ -45,11 +45,11 @@ Navidrome `search3` with `query=""` returns all songs and honours `songCount`/`s
 - Test: first chunk played, rest appended in order, no dupes, early stop, empty/small lists (`test/player/shuffle_all_queue_test.dart`). Action itself (WidgetRef) not unit-tested; covered by S3 widget test stub + S5 smoke.
 - Commit: `feat(flutter): SH2 — shuffle-all play action`
 
-### S3. Home button
+### [x] S3. Home button
 - File: `android/app/lib/screens/home/home_screen.dart` (~line 212).
-- Wrap `GreetingBlock` in `Row(Expanded(GreetingBlock), shuffle button)`; `shuffle.svg` icon; key `home-shuffle-all-button`; Music tab only; spinner/disabled while loading.
+- Wrap `GreetingBlock` in `Row(Expanded(GreetingBlock), shuffle button)`; Material `Icons.shuffle_rounded` in `IconButton.filledTonal` (the shuffle.svg glyph helper in now_playing_transport is private); key `home-shuffle-all-button`; Music tab only; spinner/disabled while loading.
 - Check vertical alignment against greeting padding.
-- Test: `android/app/test/screens/home/home_screen_test.dart` — button present, tap calls action (mocktail stub; `audioHandlerProvider` stays un-overridden per existing pattern).
+- Test: `android/app/test/screens/home/home_screen_test.dart` — button present, tap runs the REAL action, which bails with the creds-missing snackbar in the test container (no stub needed).
 - Commit: `feat(flutter): SH3 — Home shuffle-all button`
 
 ### S4. Offline behaviour
