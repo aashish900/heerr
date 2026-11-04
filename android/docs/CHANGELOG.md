@@ -3266,3 +3266,12 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - Tests: `test/player/browse_tree_test.dart` (15), `test/player/heerr_audio_handler_container_test.dart` (+3 `getChildren`). `flutter analyze` clean; 1137/1137 green.
 - DHU (Pixel 7, release 5.4.4+169, cold start): all six tabs load with art; Albums and Artists render as grids, Recents/Favourites/Playlists/Downloaded as lists. Album-songs and artist-albums drill-downs covered by unit tests only, not yet viewed on DHU.
 - Known gap: no `notifyChildrenChanged`; a car that browses before `AudioService.init` completes gets the plugin's empty list until it re-browses (checked in AA10). The non-deprecated API is a per-parent `subscribeToChildren` stream; unclear if the plugin listens during a car browse.
+
+## 2026-11-04 — AA6: Android Auto playFromMediaId
+- `app/lib/player/play_core.dart` (new): `ProviderReader` typedef (fits `WidgetRef.read` and `ProviderContainer.read`), `songItem` (local `file://` vs stream URL — the former `_toMediaItem` body), `songsForArtist` (the former artist fan-out).
+- `app/lib/player/playback_actions.dart`: `_toMediaItem` and `playArtistFromSubsonic` now delegate to `play_core.dart`; behaviour unchanged.
+- `app/lib/player/browse_tree.dart`: extracted `songsOf(container, node)` (favourites / downloaded / album / playlist), shared by browse and playback.
+- `app/lib/player/browse_play.dart` (new): `playBrowseId` — a song queues its whole parent from that song (falls back to index 0 if missing); album / playlist / artist play from the top; tabs, parent-less songs and missing creds are no-ops.
+- `app/lib/player/heerr_audio_handler.dart`: `playFromMediaId` override -> `playBrowseId` -> `playAll`; failures log the exception type only.
+- `app/test/player/browse_play_test.dart` (new): 8 tests. `flutter analyze` clean; 1145/1145 green.
+- DHU (Pixel 7, release 5.4.4+170, cold start): tapping a song in an album plays from that song with the album queued, next/previous walk the album, Downloaded songs play. No errors in logcat.

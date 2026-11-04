@@ -58,7 +58,7 @@ Status: planned, nothing executed. Execute one step at a time; tick the box and 
 - `androidBrowsableRootExtras` in `main.dart` `AudioServiceConfig`: grid for albums/artists, list for songs (assumption B).
 - Test: `getChildren` for root, each tab, nested levels, offline.
 
-### [ ] AA6. `playFromMediaId`
+### [x] AA6. `playFromMediaId`
 - Extract a `Ref`/container-based core from `playback_actions.dart` (reuse `_toMediaItem` and the album/artist/playlist/song functions); UI wrappers keep snackbars and call the core. No duplicate logic.
 - `playFromMediaId(id)`: decode (AA3) -> queue -> `playAll`/`playSong`. Tapping a song inside an album queues the whole album from that song.
 - Test: each id kind -> expected queue; downloaded songs resolve to `file://`.

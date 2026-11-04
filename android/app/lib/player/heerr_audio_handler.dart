@@ -8,6 +8,7 @@ import 'package:rxdart/rxdart.dart';
 
 import '../providers/profiles/profile_registry.dart';
 import 'browse_ids.dart';
+import 'browse_play.dart';
 import 'browse_tree.dart';
 
 /// The `audio_service` `BaseAudioHandler` backed by a `just_audio`
@@ -61,6 +62,25 @@ class HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
       // Type only: Dio error messages embed URLs with auth params.
       debugPrint('browse $parentMediaId failed: ${e.runtimeType}');
       return <MediaItem>[];
+    }
+  }
+
+  /// Android Auto tap on a browse item (see `browse_play.dart`).
+  @override
+  Future<void> playFromMediaId(
+    String mediaId, [
+    Map<String, dynamic>? extras,
+  ]) async {
+    final BrowseId? id = BrowseId.tryParse(mediaId);
+    if (id == null) return;
+    try {
+      await playBrowseId(
+        await whenReady(),
+        id,
+        (List<MediaItem> items, int start) => playAll(items, startIndex: start),
+      );
+    } catch (e) {
+      debugPrint('playFromMediaId $mediaId failed: ${e.runtimeType}');
     }
   }
 

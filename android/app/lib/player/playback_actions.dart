@@ -17,7 +17,6 @@ import '../models/subsonic/artist.dart';
 import '../models/subsonic/playlist.dart';
 import '../models/subsonic/search_result3.dart';
 import '../models/subsonic/song.dart';
-import '../offline/local_uri.dart';
 import '../providers/library/library_album.dart';
 import '../providers/library/library_artist.dart';
 import '../providers/library/library_playlist.dart';
@@ -27,6 +26,7 @@ import '../providers/server_creds.dart';
 import '../services/subsonic_library_service.dart';
 import '../widgets/error_snackbar.dart';
 import 'heerr_audio_handler.dart';
+import 'play_core.dart';
 import 'player_provider.dart';
 import 'search_result_to_media_item.dart';
 import 'song_to_media_item.dart';
@@ -70,31 +70,8 @@ void _errSnack(BuildContext context, Object e) {
   ));
 }
 
-Future<MediaItem> _toMediaItem(WidgetRef ref, Song s, _Creds c) async {
-  // Single chokepoint: ask the offline layer if we have a local file for
-  // this song id; pass it through to songToMediaItem so MediaItem.id becomes
-  // file://… instead of the Subsonic stream URL. Null = stream.
-  // Awaits the `.future` so the manifest provider has fully rebuilt after
-  // a recent sync — without this, a fresh download would be invisible to
-  // the player until the next time the manifest cache happens to refresh
-  // (the "have to download twice to play offline" bug).
-  final String? localUri =
-      await ref.read(localUriForProvider(s.id).future);
-  String? localPath;
-  if (localUri != null) {
-    final Uri parsed = Uri.parse(localUri);
-    if (parsed.scheme == 'file') {
-      localPath = parsed.toFilePath();
-    }
-  }
-  return songToMediaItem(
-    song: s,
-    navidromeBaseUrl: c.url,
-    navidromeUsername: c.user,
-    navidromePassword: c.pass,
-    localFilePath: localPath,
-  );
-}
+Future<MediaItem> _toMediaItem(WidgetRef ref, Song s, _Creds c) =>
+    songItem(ref.read, s, url: c.url, user: c.user, pass: c.pass);
 
 /// Play a single Subsonic [Song]. Replaces the queue with just this song.
 Future<void> playSongFromSubsonic(
@@ -382,13 +359,7 @@ Future<void> playArtistFromSubsonic(
       }
       return;
     }
-    final List<Album> resolved = await Future.wait<Album>(
-      artist.album
-          .map((Album a) => ref.read(libraryAlbumProvider(a.id).future)),
-    );
-    final List<Song> songs = <Song>[
-      for (final Album a in resolved) ...a.song,
-    ];
+    final List<Song> songs = await songsForArtist(ref.read, artist);
     if (!context.mounted) return;
     await playAllSongsFromSubsonic(ref, context, songs);
   } catch (e) {

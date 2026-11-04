@@ -139,24 +139,13 @@ Future<List<MediaItem>> browseChildren(
           ),
       ];
     case BrowseKind.favourites:
-      final Playlist? fav = await c.read(favouritesPlaylistProvider.future);
-      if (fav == null) return <MediaItem>[];
-      return songs(
-        (await c.read(libraryPlaylistProvider(fav.id).future)).entry,
-      );
     case BrowseKind.downloaded:
-      return songs(await c.read(downloadedSongsProvider.future));
     case BrowseKind.album:
-      return songs(
-        (await c.read(libraryAlbumProvider(parent.id!).future)).song,
-      );
+    case BrowseKind.playlist:
+      return songs(await songsOf(c, parent));
     case BrowseKind.artist:
       return albums(
         (await c.read(libraryArtistProvider(parent.id!).future)).album,
-      );
-    case BrowseKind.playlist:
-      return songs(
-        (await c.read(libraryPlaylistProvider(parent.id!).future)).entry,
       );
     case BrowseKind.root:
     case BrowseKind.song:
@@ -176,3 +165,23 @@ List<MediaItem> _tabItems() => <MediaItem>[
       },
     ),
 ];
+
+/// Songs directly under a song-bearing node (favourites, downloaded, album,
+/// playlist); `[]` for every other kind. Shared by browsing and
+/// `playFromMediaId` so both see the same list.
+Future<List<Song>> songsOf(ProviderContainer c, BrowseId node) async {
+  switch (node.kind) {
+    case BrowseKind.favourites:
+      final Playlist? fav = await c.read(favouritesPlaylistProvider.future);
+      if (fav == null) return <Song>[];
+      return (await c.read(libraryPlaylistProvider(fav.id).future)).entry;
+    case BrowseKind.downloaded:
+      return c.read(downloadedSongsProvider.future);
+    case BrowseKind.album:
+      return (await c.read(libraryAlbumProvider(node.id!).future)).song;
+    case BrowseKind.playlist:
+      return (await c.read(libraryPlaylistProvider(node.id!).future)).entry;
+    default:
+      return <Song>[];
+  }
+}
