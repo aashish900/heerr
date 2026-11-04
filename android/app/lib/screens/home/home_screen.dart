@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../models/subsonic/album.dart';
@@ -295,7 +296,13 @@ class _ShuffleAllButtonState extends ConsumerState<_ShuffleAllButton> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              const Icon(Icons.shuffle_rounded, color: fg, size: 22),
+              // Same glyph as the Now Playing shuffle toggle.
+              SvgPicture.asset(
+                'assets/icons/shuffle.svg',
+                width: 24,
+                height: 24,
+                colorFilter: const ColorFilter.mode(fg, BlendMode.srcIn),
+              ),
               const SizedBox(width: 8),
               Text(
                 'Play All',

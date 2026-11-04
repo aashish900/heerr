@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
@@ -117,6 +118,11 @@ void main() {
     expect(button, findsOneWidget);
     expect(find.byTooltip('Shuffle all'), findsOneWidget);
     expect(find.text('Play All'), findsOneWidget);
+    // Shuffle glyph = the player's bundled SVG, not a Material icon.
+    expect(
+      find.descendant(of: button, matching: find.byType(SvgPicture)),
+      findsOneWidget,
+    );
     // Same row as the greeting, to its right.
     final Offset b = tester.getCenter(button);
     final Offset g = tester.getCenter(find.byType(GreetingBlock));
