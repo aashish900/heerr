@@ -116,6 +116,7 @@ void main() {
     final Finder button = find.byKey(const Key('home-shuffle-all-button'));
     expect(button, findsOneWidget);
     expect(find.byTooltip('Shuffle all'), findsOneWidget);
+    expect(find.text('Play All'), findsOneWidget);
     // Same row as the greeting, to its right.
     final Offset b = tester.getCenter(button);
     final Offset g = tester.getCenter(find.byType(GreetingBlock));
@@ -128,6 +129,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Navidrome creds missing'), findsOneWidget);
   });
+
+  for (final String? nick in <String?>['Aashish', null]) {
+    testWidgets('Play All pill fits a 360dp-wide phone (nickname: $nick)',
+        (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(360 * 3, 800 * 3);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(_wrap(overrides: <Override>[
+        ..._homeOverrides(),
+        profileMetaNotifierProvider.overrideWith(() => _StubMeta(nick)),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull); // no RenderFlex overflow
+      expect(find.text('Play All'), findsOneWidget);
+    });
+  }
 
   testWidgets('body renders search bar, Quick Access and Recently Added',
       (WidgetTester tester) async {

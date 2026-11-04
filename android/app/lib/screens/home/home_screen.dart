@@ -270,36 +270,53 @@ class _ShuffleAllButtonState extends ConsumerState<_ShuffleAllButton> {
 
   @override
   Widget build(BuildContext context) {
-    // Same look as the mini-player's play button (widgets/mini_player.dart):
-    // 40px brand-gradient circle, black glyph, soft magenta glow.
+    // Mockup pill: brand gradient, shuffle icon + "Play All" + play glyph,
+    // magenta glow. Behaviour = shuffle the whole library.
+    const Color fg = Colors.white;
     return Tooltip(
       message: 'Shuffle all',
       child: InkWell(
         key: const Key('home-shuffle-all-button'),
-        customBorder: const CircleBorder(),
+        customBorder: const StadiumBorder(),
         onTap: _busy ? null : _run,
         child: Container(
-          width: 40,
-          height: 40,
+          height: 46,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
             gradient: heerrGradient,
-            shape: BoxShape.circle,
+            borderRadius: BorderRadius.circular(23),
             boxShadow: <BoxShadow>[
               BoxShadow(
-                color: heerrMagenta.withValues(alpha: 0.25),
-                blurRadius: 16,
+                color: heerrMagenta.withValues(alpha: 0.45),
+                blurRadius: 20,
               ),
             ],
           ),
-          child: _busy
-              ? const Padding(
-                  padding: EdgeInsets.all(10),
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.black,
-                  ),
-                )
-              : const Icon(Icons.play_arrow, color: Colors.black, size: 24),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Icon(Icons.shuffle_rounded, color: fg, size: 22),
+              const SizedBox(width: 8),
+              Text(
+                'Play All',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: fg,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(width: 8),
+              _busy
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: fg,
+                      ),
+                    )
+                  : const Icon(Icons.play_arrow_rounded, color: fg, size: 24),
+            ],
+          ),
         ),
       ),
     );

@@ -3213,3 +3213,8 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - **`android/app/test/player/heerr_audio_handler_modes_test.dart`** — new test: with a never-completing `play()`, `playAll` and a following `playSong` both return and the second is not dropped (failed before the fix).
 - `flutter analyze` clean, `flutter test` 1107 green. Version bump `5.4.1` → `5.4.2` across the five sync locations.
 - See `DECISIONLOG.md` 2026-11-04 "Don't await just_audio play()".
+
+## 2026-11-04 — Home play button restyled as the mockup "Play All" pill
+
+- **`android/app/lib/screens/home/home_screen.dart`** — `_ShuffleAllButton` is now a 46 px gradient pill (shuffle icon + "Play All" + play glyph, white, magenta glow) matching `Neon Purple Music App Home Screen.png`; replaces the 40 px circle. Pill only: no sparkles, no other Home layout change. Behaviour, key (`home-shuffle-all-button`) and "Shuffle all" tooltip unchanged; spinner replaces the trailing play glyph while running.
+- Tests: `home_screen_test.dart` asserts the "Play All" label, and two new tests render Home at 360 dp wide (with/without nickname) to catch RenderFlex overflow. `flutter analyze` clean, Home tests green. No version bump yet.
