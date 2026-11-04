@@ -969,6 +969,19 @@ Design doc: `~/Downloads/ChatGPT Image Jul 20, 2026, 07_29_43 PM.png` ("heerr �
 
 ---
 
+## Phase SH — Home "Shuffle all" (client-only, v5.4.0)
+
+Working breakdown lives in `android/docs/PLAN.md` (temp file; S0–S8).
+
+### [ ] SH1. Home "Shuffle all" button (full library)
+**Backend prereq:** none (client-only). Navidrome `search3` with an empty query pages the whole library — verified on the home server 2026-11-04 (500 + 500 + 16 = 1016 songs). **Files:** `android/app/lib/services/subsonic_library_service.dart` (`getAllSongs`), `android/app/lib/player/playback_actions.dart` (`playShuffledInChunks`, `songsForShuffleAll`, `shuffleAllSongsFromSubsonic`), `android/app/lib/screens/home/home_screen.dart` (`_GreetingRow` + `_ShuffleAllButton`), tests under `test/services/`, `test/player/`, `test/screens/home/`.
+**Deliverable:** A tonal shuffle button to the right of the Home greeting. Tap pages every song via `search3`, shuffles once in Dart, plays the first 50, appends the rest in 200-song chunks (stops if the user starts other playback). Re-taps ignored while running. Any online failure falls back to shuffling downloaded songs; nothing downloaded surfaces the original error.
+**Test gate:** `getAllSongs` paging (500/500/16, empty library); chunking (no dupes/loss, early stop, small/empty list); offline fallback (3 cases); Home widget test (button beside greeting, tap runs the real action). `flutter analyze` + `flutter test` green.
+**Smoke (on-device):** tap → playback within ~2 s on the full library; queue grows to library size; next/prev fine, no ANR; double-tap loads once; airplane mode plays downloads (or errors if none); button aligns with greeting with/without nickname.
+**Commits:** `feat(flutter): SH1 — getAllSongs paged search3`, `SH2 — shuffle-all play action`, `SH3 — Home shuffle-all button`, `SH4 — shuffle-all offline fallback`.
+
+---
+
 ## Cross-cutting reminders
 
 - **`flutter analyze` green before declaring any milestone done.**
@@ -1005,8 +1018,8 @@ Items scheduled into v1.5.0 (Phase P) or v2.0.0 (Phase Q) are no longer here —
 
 ## Roadmap complete when
 
-1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5, P1–P4, Q1–Q4, R1, S1–S11, T1–T5, U1, V1, W1, X1–X7, Y1–Y2, Z1–Z6, PC1–PC5).
+1. All milestone boxes checked (A1–G1, H1–K2, L1–L6, M1–M5, N1–N5, O1–O5, P1–P4, Q1–Q4, R1, S1–S11, T1–T5, U1, V1, W1, X1–X7, Y1–Y2, Z1–Z6, PC1–PC5, SH1).
 2. Every test gate green at its milestone.
-3. G1, K2, L6, M5, N5, O5, P4, Q4, R1, S11, T5, and PC5 manual smokes verified on-device.
+3. G1, K2, L6, M5, N5, O5, P4, Q4, R1, S11, T5, PC5, and SH1 manual smokes verified on-device.
 4. CHANGELOG entries exist for each milestone group.
 5. `git log --oneline android/` reads as a clean A→U progression under the `feat(flutter):` / `chore(flutter):` Conventional-Commits cadence.

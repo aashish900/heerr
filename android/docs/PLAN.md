@@ -62,7 +62,7 @@ Navidrome `search3` with `query=""` returns all songs and honours `songCount`/`s
 - Tap -> playback starts within ~2s on full library; queue grows to library size; no ANR; next/prev OK; re-tap doesn't double-load; airplane mode per S4.
 - Note large-library ceiling (10k+ songs) as a `ponytail:` comment where relevant.
 
-### S6. Docs
+### [x] S6. Docs
 - `android/docs/ROADMAP.md`: new `## Phase SH` before `## Cross-cutting reminders` (line ~972) with milestone SH1 (Files / Deliverable / Test gate / Smoke / Commit); update Status line and "Roadmap complete when" list (~line 1006).
 - `android/docs/DECISIONLOG.md`: search3 paging vs random-500 vs album fan-out; Dart-side shuffle.
 - `android/docs/CHANGELOG.md`: per-task entry.

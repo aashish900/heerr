@@ -1381,3 +1381,19 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Why:** This wasn't a regression from the first fix — it was a pre-existing duplicate of the same bug in a code path the first investigation didn't check. Two screens both offer a "Retry" affordance for a failed job and both had grown their own copy of the dispatch logic rather than sharing one; the DEBT-worthy follow-up (not undertaken here, out of scope for a bug-fix turn) would be to extract a single `retryJob(WidgetRef, JobView)` helper both screens call, so a future job-kind bug fix can't be applied to only one of the two call sites again.
 
 **Reference:** `android/app/lib/screens/job_detail_screen.dart::_JobBody._retry`, `android/app/test/screens/job_detail_screen_test.dart` (`retry (#53)` group).
+
+## 2026-11-04 — Home "Shuffle all": page `search3`, shuffle once in Dart
+
+**Context:** Want a Home button that plays every song on the server, shuffled. The backend has no track-listing endpoint (library is read from Navidrome via Subsonic), and `getRandomSongs` caps at 500 — a sample, not the library. User chose "true full library".
+
+**Decision:** Client-only. Page `search3.view` with an empty `query`, `songCount=500`, increasing `songOffset` until a short page (`SubsonicLibraryService.getAllSongs`). Fetch all pages, shuffle the whole list once in Dart, play the first 50, append the rest in 200-song chunks. Any online failure falls back to shuffling downloaded songs.
+
+**Why:** Empty-query `search3` paging was verified on the home server (500 + 500 + 16 = 1016 songs, distinct pages) — it is Navidrome behaviour, not part of the Subsonic spec. Shuffling each page as it arrives would bias playback to the first 500 songs in server order, so all pages are fetched first (~N/500 requests, a few seconds even for large libraries). Dart-side shuffle instead of just_audio shuffle mode because `setShuffleModeEnabled` after `setAudioSources` reorders and pins the current index, and the chunked append would fight it. The small first chunk plus bounded appends avoids one huge `setAudioSources` (the `_isLoadingSource` ANR guard exists for that class of problem). No backend change, so the backend-first rule is not triggered.
+
+**Alternatives considered:**
+- **`getRandomSongs(500)`** — rejected: only a sample of the library.
+- **Album fan-out (`getAlbumList` + per-album `getAlbum`)** — rejected: N requests; kept as fallback had the S0 spike failed.
+- **New backend endpoint listing all songs** — rejected: extra surface and deploy for something Navidrome already serves.
+- **just_audio shuffle mode over the full queue** — rejected, see Why.
+
+**Reference:** `android/app/lib/services/subsonic_library_service.dart::getAllSongs`, `android/app/lib/player/playback_actions.dart::shuffleAllSongsFromSubsonic`, `android/docs/PLAN.md`, `android/docs/ROADMAP.md` Phase SH.
