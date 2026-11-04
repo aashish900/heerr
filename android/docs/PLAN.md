@@ -63,13 +63,13 @@ Status: planned, nothing executed. Execute one step at a time; tick the box and 
 - `playFromMediaId(id)`: decode (AA3) -> queue -> `playAll`/`playSong`. Tapping a song inside an album queues the whole album from that song.
 - Test: each id kind -> expected queue; downloaded songs resolve to `file://`.
 
-### [ ] AA7. Voice / search
+### [-] AA7. (BACKLOG, skipped 2026-11-04) Voice / search
 - `search(query)` and `playFromSearch(query, extras)` via `search3` / `findLibraryMatch`. Empty query -> shuffle-all (`playback_actions.dart:291` logic).
 - Test with fake service.
 
-### [ ] AA8. Now-playing polish
-- Verify prev/play/pause/next/seek and queue ("Up next") on DHU; optional `MediaControl.custom` + `customAction` for shuffle/repeat/favourite.
-- Confirm `now_playing_persistence` restore doesn't autoplay when the car connects.
+### [x] AA8. Now-playing polish (verified, no code)
+- DHU 2026-11-04: title/artist/art, seekable progress, play/pause, prev, next and Queue ("Up next", current track highlighted) all work. `restoreQueue` loads paused (`heerr_audio_handler.dart:299-319`), so connecting never autoplays.
+- Backlog (not done): shuffle / repeat / favourite `MediaControl.custom` + `customAction` (needs new icon drawables); the `Stop` control renders as a plain white square in the car; a car tap during cold-start `restoreQueue` is dropped by the `_isLoadingSource` guard (low risk, unverified).
 
 ### [ ] AA9. Docs + version
 - ROADMAP: add `Phase AA` before `## Cross-cutting reminders` (`docs/ROADMAP.md:985`). CHANGELOG entry per step. DECISIONLOG: browse ids, headless approach. CONTEXT.md: Android Auto note.

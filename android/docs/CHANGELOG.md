@@ -3275,3 +3275,8 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - `app/lib/player/heerr_audio_handler.dart`: `playFromMediaId` override -> `playBrowseId` -> `playAll`; failures log the exception type only.
 - `app/test/player/browse_play_test.dart` (new): 8 tests. `flutter analyze` clean; 1145/1145 green.
 - DHU (Pixel 7, release 5.4.4+170, cold start): tapping a song in an album plays from that song with the album queued, next/previous walk the album, Downloaded songs play. No errors in logcat.
+
+## 2026-11-04 — AA7 backlogged, AA8 verified (no code)
+- `docs/PLAN.md`: AA7 (voice / `playFromSearch` / `search`) marked backlog `[-]` by user decision; AA8 ticked.
+- AA8 findings (DHU, Pixel 7, release 5.4.4+170): now-playing shows title, artist, art, seekable progress bar, play/pause, previous, next and a working Queue list with the current track highlighted. `restoreQueue` never calls `play()`, so a car connect does not autoplay.
+- Backlog items from AA8 recorded in PLAN.md (custom shuffle/repeat/favourite actions, white-square Stop control, `_isLoadingSource` drop during cold-start restore).
