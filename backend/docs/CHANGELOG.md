@@ -1075,3 +1075,8 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 ## 2026-11-04 — CI: install Trivy from the GitHub release (get.trivy.dev is dead)
 
 - **`.github/workflows/docker-publish.yml`** — `aquasecurity/trivy-action` replaced by an "Install Trivy" step (v0.76.1 tarball from `github.com/aquasecurity/trivy/releases`, verified against the release `checksums.txt`) plus a `trivy image` step with the same gate (HIGH/CRITICAL, `--ignore-unfixed`, `--exit-code 1`, `--pkg-types os,library`, same `--skip-dirs`). Cause: setup-trivy's installer downloads from `get.trivy.dev`, which no longer resolves (curl exit 6); every run since 2026-08 failed at the scan step, so the build-and-push step after it never ran (v5.3.6 image was not published). Out of TDD scope (workflow file); verified by the re-run on the `v5.3.6` tag.
+
+## 2026-11-04 — deps: patch HIGH CVEs surfaced by the restored Trivy gate
+
+- **`backend/poetry.lock`** — `poetry update urllib3 certifi anyio yt-dlp`: urllib3 2.7.0 → 2.8.0 (CVE-2026-97687, CVE-2026-97689), yt-dlp 2026.6.9 → 2026.10.26 (CVE-2026-55404; also addresses the stale-extractor risk), certifi 2026.10.19 → 2026.10.23, anyio 4.13.0 → 4.16.0, typing-extensions 4.15.0 → 4.16.0 (transitive). `pyproject.toml` constraints unchanged.
+- The Trivy gate had been failing at install since 2026-08 (previous entry), so these were never reported. Local rebuild + `trivy image` (v0.76.1, same flags as CI): clean. Backend suite 647 passed.
