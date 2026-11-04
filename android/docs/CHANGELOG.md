@@ -3235,3 +3235,9 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 ## 2026-11-04 — SH1 on-device smoke passed
 
 - Owner ran the SH1 on-device smoke (Home "Play All" pill, shuffled full library, queue growth, no stuck spinner after the v5.4.2 `play()` fix) and reported it passing on `v5.4.4`. `android/docs/ROADMAP.md` SH1 box ticked `[x]`; `android/docs/PLAN.md` S5/S8 ticked (final `flutter analyze` + `flutter test` 1109 green, `graphify update .` run). Docs only; no version change.
+
+## 2026-11-04 — AA1: Android Auto manifest descriptor
+- `app/android/app/src/main/res/xml/automotive_app_desc.xml` (new): `<uses name="media"/>`.
+- `app/android/app/src/main/AndroidManifest.xml`: added `com.google.android.gms.car.application` meta-data pointing at it.
+- `README.md`: added "Android Auto (Desktop Head Unit)" setup steps.
+- `flutter build apk --debug` succeeds. DHU smoke passed on Pixel 7 (release build 5.4.4+168 sideloaded over 167): heerr listed in the DHU launcher and dock. DHU installed via `sdkmanager "extras;google;auto"`; it must be run with stdin held open (`tail -f /dev/null | desktop-head-unit`) or it exits at once, and the phone needs the one-time Android Auto "Continue" prompt accepted.

@@ -1,87 +1,86 @@
-# PLAN — Home "Shuffle all" button (full library)
+# PLAN — Android Auto support (phase AA)
 
-Status: planned, nothing executed. Execute one step at a time; tick the box and commit after each step.
+Status: planned, nothing executed. Execute one step at a time; tick the box and commit after each step. TDD; `flutter test` + `flutter analyze` green before and after each step.
 
 ## Decisions (user-confirmed 2026-11-04)
-- Scope: **true full library**, not a random-500 sample.
-- Placement: button on the **right of the greeting row** on Home (Music tab), not under it.
-- Client-only change; no backend change (backend-first rule not triggered).
+- Testing: **sideload + Desktop Head Unit (DHU) only**. No Play Store, no real car yet.
+- Browse tree: **Recents, Favourites, Playlists, Albums, Artists, Downloaded**. No podcasts.
+- Cold start: **full browse + play headless** (phone app not open).
+- Client-only change; no backend change.
 
 ## Facts (from code)
-- No backend "all songs" endpoint. Library is read from Navidrome via Subsonic: `android/app/lib/services/subsonic_library_service.dart`.
-- `getRandomSongs` (`subsonic_library_service.dart:182`) caps at 500 -> not enough.
-- `search3` (`subsonic_library_service.dart:132`) takes only `query`; no `songCount`/`songOffset`. `findLibraryMatch` (line 149) shows how to pass `songCount`.
-- Home Music body: `android/app/lib/screens/home/home_screen.dart:205-228`; `GreetingBlock` at line 212 (class in `widgets/branded_header.dart:135`, padding `fromLTRB(16,16,16,8)`).
-- Player: `HeerrAudioHandler.playAll` (`player/heerr_audio_handler.dart:203`, guarded by `_isLoadingSource`), `setShuffleMode` (line 301).
-- Helpers in `player/playback_actions.dart`: `playAllSongsFromSubsonic` (207), `addSongsToQueue` (~160), `_toMediaItem` (69), `_resolveCreds` (39).
-- Existing shuffle icon: `assets/icons/shuffle.svg`.
-- Version now 5.3.7 (backend + android share it).
+- Deps: `audio_service 0.18.18`, `just_audio 0.10.5` (`app/pubspec.lock`). No `just_audio_background`.
+- Handler: `HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler` — `app/lib/player/heerr_audio_handler.dart:15`. Has `playSong` (190), `playAll` (207), `restoreQueue` (235), skip/seek/repeat/shuffle overrides.
+- Handler does NOT implement: `getChildren`, `getMediaItem`, `search`, `playFromMediaId`, `playFromSearch`, `customAction`. `AudioService.init` (`app/lib/main.dart:34-43`) sets no `androidBrowsableRootExtras`.
+- Manifest (`app/android/app/src/main/AndroidManifest.xml:62-79`): `AudioService` already exported with `android.media.browse.MediaBrowserService` filter; `MediaButtonReceiver` present. `MainActivity : AudioServiceFragmentActivity`. minSdk 24, targetSdk 36.
+- Missing: `com.google.android.gms.car.application` meta-data and `res/xml/automotive_app_desc.xml` (only `hero_widget_info.xml` exists in `res/xml/`).
+- `MediaItem.id` is the playback URL with embedded auth (`player/song_to_media_item.dart:29-83`) -> unusable as a browse id. Reverse map: `songFromMediaItem` (:94). Extras hold `subsonicId`, `coverArt`.
+- Art URL: `buildSubsonicCoverArtUrl` (`api/subsonic_client.dart:117-179`), no `size` param today.
+- Handler has no Riverpod access. `ProviderContainer` is built after `AudioService.init` (`main.dart:49-53`). Creds: `serverCredsProvider` (`providers/server_creds.dart`), passwords in `flutter_secure_storage`.
+- Play helpers in `player/playback_actions.dart` take `WidgetRef` + `BuildContext` (snackbars): `_toMediaItem` (73, offline check via `localUriForProvider`), `playSongFromSubsonic` (100), `playAlbumFromSubsonic` (346), `playArtistFromSubsonic` (368), `playPlaylistFromSubsonic` (400), `shuffleAllSongsFromSubsonic` (291).
+- Library providers (`providers/library/`): `libraryAlbumsProvider`, `libraryAlbumProvider(id)`, `libraryArtistsProvider`, `libraryArtistProvider(id)`, `libraryPlaylistsProvider`, `libraryPlaylistProvider(id)`, `favouritesPlaylistProvider`. Recents: `recentlyPlayed` (`providers/home/home_providers.dart:39`). Downloaded: `downloadedSongsProvider` (`providers/downloaded_songs.dart`). Offline cache: `cacheAware` (`offline/library_cache.dart`).
+- Search: `SubsonicLibraryService.search3`, `findLibraryMatch` (`services/subsonic_library_service.dart`).
+- `WidgetSeekReceiver.kt` already connects a `MediaBrowserCompat` to the AudioService (working example).
+- Handler test pattern: `app/test/player/heerr_audio_handler_modes_test.dart` (mocktail `_MockAudioPlayer`, no platform channels).
 
-## Assumption (unverified — gated by S0)
-Navidrome `search3` with `query=""` returns all songs and honours `songCount`/`songOffset` paging.
+## Assumptions (unverified — gated by AA2)
+- A. A cold MediaBrowser bind from Android Auto makes audio_service start the Flutter engine and run `main()`. If false, a headless entrypoint is needed and AA4 changes.
+- B. Android Auto honors `android.media.browse.CONTENT_STYLE_*` root extras passed via `androidBrowsableRootExtras` in `AudioServiceConfig`. Verify in audio_service 0.18.18 source.
+- C. Sideloaded app appears in DHU only with Android Auto developer mode -> "Unknown sources" enabled on the phone.
 
 ## Steps
 
-### [x] S0. Spike: verify Navidrome paging  (no code)
-- curl `search3.view?query=&songCount=500&songOffset=0` and `songOffset=500` with real creds.
-- Pass: distinct pages; summed count ≈ library size.
-- Fail: switch to album fan-out (`getAlbumList` + per-album `getAlbum`); record in DECISIONLOG; amend S1.
-- Output: result noted in this file under "Spike result".
+### [x] AA1. Manifest + descriptor, empty app visible in DHU
+- Files: new `app/android/app/src/main/res/xml/automotive_app_desc.xml` (`<automotiveApp><uses name="media"/></automotiveApp>`); `AndroidManifest.xml` add `<meta-data android:name="com.google.android.gms.car.application" android:resource="@xml/automotive_app_desc"/>` inside `<application>`; `android/README.md` add DHU setup (SDK Manager -> Android Auto DHU; phone: AA developer mode, "Start head unit server"; `adb forward tcp:5277 tcp:5277`; run `desktop-head-unit`).
+- Gate: heerr listed in DHU app launcher (empty tree OK).
+- Commit: `feat(flutter): AA1 — Android Auto manifest descriptor`
 
-### [x] S1. `getAllSongs` paging in the library service
-- File: `android/app/lib/services/subsonic_library_service.dart`.
-- Add `Future<List<Song>> getAllSongs({void Function(List<Song> page)? onPage})`: loop `search3` with `query=''`, `songCount=500`, `artistCount=0`, `albumCount=0`, increasing `songOffset`; stop on a short page. Reuse `subsonicCall`.
-- Test: mock Dio, 2 full pages + 1 short -> concatenated, stops; empty library -> `[]`.
-- Commit: `feat(flutter): SH1 — getAllSongs paged search3`
+### [ ] AA2. Cold-start spike (investigation, no feature code)
+- Read audio_service 0.18.18 source in pub cache: engine start, entrypoint, `getChildren` plumbing, `androidBrowsableRootExtras`.
+- Kill app, connect DHU, `adb logcat`: does `main()` run, does `AudioService.init` complete, does the handler get `getChildren`?
+- Output: DECISIONLOG entry confirming/denying A and B. Decides AA4 shape.
+- Commit: `docs(flutter): AA2 — cold-start findings`
 
-### [x] S2. Shuffle-all play action
-- File: `android/app/lib/player/playback_actions.dart`.
-- Add `shuffleAllSongsFromSubsonic(ref, context)`:
-  - First page -> shuffle in Dart -> `playAllSongsFromSubsonic` (reuses creds, `_toMediaItem`, empty-list snackbar).
-  - Remaining pages in background -> shuffle each -> append via `addSongsToQueue` path, in chunks (avoid ANR; respect `_isLoadingSource`).
-  - Do NOT enable just_audio shuffle mode (reorders after `setAudioSources`, pins current index).
-  - Guard against re-entry (in-flight flag); abort appends if the user starts other playback.
-- DEVIATION (done): fetch ALL pages first, shuffle once, then play 50 / append 200-chunks (shuffling per page would bias to the first 500 songs). Core is `playShuffledInChunks` (pure, tested); re-entry guard + queue-head check (`shouldContinue`) live in the action.
-- Test: first chunk played, rest appended in order, no dupes, early stop, empty/small lists (`test/player/shuffle_all_queue_test.dart`). Action itself (WidgetRef) not unit-tested; covered by S3 widget test stub + S5 smoke.
-- Commit: `feat(flutter): SH2 — shuffle-all play action`
+### [ ] AA3. Stable browse ids (pure functions)
+- New `app/lib/player/browse_ids.dart`: encode/decode `root`, `recents`, `favourites`, `playlists`, `albums`, `artists`, `downloaded`, `album:<id>`, `playlist:<id>`, `artist:<id>`, `song:<id>`.
+- Test: `app/test/player/browse_ids_test.dart` — round-trip, malformed ids.
 
-### [x] S3. Home button
-- File: `android/app/lib/screens/home/home_screen.dart` (~line 212).
-- Wrap `GreetingBlock` in `Row(Expanded(GreetingBlock), shuffle button)`; Material `Icons.shuffle_rounded` in `IconButton.filledTonal` (the shuffle.svg glyph helper in now_playing_transport is private); key `home-shuffle-all-button`; Music tab only; spinner/disabled while loading.
-- Check vertical alignment against greeting padding.
-- Test: `android/app/test/screens/home/home_screen_test.dart` — button present, tap runs the REAL action, which bails with the creds-missing snackbar in the test container (no stub needed).
-- Commit: `feat(flutter): SH3 — Home shuffle-all button`
+### [ ] AA4. Headless container/creds access for the handler
+- `HeerrAudioHandler`: late-bound `ProviderContainer` setter, wired in `main.dart` right after the container is built. Before wiring: return empty / await a `Completer`. Active profile + creds must load without UI (reuse `activeProfileProvider`, `serverCredsProvider`).
+- Shape depends on AA2.
+- Test: handler before/after wiring, mocktail pattern above.
 
-### [x] S4. Offline behaviour
-- No network -> fall back to `downloadedSongsProvider` songs (shuffled) via `playAllSongsFromSubsonic`; if none, snackbar "Nothing to play."
-- Done via `songsForShuffleAll(online, downloaded)`: ANY online error (offline, Tailscale down, server 5xx) falls back to downloaded songs; empty downloads -> original error snackbar. Songs play via `file://` through `_toMediaItem`.
-- Test: fallback / no-touch-on-success / rethrow when nothing downloaded (`shuffle_all_queue_test.dart`).
-- Commit: `feat(flutter): SH4 — shuffle-all offline fallback`
+### [ ] AA5. Browse tree `getChildren`
+- Root (browsable): Recents, Favourites, Playlists, Albums, Artists, Downloaded.
+- Nested: album -> songs, artist -> albums, playlist -> songs. Playable leaves: `MediaItem(id: browseId, title, artist, album, artUri, playable)`.
+- `buildSubsonicCoverArtUrl`: add optional `size` (e.g. 300) for car art.
+- Cap list sizes (Albums limited/paged). Downloaded tab works offline via `cacheAware` + `downloadedSongsProvider`.
+- `androidBrowsableRootExtras` in `main.dart` `AudioServiceConfig`: grid for albums/artists, list for songs (assumption B).
+- Test: `getChildren` for root, each tab, nested levels, offline.
 
-### [x] S5. On-device smoke (PASSED, user-verified 2026-11-04, v5.4.4)
-- Tap -> playback starts within ~2s on full library; queue grows to library size; no ANR; next/prev OK; re-tap doesn't double-load; airplane mode per S4.
-- Note large-library ceiling (10k+ songs) as a `ponytail:` comment where relevant.
+### [ ] AA6. `playFromMediaId`
+- Extract a `Ref`/container-based core from `playback_actions.dart` (reuse `_toMediaItem` and the album/artist/playlist/song functions); UI wrappers keep snackbars and call the core. No duplicate logic.
+- `playFromMediaId(id)`: decode (AA3) -> queue -> `playAll`/`playSong`. Tapping a song inside an album queues the whole album from that song.
+- Test: each id kind -> expected queue; downloaded songs resolve to `file://`.
 
-### [x] S6. Docs
-- `android/docs/ROADMAP.md`: new `## Phase SH` before `## Cross-cutting reminders` (line ~972) with milestone SH1 (Files / Deliverable / Test gate / Smoke / Commit); update Status line and "Roadmap complete when" list (~line 1006).
-- `android/docs/DECISIONLOG.md`: search3 paging vs random-500 vs album fan-out; Dart-side shuffle.
-- `android/docs/CHANGELOG.md`: per-task entry.
-- `android/docs/CONTEXT.md`: only if standing facts change.
+### [ ] AA7. Voice / search
+- `search(query)` and `playFromSearch(query, extras)` via `search3` / `findLibraryMatch`. Empty query -> shuffle-all (`playback_actions.dart:291` logic).
+- Test with fake service.
 
-### [x] S7. Version bump 5.3.7 -> 5.4.0 (one commit, all five files)
-- `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml`, `backend/docs/ROADMAP.md`, `android/docs/ROADMAP.md`.
+### [ ] AA8. Now-playing polish
+- Verify prev/play/pause/next/seek and queue ("Up next") on DHU; optional `MediaControl.custom` + `customAction` for shuffle/repeat/favourite.
+- Confirm `now_playing_persistence` restore doesn't autoplay when the car connects.
 
-### [x] S8. Housekeeping
-- `graphify update .`; `cd android/app && flutter analyze && flutter test`.
+### [ ] AA9. Docs + version
+- ROADMAP: add `Phase AA` before `## Cross-cutting reminders` (`docs/ROADMAP.md:985`). CHANGELOG entry per step. DECISIONLOG: browse ids, headless approach. CONTEXT.md: Android Auto note.
+- Version bump (e.g. 5.5.0) in all five places listed in root `CLAUDE.md` §3, backend + android together.
+
+### [ ] AA10. DHU end-to-end smoke
+- App listed; each tab loads; drill into album/artist/playlist; play; skip/seek; voice "play <artist>"; kill phone app then reconnect (cold); VPN-down/airplane -> Downloaded still plays; art loads.
+- Repeat once on a `--release` build (R8 precedent: `docs/CHANGELOG.md:1850`; keep rules in `proguard-rules.pro`).
 
 ## Risks
-- Empty-query `search3` is Navidrome-specific (S0 gates everything).
-- Memory/time on very large libraries -> chunked append.
-- Rapid re-taps / competing playback -> in-flight guard.
-
-## Spike result
-S0 PASSED (2026-11-04, run on server, localhost:4533): `search3` query='' songCount=500:
-- offset=0 -> 500 songs, first id 3XPgtNdEC9vuEHZpjtWbcJ
-- offset=500 -> 500 songs, first id TybA17jxr12Psc6miV8YVk
-- offset=1000 -> 16 songs (short page = end) => library = 1016 songs.
-Assumption confirmed: empty-query search3 pages the whole library. Album fan-out not needed.
+- Cold start (AA2) is the biggest unknown; handler is outside Riverpod today.
+- Auth tokens are embedded in stream/art URLs (existing design); do not log them.
+- Tailscale must be up on the phone for streaming; offline Downloaded is the fallback.
+- Android Auto media-template limits (list length/depth); stock template used, no `androidx.car.app`.

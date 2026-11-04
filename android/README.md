@@ -134,6 +134,24 @@ flutter pub run build_runner watch \
 flutter run -d <device-id>                     # hot-reload dev loop
 ```
 
+### Android Auto (Desktop Head Unit)
+
+One-time, on the Mac: Android Studio → SDK Manager → SDK Tools → install **Android Auto Desktop Head Unit Emulator** (lands in `~/Library/Android/sdk/extras/google/auto/`).
+
+One-time, on the phone: Android Auto app → tap the version number 10× → ⋮ menu → **Developer settings** → enable **Unknown sources** (needed for sideloaded builds).
+
+Each session:
+
+```bash
+# phone: Android Auto → ⋮ → Start head unit server
+adb forward tcp:5277 tcp:5277
+~/Library/Android/sdk/extras/google/auto/desktop-head-unit
+```
+
+heerr should appear in the DHU app launcher (media section).
+
+---
+
 The CI workflow on `main` runs `flutter analyze` + `flutter test` for every PR touching `android/**` (added at a Flutter-CI milestone post-G1; planning-round scope only).
 
 ---
