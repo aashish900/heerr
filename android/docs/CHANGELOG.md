@@ -3196,3 +3196,8 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 ## 2026-11-04 — version bump 5.3.7 → 5.4.0 (Home "Shuffle all")
 
 - `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml` — `5.3.7` → `5.4.0`; Status line in `backend/docs/ROADMAP.md` and `android/docs/ROADMAP.md` gets the `v5.4.0` entry. No backend behaviour change (version bumped for sync). Minor bump: new user-facing feature.
+
+## 2026-11-04 — Home shuffle-all button restyled as the mini-player play circle
+
+- **`android/app/lib/screens/home/home_screen.dart`** — `_ShuffleAllButton` is now a 40 px brand-gradient circle with a black `play_arrow` and magenta glow (copy of `widgets/mini_player.dart::_PlayPauseButton`), replacing the tonal shuffle icon. Behaviour unchanged (still shuffles the whole library); key `home-shuffle-all-button` and "Shuffle all" tooltip kept; black spinner while running.
+- User feedback from on-device use. `flutter analyze` clean, home tests green. No version bump yet (`v5.4.0` already tagged).

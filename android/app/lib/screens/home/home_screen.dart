@@ -270,17 +270,38 @@ class _ShuffleAllButtonState extends ConsumerState<_ShuffleAllButton> {
 
   @override
   Widget build(BuildContext context) {
-    return IconButton.filledTonal(
-      key: const Key('home-shuffle-all-button'),
-      tooltip: 'Shuffle all',
-      onPressed: _busy ? null : _run,
-      icon: _busy
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(Icons.shuffle_rounded),
+    // Same look as the mini-player's play button (widgets/mini_player.dart):
+    // 40px brand-gradient circle, black glyph, soft magenta glow.
+    return Tooltip(
+      message: 'Shuffle all',
+      child: InkWell(
+        key: const Key('home-shuffle-all-button'),
+        customBorder: const CircleBorder(),
+        onTap: _busy ? null : _run,
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            gradient: heerrGradient,
+            shape: BoxShape.circle,
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: heerrMagenta.withValues(alpha: 0.25),
+                blurRadius: 16,
+              ),
+            ],
+          ),
+          child: _busy
+              ? const Padding(
+                  padding: EdgeInsets.all(10),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.black,
+                  ),
+                )
+              : const Icon(Icons.play_arrow, color: Colors.black, size: 24),
+        ),
+      ),
     );
   }
 }
