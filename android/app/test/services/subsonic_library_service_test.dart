@@ -103,4 +103,39 @@ void main() {
     final songs = await service.getStarredSongs();
     expect(songs.single.id, 's1');
   });
+
+  String songs(int n, int from) {
+    final String items = List<String>.generate(
+      n,
+      (i) => '{"id":"s${from + i}","title":"T"}',
+    ).join(',');
+    return '"searchResult3":{"song":[$items]}';
+  }
+
+  test('getAllSongs pages search3 until a short page and concatenates', () async {
+    final List<dynamic> offsets = <dynamic>[];
+    final (SubsonicLibraryService service, _) = _service((o) {
+      final int off = o.queryParameters['songOffset'] as int;
+      offsets.add(off);
+      expect(o.queryParameters['query'], '');
+      expect(o.queryParameters['songCount'], SubsonicLibraryService.songPageSize);
+      return _ok(songs(off == 1000 ? 16 : 500, off));
+    });
+    final List<int> pageSizes = <int>[];
+
+    final all = await service.getAllSongs(onPage: (p) => pageSizes.add(p.length));
+
+    expect(all.length, 1016);
+    expect(all.first.id, 's0');
+    expect(all.last.id, 's1015');
+    expect(offsets, <dynamic>[0, 500, 1000]);
+    expect(pageSizes, <int>[500, 500, 16]);
+  });
+
+  test('getAllSongs on an empty library returns [] after one request', () async {
+    final (SubsonicLibraryService service, _FakeAdapter adapter) =
+        _service((_) => _ok('"searchResult3":{}'));
+    expect(await service.getAllSongs(), isEmpty);
+    expect(adapter.lastRequest!.queryParameters['songOffset'], 0);
+  });
 }

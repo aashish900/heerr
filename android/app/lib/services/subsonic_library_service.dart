@@ -144,6 +144,43 @@ class SubsonicLibraryService {
     );
   }
 
+  /// Page size for [getAllSongs]. Navidrome honours `songCount=500`.
+  static const int songPageSize = 500;
+
+  /// Every song in the library: `search3.view?query=&songCount=500` paged by
+  /// `songOffset` until a short (or empty) page. An empty query returns all
+  /// songs on Navidrome (verified on the home server, docs/PLAN.md S0).
+  /// [onPage] fires per page so a caller can start playback before the walk
+  /// finishes.
+  Future<List<Song>> getAllSongs({void Function(List<Song> page)? onPage}) async {
+    final List<Song> all = <Song>[];
+    for (int offset = 0;; offset += songPageSize) {
+      final List<Song> page = (await subsonicCall<SearchResult3>(
+        () => _dio.get<dynamic>(
+          SubsonicEndpoints.search3,
+          queryParameters: <String, dynamic>{
+            'query': '',
+            'artistCount': 0,
+            'albumCount': 0,
+            'songCount': songPageSize,
+            'songOffset': offset,
+          },
+        ),
+        (Map<String, dynamic> env) {
+          final dynamic payload = env['searchResult3'];
+          if (payload is! Map<String, dynamic>) return const SearchResult3();
+          return SearchResult3.fromJson(payload);
+        },
+      ))
+          .song;
+      if (page.isNotEmpty) {
+        all.addAll(page);
+        onPage?.call(page);
+      }
+      if (page.length < songPageSize) return all;
+    }
+  }
+
   /// Single best library match for a free-text `"<artist> <title>"` query —
   /// the N4 recommendation cross-reference probe. Returns null when nothing
   /// matches. Forces `songCount=1, artistCount=0, albumCount=0`.
