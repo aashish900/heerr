@@ -35,7 +35,7 @@ Status: planned, nothing executed. Execute one step at a time; tick the box and 
 - Gate: heerr listed in DHU app launcher (empty tree OK).
 - Commit: `feat(flutter): AA1 — Android Auto manifest descriptor`
 
-### [ ] AA2. Cold-start spike (investigation, no feature code)
+### [x] AA2. Cold-start spike (investigation, no feature code)
 - Read audio_service 0.18.18 source in pub cache: engine start, entrypoint, `getChildren` plumbing, `androidBrowsableRootExtras`.
 - Kill app, connect DHU, `adb logcat`: does `main()` run, does `AudioService.init` complete, does the handler get `getChildren`?
 - Output: DECISIONLOG entry confirming/denying A and B. Decides AA4 shape.

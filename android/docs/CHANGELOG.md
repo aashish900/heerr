@@ -3241,3 +3241,7 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - `app/android/app/src/main/AndroidManifest.xml`: added `com.google.android.gms.car.application` meta-data pointing at it.
 - `README.md`: added "Android Auto (Desktop Head Unit)" setup steps.
 - `flutter build apk --debug` succeeds. DHU smoke passed on Pixel 7 (release build 5.4.4+168 sideloaded over 167): heerr listed in the DHU launcher and dock. DHU installed via `sdkmanager "extras;google;auto"`; it must be run with stdin held open (`tail -f /dev/null | desktop-head-unit`) or it exits at once, and the phone needs the one-time Android Auto "Continue" prompt accepted.
+
+## 2026-11-04 — AA2: cold-start spike (investigation only)
+- Read audio_service 0.18.18 Android source; verified on Pixel 7 + DHU with app force-stopped. Findings in DECISIONLOG ("Android Auto: browse tree is served from the app process").
+- `docs/PLAN.md`: AA2 ticked. No code changes.

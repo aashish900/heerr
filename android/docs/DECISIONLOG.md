@@ -1409,3 +1409,23 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Alternatives considered:** keep `await` and make Shuffle-all fire the first `playAll` without awaiting — rejected: leaves the lock held (other play calls silently dropped for the whole track) and the bug latent for every other caller.
 
 **Reference:** `android/app/lib/player/heerr_audio_handler.dart::playAll`, `::playSong`; `test/player/heerr_audio_handler_modes_test.dart`.
+
+## 2026-11-04 — Android Auto: browse tree is served from the app process; no headless entrypoint needed
+
+**Context:** Phase AA (Android Auto). Open question: when the car binds the MediaBrowserService with the app closed, does Dart code run, so the handler can serve `getChildren` / `playFromMediaId` with creds?
+
+**Decision:** Serve the browse tree from the existing `HeerrAudioHandler` in the normal `main()` flow. No separate headless Dart entrypoint. AA4 wires the `ProviderContainer` into the handler and must cope with `getChildren` arriving before wiring/`AudioService.init`.
+
+**Why (cited facts):**
+- audio_service 0.18.18 `AudioService.onCreate` calls `AudioServicePlugin.getFlutterEngine(this)`, which creates a `FlutterEngine` and runs `DartEntrypoint.createDefault()` (`AudioService.java:345`, `AudioServicePlugin.java:72-111`), so `main()` is the entrypoint on a cold bind.
+- Device (Pixel 7, release 5.4.4+168, DHU): after `force-stop`, logcat shows `Start proc ...com.aashish.heerr for bound-service {...AudioService}` then `flutterEngine warmed up` (twice, 21:09 and 21:11). Tapping heerr in the DHU renders "No items" (baseline, `getChildren` unimplemented).
+- `onGetRoot` returns hardcoded root `"root"` (or `"recent"`) synchronously and passes `androidBrowsableRootExtras` as root extras (`AudioService.java:817-822`).
+- `onLoadChildren` returns an empty list when the Dart listener is not yet attached (`AudioService.java:834-838`) — a race with `AudioService.init`.
+
+**Not verified:** that `main()` completes in the headless process (release build logs no Dart output; secure-storage access in that process suggests Dart ran); that Android Auto honours `CONTENT_STYLE_*` root extras (checked only at plugin level). Both to be proven in AA4/AA5 with debug logging.
+
+**Side finding:** `SecureStorageAndroid: EncryptedSharedPreferences initialization failed / AEADBadTagException` appears on every process start, including a normal launch, with no data loss (user still logged in). Pre-existing; not caused by Android Auto. Logged in DEBT.md candidates; AA4 must not assume the first secure-storage read succeeds.
+
+**Alternatives considered:** a dedicated headless entrypoint / native Kotlin browse service reading creds directly — rejected unless AA4 shows `main()` is too slow or does not complete headless.
+
+**Reference:** `android/app/lib/main.dart:34-53`, `~/.pub-cache/hosted/pub.dev/audio_service-0.18.18/android/src/main/java/com/ryanheise/audioservice/`.
