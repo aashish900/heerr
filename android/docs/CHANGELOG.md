@@ -3280,3 +3280,9 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - `docs/PLAN.md`: AA7 (voice / `playFromSearch` / `search`) marked backlog `[-]` by user decision; AA8 ticked.
 - AA8 findings (DHU, Pixel 7, release 5.4.4+170): now-playing shows title, artist, art, seekable progress bar, play/pause, previous, next and a working Queue list with the current track highlighted. `restoreQueue` never calls `play()`, so a car connect does not autoplay.
 - Backlog items from AA8 recorded in PLAN.md (custom shuffle/repeat/favourite actions, white-square Stop control, `_isLoadingSource` drop during cold-start restore).
+
+## 2026-11-04 — AA9: docs + version 5.5.0 (Android Auto)
+- Version `5.4.4` -> `5.5.0` in the five sync locations: `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml`, `backend/docs/ROADMAP.md` and `android/docs/ROADMAP.md` status lines.
+- `android/docs/ROADMAP.md`: added `Phase AA` (AA1–AA10; AA7 backlog, AA10 pending) before "Cross-cutting reminders".
+- `android/docs/CONTEXT.md`: added "Android Auto (v5.5.0)" section.
+- DECISIONLOG entries for AA were written with AA2 and AA5.

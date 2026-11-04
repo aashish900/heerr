@@ -71,7 +71,7 @@ Status: planned, nothing executed. Execute one step at a time; tick the box and 
 - DHU 2026-11-04: title/artist/art, seekable progress, play/pause, prev, next and Queue ("Up next", current track highlighted) all work. `restoreQueue` loads paused (`heerr_audio_handler.dart:299-319`), so connecting never autoplays.
 - Backlog (not done): shuffle / repeat / favourite `MediaControl.custom` + `customAction` (needs new icon drawables); the `Stop` control renders as a plain white square in the car; a car tap during cold-start `restoreQueue` is dropped by the `_isLoadingSource` guard (low risk, unverified).
 
-### [ ] AA9. Docs + version
+### [x] AA9. Docs + version
 - ROADMAP: add `Phase AA` before `## Cross-cutting reminders` (`docs/ROADMAP.md:985`). CHANGELOG entry per step. DECISIONLOG: browse ids, headless approach. CONTEXT.md: Android Auto note.
 - Version bump (e.g. 5.5.0) in all five places listed in root `CLAUDE.md` §3, backend + android together.
 

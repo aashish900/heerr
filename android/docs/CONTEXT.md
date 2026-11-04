@@ -95,6 +95,10 @@ From the root `CONTEXT.md`:
 
 Zero Flutter / Dart / mobile-app experience. Hand-hold every file path, every command, every IDE step. The user *is* fluent on: REST APIs, JSON, async/await, containers, Linux, the backend in this repo. No need to re-explain those.
 
+## Android Auto (v5.5.0)
+
+heerr is an Android Auto **media app**: the `audio_service` MediaBrowserService (already exported) serves a browse tree, declared via `res/xml/automotive_app_desc.xml` + the `com.google.android.gms.car.application` manifest meta-data. A car bind cold-starts the app process and runs `main()`; `main.dart` attaches the `ProviderContainer` to `HeerrAudioHandler`, whose `getChildren` / `playFromMediaId` read the same cache-aware providers as the UI (`lib/player/browse_tree.dart`, `browse_play.dart`, `browse_ids.dart`). Tree: Recents, Favourites, Playlists, Albums, Artists, Downloaded (200 items per level). Not done: voice/search (backlog), custom shuffle/repeat buttons. Tested on the Desktop Head Unit only (setup in `android/README.md`); sideloaded builds need Android Auto developer mode -> "Unknown sources". No `androidx.car.app`.
+
 ## Out of scope for v1
 
 - Push notifications / FCM.
