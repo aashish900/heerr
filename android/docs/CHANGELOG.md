@@ -3227,3 +3227,7 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 
 - **`android/app/lib/screens/home/home_screen.dart`** — the pill's shuffle icon is now `assets/icons/shuffle.svg` (white, 24 px via `flutter_svg`), the same asset as the Now Playing shuffle toggle, instead of Material `Icons.shuffle_rounded`.
 - `home_screen_test.dart` asserts an `SvgPicture` inside the button. Analyze clean, Home tests green. No version bump yet.
+
+## 2026-11-04 — version bump 5.4.3 → 5.4.4 (Play All shuffle glyph)
+
+- `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml` — `5.4.3` → `5.4.4`; Status line in both ROADMAPs gets the `v5.4.4` entry. `flutter analyze` clean, `flutter test` 1109 green. No backend behaviour change (version bumped for sync).
