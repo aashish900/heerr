@@ -1013,7 +1013,7 @@ Backlog from it: custom shuffle/repeat/favourite actions, white-square Stop cont
 ### [x] AA9. Docs + version
 `v5.5.0` in the five sync locations; this phase; CONTEXT note. **Commit:** `chore: bump version to 5.5.0 (Android Auto)`.
 
-### [ ] AA10. DHU end-to-end smoke
+### [x] AA10. DHU end-to-end smoke
 Release build: tabs, drill-downs, play, skip/seek, cold start, VPN-down Downloaded, art.
 
 ---

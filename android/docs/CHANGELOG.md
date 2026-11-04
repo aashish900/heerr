@@ -3286,3 +3286,8 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - `android/docs/ROADMAP.md`: added `Phase AA` (AA1–AA10; AA7 backlog, AA10 pending) before "Cross-cutting reminders".
 - `android/docs/CONTEXT.md`: added "Android Auto (v5.5.0)" section.
 - DECISIONLOG entries for AA were written with AA2 and AA5.
+
+## 2026-11-04 — AA10: DHU end-to-end smoke + cold-bind fix
+- `app/lib/main.dart`: after `AudioService.init`, call `AudioServiceBackground.notifyChildrenChanged` for the root and each tab id. Found in AA10: a car that browses immediately after a cold bind got "No items" (process start 21:50:13.014, MediaBrowser connect 21:50:13.186, before the Dart listener attaches; plugin answers `onLoadChildren` with an empty list, `AudioService.java:834-838`); back + reopen recovered it. Deprecated API but the only one wired to the native `notifyChildrenChanged` in audio_service 0.18.18 (`AudioServicePlugin.java:944-947`); marked `ignore: deprecated_member_use`. Verified fixed on the DHU (tabs show immediately after cold bind).
+- DHU smoke, Pixel 7, release 5.5.0+171/+172: cold start tabs, all tabs + art, album and artist drill-downs, play from a song mid-album, next/previous/seek, queue, now-playing art: all pass. Tailscale off + cold start: user reported everything working (Downloaded plays; whether the other tabs showed cached lists or empty was not itemised).
+- `flutter analyze` clean; 1145/1145 tests green.

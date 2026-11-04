@@ -75,7 +75,7 @@ Status: planned, nothing executed. Execute one step at a time; tick the box and 
 - ROADMAP: add `Phase AA` before `## Cross-cutting reminders` (`docs/ROADMAP.md:985`). CHANGELOG entry per step. DECISIONLOG: browse ids, headless approach. CONTEXT.md: Android Auto note.
 - Version bump (e.g. 5.5.0) in all five places listed in root `CLAUDE.md` §3, backend + android together.
 
-### [ ] AA10. DHU end-to-end smoke
+### [x] AA10. DHU end-to-end smoke
 - App listed; each tab loads; drill into album/artist/playlist; play; skip/seek; voice "play <artist>"; kill phone app then reconnect (cold); VPN-down/airplane -> Downloaded still plays; art loads.
 - Repeat once on a `--release` build (R8 precedent: `docs/CHANGELOG.md:1850`; keep rules in `proguard-rules.pro`).
 

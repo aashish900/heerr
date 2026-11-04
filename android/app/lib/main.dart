@@ -8,6 +8,7 @@ import 'package:workmanager/workmanager.dart';
 
 import 'offline/background_sync.dart';
 import 'player/episode_progress_provider.dart';
+import 'player/browse_ids.dart';
 import 'player/browse_tree.dart';
 import 'player/heerr_audio_handler.dart';
 import 'player/now_playing_persistence.dart';
@@ -43,6 +44,16 @@ Future<void> main() async {
       androidBrowsableRootExtras: kBrowseRootExtras,
     ),
   );
+
+  // Android Auto: a car that binds cold browses before this point, and the
+  // plugin answers an `onLoadChildren` with no Dart listener with an empty
+  // list ("No items"). Ask it to re-query now that the handler is attached.
+  // Deprecated API, but the only one wired to the native call in
+  // audio_service 0.18.18 (AudioServicePlugin.java "notifyChildrenChanged").
+  for (final BrowseKind kind in BrowseKind.values.where((k) => !k.hasId)) {
+    // ignore: deprecated_member_use
+    unawaited(AudioServiceBackground.notifyChildrenChanged(BrowseId(kind).encoded));
+  }
 
   // S3: one-shot migration of legacy single-set credentials into a Phase-S
   // Profile. No-op on fresh installs and on already-migrated installs.
