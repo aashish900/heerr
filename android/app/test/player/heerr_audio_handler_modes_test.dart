@@ -207,6 +207,30 @@ void main() {
       verify(() => player.play()).called(1);
     });
 
+    test('playAll / playSong return without waiting for playback to end',
+        () async {
+      // just_audio's play() only completes on pause/stop/completion; awaiting
+      // it kept _isLoadingSource held and blocked Shuffle-all's queue appends.
+      when(() => player.setAudioSources(any(),
+              initialIndex: any(named: 'initialIndex'),
+              initialPosition: any(named: 'initialPosition')))
+          .thenAnswer((_) async => null);
+      when(() => player.play()).thenAnswer((_) => Completer<void>().future);
+
+      await handler.playAll(const <MediaItem>[a]).timeout(
+            const Duration(seconds: 1),
+            onTimeout: () => fail('playAll blocked on play()'),
+          );
+      // Lock released: a following call is not dropped.
+      await handler.playSong(b).timeout(
+            const Duration(seconds: 1),
+            onTimeout: () => fail('playSong blocked on play()'),
+          );
+
+      expect(handler.queue.value, const <MediaItem>[b]);
+      verify(() => player.play()).called(2);
+    });
+
     test('playSong is available again once the first call has settled',
         () async {
       when(() => player.setAudioSources(any(),

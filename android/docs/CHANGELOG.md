@@ -3205,3 +3205,11 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 ## 2026-11-04 — version bump 5.4.0 → 5.4.1 (Home play-circle restyle)
 
 - `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml` — `5.4.0` → `5.4.1`; Status line in both ROADMAPs gets the `v5.4.1` entry. No backend behaviour change (version bumped for sync).
+
+## 2026-11-04 — fix: Shuffle-all stuck at 50 queued songs + spinner (v5.4.2)
+
+- **Bug (on-device):** after tapping the Home play button with nothing playing, the queue stayed at 50 songs and the spinner never stopped until playback paused/ended. Cause: `HeerrAudioHandler.playAll` did `await play()` inside the `_isLoadingSource` window; just_audio's `play()` future completes only on pause/stop/completion (`just_audio-0.10.5/lib/just_audio.dart:1065-1070`), so `playShuffledInChunks` never reached its appends and the lock stayed held for the whole track. "Sometimes" = when already playing, `play()` returns immediately.
+- **`android/app/lib/player/heerr_audio_handler.dart`** — `playAll` and `playSong` use `unawaited(play())`.
+- **`android/app/test/player/heerr_audio_handler_modes_test.dart`** — new test: with a never-completing `play()`, `playAll` and a following `playSong` both return and the second is not dropped (failed before the fix).
+- `flutter analyze` clean, `flutter test` 1107 green. Version bump `5.4.1` → `5.4.2` across the five sync locations.
+- See `DECISIONLOG.md` 2026-11-04 "Don't await just_audio play()".

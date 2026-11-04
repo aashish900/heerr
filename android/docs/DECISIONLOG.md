@@ -1397,3 +1397,15 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - **just_audio shuffle mode over the full queue** — rejected, see Why.
 
 **Reference:** `android/app/lib/services/subsonic_library_service.dart::getAllSongs`, `android/app/lib/player/playback_actions.dart::shuffleAllSongsFromSubsonic`, `android/docs/PLAN.md`, `android/docs/ROADMAP.md` Phase SH.
+
+## 2026-11-04 — Don't await just_audio `play()` inside the load lock
+
+**Context:** Shuffle-all stalled at 50 queued songs with a stuck spinner when nothing was playing at tap time.
+
+**Decision:** `HeerrAudioHandler.playAll` and `playSong` call `unawaited(play())` instead of `await play()`.
+
+**Why:** just_audio's `play()` future completes only when playback pauses, stops or completes (already-playing returns immediately). Awaiting it inside the `_isLoadingSource` try/finally held the reentrancy lock for the whole track and blocked any caller that awaited the handler (here the chunked appends). Errors from loading still surface via the awaited `setAudioSources`/`updateQueue`.
+
+**Alternatives considered:** keep `await` and make Shuffle-all fire the first `playAll` without awaiting — rejected: leaves the lock held (other play calls silently dropped for the whole track) and the bug latent for every other caller.
+
+**Reference:** `android/app/lib/player/heerr_audio_handler.dart::playAll`, `::playSong`; `test/player/heerr_audio_handler_modes_test.dart`.

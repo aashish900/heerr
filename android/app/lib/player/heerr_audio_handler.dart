@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:rxdart/rxdart.dart';
@@ -190,7 +192,9 @@ class HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     _isLoadingSource = true;
     try {
       await updateQueue(<MediaItem>[item]);
-      await play();
+      // Not awaited: just_audio's play() only completes on pause/stop/end,
+      // which would hold [_isLoadingSource] for the whole track.
+      unawaited(play());
     } finally {
       _isLoadingSource = false;
     }
@@ -213,7 +217,9 @@ class HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
         initialPosition: Duration.zero,
       );
       mediaItem.add(items[idx]);
-      await play();
+      // Not awaited: just_audio's play() only completes on pause/stop/end,
+      // which would hold [_isLoadingSource] for the whole track.
+      unawaited(play());
     } finally {
       _isLoadingSource = false;
     }
