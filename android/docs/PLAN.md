@@ -58,7 +58,7 @@ Navidrome `search3` with `query=""` returns all songs and honours `songCount`/`s
 - Test: fallback / no-touch-on-success / rethrow when nothing downloaded (`shuffle_all_queue_test.dart`).
 - Commit: `feat(flutter): SH4 — shuffle-all offline fallback`
 
-### S5. On-device smoke
+### [x] S5. On-device smoke (PASSED, user-verified 2026-11-04, v5.4.4)
 - Tap -> playback starts within ~2s on full library; queue grows to library size; no ANR; next/prev OK; re-tap doesn't double-load; airplane mode per S4.
 - Note large-library ceiling (10k+ songs) as a `ponytail:` comment where relevant.
 
@@ -71,7 +71,7 @@ Navidrome `search3` with `query=""` returns all songs and honours `songCount`/`s
 ### [x] S7. Version bump 5.3.7 -> 5.4.0 (one commit, all five files)
 - `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml`, `backend/docs/ROADMAP.md`, `android/docs/ROADMAP.md`.
 
-### S8. Housekeeping
+### [x] S8. Housekeeping
 - `graphify update .`; `cd android/app && flutter analyze && flutter test`.
 
 ## Risks

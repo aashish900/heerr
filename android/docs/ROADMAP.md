@@ -973,7 +973,7 @@ Design doc: `~/Downloads/ChatGPT Image Jul 20, 2026, 07_29_43 PM.png` ("heerr �
 
 Working breakdown lives in `android/docs/PLAN.md` (temp file; S0–S8).
 
-### [ ] SH1. Home "Shuffle all" button (full library)
+### [x] SH1. Home "Shuffle all" button (full library)
 **Backend prereq:** none (client-only). Navidrome `search3` with an empty query pages the whole library — verified on the home server 2026-11-04 (500 + 500 + 16 = 1016 songs). **Files:** `android/app/lib/services/subsonic_library_service.dart` (`getAllSongs`), `android/app/lib/player/playback_actions.dart` (`playShuffledInChunks`, `songsForShuffleAll`, `shuffleAllSongsFromSubsonic`), `android/app/lib/screens/home/home_screen.dart` (`_GreetingRow` + `_ShuffleAllButton`), tests under `test/services/`, `test/player/`, `test/screens/home/`.
 **Deliverable:** A tonal shuffle button to the right of the Home greeting. Tap pages every song via `search3`, shuffles once in Dart, plays the first 50, appends the rest in 200-song chunks (stops if the user starts other playback). Re-taps ignored while running. Any online failure falls back to shuffling downloaded songs; nothing downloaded surfaces the original error.
 **Test gate:** `getAllSongs` paging (500/500/16, empty library); chunking (no dupes/loss, early stop, small/empty list); offline fallback (3 cases); Home widget test (button beside greeting, tap runs the real action). `flutter analyze` + `flutter test` green.

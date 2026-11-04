@@ -3231,3 +3231,7 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 ## 2026-11-04 — version bump 5.4.3 → 5.4.4 (Play All shuffle glyph)
 
 - `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml` — `5.4.3` → `5.4.4`; Status line in both ROADMAPs gets the `v5.4.4` entry. `flutter analyze` clean, `flutter test` 1109 green. No backend behaviour change (version bumped for sync).
+
+## 2026-11-04 — SH1 on-device smoke passed
+
+- Owner ran the SH1 on-device smoke (Home "Play All" pill, shuffled full library, queue growth, no stuck spinner after the v5.4.2 `play()` fix) and reported it passing on `v5.4.4`. `android/docs/ROADMAP.md` SH1 box ticked `[x]`; `android/docs/PLAN.md` S5/S8 ticked (final `flutter analyze` + `flutter test` 1109 green, `graphify update .` run). Docs only; no version change.
