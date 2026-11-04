@@ -44,6 +44,8 @@ void main() {
     expect(appendCalls, 2);
   });
 
+  _offline();
+
   test('small list: play only, no append; empty list: nothing', () async {
     int appends = 0;
     expect(
@@ -59,5 +61,33 @@ void main() {
       0,
     );
     expect(played, isFalse);
+  });
+}
+
+void _offline() {
+  test('online failure falls back to downloaded songs', () async {
+    final List<Song> got = await songsForShuffleAll(
+      online: () async => throw Exception('no route'),
+      downloaded: () async => _songs(4),
+    );
+    expect(got.length, 4);
+  });
+
+  test('online success never touches downloads', () async {
+    final List<Song> got = await songsForShuffleAll(
+      online: () async => _songs(7),
+      downloaded: () async => throw StateError('should not be called'),
+    );
+    expect(got.length, 7);
+  });
+
+  test('online failure + nothing downloaded rethrows the online error', () async {
+    expect(
+      songsForShuffleAll(
+        online: () async => throw Exception('no route'),
+        downloaded: () async => <Song>[],
+      ),
+      throwsA(predicate((e) => e.toString().contains('no route'))),
+    );
   });
 }

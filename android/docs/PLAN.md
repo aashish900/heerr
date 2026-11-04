@@ -52,9 +52,10 @@ Navidrome `search3` with `query=""` returns all songs and honours `songCount`/`s
 - Test: `android/app/test/screens/home/home_screen_test.dart` — button present, tap runs the REAL action, which bails with the creds-missing snackbar in the test container (no stub needed).
 - Commit: `feat(flutter): SH3 — Home shuffle-all button`
 
-### S4. Offline behaviour
+### [x] S4. Offline behaviour
 - No network -> fall back to `downloadedSongsProvider` songs (shuffled) via `playAllSongsFromSubsonic`; if none, snackbar "Nothing to play."
-- Test: offline path uses downloaded songs.
+- Done via `songsForShuffleAll(online, downloaded)`: ANY online error (offline, Tailscale down, server 5xx) falls back to downloaded songs; empty downloads -> original error snackbar. Songs play via `file://` through `_toMediaItem`.
+- Test: fallback / no-touch-on-success / rethrow when nothing downloaded (`shuffle_all_queue_test.dart`).
 - Commit: `feat(flutter): SH4 — shuffle-all offline fallback`
 
 ### S5. On-device smoke

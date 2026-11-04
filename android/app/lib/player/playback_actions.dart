@@ -22,6 +22,7 @@ import '../providers/library/library_album.dart';
 import '../providers/library/library_artist.dart';
 import '../providers/library/library_playlist.dart';
 import '../providers/profiles/active_profile.dart';
+import '../providers/downloaded_songs.dart';
 import '../providers/server_creds.dart';
 import '../services/subsonic_library_service.dart';
 import '../widgets/error_snackbar.dart';
@@ -264,6 +265,22 @@ Future<int> playShuffledInChunks(
   return shuffled.length;
 }
 
+/// Songs to shuffle: the whole library when the server answers, else (offline,
+/// Tailscale down, ...) whatever is downloaded. Nothing downloaded -> the
+/// original [online] error surfaces.
+Future<List<Song>> songsForShuffleAll({
+  required Future<List<Song>> Function() online,
+  required Future<List<Song>> Function() downloaded,
+}) async {
+  try {
+    return await online();
+  } catch (_) {
+    final List<Song> local = await downloaded();
+    if (local.isEmpty) rethrow;
+    return local;
+  }
+}
+
 bool _shuffleAllBusy = false;
 
 /// Home "Shuffle all": every song in the Navidrome library, shuffled. Pages
@@ -283,9 +300,12 @@ Future<void> shuffleAllSongsFromSubsonic(
       if (context.mounted) _credsMissingSnack(context);
       return;
     }
-    final SubsonicLibraryService service =
-        await ref.read(subsonicLibraryServiceProvider.future);
-    final List<Song> songs = await service.getAllSongs();
+    final List<Song> songs = await songsForShuffleAll(
+      online: () async =>
+          (await ref.read(subsonicLibraryServiceProvider.future))
+              .getAllSongs(),
+      downloaded: () => ref.read(downloadedSongsProvider.future),
+    );
     if (songs.isEmpty) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
