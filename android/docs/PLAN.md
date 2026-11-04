@@ -41,7 +41,7 @@ Status: planned, nothing executed. Execute one step at a time; tick the box and 
 - Output: DECISIONLOG entry confirming/denying A and B. Decides AA4 shape.
 - Commit: `docs(flutter): AA2 — cold-start findings`
 
-### [ ] AA3. Stable browse ids (pure functions)
+### [x] AA3. Stable browse ids (pure functions)
 - New `app/lib/player/browse_ids.dart`: encode/decode `root`, `recents`, `favourites`, `playlists`, `albums`, `artists`, `downloaded`, `album:<id>`, `playlist:<id>`, `artist:<id>`, `song:<id>`.
 - Test: `app/test/player/browse_ids_test.dart` — round-trip, malformed ids.
 

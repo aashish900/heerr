@@ -3245,3 +3245,8 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 ## 2026-11-04 — AA2: cold-start spike (investigation only)
 - Read audio_service 0.18.18 Android source; verified on Pixel 7 + DHU with app force-stopped. Findings in DECISIONLOG ("Android Auto: browse tree is served from the app process").
 - `docs/PLAN.md`: AA2 ticked. No code changes.
+
+## 2026-11-04 — AA3: stable browse ids
+- `app/lib/player/browse_ids.dart` (new): `BrowseKind` + `BrowseId` with `encoded` / `tryParse`. Format `root | <tab> | <album|artist|playlist>:<id> | [<parent>/]song:<id>`; entity ids percent-encoded; songs carry their parent container so `playFromMediaId` (AA6) can queue the whole album/playlist from that song. `BrowseId.root.encoded == 'root'` (= `AudioService.browsableRootId`).
+- `app/test/player/browse_ids_test.dart` (new): 5 tests (bare tabs, entity ids, song+parent, round-trip of every kind, delimiter-safe ids, malformed -> null).
+- `flutter analyze` clean; 1115/1115 tests green.
