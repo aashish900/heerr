@@ -1070,4 +1070,4 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 - **`backend/app/api/v1/preview.py`** — client Range is now translated into bounded `_CHUNK` (4 MiB) upstream fetches (`_open_chunk`) stitched into one response; total size comes from the first chunk's `Content-Range`. No client Range -> 200 full body; `bytes=N-` / `bytes=N-M` -> 206 with a correct `Content-Range`/`Content-Length`; start past end -> 416. Previously the client's (usually absent or open-ended) Range was forwarded verbatim.
 - **`backend/tests/test_preview.py`** — fake upstream now 403s unbounded Range like the real one; added tests for open-ended stitching, no-Range stitching, and 416. Full suite 647 passed; ruff + mypy clean.
 - Not changed: yt-dlp is still `>=2025.1` (installed 2026.06.09, >90 days old; no JS runtime in the image). Not the cause of this failure per the in-container test, but a separate staleness risk.
-- No version bump yet (pending sync across the five locations, `/CLAUDE.md` §3).
+- Version bump `5.3.5` → `5.3.6` across all five sync locations per `/CLAUDE.md` §3.
