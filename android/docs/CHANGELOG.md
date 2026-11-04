@@ -3218,3 +3218,7 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 
 - **`android/app/lib/screens/home/home_screen.dart`** — `_ShuffleAllButton` is now a 46 px gradient pill (shuffle icon + "Play All" + play glyph, white, magenta glow) matching `Neon Purple Music App Home Screen.png`; replaces the 40 px circle. Pill only: no sparkles, no other Home layout change. Behaviour, key (`home-shuffle-all-button`) and "Shuffle all" tooltip unchanged; spinner replaces the trailing play glyph while running.
 - Tests: `home_screen_test.dart` asserts the "Play All" label, and two new tests render Home at 360 dp wide (with/without nickname) to catch RenderFlex overflow. `flutter analyze` clean, Home tests green. No version bump yet.
+
+## 2026-11-04 — version bump 5.4.2 → 5.4.3 (Home "Play All" pill)
+
+- `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml` — `5.4.2` → `5.4.3`; Status line in both ROADMAPs gets the `v5.4.3` entry. `flutter analyze` clean, `flutter test` 1109 green. No backend behaviour change (version bumped for sync).
