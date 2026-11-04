@@ -1424,7 +1424,7 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 
 **Not verified:** that `main()` completes in the headless process (release build logs no Dart output; secure-storage access in that process suggests Dart ran); that Android Auto honours `CONTENT_STYLE_*` root extras (checked only at plugin level). Both to be proven in AA4/AA5 with debug logging.
 
-**Side finding:** `SecureStorageAndroid: EncryptedSharedPreferences initialization failed / AEADBadTagException` appears on every process start, including a normal launch, with no data loss (user still logged in). Pre-existing; not caused by Android Auto. Logged in DEBT.md candidates; AA4 must not assume the first secure-storage read succeeds.
+**Side finding:** `SecureStorageAndroid: EncryptedSharedPreferences initialization failed / AEADBadTagException` appears on every process start, including a normal launch, with no data loss (user still logged in). Pre-existing; not caused by Android Auto. Not yet in DEBT.md; AA4 must not assume the first secure-storage read succeeds.
 
 **Alternatives considered:** a dedicated headless entrypoint / native Kotlin browse service reading creds directly — rejected unless AA4 shows `main()` is too slow or does not complete headless.
 
