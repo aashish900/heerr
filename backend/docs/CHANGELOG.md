@@ -1080,3 +1080,7 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 
 - **`backend/poetry.lock`** — `poetry update urllib3 certifi anyio yt-dlp`: urllib3 2.7.0 → 2.8.0 (CVE-2026-97687, CVE-2026-97689), yt-dlp 2026.6.9 → 2026.10.26 (CVE-2026-55404; also addresses the stale-extractor risk), certifi 2026.10.19 → 2026.10.23, anyio 4.13.0 → 4.16.0, typing-extensions 4.15.0 → 4.16.0 (transitive). `pyproject.toml` constraints unchanged.
 - The Trivy gate had been failing at install since 2026-08 (previous entry), so these were never reported. Local rebuild + `trivy image` (v0.76.1, same flags as CI): clean. Backend suite 647 passed.
+
+## 2026-11-04 — Dockerfile: drop the base image's system pip (Trivy vendored-lib findings)
+
+- **`backend/Dockerfile`** — runtime stage runs `/usr/local/bin/python -m pip uninstall -y pip` after the spotdl venv is built. CI's remaining 5 HIGH findings (msgpack 1.1.2, urllib3 2.7.0 x2, setuptools 70.3.0) were pip 26.2.2's own vendored copies in the base image's `/usr/local/lib/python3.13/site-packages/pip/_vendor` — unfixable until pip re-vendors, and unused at runtime (both venvs carry their own pip). Reproduced locally only after `docker build --pull` (a stale local base image had pip 26.0.1 and hid it). Verified: fresh-base rebuild, `spotdl --version` = 4.5.0, `import app.main` ok, `trivy image` (v0.76.1, CI flags) exit 0.

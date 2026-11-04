@@ -57,6 +57,11 @@ RUN python3 -m venv /opt/spotdl-venv \
     && /opt/spotdl-venv/bin/pip install --no-cache-dir spotdl==4.5.0 \
     && /opt/spotdl-venv/bin/spotdl --version
 
+# The base image's own pip is never used at runtime (both venvs carry their own),
+# and its vendored msgpack/urllib3/setuptools are what Trivy flags. Absolute path:
+# `pip` on PATH resolves to the spotdl venv's copy at this point.
+RUN /usr/local/bin/python -m pip uninstall -y pip
+
 # Non-root runtime user.
 RUN groupadd --system --gid 1000 app \
     && useradd  --system --uid 1000 --gid app \
