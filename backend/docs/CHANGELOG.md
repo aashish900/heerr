@@ -1071,3 +1071,7 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 - **`backend/tests/test_preview.py`** — fake upstream now 403s unbounded Range like the real one; added tests for open-ended stitching, no-Range stitching, and 416. Full suite 647 passed; ruff + mypy clean.
 - Not changed: yt-dlp is still `>=2025.1` (installed 2026.06.09, >90 days old; no JS runtime in the image). Not the cause of this failure per the in-container test, but a separate staleness risk.
 - Version bump `5.3.5` → `5.3.6` across all five sync locations per `/CLAUDE.md` §3.
+
+## 2026-11-04 — CI: install Trivy from the GitHub release (get.trivy.dev is dead)
+
+- **`.github/workflows/docker-publish.yml`** — `aquasecurity/trivy-action` replaced by an "Install Trivy" step (v0.76.1 tarball from `github.com/aquasecurity/trivy/releases`, verified against the release `checksums.txt`) plus a `trivy image` step with the same gate (HIGH/CRITICAL, `--ignore-unfixed`, `--exit-code 1`, `--pkg-types os,library`, same `--skip-dirs`). Cause: setup-trivy's installer downloads from `get.trivy.dev`, which no longer resolves (curl exit 6); every run since 2026-08 failed at the scan step, so the build-and-push step after it never ran (v5.3.6 image was not published). Out of TDD scope (workflow file); verified by the re-run on the `v5.3.6` tag.
