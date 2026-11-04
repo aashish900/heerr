@@ -60,7 +60,14 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 60));
 
     expect(builds, 1, reason: 'three events collapse into one debounced save');
-    final NowPlayingSnapshot? saved = await store.load();
+    // The debounce has fired, but its write (tmp file + rename) is async disk
+    // IO that can lag the fixed delay on a loaded CI runner — wait for it
+    // rather than racing it.
+    NowPlayingSnapshot? saved = await store.load();
+    for (int i = 0; saved == null && i < 50; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      saved = await store.load();
+    }
     expect(saved, isNotNull);
     expect(saved!.positionMs, 100);
   });

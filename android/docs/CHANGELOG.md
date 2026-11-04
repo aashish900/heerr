@@ -3179,3 +3179,7 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - `flutter analyze` and `flutter test` (1097 tests) green before and after.
 - Version bump `5.3.4` → `5.3.5` across all five sync locations.
 - See `DECISIONLOG.md` 2026-07-21 "`job_detail_screen.dart` had its own unfixed Retry (#53)".
+
+## 2026-11-04 — CI flake: `now_playing_persistence_test` debounced-save test raced its own disk write
+
+- **`android/app/test/player/now_playing_persistence_test.dart`** — "debounced save fires once for a burst of trigger events" asserted the saved file existed after a fixed 60 ms delay. The 20 ms debounce fires on time, but its write (tmp file + rename) is async disk IO that can finish after the delay on a loaded CI runner, so `store.load()` returned null (android CI run 41767821739, `Expected: not null  Actual: <null>`). The test now polls `store.load()` (up to ~1 s) instead of racing the write. Test-only: no production code or version change. Same class as the v5.3.3 `dispose()` race, in the test rather than the code.
