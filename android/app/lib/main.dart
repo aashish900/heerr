@@ -56,6 +56,8 @@ Future<void> main() async {
   // into plain shared_preferences. Idempotent — no-op once the keys are
   // gone from secure storage.
   await migrateOfflinePrefs(rootContainer);
+  // Android Auto: let the handler reach profiles/creds with no UI running.
+  handler.attachContainer(rootContainer);
 
   runApp(
     UncontrolledProviderScope(

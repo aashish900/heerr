@@ -45,7 +45,7 @@ Status: planned, nothing executed. Execute one step at a time; tick the box and 
 - New `app/lib/player/browse_ids.dart`: encode/decode `root`, `recents`, `favourites`, `playlists`, `albums`, `artists`, `downloaded`, `album:<id>`, `playlist:<id>`, `artist:<id>`, `song:<id>`.
 - Test: `app/test/player/browse_ids_test.dart` — round-trip, malformed ids.
 
-### [ ] AA4. Headless container/creds access for the handler
+### [x] AA4. Headless container/creds access for the handler
 - `HeerrAudioHandler`: late-bound `ProviderContainer` setter, wired in `main.dart` right after the container is built. Before wiring: return empty / await a `Completer`. Active profile + creds must load without UI (reuse `activeProfileProvider`, `serverCredsProvider`).
 - Shape depends on AA2.
 - Test: handler before/after wiring, mocktail pattern above.

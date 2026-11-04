@@ -1,8 +1,11 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:rxdart/rxdart.dart';
+
+import '../providers/profiles/profile_registry.dart';
 
 /// The `audio_service` `BaseAudioHandler` backed by a `just_audio`
 /// [AudioPlayer]. Owns the queue (mirrored from `BaseAudioHandler.queue`)
@@ -19,6 +22,26 @@ class HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   }
 
   final AudioPlayer _player;
+
+  final Completer<ProviderContainer> _container =
+      Completer<ProviderContainer>();
+
+  /// Android Auto: the handler is built by `AudioService.init` before the
+  /// app's [ProviderContainer] exists, and a car can bind the service (and
+  /// call `getChildren` / `playFromMediaId`) with no UI running. `main()`
+  /// attaches the container once creds are migrated; first call wins.
+  void attachContainer(ProviderContainer container) {
+    if (!_container.isCompleted) _container.complete(container);
+  }
+
+  /// The attached container with the profile registry loaded, so
+  /// `activeProfileProvider` / `serverCredsProvider` are valid. Pends until
+  /// [attachContainer]; throws if secure storage can't be read.
+  Future<ProviderContainer> whenReady() async {
+    final ProviderContainer c = await _container.future;
+    await c.read(profileRegistryProvider.future);
+    return c;
+  }
 
   // Guards [playSong] / [playAll] / [restoreQueue] against overlapping calls
   // to `_player.setAudioSources`. A double-tap on a Play button (or two

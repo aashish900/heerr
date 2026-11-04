@@ -3250,3 +3250,10 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - `app/lib/player/browse_ids.dart` (new): `BrowseKind` + `BrowseId` with `encoded` / `tryParse`. Format `root | <tab> | <album|artist|playlist>:<id> | [<parent>/]song:<id>`; entity ids percent-encoded; songs carry their parent container so `playFromMediaId` (AA6) can queue the whole album/playlist from that song. `BrowseId.root.encoded == 'root'` (= `AudioService.browsableRootId`).
 - `app/test/player/browse_ids_test.dart` (new): 5 tests (bare tabs, entity ids, song+parent, round-trip of every kind, delimiter-safe ids, malformed -> null).
 - `flutter analyze` clean; 1115/1115 tests green.
+
+## 2026-11-04 — AA4: handler can reach the ProviderContainer (headless)
+- `app/lib/player/heerr_audio_handler.dart`: added `attachContainer(ProviderContainer)` (first call wins) and `whenReady()` — awaits the attached container, then `profileRegistryProvider.future`, so `activeProfileProvider` / `serverCredsProvider` are valid. Pends until attached; rethrows a secure-storage failure rather than hanging.
+- `app/lib/main.dart`: `handler.attachContainer(rootContainer)` after `migrateLegacyCreds` / `migrateOfflinePrefs`, before `runApp` (runs in the headless car-bind process too — see DECISIONLOG 2026-11-04 Android Auto).
+- `app/test/player/heerr_audio_handler_container_test.dart` (new): 4 tests (waits for attach, waits for registry load, surfaces storage error, double attach).
+- Not covered: `getChildren` arriving before `AudioService.init` finishes still gets an empty list from the plugin (`AudioService.java:834-838`); nothing consumes `whenReady` until AA5, so the headless path is only unit-tested so far.
+- `flutter analyze` clean; 1119/1119 tests green.
