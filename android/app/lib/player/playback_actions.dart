@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,6 +23,7 @@ import '../providers/library/library_artist.dart';
 import '../providers/library/library_playlist.dart';
 import '../providers/profiles/active_profile.dart';
 import '../providers/server_creds.dart';
+import '../services/subsonic_library_service.dart';
 import '../widgets/error_snackbar.dart';
 import 'heerr_audio_handler.dart';
 import 'player_provider.dart';
@@ -231,6 +234,90 @@ Future<void> playAllSongsFromSubsonic(
         .playAll(items, startIndex: startIndex);
   } catch (e) {
     if (context.mounted) _errSnack(context, e);
+  }
+}
+
+/// Shuffle-all queue chunking: a small first chunk so playback starts fast,
+/// then bounded appends so one huge `setAudioSources` never blocks the player
+/// (see the `_isLoadingSource` ANR guard in [HeerrAudioHandler]).
+const int shuffleFirstChunk = 50;
+const int shuffleAppendChunk = 200;
+
+/// Shuffle [songs] once, hand the first [shuffleFirstChunk] to [play], then the
+/// rest to [append] in [shuffleAppendChunk] slices. Stops early when
+/// [shouldContinue] turns false (user started something else). Returns the
+/// number of songs shuffled.
+Future<int> playShuffledInChunks(
+  List<Song> songs, {
+  required Future<void> Function(List<Song> chunk) play,
+  required Future<void> Function(List<Song> chunk) append,
+  bool Function()? shouldContinue,
+  Random? rng,
+}) async {
+  if (songs.isEmpty) return 0;
+  final List<Song> shuffled = <Song>[...songs]..shuffle(rng);
+  await play(shuffled.take(shuffleFirstChunk).toList());
+  for (int i = shuffleFirstChunk; i < shuffled.length; i += shuffleAppendChunk) {
+    if (shouldContinue != null && !shouldContinue()) break;
+    await append(shuffled.skip(i).take(shuffleAppendChunk).toList());
+  }
+  return shuffled.length;
+}
+
+bool _shuffleAllBusy = false;
+
+/// Home "Shuffle all": every song in the Navidrome library, shuffled. Pages
+/// the whole library via [SubsonicLibraryService.getAllSongs], shuffles in
+/// Dart (not just_audio shuffle mode, which pins the current index and
+/// reorders after load), plays the first chunk and appends the rest.
+/// Re-taps while a run is in flight are ignored.
+Future<void> shuffleAllSongsFromSubsonic(
+  WidgetRef ref,
+  BuildContext context,
+) async {
+  if (_shuffleAllBusy) return;
+  _shuffleAllBusy = true;
+  try {
+    final _Creds? creds = await _resolveCreds(ref);
+    if (creds == null) {
+      if (context.mounted) _credsMissingSnack(context);
+      return;
+    }
+    final SubsonicLibraryService service =
+        await ref.read(subsonicLibraryServiceProvider.future);
+    final List<Song> songs = await service.getAllSongs();
+    if (songs.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          duration: kSnackBarDuration,
+          content: Text('Nothing to play.'),
+        ));
+      }
+      return;
+    }
+    final HeerrAudioHandler handler = ref.read(audioHandlerProvider);
+    Future<List<MediaItem>> items(List<Song> chunk) => Future.wait<MediaItem>(
+          chunk.map((Song s) => _toMediaItem(ref, s, creds)),
+        );
+    String? firstId;
+    await playShuffledInChunks(
+      songs,
+      play: (List<Song> chunk) async {
+        final List<MediaItem> m = await items(chunk);
+        firstId = m.first.id;
+        await handler.playAll(m);
+      },
+      append: (List<Song> chunk) async =>
+          handler.addQueueItems(await items(chunk)),
+      // Queue head changed (or playAll was dropped) -> someone else took over.
+      shouldContinue: () =>
+          handler.queue.value.isNotEmpty &&
+          handler.queue.value.first.id == firstId,
+    );
+  } catch (e) {
+    if (context.mounted) _errSnack(context, e);
+  } finally {
+    _shuffleAllBusy = false;
   }
 }
 

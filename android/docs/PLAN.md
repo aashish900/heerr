@@ -34,14 +34,15 @@ Navidrome `search3` with `query=""` returns all songs and honours `songCount`/`s
 - Test: mock Dio, 2 full pages + 1 short -> concatenated, stops; empty library -> `[]`.
 - Commit: `feat(flutter): SH1 — getAllSongs paged search3`
 
-### S2. Shuffle-all play action
+### [x] S2. Shuffle-all play action
 - File: `android/app/lib/player/playback_actions.dart`.
 - Add `shuffleAllSongsFromSubsonic(ref, context)`:
   - First page -> shuffle in Dart -> `playAllSongsFromSubsonic` (reuses creds, `_toMediaItem`, empty-list snackbar).
   - Remaining pages in background -> shuffle each -> append via `addSongsToQueue` path, in chunks (avoid ANR; respect `_isLoadingSource`).
   - Do NOT enable just_audio shuffle mode (reorders after `setAudioSources`, pins current index).
   - Guard against re-entry (in-flight flag); abort appends if the user starts other playback.
-- Test: first batch played, rest appended, re-entry ignored.
+- DEVIATION (done): fetch ALL pages first, shuffle once, then play 50 / append 200-chunks (shuffling per page would bias to the first 500 songs). Core is `playShuffledInChunks` (pure, tested); re-entry guard + queue-head check (`shouldContinue`) live in the action.
+- Test: first chunk played, rest appended in order, no dupes, early stop, empty/small lists (`test/player/shuffle_all_queue_test.dart`). Action itself (WidgetRef) not unit-tested; covered by S3 widget test stub + S5 smoke.
 - Commit: `feat(flutter): SH2 — shuffle-all play action`
 
 ### S3. Home button
