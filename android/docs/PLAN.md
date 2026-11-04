@@ -68,7 +68,7 @@ Navidrome `search3` with `query=""` returns all songs and honours `songCount`/`s
 - `android/docs/CHANGELOG.md`: per-task entry.
 - `android/docs/CONTEXT.md`: only if standing facts change.
 
-### S7. Version bump 5.3.7 -> 5.4.0 (one commit, all five files)
+### [x] S7. Version bump 5.3.7 -> 5.4.0 (one commit, all five files)
 - `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml`, `backend/docs/ROADMAP.md`, `android/docs/ROADMAP.md`.
 
 ### S8. Housekeeping

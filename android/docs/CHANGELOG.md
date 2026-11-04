@@ -3192,3 +3192,7 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - Tests: `test/services/subsonic_library_service_test.dart` (+2), new `test/player/shuffle_all_queue_test.dart` (6), `test/screens/home/home_screen_test.dart` (+1). `flutter test` 1097 → 1106, `flutter analyze` clean.
 - Commits `4f4bad0`, `16fb777`, `4e6559c`, `b6d346c`. On-device smoke (SH1) and version bump to `5.4.0` pending.
 - See `DECISIONLOG.md` 2026-11-04 "Home Shuffle all".
+
+## 2026-11-04 — version bump 5.3.7 → 5.4.0 (Home "Shuffle all")
+
+- `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml` — `5.3.7` → `5.4.0`; Status line in `backend/docs/ROADMAP.md` and `android/docs/ROADMAP.md` gets the `v5.4.0` entry. No backend behaviour change (version bumped for sync). Minor bump: new user-facing feature.
