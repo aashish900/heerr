@@ -54,3 +54,6 @@ android/app/key.properties
 # personal usernames). The committed `dev_defaults.example.dart` is the
 # template; the real values live only on the developer's machine.
 lib/dev_defaults.dart
+
+# Flutter DevTools per-developer settings (auto-generated)
+devtools_options.yaml
