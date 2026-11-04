@@ -4,7 +4,9 @@ Resolves the watch URL to a direct googlevideo audio URL (K1), then proxies the
 bytes to the client over Tailscale. The backend is the only thing that talks to
 googlevideo (its URLs are egress-IP-bound), and the device never leaves the tailnet.
 
-- Range is forwarded both ways so ExoPlayer can seek (googlevideo answers 206).
+- googlevideo 403s any fetch without a *bounded* Range (open-ended `bytes=N-` and
+  no Range both fail, `bytes=N-M` works), so the client's Range is translated into
+  bounded `_CHUNK`-sized upstream fetches stitched into one response. Seeks still work.
 - googlevideo 302-redirects to a CDN node, so the upstream client follows redirects.
 - Auth rides in `?token=` because the audio player can't set headers (K3 redacts it).
 - Nothing is persisted — previews are ephemeral.
@@ -12,6 +14,7 @@ googlevideo (its URLs are egress-IP-bound), and the device never leaves the tail
 
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncIterator, Awaitable, Callable
 
 import httpx
@@ -35,8 +38,9 @@ router = APIRouter(tags=["preview"])
 # trickles for the length of the track.
 _UPSTREAM_TIMEOUT = httpx.Timeout(connect=10.0, read=None, write=10.0, pool=10.0)
 _STREAMABLE_STATUS = {status.HTTP_200_OK, status.HTTP_206_PARTIAL_CONTENT}
-# Upstream response headers worth forwarding verbatim to the client.
-_PASSTHROUGH_HEADERS = ("content-length", "content-range", "accept-ranges")
+# Upstream fetch size; yt-dlp itself chunks googlevideo at 10 MiB.
+_CHUNK = 4 * 1024 * 1024
+_RANGE_RE = re.compile(r"bytes=(\d+)-(\d*)$")
 
 PreviewResolver = Callable[[str], Awaitable[ResolvedPreview]]
 
@@ -68,6 +72,25 @@ async def get_preview_http_client() -> AsyncIterator[httpx.AsyncClient]:
         yield client
 
 
+async def _open_chunk(
+    client: httpx.AsyncClient, resolved: ResolvedPreview, start: int, end: int
+) -> httpx.Response:
+    """Open a streamed, bounded-Range upstream fetch; map failures to 502."""
+    headers = {**resolved.headers, "Range": f"bytes={start}-{end}"}
+    req = client.build_request("GET", resolved.stream_url, headers=headers)
+    try:
+        upstream = await client.send(req, stream=True)
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, detail=f"upstream fetch failed: {exc}"
+        ) from exc
+    if upstream.status_code != status.HTTP_206_PARTIAL_CONTENT:
+        code = upstream.status_code
+        await upstream.aclose()
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=f"upstream returned {code}")
+    return upstream
+
+
 @router.get("/preview/stream")
 async def preview_stream(
     request: Request,
@@ -88,45 +111,52 @@ async def preview_stream(
     except PreviewResolveError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
-    upstream_headers = dict(resolved.headers)
-    client_range = request.headers.get("range")
-    if client_range:
-        upstream_headers["Range"] = client_range
+    m = _RANGE_RE.match(request.headers.get("range", ""))
+    start = int(m[1]) if m else 0
+    want_end = int(m[2]) if m and m[2] else None
 
-    upstream_req = client.build_request("GET", resolved.stream_url, headers=upstream_headers)
+    first = await _open_chunk(
+        client,
+        resolved,
+        start,
+        start + _CHUNK - 1 if want_end is None else min(want_end, start + _CHUNK - 1),
+    )
     try:
-        upstream = await client.send(upstream_req, stream=True)
-    except httpx.HTTPError as exc:
+        total = int(first.headers["content-range"].rsplit("/", 1)[1])
+    except (KeyError, ValueError) as exc:
+        await first.aclose()
         raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY, detail=f"upstream fetch failed: {exc}"
+            status.HTTP_502_BAD_GATEWAY, detail="upstream gave no total size"
         ) from exc
-
-    if upstream.status_code not in _STREAMABLE_STATUS:
-        code = upstream.status_code
-        await upstream.aclose()
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY,
-            detail=f"upstream returned {code}",
-        )
+    if start >= total:
+        await first.aclose()
+        raise HTTPException(status.HTTP_416_RANGE_NOT_SATISFIABLE, detail="range past end")
+    end = total - 1 if want_end is None else min(want_end, total - 1)
 
     async def _body() -> AsyncIterator[bytes]:
-        try:
-            # In production `stream=True` leaves the stream unread → iterate it.
-            # A buffered upstream (already-read body) is yielded whole.
-            if upstream.is_stream_consumed:
-                yield upstream.content
-            else:
-                async for chunk in upstream.aiter_raw():
-                    yield chunk
-        finally:
-            await upstream.aclose()
+        up, pos = first, start
+        while True:
+            try:
+                # In production `stream=True` leaves the stream unread → iterate it.
+                # A buffered upstream (already-read body) is yielded whole.
+                if up.is_stream_consumed:
+                    yield up.content
+                else:
+                    async for chunk in up.aiter_raw():
+                        yield chunk
+            finally:
+                await up.aclose()
+            pos += _CHUNK
+            if pos > end:
+                return
+            up = await _open_chunk(client, resolved, pos, min(pos + _CHUNK - 1, end))
 
-    out_headers = {k: upstream.headers[k] for k in _PASSTHROUGH_HEADERS if k in upstream.headers}
-    media_type = upstream.headers.get("content-type") or resolved.content_type
-
+    out_headers = {"accept-ranges": "bytes", "content-length": str(end - start + 1)}
+    if m:
+        out_headers["content-range"] = f"bytes {start}-{end}/{total}"
     return StreamingResponse(
         _body(),
-        status_code=upstream.status_code,
+        status_code=206 if m else 200,
         headers=out_headers,
-        media_type=media_type,
+        media_type=first.headers.get("content-type") or resolved.content_type,
     )
