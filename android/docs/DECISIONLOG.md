@@ -1429,3 +1429,15 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Alternatives considered:** a dedicated headless entrypoint / native Kotlin browse service reading creds directly — rejected unless AA4 shows `main()` is too slow or does not complete headless.
 
 **Reference:** `android/app/lib/main.dart:34-53`, `~/.pub-cache/hosted/pub.dev/audio_service-0.18.18/android/src/main/java/com/ryanheise/audioservice/`.
+
+## 2026-11-04 — Android Auto: browse tree reads existing providers; flat 200-item cap; per-item grid hints
+
+**Context:** AA5 needed a car-facing browse tree over the library without duplicating data access.
+
+**Decision:** `browseChildren(ProviderContainer, BrowseId)` in `lib/player/browse_tree.dart` reads the same cache-aware Riverpod providers as the UI (offline-safe). Each level is capped at `kMaxBrowseItems = 200`, no paging. Albums/Artists tab items carry `CONTENT_STYLE_BROWSABLE_HINT = 2` (grid); everything else is a list. Handler `getChildren` never throws (returns `[]`).
+
+**Why:** reuse keeps Downloaded and cached lists working with no network and avoids a second Subsonic client path. Verified on DHU 2026-11-04: per-item grid hint is honoured (Albums/Artists grids); whether the root-level extras (`kBrowseRootExtras`) matter on their own is not isolated.
+
+**Alternatives considered:** paging via `getChildren` options — deferred (library fits under the cap today); a separate native Kotlin browse service — rejected (AA2: Dart runs headless).
+
+**Reference:** `android/app/lib/player/browse_tree.dart`, `android/app/lib/player/heerr_audio_handler.dart::getChildren`.

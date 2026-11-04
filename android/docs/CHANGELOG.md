@@ -3257,3 +3257,12 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - `app/test/player/heerr_audio_handler_container_test.dart` (new): 4 tests (waits for attach, waits for registry load, surfaces storage error, double attach).
 - Not covered: `getChildren` arriving before `AudioService.init` finishes still gets an empty list from the plugin (`AudioService.java:834-838`); nothing consumes `whenReady` until AA5, so the headless path is only unit-tested so far.
 - `flutter analyze` clean; 1119/1119 tests green.
+
+## 2026-11-04 — AA5: Android Auto browse tree
+- `app/lib/player/browse_tree.dart` (new): `browseChildren(ProviderContainer, BrowseId)` + `kBrowseRootExtras` + `kMaxBrowseItems` (200). Root = Recents / Favourites / Playlists / Albums / Artists / Downloaded; nested album -> songs, artist -> albums, playlist -> songs. Reads the existing cache-aware providers (`recentlyPlayedProvider`, `libraryAlbumsProvider`, `libraryArtistsProvider`, `libraryPlaylistsProvider`, `favouritesPlaylistProvider`, `downloadedSongsProvider`, `libraryAlbumProvider`, `libraryArtistProvider`, `libraryPlaylistProvider`). Cover art via `buildSubsonicCoverArtUrl(size: 300)`. Songs carry `subsonicId` extra and a `BrowseId` with parent (AA3). Data tabs return `[]` with no creds.
+- `app/lib/player/heerr_audio_handler.dart`: `getChildren` override — parse id, `whenReady()` (AA4), `browseChildren`; any failure -> `[]` (logs exception type only, Dio messages embed auth URLs).
+- `app/lib/main.dart`: `androidBrowsableRootExtras: kBrowseRootExtras`.
+- Albums/Artists tab items carry `CONTENT_STYLE_BROWSABLE_HINT = 2` (grid).
+- Tests: `test/player/browse_tree_test.dart` (15), `test/player/heerr_audio_handler_container_test.dart` (+3 `getChildren`). `flutter analyze` clean; 1137/1137 green.
+- DHU (Pixel 7, release 5.4.4+169, cold start): all six tabs load with art; Albums and Artists render as grids, Recents/Favourites/Playlists/Downloaded as lists. Album-songs and artist-albums drill-downs covered by unit tests only, not yet viewed on DHU.
+- Known gap: no `notifyChildrenChanged`; a car that browses before `AudioService.init` completes gets the plugin's empty list until it re-browses (checked in AA10). The non-deprecated API is a per-parent `subscribeToChildren` stream; unclear if the plugin listens during a car browse.

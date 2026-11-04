@@ -8,6 +8,7 @@ import 'package:workmanager/workmanager.dart';
 
 import 'offline/background_sync.dart';
 import 'player/episode_progress_provider.dart';
+import 'player/browse_tree.dart';
 import 'player/heerr_audio_handler.dart';
 import 'player/now_playing_persistence.dart';
 import 'player/player_provider.dart';
@@ -39,6 +40,7 @@ Future<void> main() async {
       androidNotificationOngoing: true,
       androidStopForegroundOnPause: true,
       androidNotificationIcon: 'drawable/ic_stat_heerr',
+      androidBrowsableRootExtras: kBrowseRootExtras,
     ),
   );
 

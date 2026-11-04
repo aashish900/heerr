@@ -1,11 +1,14 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../providers/profiles/profile_registry.dart';
+import 'browse_ids.dart';
+import 'browse_tree.dart';
 
 /// The `audio_service` `BaseAudioHandler` backed by a `just_audio`
 /// [AudioPlayer]. Owns the queue (mirrored from `BaseAudioHandler.queue`)
@@ -41,6 +44,24 @@ class HeerrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     final ProviderContainer c = await _container.future;
     await c.read(profileRegistryProvider.future);
     return c;
+  }
+
+  /// Android Auto browse tree (see `browse_tree.dart`). Never throws: the
+  /// car just shows "No items" on failure.
+  @override
+  Future<List<MediaItem>> getChildren(
+    String parentMediaId, [
+    Map<String, dynamic>? options,
+  ]) async {
+    final BrowseId? id = BrowseId.tryParse(parentMediaId);
+    if (id == null) return <MediaItem>[];
+    try {
+      return await browseChildren(await whenReady(), id);
+    } catch (e) {
+      // Type only: Dio error messages embed URLs with auth params.
+      debugPrint('browse $parentMediaId failed: ${e.runtimeType}');
+      return <MediaItem>[];
+    }
   }
 
   // Guards [playSong] / [playAll] / [restoreQueue] against overlapping calls

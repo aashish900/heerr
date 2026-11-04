@@ -50,7 +50,7 @@ Status: planned, nothing executed. Execute one step at a time; tick the box and 
 - Shape depends on AA2.
 - Test: handler before/after wiring, mocktail pattern above.
 
-### [ ] AA5. Browse tree `getChildren`
+### [x] AA5. Browse tree `getChildren`
 - Root (browsable): Recents, Favourites, Playlists, Albums, Artists, Downloaded.
 - Nested: album -> songs, artist -> albums, playlist -> songs. Playable leaves: `MediaItem(id: browseId, title, artist, album, artUri, playable)`.
 - `buildSubsonicCoverArtUrl`: add optional `size` (e.g. 300) for car art.

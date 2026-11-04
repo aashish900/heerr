@@ -7,6 +7,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:heerr/player/heerr_audio_handler.dart';
+import 'package:heerr/providers/library/library_albums.dart';
 import 'package:heerr/providers/profiles/profile_registry.dart';
 import 'package:heerr/providers/secure_storage.dart';
 import 'package:heerr/providers/server_creds.dart';
@@ -113,5 +114,31 @@ void main() {
     handler.attachContainer(first);
     handler.attachContainer(second);
     expect(await handler.whenReady(), same(first));
+  });
+
+  group('getChildren', () {
+    test('waits for the container, then serves the root tabs', () async {
+      final f = handler.getChildren('root');
+      handler.attachContainer(containerWith(storageWithProfile()));
+      expect((await f).map((i) => i.id).first, 'recents');
+    });
+
+    test('unknown parent ids give an empty list', () async {
+      handler.attachContainer(containerWith(storageWithProfile()));
+      expect(await handler.getChildren('recent'), isEmpty);
+      expect(await handler.getChildren('bogus'), isEmpty);
+    });
+
+    test('a failing provider gives an empty list, not an exception', () async {
+      final c = ProviderContainer(
+        overrides: [
+          secureStorageProvider.overrideWithValue(storageWithProfile()),
+          libraryAlbumsProvider.overrideWith((ref) async => throw StateError('x')),
+        ],
+      );
+      addTearDown(c.dispose);
+      handler.attachContainer(c);
+      expect(await handler.getChildren('albums'), isEmpty);
+    });
   });
 }
