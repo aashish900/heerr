@@ -371,8 +371,9 @@ A guest phone sends playback commands; the host phone polls them. Full design: `
 | `DELETE` | `/api/v1/jam/{id}` | host | — | `204`; `403` non-host; `404` unknown |
 | `POST` | `/api/v1/jam/join` | guest | `{code}` | `200 {id, host_username, expires_at}`; `404` unknown/ended/expired; `409` own session |
 | `POST` | `/api/v1/jam/{id}/commands` | guest | `{kind, payload}` | `201 {id}`; `404` inactive; `422` bad shape |
-| `POST` | `/api/v1/jam/{id}/sync` | host | `{state, after}` | `200 {commands, cursor, ended}`; `after: null` returns only the cursor; `403` non-host |
-| `GET` | `/api/v1/jam/{id}/state` | guest | — | `200 {state, state_at, host_username, ended}` |
+| `POST` | `/api/v1/jam/{id}/sync` | host | `{state, after, wait_s?}` | `200 {commands, cursor, ended}`; `after: null` returns only the cursor; `wait_s` (0–20) long-polls until a command arrives or the session ends; `403` non-host |
+| `PUT` | `/api/v1/jam/{id}/state` | host | `{state}` | `204`; push a snapshot outside the sync long-poll; `403` non-host |
+| `GET` | `/api/v1/jam/{id}/state` | guest | `?since=<state_at>&wait_s=` | `200 {state, state_at, host_username, ended}`; with `since` + `wait_s`, long-polls until a newer snapshot lands or the session ends |
 
 `kind`: `play_songs {songs, start_index?}`, `enqueue {songs}`, `seek {position_ms}`, `play`, `pause`, `next`, `prev` (`{}`). `songs` = 1–500 Subsonic song objects, each with a string `id`.
 

@@ -1479,3 +1479,17 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Why:** Every future CI build outranks any plausible hand-numbered local build; still monotonic, so Play Console uploads keep working. Local sideload builds should stay below 1000.
 
 **Alternatives considered:** deriving the code from the semver (e.g. 50601) — breaks if a tag is re-released or two builds share a version; manual `+N` in `pubspec.yaml` — easy to forget, same collision risk.
+
+## 2026-11-05 — Jam latency: long-poll + host state push + optimistic guest UI
+
+**Context:** v5.6.1 two-phone test: every guest action took 1–3s to show on both phones. Cause (design, not a bug): host polled every 1s, guest polled host state every 2s (1.2s after a send), plus Tailscale round trips.
+
+**Decision:** Keep REST (no WebSocket/SSE/FCM, per `android/CLAUDE.md`) but long-poll:
+- Host holds `POST /jam/{id}/sync` open with `wait_s=8` (under dio's 10s `receiveTimeout`); the backend answers the moment a command lands (DB re-check every 100ms). Retry after 1s only on failure.
+- Host pushes its snapshot via a new `PUT /jam/{id}/state` on every track / play-state / queue-length change or seek (>2s off the extrapolated position), debounced 150ms, deduped against what the last sync/push already carried.
+- Guest long-polls `GET /jam/{id}/state?since=<state_at>&wait_s=8`.
+- Guest play/pause/seek patch the shown snapshot immediately; next/prev wait for the host's push (the new track is only known there).
+
+**Why:** User choice. Expected host reaction ≈ one guest→backend round trip + one backend→host round trip (inference; not yet measured), and the guest sees the host's real state one push later. Fewer requests than 1s polling when idle (one per 8s each side).
+
+**Alternatives considered:** 300ms polling (≈12k req/h on the host) — rejected by user; in-process `asyncio.Event` wake-ups — rejected (breaks with >1 uvicorn worker, lost on restart); Postgres LISTEN/NOTIFY — deferred, the 100ms re-check is enough for a handful of sessions (`ponytail:` note in `backend/app/api/v1/jam.py`).

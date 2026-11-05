@@ -1,3 +1,5 @@
+import asyncio
+import time
 import uuid
 
 import pytest
@@ -218,3 +220,116 @@ async def test_unknown_session_404(client, guest):
     sid = uuid.uuid4()
     assert (await _send(client, sid, guest[0], "play")).status_code == 404
     assert (await client.get(f"/api/v1/jam/{sid}/state", headers=guest[0])).status_code == 404
+
+
+# ----- long-poll: sync waits for commands, state waits for a newer snapshot --
+
+
+async def test_sync_long_poll_returns_when_command_arrives(client, host, guest):
+    sid = await _joined(client, host, guest)
+    cursor = (await _sync(client, sid, host, None)).json()["cursor"]
+
+    async def later_send():
+        await asyncio.sleep(0.3)
+        await _send(client, sid, guest[0], "pause")
+
+    t0 = time.monotonic()
+    r, _ = await asyncio.gather(
+        client.post(
+            f"/api/v1/jam/{sid}/sync",
+            json={"state": None, "after": cursor, "wait_s": 5},
+            headers=host,
+        ),
+        later_send(),
+    )
+    elapsed = time.monotonic() - t0
+    assert [c["kind"] for c in r.json()["commands"]] == ["pause"]
+    assert elapsed < 2
+
+
+async def test_sync_long_poll_times_out_empty(client, host, guest):
+    sid = await _joined(client, host, guest)
+    t0 = time.monotonic()
+    r = await client.post(
+        f"/api/v1/jam/{sid}/sync",
+        json={"state": None, "after": 0, "wait_s": 0.5},
+        headers=host,
+    )
+    assert r.json()["commands"] == []
+    assert time.monotonic() - t0 >= 0.4
+
+
+async def test_sync_long_poll_stops_when_session_ends(client, host, guest):
+    sid = await _joined(client, host, guest)
+
+    async def later_end():
+        await asyncio.sleep(0.3)
+        await client.delete(f"/api/v1/jam/{sid}", headers=host)
+
+    t0 = time.monotonic()
+    r, _ = await asyncio.gather(
+        client.post(
+            f"/api/v1/jam/{sid}/sync",
+            json={"state": None, "after": 0, "wait_s": 5},
+            headers=host,
+        ),
+        later_end(),
+    )
+    assert r.json()["ended"] is True
+    assert time.monotonic() - t0 < 2
+
+
+async def test_put_state_host_only(client, host, guest):
+    sid = await _joined(client, host, guest)
+    r = await client.put(
+        f"/api/v1/jam/{sid}/state", json={"state": {"playing": False}}, headers=host
+    )
+    assert r.status_code == 204
+    body = (await client.get(f"/api/v1/jam/{sid}/state", headers=guest[0])).json()
+    assert body["state"] == {"playing": False}
+    r = await client.put(f"/api/v1/jam/{sid}/state", json={"state": {}}, headers=guest[0])
+    assert r.status_code == 403
+
+
+async def test_state_long_poll_returns_on_newer_snapshot(client, host, guest):
+    sid = await _joined(client, host, guest)
+    await client.put(f"/api/v1/jam/{sid}/state", json={"state": {"n": 1}}, headers=host)
+    first = (await client.get(f"/api/v1/jam/{sid}/state", headers=guest[0])).json()
+
+    async def later_push():
+        await asyncio.sleep(0.3)
+        await client.put(f"/api/v1/jam/{sid}/state", json={"state": {"n": 2}}, headers=host)
+
+    t0 = time.monotonic()
+    r, _ = await asyncio.gather(
+        client.get(
+            f"/api/v1/jam/{sid}/state",
+            params={"since": first["state_at"], "wait_s": 5},
+            headers=guest[0],
+        ),
+        later_push(),
+    )
+    assert r.json()["state"] == {"n": 2}
+    assert time.monotonic() - t0 < 2
+
+
+async def test_state_long_poll_times_out_unchanged(client, host, guest):
+    sid = await _joined(client, host, guest)
+    await client.put(f"/api/v1/jam/{sid}/state", json={"state": {"n": 1}}, headers=host)
+    first = (await client.get(f"/api/v1/jam/{sid}/state", headers=guest[0])).json()
+    r = await client.get(
+        f"/api/v1/jam/{sid}/state",
+        params={"since": first["state_at"], "wait_s": 0.5},
+        headers=guest[0],
+    )
+    assert r.json()["state"] == {"n": 1}
+
+
+async def test_wait_capped(client, host, guest):
+    sid = await _joined(client, host, guest)
+    r = await client.post(
+        f"/api/v1/jam/{sid}/sync",
+        json={"state": None, "after": 0, "wait_s": 60},
+        headers=host,
+    )
+    assert r.status_code == 422

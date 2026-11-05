@@ -3345,3 +3345,11 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 
 - Version bump `5.6.0` -> `5.6.1` across all five sync locations per `/CLAUDE.md` §3.
 - **`.github/workflows/android-publish.yml`** — APK + AAB `--build-number` is now `1000 + github.run_number` (see DECISIONLOG 2026-11-05). Fixes the v5.6.0 "cannot install older version (172 -> 169)" sideload refusal for future releases.
+
+## 2026-11-05 — Jam latency: long-poll host + guest, state push, optimistic guest UI
+
+- **`android/app/lib/providers/jam_host.dart`** — continuous `sync` long-poll (`kJamLongPollWaitS = 8`, 100ms gap, 1s retry only after a failure); subscribes to the handler's `mediaItem` / `playbackState` / `queue` and pushes `PUT /jam/{id}/state` on a track / play-state / queue-length change or a seek (>2s off the extrapolated position), debounced 150ms and re-checked on fire so a state the sync already carried isn't re-sent.
+- **`android/app/lib/providers/jam_remote.dart`** — state long-poll `since` the last `state_at` (8s, 150ms gap, 2s retry after failure); `send` patches play/pause/seek into the shown snapshot immediately (`state_at` untouched, so the long-poll still waits for the host's real push). Removed the 1.2s refresh-after-send.
+- **`android/app/lib/services/backend_service.dart`** — `jamSync(waitS:)`, `jamPushState`, `jamState(since:, waitS:)`.
+- Tests: `jam_host_test.dart` rewritten (5, incl. push debounce/dedupe/seek), `jam_remote_test.dart` rewritten (6, incl. optimistic UI), `backend_service_jam_test.dart` +3. `flutter test` 1188 passed, `flutter analyze` clean.
+- **`android/docs/CONTEXT.md`** — jam section updated for long-poll/push.

@@ -9,7 +9,7 @@ part of 'jam_remote.dart';
 String _$jamRemotePollIntervalHash() =>
     r'8618e6ca8e25e42fd59ffc66ae1cd7d87d025738';
 
-/// Guest state-poll cadence. Overridable for `fake_async` tests.
+/// Retry delay after a failed state poll. Overridable for `fake_async` tests.
 ///
 /// Copied from [jamRemotePollInterval].
 @ProviderFor(jamRemotePollInterval)
@@ -26,13 +26,15 @@ final jamRemotePollIntervalProvider = Provider<Duration>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef JamRemotePollIntervalRef = ProviderRef<Duration>;
-String _$jamRemoteHash() => r'df3abd6e7c642066c8ad90deafd527d637e553ae';
+String _$jamRemoteHash() => r'798dd472d3cb058a392625d37cf8c74292d46b00';
 
 /// Phase JM guest side. While joined, the play / queue wrappers in
 /// `player/playback_actions.dart` send commands here instead of touching the
-/// local player, and the host's snapshot is polled every
-/// [jamRemotePollInterval] (paused while the app is backgrounded). A host
-/// that stops the session flips `ended`, which leaves automatically.
+/// local player, and the host's snapshot is long-polled (`since` the last
+/// `state_at`), so a host change shows within ~one network round trip.
+/// Play / pause / seek also patch the shown snapshot at once (optimistic).
+/// Paused while the app is backgrounded. A host that stops the session
+/// flips `ended`, which leaves automatically.
 /// `null` state = not joined.
 ///
 /// Copied from [JamRemote].

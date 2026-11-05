@@ -9,9 +9,15 @@ import '../services/backend_service.dart';
 part 'jam_remote.g.dart';
 
 const Duration _kDefaultJamRemotePollInterval = Duration(seconds: 2);
-const Duration _kRefreshAfterSend = Duration(milliseconds: 1200);
 
-/// Guest state-poll cadence. Overridable for `fake_async` tests.
+/// Long-poll hold for `GET /jam/{id}/state` (under dio's 10s receiveTimeout).
+const double _kStateWaitS = 8;
+
+/// Gap between back-to-back long-polls; also stops a tight loop if a server
+/// ever answers instantly.
+const Duration _kLoopGap = Duration(milliseconds: 150);
+
+/// Retry delay after a failed state poll. Overridable for `fake_async` tests.
 @Riverpod(keepAlive: true)
 Duration jamRemotePollInterval(JamRemotePollIntervalRef ref) =>
     _kDefaultJamRemotePollInterval;
@@ -32,9 +38,11 @@ class JamRemoteStatus {
 
 /// Phase JM guest side. While joined, the play / queue wrappers in
 /// `player/playback_actions.dart` send commands here instead of touching the
-/// local player, and the host's snapshot is polled every
-/// [jamRemotePollInterval] (paused while the app is backgrounded). A host
-/// that stops the session flips `ended`, which leaves automatically.
+/// local player, and the host's snapshot is long-polled (`since` the last
+/// `state_at`), so a host change shows within ~one network round trip.
+/// Play / pause / seek also patch the shown snapshot at once (optimistic).
+/// Paused while the app is backgrounded. A host that stops the session
+/// flips `ended`, which leaves automatically.
 /// `null` state = not joined.
 @Riverpod(keepAlive: true)
 class JamRemote extends _$JamRemote with WidgetsBindingObserver {
@@ -77,12 +85,33 @@ class JamRemote extends _$JamRemote with WidgetsBindingObserver {
       backendServiceProvider.future,
     );
     await backend.jamSend(s.sessionId, kind, payload ?? <String, dynamic>{});
-    // The host applies it within ~1s; refresh sooner than the 2s cadence so
-    // the UI catches up fast.
-    if (state?.sessionId == s.sessionId && !_inFlight && _timer != null) {
-      _timer!.cancel();
-      _timer = Timer(_kRefreshAfterSend, _tick);
+    _applyOptimistic(kind, payload);
+  }
+
+  /// Show the expected result of play / pause / seek before the host's push
+  /// arrives; the next real snapshot overwrites it. Next / prev wait for the
+  /// host (the new track is only known there).
+  void _applyOptimistic(String kind, Map<String, dynamic>? payload) {
+    final JamRemoteStatus? s = state;
+    final JamState? hs = s?.hostState;
+    final Map<String, dynamic>? cur = hs?.state;
+    if (s == null || hs == null || cur == null) return;
+    final Map<String, dynamic> patched = <String, dynamic>{...cur};
+    switch (kind) {
+      case 'play':
+        patched['playing'] = true;
+      case 'pause':
+        patched['playing'] = false;
+      case 'seek':
+        patched['position_ms'] = payload?['position_ms'];
+      default:
+        return;
     }
+    state = JamRemoteStatus(
+      sessionId: s.sessionId,
+      hostUsername: s.hostUsername,
+      hostState: hs.copyWith(state: patched),
+    );
   }
 
   @override
@@ -115,11 +144,17 @@ class JamRemote extends _$JamRemote with WidgetsBindingObserver {
     final JamRemoteStatus? s = state;
     if (s == null) return;
     _inFlight = true;
+    Duration next = _kLoopGap;
     try {
       final BackendService backend = await ref.read(
         backendServiceProvider.future,
       );
-      final JamState st = await backend.jamState(s.sessionId);
+      final DateTime? since = s.hostState?.stateAt;
+      final JamState st = await backend.jamState(
+        s.sessionId,
+        since: since,
+        waitS: since == null ? 0 : _kStateWaitS,
+      );
       if (state?.sessionId != s.sessionId) return; // left mid-flight
       if (st.ended) {
         leave();
@@ -131,12 +166,13 @@ class JamRemote extends _$JamRemote with WidgetsBindingObserver {
         hostState: st,
       );
     } catch (_) {
-      // Transient (tailnet blip): keep the last snapshot, keep polling.
+      // Transient (tailnet blip): keep the last snapshot, retry shortly.
       if (state?.sessionId != s.sessionId) return;
+      next = ref.read(jamRemotePollIntervalProvider);
     } finally {
       _inFlight = false;
     }
     if (_backgrounded) return;
-    _timer = Timer(ref.read(jamRemotePollIntervalProvider), _tick);
+    _timer = Timer(next, _tick);
   }
 }

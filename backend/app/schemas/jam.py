@@ -24,6 +24,8 @@ class JamJoinResponse(BaseModel):
 
 
 MAX_SONGS_PER_COMMAND = 500
+# Server-side long-poll cap. The app asks for 8s (its dio receiveTimeout is 10s).
+MAX_WAIT_S = 20.0
 
 
 class JamCommandRequest(BaseModel):
@@ -81,6 +83,14 @@ class JamSyncRequest(BaseModel):
     state: dict[str, Any] | None = None
     # None = bootstrap: return no commands, just the current cursor.
     after: int | None = None
+    # Long-poll: hold the request up to this long until a command arrives.
+    wait_s: float = Field(default=0, ge=0, le=MAX_WAIT_S)
+
+
+class JamStatePush(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    state: dict[str, Any]
 
 
 class JamSyncResponse(BaseModel):

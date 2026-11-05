@@ -1119,3 +1119,11 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 ## 2026-11-05 — v5.6.1: version sync only
 
 - Version bump `5.6.0` -> `5.6.1` (`backend/pyproject.toml`, `backend/app/main.py`) for the Android jam fix release; no backend code changes.
+
+## 2026-11-05 — Jam long-poll: sync waits for commands, state waits for a newer snapshot
+
+- **`backend/app/api/v1/jam.py`** — `POST /jam/{id}/sync` accepts `wait_s` (0–20): commits the pushed state first, then re-checks every 100ms (committing between checks so no pool connection is held) until a command after the cursor exists, the session ends, or the wait elapses. New `PUT /jam/{id}/state` (host only, 204) stores a snapshot. `GET /jam/{id}/state` accepts `since` + `wait_s` and holds until `state_at > since` or the session ends. Shared `_wait_until` helper.
+- **`backend/app/schemas/jam.py`** — `MAX_WAIT_S = 20`, `JamSyncRequest.wait_s`, `JamStatePush`.
+- **`backend/tests/test_jam.py`** — +7 long-poll tests (early return on command / end / newer state, timeout, PUT host-only, wait cap 422). Suite 682 passed.
+- **`backend/README.md`**, **`backend/docs/CONTEXT.md`** — endpoint table + jam description updated.
+- **Compatibility:** the new app sends `wait_s`, which the 5.6.1 schema rejects (`extra="forbid"` → 422). Backend must be redeployed with the app.

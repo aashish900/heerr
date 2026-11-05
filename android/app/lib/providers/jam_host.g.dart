@@ -9,7 +9,7 @@ part of 'jam_host.dart';
 String _$jamHostPollIntervalHash() =>
     r'4832f223263d4dd57760ab6599a175be29005f83';
 
-/// Host sync cadence. Overridable for `fake_async` tests.
+/// Retry delay after a failed sync. Overridable for `fake_async` tests.
 ///
 /// Copied from [jamHostPollInterval].
 @ProviderFor(jamHostPollInterval)
@@ -26,14 +26,16 @@ final jamHostPollIntervalProvider = Provider<Duration>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef JamHostPollIntervalRef = ProviderRef<Duration>;
-String _$jamHostHash() => r'28e89314752d2a77336f2fc627352d2189a94600';
+String _$jamHostHash() => r'ac55636cd727d7240ba5a440c7e8334818d4f55c';
 
-/// Phase JM host side: while a session is live, every [jamHostPollInterval]
-/// push the player snapshot and pull guest commands via `POST /jam/{id}/sync`,
-/// then run them strictly in order, each awaited (the handler's
-/// `_isLoadingSource` guard drops overlapping loads). One-shot `Timer`
-/// rescheduled after each tick (same shape as `queue.dart`), so ticks never
-/// overlap. `null` state = not hosting.
+/// Phase JM host side. While a session is live:
+/// * a continuous `POST /jam/{id}/sync` long-poll ([kJamLongPollWaitS]) pulls
+///   guest commands the moment they are sent and runs them strictly in
+///   order, each awaited (the handler's `_isLoadingSource` guard drops
+///   overlapping loads); retry after [jamHostPollInterval] on failure;
+/// * every meaningful player change (track, play/pause, queue, seek) is
+///   pushed via `PUT /jam/{id}/state` so guests see it at once.
+/// `null` state = not hosting.
 ///
 /// Copied from [JamHost].
 @ProviderFor(JamHost)

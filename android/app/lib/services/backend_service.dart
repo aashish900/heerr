@@ -370,26 +370,57 @@ class BackendService {
 
   /// `POST /jam/{id}/sync` → host stores its [state] snapshot and receives
   /// commands newer than [after]. `after == null` bootstraps the cursor
-  /// without returning (stale) commands.
+  /// without returning (stale) commands. [waitS] > 0 long-polls: the backend
+  /// holds the request until a command arrives (keep it under dio's 10s
+  /// receiveTimeout).
   Future<JamSyncResponse> jamSync(
     String sessionId, {
     required Map<String, dynamic>? state,
     required int? after,
+    double waitS = 0,
   }) {
     return apiCall<JamSyncResponse>(
       () => _dio.post<dynamic>(
         Endpoints.jamSync(sessionId),
-        data: <String, dynamic>{'state': state, 'after': after},
+        data: <String, dynamic>{
+          'state': state,
+          'after': after,
+          if (waitS > 0) 'wait_s': waitS,
+        },
       ),
       (dynamic data) =>
           JamSyncResponse.fromJson(data as Map<String, dynamic>),
     );
   }
 
-  /// `GET /jam/{id}/state` → guest reads the host's latest snapshot.
-  Future<JamState> jamState(String sessionId) {
+  /// `PUT /jam/{id}/state` → host pushes a fresh snapshot right after its
+  /// player changes (outside the `sync` long-poll).
+  Future<void> jamPushState(String sessionId, Map<String, dynamic> state) {
+    return apiCall<void>(
+      () => _dio.put<dynamic>(
+        Endpoints.jamState(sessionId),
+        data: <String, dynamic>{'state': state},
+      ),
+      (dynamic _) {},
+    );
+  }
+
+  /// `GET /jam/{id}/state` → guest reads the host's latest snapshot. With
+  /// [since] (the `state_at` already seen) and [waitS] > 0 it long-polls
+  /// until a newer snapshot lands or the session ends.
+  Future<JamState> jamState(
+    String sessionId, {
+    DateTime? since,
+    double waitS = 0,
+  }) {
     return apiCall<JamState>(
-      () => _dio.get<dynamic>(Endpoints.jamState(sessionId)),
+      () => _dio.get<dynamic>(
+        Endpoints.jamState(sessionId),
+        queryParameters: <String, dynamic>{
+          if (since != null) 'since': since.toUtc().toIso8601String(),
+          if (waitS > 0) 'wait_s': waitS,
+        },
+      ),
       (dynamic data) => JamState.fromJson(data as Map<String, dynamic>),
     );
   }

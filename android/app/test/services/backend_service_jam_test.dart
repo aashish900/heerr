@@ -41,18 +41,21 @@ class _FakeAdapter implements HttpClientAdapter {
 }
 
 ResponseBody _json(String body, int status) => ResponseBody.fromString(
-      body,
-      status,
-      headers: <String, List<String>>{
-        'content-type': <String>['application/json'],
-      },
-    );
+  body,
+  status,
+  headers: <String, List<String>>{
+    'content-type': <String>['application/json'],
+  },
+);
 
 void main() {
   test('jamCreate POSTs /jam and parses the session', () async {
-    final (BackendService s, _FakeAdapter a) = _service((_) => _json(
+    final (BackendService s, _FakeAdapter a) = _service(
+      (_) => _json(
         '{"id":"s1","code":"K7Q2MX","expires_at":"2026-11-05T12:00:00Z"}',
-        201));
+        201,
+      ),
+    );
     final JamSession js = await s.jamCreate();
     expect(a.lastRequest!.method, 'POST');
     expect(a.lastRequest!.path, '/jam');
@@ -61,43 +64,55 @@ void main() {
   });
 
   test('jamEnd DELETEs /jam/{id}', () async {
-    final (BackendService s, _FakeAdapter a) =
-        _service((_) => ResponseBody.fromString('', 204));
+    final (BackendService s, _FakeAdapter a) = _service(
+      (_) => ResponseBody.fromString('', 204),
+    );
     await s.jamEnd('s1');
     expect(a.lastRequest!.method, 'DELETE');
     expect(a.lastRequest!.path, '/jam/s1');
   });
 
   test('jamJoin sends the code; 404 maps to NotFoundError', () async {
-    final (BackendService s, _FakeAdapter a) = _service((_) => _json(
+    final (BackendService s, _FakeAdapter a) = _service(
+      (_) => _json(
         '{"id":"s1","host_username":"aashish",'
         '"expires_at":"2026-11-05T12:00:00Z"}',
-        200));
+        200,
+      ),
+    );
     final JamJoin j = await s.jamJoin('k7q2mx');
     expect(jsonEncode(a.lastRequest!.data), '{"code":"k7q2mx"}');
     expect(j.hostUsername, 'aashish');
 
-    final (BackendService s2, _) =
-        _service((_) => _json('{"detail":"no active jam session"}', 404));
+    final (BackendService s2, _) = _service(
+      (_) => _json('{"detail":"no active jam session"}', 404),
+    );
     await expectLater(s2.jamJoin('nope'), throwsA(isA<NotFoundError>()));
   });
 
   test('jamSend POSTs kind + payload and returns the id', () async {
-    final (BackendService s, _FakeAdapter a) =
-        _service((_) => _json('{"id":7}', 201));
-    final int id =
-        await s.jamSend('s1', 'seek', <String, dynamic>{'position_ms': 10});
+    final (BackendService s, _FakeAdapter a) = _service(
+      (_) => _json('{"id":7}', 201),
+    );
+    final int id = await s.jamSend('s1', 'seek', <String, dynamic>{
+      'position_ms': 10,
+    });
     expect(a.lastRequest!.path, '/jam/s1/commands');
-    expect(jsonEncode(a.lastRequest!.data),
-        '{"kind":"seek","payload":{"position_ms":10}}');
+    expect(
+      jsonEncode(a.lastRequest!.data),
+      '{"kind":"seek","payload":{"position_ms":10}}',
+    );
     expect(id, 7);
   });
 
   test('jamSync sends explicit null after and parses commands', () async {
-    final (BackendService s, _FakeAdapter a) = _service((_) => _json(
+    final (BackendService s, _FakeAdapter a) = _service(
+      (_) => _json(
         '{"commands":[{"id":3,"kind":"pause","payload":{},"sender":"g"}],'
         '"cursor":3,"ended":false}',
-        200));
+        200,
+      ),
+    );
     final JamSyncResponse r = await s.jamSync('s1', state: null, after: null);
     expect(a.lastRequest!.path, '/jam/s1/sync');
     expect(jsonEncode(a.lastRequest!.data), '{"state":null,"after":null}');
@@ -106,11 +121,50 @@ void main() {
     expect(r.commands.single.sender, 'g');
   });
 
+  test('jamSync long-poll sends wait_s', () async {
+    final (BackendService s, _FakeAdapter a) = _service(
+      (_) => _json('{"commands":[],"cursor":3,"ended":false}', 200),
+    );
+    await s.jamSync('s1', state: null, after: 3, waitS: 8);
+    expect(
+      jsonEncode(a.lastRequest!.data),
+      '{"state":null,"after":3,"wait_s":8.0}',
+    );
+  });
+
+  test('jamPushState PUTs /jam/{id}/state', () async {
+    final (BackendService s, _FakeAdapter a) = _service(
+      (_) => ResponseBody.fromString('', 204),
+    );
+    await s.jamPushState('s1', <String, dynamic>{'playing': true});
+    expect(a.lastRequest!.method, 'PUT');
+    expect(a.lastRequest!.path, '/jam/s1/state');
+    expect(jsonEncode(a.lastRequest!.data), '{"state":{"playing":true}}');
+  });
+
+  test('jamState long-poll sends since + wait_s', () async {
+    final (BackendService s, _FakeAdapter a) = _service(
+      (_) => _json('{"state":null,"host_username":"h","ended":false}', 200),
+    );
+    await s.jamState(
+      's1',
+      since: DateTime.utc(2026, 11, 5, 4, 52, 31, 123, 456),
+      waitS: 8,
+    );
+    expect(a.lastRequest!.queryParameters, <String, dynamic>{
+      'since': '2026-11-05T04:52:31.123456Z',
+      'wait_s': 8.0,
+    });
+  });
+
   test('jamState GETs /jam/{id}/state', () async {
-    final (BackendService s, _FakeAdapter a) = _service((_) => _json(
+    final (BackendService s, _FakeAdapter a) = _service(
+      (_) => _json(
         '{"state":{"playing":true},"state_at":null,'
         '"host_username":"aashish","ended":false}',
-        200));
+        200,
+      ),
+    );
     final JamState st = await s.jamState('s1');
     expect(a.lastRequest!.method, 'GET');
     expect(a.lastRequest!.path, '/jam/s1/state');
