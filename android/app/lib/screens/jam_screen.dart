@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../api/api_error.dart';
-import '../models/subsonic/song.dart';
 import '../providers/jam_host.dart';
 import '../providers/jam_remote.dart';
 import '../theme.dart';
 import '../widgets/error_snackbar.dart';
-import '../widgets/library_cover_art.dart';
 
 /// Phase JM: host a jam session (guests control playback on this phone) or
 /// join one (this phone becomes a remote for the host). Reached from
@@ -190,126 +189,44 @@ class _Hosting extends ConsumerWidget {
   }
 }
 
-/// Guest view: the host's now-playing + queue from the polled snapshot, and
-/// transport buttons that send commands. Positions update with each 2s poll
-/// (no client-side extrapolation: the host clock may differ from ours).
+/// Guest view. The host's now-playing renders in the normal Now Playing
+/// screen + mini-player (see `player/jam_display.dart`), whose controls drive
+/// the host while joined; this page only reports the link and leaves it.
 class _Joined extends ConsumerWidget {
   const _Joined(this.remote);
 
   final JamRemoteStatus remote;
 
-  Future<void> _send(
-    BuildContext context,
-    WidgetRef ref,
-    String kind, [
-    Map<String, dynamic>? payload,
-  ]) async {
-    try {
-      await ref.read(jamRemoteProvider.notifier).send(kind, payload);
-    } on NotFoundError {
-      ref.read(jamRemoteProvider.notifier).leave();
-    } on ApiError catch (e) {
-      if (context.mounted) showApiError(context, e);
-    }
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final TextTheme tt = Theme.of(context).textTheme;
     final ColorScheme cs = Theme.of(context).colorScheme;
-    final Map<String, dynamic> s =
-        remote.hostState?.state ?? const <String, dynamic>{};
-    final Song? current = _song(s['current']);
-    final bool playing = s['playing'] == true;
-    final int positionMs = s['position_ms'] is int
-        ? s['position_ms'] as int
-        : 0;
-    final int durationMs = (current?.duration ?? 0) * 1000;
-    final List<Song> upNext = <Song>[
-      if (s['queue'] is List)
-        for (final dynamic e in (s['queue'] as List<dynamic>).skip(1).take(10))
-          if (_song(e) case final Song song) song,
-    ];
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Text(
-          'Controlling ${remote.hostUsername}\'s phone',
-          style: tt.titleMedium,
-          textAlign: TextAlign.center,
-        ),
+        const Icon(Icons.settings_remote, size: 64, color: heerrMagenta),
         const SizedBox(height: 16),
-        Center(
-          child: LibraryCoverArt(coverArtId: current?.coverArt, size: 160),
-        ),
-        const SizedBox(height: 12),
         Text(
-          current?.title ?? 'Nothing playing',
-          key: const Key('jam-now-title'),
+          "Controlling ${remote.hostUsername}'s phone",
           style: tt.titleLarge,
           textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        if (current?.artist != null)
-          Text(
-            current!.artist!,
-            style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-            textAlign: TextAlign.center,
-          ),
-        if (durationMs > 0)
-          _SeekBar(
-            positionMs: positionMs.clamp(0, durationMs),
-            durationMs: durationMs,
-            onSeek: (int ms) => _send(context, ref, 'seek', <String, dynamic>{
-              'position_ms': ms,
-            }),
-          ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            IconButton(
-              key: const Key('jam-prev'),
-              iconSize: 36,
-              icon: const Icon(Icons.skip_previous),
-              onPressed: () => _send(context, ref, 'prev'),
-            ),
-            IconButton.filled(
-              key: const Key('jam-playpause'),
-              iconSize: 44,
-              icon: Icon(playing ? Icons.pause : Icons.play_arrow),
-              onPressed: () => _send(context, ref, playing ? 'pause' : 'play'),
-            ),
-            IconButton(
-              key: const Key('jam-next'),
-              iconSize: 36,
-              icon: const Icon(Icons.skip_next),
-              onPressed: () => _send(context, ref, 'next'),
-            ),
-          ],
         ),
         const SizedBox(height: 8),
         Text(
-          'Pick songs anywhere in heerr: Play and Add to queue go to '
-          '${remote.hostUsername}.',
-          style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          'Play and Add to queue anywhere in heerr go to '
+          '${remote.hostUsername}. Now Playing shows and controls their '
+          'phone.',
+          style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 8),
-        if (upNext.isNotEmpty) Text('Up next', style: tt.titleSmall),
-        Expanded(
-          child: ListView(
-            children: <Widget>[
-              for (final Song song in upNext)
-                ListTile(
-                  dense: true,
-                  title: Text(song.title, maxLines: 1),
-                  subtitle: song.artist == null ? null : Text(song.artist!),
-                ),
-            ],
-          ),
+        const SizedBox(height: 24),
+        FilledButton.icon(
+          key: const Key('jam-open-player'),
+          onPressed: () => context.push('/player'),
+          icon: const Icon(Icons.music_note),
+          label: const Text('Open Now Playing'),
         ),
+        const Spacer(),
         OutlinedButton.icon(
           key: const Key('jam-leave'),
           onPressed: () => ref.read(jamRemoteProvider.notifier).leave(),
@@ -317,50 +234,6 @@ class _Joined extends ConsumerWidget {
           label: const Text('Leave session'),
         ),
       ],
-    );
-  }
-
-  static Song? _song(dynamic json) {
-    if (json is! Map<String, dynamic>) return null;
-    try {
-      return Song.fromJson(json);
-    } catch (_) {
-      return null;
-    }
-  }
-}
-
-/// Slider that follows the host position except while the user drags; the
-/// seek is sent once on release.
-class _SeekBar extends StatefulWidget {
-  const _SeekBar({
-    required this.positionMs,
-    required this.durationMs,
-    required this.onSeek,
-  });
-
-  final int positionMs;
-  final int durationMs;
-  final ValueChanged<int> onSeek;
-
-  @override
-  State<_SeekBar> createState() => _SeekBarState();
-}
-
-class _SeekBarState extends State<_SeekBar> {
-  double? _drag;
-
-  @override
-  Widget build(BuildContext context) {
-    return Slider(
-      key: const Key('jam-seek'),
-      value: _drag ?? widget.positionMs.toDouble(),
-      max: widget.durationMs.toDouble(),
-      onChanged: (double v) => setState(() => _drag = v),
-      onChangeEnd: (double v) {
-        setState(() => _drag = null);
-        widget.onSeek(v.round());
-      },
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -124,6 +126,13 @@ void main() {
       () => h.skipToPrevious(),
       () => h.seek(const Duration(milliseconds: 1500)),
     ]);
+  });
+
+  test('play does not wait for playback to end', () async {
+    when(() => h.play()).thenAnswer((_) => Completer<void>().future);
+    await runJamCommand(_cmd('play'), h, _toItem);
+    await runJamCommand(_cmd('next'), h, _toItem);
+    verify(() => h.skipToNext()).called(1);
   });
 
   test('unknown kind and malformed payloads are ignored', () async {

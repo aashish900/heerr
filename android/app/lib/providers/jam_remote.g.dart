@@ -26,7 +26,7 @@ final jamRemotePollIntervalProvider = Provider<Duration>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef JamRemotePollIntervalRef = ProviderRef<Duration>;
-String _$jamRemoteHash() => r'717a635af2d77ce4b6af39fc73ce66d3cc549704';
+String _$jamRemoteHash() => r'df3abd6e7c642066c8ad90deafd527d637e553ae';
 
 /// Phase JM guest side. While joined, the play / queue wrappers in
 /// `player/playback_actions.dart` send commands here instead of touching the

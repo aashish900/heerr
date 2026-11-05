@@ -3331,3 +3331,12 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - Version bump `5.5.0` -> `5.6.0` across all five sync locations per `/CLAUDE.md` §3.
 - **`android/docs/CONTEXT.md`** — new "Jam / remote control (v5.6.0)" section. **`android/README.md`** — jam guest setup (Navidrome user, Tailscale node share, join flow).
 - JM7 (paused-host background polling) and JM9 (two-phone smoke) not yet run; their ROADMAP boxes stay open.
+
+## 2026-11-05 — Jam fixes from first two-phone test: host loop stall, guest UI on Now Playing
+
+- **Bug (user-reported: long delay; seek/next/prev from the guest did nothing):** `lib/player/jam_executor.dart` awaited `handler.play()`, which only completes on pause/stop/end (`heerr_audio_handler.dart:259-260`), so a guest "play" blocked the host's sync loop for the whole track and no later commands were fetched. Now `unawaited`. Regression test in `test/player/jam_executor_test.dart` (play never completes, next still runs).
+- **New `lib/player/jam_display.dart`** — `displaySnapshotProvider` / `displayQueueProvider` (local player, or the host snapshot as `MediaItem`s built with this phone's creds while joined) and `playerTransport(ref, kind)` (jam command while joined, a 404 leaves; local handler otherwise).
+- **Now Playing** (`now_playing_screen.dart`, `now_playing_transport.dart`, `now_playing_lyrics.dart`) and **`widgets/mini_player.dart`** read the display providers and send transport via `playerTransport`; shuffle/repeat disabled and the queue sheet read-only while joined. Header top-right button (was the disabled "Audio device" placeholder) now opens `/jam`.
+- **`lib/screens/jam_screen.dart`** — guest view reduced to status + "Open Now Playing" + Leave (old inline now-playing/transport/seek removed).
+- **`lib/providers/jam_remote.dart`** — after a send, re-polls host state after 1.2s instead of waiting for the 2s tick; in-flight / backgrounded guards so a send or app resume can't start a second poll loop, and a tick finishing while backgrounded doesn't reschedule.
+- Tests: `test/player/jam_display_test.dart` (new, 4), `jam_remote_test.dart` (+1), `jam_screen_test.dart` (joined view updated). `flutter test` 1184 passed, `flutter analyze` clean.

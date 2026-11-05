@@ -1459,3 +1459,13 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Open risk:** with `androidStopForegroundOnPause: true` (`lib/main.dart`), a paused host may stop polling; verified/fixed in JM7.
 
 **Reference:** `/PLAN.md` §4–§5.
+
+## 2026-11-05 — Jam guest UI: reuse Now Playing + mini-player, not a separate remote screen
+
+**Context:** First two-phone test of v5.6.0: user found the guest's Jam page UI poor and wanted the Now Playing top-right button to open Jam.
+
+**Decision:** While joined, Now Playing (incl. lyrics + queue sheet) and the mini-player render the host's polled snapshot through `displaySnapshotProvider` / `displayQueueProvider` (`lib/player/jam_display.dart`), and their play/pause, prev, next and seek go through `playerTransport`, which sends jam commands while joined and drives the local handler otherwise. Shuffle, repeat and queue edits (skip-to, reorder, remove) are disabled while joined — no host command exists for them. The Jam page shrinks to code entry / hosting status / "Open Now Playing" / Leave. Now Playing's disabled "Audio device" placeholder (NOWPLAYING.md §2.3) becomes the Jam entry point.
+
+**Why:** User choice ("Reuse Now Playing look"). One player UI to maintain; the guest sees the host's song with the app's normal art/gradient/controls. Host `PlaybackState` is rebuilt with `updateTime = now`, so the existing 250ms ticker extrapolates position from snapshot arrival — immune to host/guest clock skew.
+
+**Alternatives considered:** restyling the separate Jam page — rejected by user; making the global `playerSnapshotProvider` jam-aware — rejected: home cards, album "now playing" highlights and the home-screen widget would silently switch to the host too.

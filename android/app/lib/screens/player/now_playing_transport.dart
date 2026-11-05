@@ -114,6 +114,9 @@ class _Transport extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ColorScheme cs = Theme.of(context).colorScheme;
+    // JM: while controlling a jam host, shuffle / repeat stay local-only
+    // (no host command for them), so they are disabled.
+    final bool jam = ref.watch(jamRemoteProvider) != null;
     final bool shuffleOn = shuffleMode != AudioServiceShuffleMode.none;
     final bool repeatOn = repeatMode != AudioServiceRepeatMode.none;
 
@@ -132,12 +135,14 @@ class _Transport extends ConsumerWidget {
               active: shuffleOn,
               inactiveColor: cs.onSurfaceVariant,
             ),
-            onPressed: () {
-              final HeerrAudioHandler h = ref.read(audioHandlerProvider);
-              h.setShuffleMode(shuffleOn
-                  ? AudioServiceShuffleMode.none
-                  : AudioServiceShuffleMode.all);
-            },
+            onPressed: jam
+                ? null
+                : () {
+                    final HeerrAudioHandler h = ref.read(audioHandlerProvider);
+                    h.setShuffleMode(shuffleOn
+                        ? AudioServiceShuffleMode.none
+                        : AudioServiceShuffleMode.all);
+                  },
           ),
         ),
         _TapScale(
@@ -145,7 +150,7 @@ class _Transport extends ConsumerWidget {
             iconSize: 36,
             tooltip: 'Previous',
             icon: const Icon(Icons.skip_previous_rounded),
-            onPressed: () => ref.read(audioHandlerProvider).skipToPrevious(),
+            onPressed: () => playerTransport(ref, 'prev'),
           ),
         ),
         // Big gradient circle (magenta→purple→violet) with a black glyph and
@@ -172,14 +177,7 @@ class _Transport extends ConsumerWidget {
               icon: Icon(
                 playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
               ),
-              onPressed: () {
-                final HeerrAudioHandler h = ref.read(audioHandlerProvider);
-                if (playing) {
-                  h.pause();
-                } else {
-                  h.play();
-                }
-              },
+              onPressed: () => playerTransport(ref, playing ? 'pause' : 'play'),
             ),
           ),
         ),
@@ -188,7 +186,7 @@ class _Transport extends ConsumerWidget {
             iconSize: 36,
             tooltip: 'Next',
             icon: const Icon(Icons.skip_next_rounded),
-            onPressed: () => ref.read(audioHandlerProvider).skipToNext(),
+            onPressed: () => playerTransport(ref, 'next'),
           ),
         ),
         // Repeat: custom rounded-loop glyph (bundled SVG, same reason as
@@ -208,9 +206,11 @@ class _Transport extends ConsumerWidget {
               active: repeatOn,
               inactiveColor: cs.onSurfaceVariant,
             ),
-            onPressed: () => ref
-                .read(audioHandlerProvider)
-                .setRepeatMode(_nextRepeat(repeatMode)),
+            onPressed: jam
+                ? null
+                : () => ref
+                    .read(audioHandlerProvider)
+                    .setRepeatMode(_nextRepeat(repeatMode)),
           ),
         ),
       ],
@@ -338,7 +338,21 @@ class _QueueList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<List<MediaItem>> q = ref.watch(playerQueueProvider);
+    final AsyncValue<List<MediaItem>> q = ref.watch(displayQueueProvider);
+    // JM: the host's queue is read-only here (no skip / reorder / remove
+    // commands); it starts at the host's current track.
+    if (ref.watch(jamRemoteProvider) != null) {
+      final List<MediaItem> items = q.valueOrNull ?? const <MediaItem>[];
+      return ListView(
+        children: <Widget>[
+          for (int i = 0; i < items.length; i++) ...<Widget>[
+            if (i == 0) const _QueueSectionLabel('NOW PLAYING'),
+            if (i == 1) const _QueueSectionLabel('NEXT UP'),
+            _QueueRow(item: items[i], isCurrent: i == 0),
+          ],
+        ],
+      );
+    }
     final AsyncValue<MediaItem?> current =
         ref.watch(currentMediaItemProvider);
     final String? currentId = current.valueOrNull?.id;

@@ -114,6 +114,22 @@ void main() {
     });
   });
 
+  test('send refreshes the host state sooner than the poll interval', () {
+    fakeAsync((FakeAsync fa) {
+      final ProviderContainer c = container();
+      addTearDown(c.dispose);
+      final JamRemote n = c.read(jamRemoteProvider.notifier);
+      n.join('x');
+      fa.flushMicrotasks();
+      expect(polls, 1);
+      n.send('next');
+      fa.elapse(const Duration(milliseconds: 1300));
+      expect(polls, 2); // not waiting for the 2s tick
+      fa.elapse(const Duration(seconds: 2));
+      expect(polls, 3); // back on the normal cadence, single loop
+    });
+  });
+
   test('send forwards to the backend; leave clears', () {
     fakeAsync((FakeAsync fa) {
       final ProviderContainer c = container();

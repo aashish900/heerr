@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:heerr/models/jam.dart';
-import 'package:heerr/models/subsonic/song.dart';
 import 'package:heerr/providers/jam_host.dart';
 import 'package:heerr/providers/jam_remote.dart';
 import 'package:heerr/screens/jam_screen.dart';
@@ -116,43 +114,19 @@ void main() {
     await t.pump();
     expect(remote.joinedWith, 'k7q2mx');
     expect(find.text("Controlling aashish's phone"), findsOneWidget);
-    expect(find.text('Nothing playing'), findsOneWidget);
   });
 
-  testWidgets('joined view shows host now-playing and sends transport', (
+  testWidgets('joined view offers Now Playing and Leave', (
     WidgetTester t,
   ) async {
-    final _FakeRemote remote = _FakeRemote(
-      JamRemoteStatus(
-        sessionId: 's1',
-        hostUsername: 'aashish',
-        hostState: JamState(
-          hostUsername: 'aashish',
-          ended: false,
-          state: <String, dynamic>{
-            'playing': true,
-            'position_ms': 30000,
-            'current': const Song(
-              id: 'a',
-              title: 'Tum Hi Ho',
-              duration: 260,
-            ).toJson(),
-            'queue': <dynamic>[
-              const Song(id: 'a', title: 'Tum Hi Ho').toJson(),
-              const Song(id: 'b', title: 'Kesariya').toJson(),
-            ],
-          },
-        ),
+    await _pump(
+      t,
+      null,
+      _FakeRemote(
+        const JamRemoteStatus(sessionId: 's1', hostUsername: 'aashish'),
       ),
     );
-    await _pump(t, null, remote);
-    expect(find.text('Tum Hi Ho'), findsOneWidget);
-    expect(find.text('Kesariya'), findsOneWidget); // up next
-    expect(find.byKey(const Key('jam-seek')), findsOneWidget);
-    await t.tap(find.byKey(const Key('jam-playpause')));
-    await t.tap(find.byKey(const Key('jam-next')));
-    await t.pump();
-    expect(remote.sent, <String>['pause', 'next']);
+    expect(find.byKey(const Key('jam-open-player')), findsOneWidget);
     await t.tap(find.byKey(const Key('jam-leave')));
     await t.pump();
     expect(find.byKey(const Key('jam-start')), findsOneWidget);

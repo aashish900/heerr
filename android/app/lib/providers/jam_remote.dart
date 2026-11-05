@@ -9,6 +9,7 @@ import '../services/backend_service.dart';
 part 'jam_remote.g.dart';
 
 const Duration _kDefaultJamRemotePollInterval = Duration(seconds: 2);
+const Duration _kRefreshAfterSend = Duration(milliseconds: 1200);
 
 /// Guest state-poll cadence. Overridable for `fake_async` tests.
 @Riverpod(keepAlive: true)
@@ -39,6 +40,8 @@ class JamRemoteStatus {
 class JamRemote extends _$JamRemote with WidgetsBindingObserver {
   Timer? _timer;
   bool _observing = false;
+  bool _inFlight = false;
+  bool _backgrounded = false;
 
   @override
   JamRemoteStatus? build() {
@@ -74,6 +77,12 @@ class JamRemote extends _$JamRemote with WidgetsBindingObserver {
       backendServiceProvider.future,
     );
     await backend.jamSend(s.sessionId, kind, payload ?? <String, dynamic>{});
+    // The host applies it within ~1s; refresh sooner than the 2s cadence so
+    // the UI catches up fast.
+    if (state?.sessionId == s.sessionId && !_inFlight && _timer != null) {
+      _timer!.cancel();
+      _timer = Timer(_kRefreshAfterSend, _tick);
+    }
   }
 
   @override
@@ -82,9 +91,12 @@ class JamRemote extends _$JamRemote with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState lifecycle) {
     if (state == null) return;
     if (lifecycle == AppLifecycleState.resumed) {
+      _backgrounded = false;
+      if (_inFlight) return; // its own reschedule resumes the loop
       _timer?.cancel();
       _tick();
     } else if (lifecycle == AppLifecycleState.paused) {
+      _backgrounded = true;
       _timer?.cancel();
       _timer = null;
     }
@@ -102,6 +114,7 @@ class JamRemote extends _$JamRemote with WidgetsBindingObserver {
   Future<void> _tick() async {
     final JamRemoteStatus? s = state;
     if (s == null) return;
+    _inFlight = true;
     try {
       final BackendService backend = await ref.read(
         backendServiceProvider.future,
@@ -120,7 +133,10 @@ class JamRemote extends _$JamRemote with WidgetsBindingObserver {
     } catch (_) {
       // Transient (tailnet blip): keep the last snapshot, keep polling.
       if (state?.sessionId != s.sessionId) return;
+    } finally {
+      _inFlight = false;
     }
+    if (_backgrounded) return;
     _timer = Timer(ref.read(jamRemotePollIntervalProvider), _tick);
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 
 import '../models/jam.dart';
@@ -34,7 +36,9 @@ Future<void> runJamCommand(
         await handler.addQueueItems(items);
       }
     case 'play':
-      await handler.play();
+      // Not awaited: just_audio's play() completes only on pause/stop/end,
+      // which would stall the host sync loop for the whole track.
+      unawaited(handler.play());
     case 'pause':
       await handler.pause();
     case 'next':

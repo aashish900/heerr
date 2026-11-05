@@ -409,7 +409,7 @@ class _SyncedLyricsState extends State<_SyncedLyrics> {
 
 /// Full-screen lyrics view (drag-up / "pulled up" state): drag-down /
 /// chevron to dismiss, album-art thumbnail in the top-left corner, big bold
-/// auto-scrolling lyrics. Watches [playerSnapshotProvider] itself so it stays
+/// auto-scrolling lyrics. Watches [displaySnapshotProvider] itself so it stays
 /// current across track changes, with its own 250 ms ticker for position.
 class _ExpandedLyricsSheet extends ConsumerStatefulWidget {
   const _ExpandedLyricsSheet({required this.tintColor});
@@ -454,7 +454,7 @@ class _ExpandedLyricsSheetState extends ConsumerState<_ExpandedLyricsSheet> {
     // line is pink regardless of the cover's extracted colour.
     const Color accent = heerrMagenta;
     final PlayerSnapshot? snap =
-        ref.watch(playerSnapshotProvider).valueOrNull;
+        ref.watch(displaySnapshotProvider).valueOrNull;
     final MediaItem? item = snap?.item;
 
     return ClipRRect(

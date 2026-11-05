@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../player/heerr_audio_handler.dart';
+import '../player/jam_display.dart';
 import '../player/player_provider.dart';
 import '../providers/player/art_palette.dart';
 import '../theme.dart';
@@ -42,7 +43,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer> {
   @override
   Widget build(BuildContext context) {
     final AsyncValue<PlayerSnapshot> snap =
-        ref.watch(playerSnapshotProvider);
+        ref.watch(displaySnapshotProvider);
     final PlayerSnapshot? s = snap.valueOrNull;
     final MediaItem? item = s?.item;
     if (s == null || item == null) {
@@ -205,14 +206,7 @@ class _PlayPauseButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return InkWell(
       customBorder: const CircleBorder(),
-      onTap: () {
-        final HeerrAudioHandler handler = ref.read(audioHandlerProvider);
-        if (playing) {
-          handler.pause();
-        } else {
-          handler.play();
-        }
-      },
+      onTap: () => playerTransport(ref, playing ? 'pause' : 'play'),
       child: Container(
         width: 40,
         height: 40,

@@ -15,12 +15,14 @@ import '../../offline/offline_manifest.dart';
 import '../../offline/offline_marker.dart';
 import '../../player/episode_to_media_item.dart';
 import '../../player/heerr_audio_handler.dart';
+import '../../player/jam_display.dart';
 import '../../player/player_provider.dart';
 import '../../player/sleep_timer.dart';
 import '../../player/song_to_media_item.dart';
 import '../../providers/library/favourites.dart';
 import '../../providers/library/lyrics.dart';
 import '../../providers/library/playlist_mutations.dart';
+import '../../providers/jam_remote.dart';
 import '../../providers/podcasts/podcast_subscriptions.dart';
 import '../../providers/queue.dart';
 import '../../router.dart';
@@ -120,7 +122,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   }
 
   void _openAddToPlaylist(BuildContext context) {
-    final MediaItem? item = ref.read(playerSnapshotProvider).valueOrNull?.item;
+    final MediaItem? item = ref.read(displaySnapshotProvider).valueOrNull?.item;
     final Song? song = item == null ? null : songFromMediaItem(item);
     if (song == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -195,7 +197,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final AsyncValue<PlayerSnapshot> snap = ref.watch(playerSnapshotProvider);
+    final AsyncValue<PlayerSnapshot> snap = ref.watch(displaySnapshotProvider);
 
     return Scaffold(
       body: snap.when(
@@ -218,7 +220,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               onSeekStart: (Duration d) => setState(() => _scrubOverride = d),
               onSeekUpdate: (Duration d) => setState(() => _scrubOverride = d),
               onSeekEnd: (Duration d) {
-                ref.read(audioHandlerProvider).seek(d);
+                playerTransport(ref, 'seek', position: d);
                 setState(() => _scrubOverride = null);
               },
               onQueueTap: () => _openQueueSheet(context),
@@ -289,12 +291,13 @@ class _Header extends StatelessWidget {
               ),
             ),
           ),
-          // NOWPLAYING.md §2.3: disabled placeholder — no output-routing
-          // feature exists yet; visual parity with the mockup only.
-          const GlassIconButton(
-            icon: Icons.speaker_outlined,
-            tooltip: 'Audio device',
-            onPressed: null,
+          // NOWPLAYING.md §2.3 slot, now the Phase JM entry point: host or
+          // join a jam session (remote control between phones).
+          GlassIconButton(
+            key: const Key('now-playing-jam'),
+            icon: Icons.speaker_group,
+            tooltip: 'Jam session',
+            onPressed: () => context.push(Routes.jam),
           ),
         ],
       ),
