@@ -187,7 +187,7 @@ The guest extrapolates the playback position on its own: `position_ms + (now - u
 - Gate: `poetry run pytest` green.
 - Commit: `feat(backend): JM1 — jam_session / jam_command schema`
 
-### [ ] JM2. Backend: session lifecycle endpoints
+### [x] JM2. Backend: session lifecycle endpoints
 - New `backend/app/schemas/jam.py` and `backend/app/api/v1/jam.py`. Wire it in `router.py`.
 - `POST /jam`, `DELETE /jam/{id}`, `POST /jam/join`. Code generation uses `secrets.choice` over the unambiguous alphabet, retrying on a unique-index collision.
 - Tests in `backend/tests/test_jam.py`:

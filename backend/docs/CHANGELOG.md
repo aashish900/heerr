@@ -1096,3 +1096,9 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 - **`backend/alembic/versions/0015_jam.py`** — new tables `jam_session` (host FK, code, `state` JSONB, `expires_at`, `ended_at`; partial unique index on `code` and partial index on `host_user_id`, both `WHERE ended_at IS NULL`) and `jam_command` (bigserial cursor id, session FK `ON DELETE CASCADE`, sender FK, `kind` CHECK, `payload` JSONB default `{}`, index `(session_id, id)`). Downgrade drops both.
 - **`backend/app/models/jam.py`** — `JamSession`, `JamCommand`, `JAM_COMMAND_KINDS`; exported from `app/models/__init__.py`.
 - **`backend/tests/test_migration_0015.py`** — active-code uniqueness, ended session frees its code, kind CHECK, cascade delete, downgrade/upgrade round trip. Suite 652 passed.
+
+## 2026-11-05 — JM2: jam session create / join / end
+
+- **`backend/app/api/v1/jam.py`** (new, wired in `app/api/v1/router.py`) — `POST /api/v1/jam` (201; ends the caller's prior live session; 6-char code from an unambiguous alphabet via `secrets.choice`, savepoint retry on partial-unique collision; 12h TTL), `DELETE /api/v1/jam/{id}` (204; 403 non-host, 404 unknown), `POST /api/v1/jam/join` (case-insensitive code; 404 unknown/ended/expired, 409 own session). All `require_scope("read")`.
+- **`backend/app/schemas/jam.py`** (new) — `JamCreateResponse`, `JamJoinRequest`, `JamJoinResponse`.
+- **`backend/tests/test_jam.py`** (new) — 9 tests (create, replace, join, wrong/expired code, own-session 409, end + 403, unknown 404, 401). Suite 661 passed.

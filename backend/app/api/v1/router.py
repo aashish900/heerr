@@ -5,6 +5,7 @@ from app.api.v1 import (
     auth,
     download,
     health,
+    jam,
     library,
     podcasts,
     preview,
@@ -30,3 +31,4 @@ api_v1.include_router(settings.router)
 api_v1.include_router(profile.router)
 api_v1.include_router(admin.router)
 api_v1.include_router(podcasts.router)
+api_v1.include_router(jam.router)
