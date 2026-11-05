@@ -1031,7 +1031,7 @@ Working breakdown: `/PLAN.md` (JM0–JM9). A guest phone controls playback on th
 ### [x] JM5. Host command executor + poller
 **Files:** `lib/player/jam_executor.dart`, `lib/providers/jam_host.dart`. **Commit:** `feat(flutter): JM5 — jam host command executor`.
 
-### [ ] JM6. Jam screen (idle + hosting) + Settings entry
+### [x] JM6. Jam screen (idle + hosting) + Settings entry
 **Files:** `lib/screens/jam_screen.dart`, `lib/router.dart`, `lib/screens/settings/settings_screen.dart`. **Commit:** `feat(flutter): JM6 — jam host screen`.
 
 ### [ ] JM7. Background-polling spike (real device)

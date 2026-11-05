@@ -225,7 +225,7 @@ The guest extrapolates the playback position on its own: `position_ms + (now - u
   - poller: with `fake_async`, commands run in order and one at a time; the cursor advances; `ended` stops polling; an error keeps polling.
 - Commit: `feat(flutter): JM5 — jam host command executor`
 
-### [ ] JM6. Android: Jam screen (idle + hosting) + Settings entry
+### [x] JM6. Android: Jam screen (idle + hosting) + Settings entry
 - New `screens/jam_screen.dart` (idle and hosting states). Add `Routes.jam` and a `GoRoute` in `router.dart`. Add the "Remote control" section in `screens/settings/settings_screen.dart`.
 - Widget tests: idle shows Start and Join; Start shows the code; Stop goes back to idle.
 - Commit: `feat(flutter): JM6 — jam host screen`

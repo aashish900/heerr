@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../models/recommend_health.dart';
 import '../../offline/delete_recursive_with_retry.dart';
@@ -13,6 +14,7 @@ import '../../offline/offline_size_estimator.dart';
 import '../../offline/offline_sync.dart';
 import '../../providers/recommendations.dart';
 import '../../providers/server_creds.dart';
+import '../../router.dart';
 import '../../theme.dart';
 import '../../widgets/branded_header.dart';
 import '../../widgets/error_snackbar.dart';
@@ -74,11 +76,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _OfflineSection(),
               SettingsSectionHeader('Recommendations'),
               SettingsGroupCard(children: <Widget>[_RecommendationsSection()]),
+              SettingsSectionHeader('Remote control'),
+              SettingsGroupCard(children: <Widget>[_JamTile()]),
               AboutFooter(),
             ]),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Phase JM entry point: opens the jam session screen.
+class _JamTile extends StatelessWidget {
+  const _JamTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsTile(
+      icon: Icons.speaker_group,
+      title: 'Jam session',
+      subtitle: 'Let a friend control playback on this phone',
+      onTap: () => context.push(Routes.jam),
     );
   }
 }

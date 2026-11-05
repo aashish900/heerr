@@ -11,6 +11,7 @@ import 'providers/library/library_search_query.dart';
 import 'providers/profiles/profile_registry.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/downloads/downloads_screen.dart';
+import 'screens/jam_screen.dart';
 import 'screens/job_detail_screen.dart';
 import 'screens/library/album_detail_screen.dart';
 import 'screens/library/artist_detail_screen.dart';
@@ -45,6 +46,8 @@ class Routes {
   static const String profile = '/profile';
   static const String profileEdit = '/profile/edit';
   static const String editServerDetails = '/edit-server-details';
+  // Phase JM: jam session (remote control). Top-level push, like /player.
+  static const String jam = '/jam';
 
   // Library detail (Subsonic via Navidrome). Nested under the library
   // route so the URL shape and the navigation hierarchy match.
@@ -226,6 +229,11 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
         path: '/player',
         builder: (BuildContext context, GoRouterState state) =>
             const NowPlayingScreen(),
+      ),
+      GoRoute(
+        path: Routes.jam,
+        builder: (BuildContext context, GoRouterState state) =>
+            const JamScreen(),
       ),
       // Podcasts Discover (PC2, #53) — top-level push, same as Now Playing.
       // No nav-tab entry point yet (PC3 wires that in); reachable via
