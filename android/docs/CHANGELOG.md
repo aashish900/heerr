@@ -3370,3 +3370,7 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 ## 2026-11-05 — v5.6.3: Home layout fix
 
 - Version bump `5.6.2` -> `5.6.3` across all five sync locations per `/CLAUDE.md` §3. Ships Play All + JAM beside the greeting (entry above). Backend unchanged from 5.6.2 (still required for the jam long-poll).
+
+## 2026-11-05 — JM9 ticked: two-phone smoke passed on v5.6.3
+
+- Owner reported the jam feature working end to end on v5.6.3 (two phones, backend 5.6.2+). `/PLAN.md` and `android/docs/ROADMAP.md` JM9 ticked; `/PLAN.md` §5.2 notes the long-poll / Now Playing changes that superseded the original polling design (staleness rule). JM7 (5-min paused-host check) not explicitly confirmed — left open.

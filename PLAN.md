@@ -97,6 +97,8 @@ jam_command
 
 ### 5.2 API (all under `/api/v1/jam`, all `require_scope("read")`)
 
+> **Superseded in part (v5.6.2):** 1s/2s polling was replaced by long-polls (`sync` `wait_s`, `GET /state?since=&wait_s=`) plus host `PUT /jam/{id}/state` pushes, and guest controls moved onto Now Playing + the mini-player (v5.6.1). See `android/docs/DECISIONLOG.md` 2026-11-05 and `backend/README.md` for the current contract.
+
 | Method | Path | Caller | Body | Returns | Errors |
 |---|---|---|---|---|---|
 | POST | `/jam` | host | — | `{id, code, expires_at}` | ends any prior active session of the caller |
@@ -247,7 +249,8 @@ The guest extrapolates the playback position on its own: `position_ms + (now - u
   - widget test for the joined screen
 - Commit: `feat(flutter): JM8 — jam guest remote`
 
-### [ ] JM9. End-to-end smoke + docs + version 5.6.0
+### [x] JM9. End-to-end smoke + docs + version 5.6.0
+- Done 2026-11-05: docs + 5.6.0 bump shipped; two-phone smoke reported working by the owner on v5.6.3 (after the 5.6.1 loop-stall fix and the 5.6.2 long-poll).
 - Two real phones (two Navidrome users, guest via a Tailscale node share), host on the DHU:
   - play now, enqueue, pause/play, next/prev, seek
   - host Stop → the guest sees "Session ended"
