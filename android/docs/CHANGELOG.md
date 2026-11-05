@@ -3297,3 +3297,10 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - **`/PLAN.md`** — new, repo root: Jam / remote-control plan (JM0–JM9), spans backend + android.
 - Stale pointers scrubbed (CLAUDE.md staleness rule): `android/CLAUDE.md` (plan pointer -> `/PLAN.md`, polling ref -> DECISIONLOG/CONTEXT), `android/README.md` (§11 ref, docs tree row, `lib/` tree pointer, further-reading bullet), `android/docs/CONTEXT.md` (backend contract + polling refs -> DECISIONLOG), `android/docs/ROADMAP.md` (SH/AA breakdown + backlog refs -> git history, PC files list, drift reminder), root `README.md` (dead `backend/docs/PLAN.md` refs, further-reading row -> `/PLAN.md`).
 - Left intact: CHANGELOG/DECISIONLOG history and code comments citing `PLAN.md` §8/§9 (frozen-in-time references; same policy as backend D2).
+
+## 2026-11-05 — JM4: jam API client
+
+- **`android/app/lib/models/jam.dart`** (new, freezed + generated `.freezed.dart`/`.g.dart`) — `JamSession`, `JamJoin`, `JamCommand`, `JamSyncResponse`, `JamState`, mirroring `backend/app/schemas/jam.py`.
+- **`android/app/lib/api/endpoints.dart`** — `jam`, `jamJoin`, `jamSession(id)`, `jamCommands(id)`, `jamSync(id)`, `jamState(id)`.
+- **`android/app/lib/services/backend_service.dart`** — `jamCreate`, `jamEnd`, `jamJoin`, `jamSend`, `jamSync` (always sends `after`, null = cursor bootstrap), `jamState`, all through `apiCall`.
+- **`android/app/test/services/backend_service_jam_test.dart`** (new) — 6 scripted-adapter tests.

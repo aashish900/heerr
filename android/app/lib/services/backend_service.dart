@@ -12,6 +12,7 @@ import '../models/episode_download_response.dart';
 import '../models/episode_feed_response.dart';
 import '../models/episode_list_response.dart';
 import '../models/episode_progress.dart';
+import '../models/jam.dart';
 import '../models/job_view.dart';
 import '../models/podcast_channel.dart';
 import '../models/queue_response.dart';
@@ -321,6 +322,75 @@ class BackendService {
         data: <String, dynamic>{'position_s': positionS, 'played': played},
       ),
       (dynamic data) => EpisodeProgress.fromJson(data as Map<String, dynamic>),
+    );
+  }
+
+  /// Phase JM: `POST /jam` → start a jam session hosted by this phone (ends
+  /// any previous one server-side).
+  Future<JamSession> jamCreate() {
+    return apiCall<JamSession>(
+      () => _dio.post<dynamic>(Endpoints.jam),
+      (dynamic data) => JamSession.fromJson(data as Map<String, dynamic>),
+    );
+  }
+
+  /// `DELETE /jam/{id}` → host ends the session.
+  Future<void> jamEnd(String sessionId) {
+    return apiCall<void>(
+      () => _dio.delete<dynamic>(Endpoints.jamSession(sessionId)),
+      (dynamic _) {},
+    );
+  }
+
+  /// `POST /jam/join` → guest joins a live session by its code.
+  Future<JamJoin> jamJoin(String code) {
+    return apiCall<JamJoin>(
+      () => _dio.post<dynamic>(
+        Endpoints.jamJoin,
+        data: <String, String>{'code': code},
+      ),
+      (dynamic data) => JamJoin.fromJson(data as Map<String, dynamic>),
+    );
+  }
+
+  /// `POST /jam/{id}/commands` → guest sends one command; returns its id.
+  Future<int> jamSend(
+    String sessionId,
+    String kind, [
+    Map<String, dynamic> payload = const <String, dynamic>{},
+  ]) {
+    return apiCall<int>(
+      () => _dio.post<dynamic>(
+        Endpoints.jamCommands(sessionId),
+        data: <String, dynamic>{'kind': kind, 'payload': payload},
+      ),
+      (dynamic data) => (data as Map<String, dynamic>)['id'] as int,
+    );
+  }
+
+  /// `POST /jam/{id}/sync` → host stores its [state] snapshot and receives
+  /// commands newer than [after]. `after == null` bootstraps the cursor
+  /// without returning (stale) commands.
+  Future<JamSyncResponse> jamSync(
+    String sessionId, {
+    required Map<String, dynamic>? state,
+    required int? after,
+  }) {
+    return apiCall<JamSyncResponse>(
+      () => _dio.post<dynamic>(
+        Endpoints.jamSync(sessionId),
+        data: <String, dynamic>{'state': state, 'after': after},
+      ),
+      (dynamic data) =>
+          JamSyncResponse.fromJson(data as Map<String, dynamic>),
+    );
+  }
+
+  /// `GET /jam/{id}/state` → guest reads the host's latest snapshot.
+  Future<JamState> jamState(String sessionId) {
+    return apiCall<JamState>(
+      () => _dio.get<dynamic>(Endpoints.jamState(sessionId)),
+      (dynamic data) => JamState.fromJson(data as Map<String, dynamic>),
     );
   }
 }

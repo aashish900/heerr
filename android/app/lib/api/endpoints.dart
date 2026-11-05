@@ -85,4 +85,17 @@ class Endpoints {
 
   static String podcastEpisodeProgress(String episodeId) =>
       '/podcasts/episodes/$episodeId/progress';
+
+  /// Phase JM (jam / remote control): `POST /jam` starts a host session,
+  /// `POST /jam/join` joins one by code. See `backend/app/api/v1/jam.py`.
+  static const String jam = '/jam';
+  static const String jamJoin = '/jam/join';
+
+  static String jamSession(String sessionId) => '/jam/$sessionId';
+
+  static String jamCommands(String sessionId) => '/jam/$sessionId/commands';
+
+  static String jamSync(String sessionId) => '/jam/$sessionId/sync';
+
+  static String jamState(String sessionId) => '/jam/$sessionId/state';
 }

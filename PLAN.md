@@ -210,7 +210,7 @@ The guest extrapolates the playback position on its own: `position_ms + (now - u
 - Gate: a manual curl round trip with two tokens, documented in `backend/README.md` (create → join → command → sync).
 - Commit: `feat(backend): JM3 — jam command relay + host state`
 
-### [ ] JM4. Android: models + BackendService methods
+### [x] JM4. Android: models + BackendService methods
 - New `android/app/lib/models/jam.dart` (freezed): `JamSession`, `JamJoin`, `JamCommand`, `JamSyncResponse`, `JamState`.
 - `services/backend_service.dart`: add `jamCreate`, `jamEnd`, `jamJoin`, `jamSend`, `jamSync`, `jamState`, all through `apiCall`.
 - Run codegen: `cd android/app && dart run build_runner build --delete-conflicting-outputs`.

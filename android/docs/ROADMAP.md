@@ -1025,7 +1025,7 @@ Working breakdown: `/PLAN.md` (JM0–JM9). A guest phone controls playback on th
 ### [x] JM0. ADRs + roadmap
 **Commit:** `docs: JM0 — jam remote-control ADRs + roadmap`.
 
-### [ ] JM4. Jam API client
+### [x] JM4. Jam API client
 **Files:** `lib/models/jam.dart`, `lib/services/backend_service.dart`. **Commit:** `feat(flutter): JM4 — jam API client`.
 
 ### [ ] JM5. Host command executor + poller
