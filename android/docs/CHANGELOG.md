@@ -3358,3 +3358,7 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 
 - **`android/app/lib/screens/home/home_screen.dart`** — new `_JamButton` (outlined magenta stadium, `Icons.group_outlined`, "JAM", 46dp tall like Play All; opens `/jam`). `_GreetingRow` is now a `Wrap` (greeting, then Play All + JAM): when greeting + both pills don't fit on one line the pills drop under the greeting instead of squeezing it. Verified with real-Roboto renders at 412dp and 360dp (nickname "Aashish"): the pills wrap under the greeting at both widths — the mockup's side-by-side layout doesn't fit a phone with the current greeting size.
 - **`android/app/test/screens/home/home_screen_test.dart`** — +1 test (JAM right of Play All, same row, opens `/jam`). `flutter test` 1189 passed, `flutter analyze` clean.
+
+## 2026-11-05 — v5.6.2: jam latency + Home JAM pill
+
+- Version bump `5.6.1` -> `5.6.2` across all five sync locations per `/CLAUDE.md` §3. Ships the jam long-poll / state push / optimistic guest UI and the Home JAM pill (entries above). Requires the 5.6.2 backend. JM7 / JM9 device checks still open.

@@ -1127,3 +1127,7 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 - **`backend/tests/test_jam.py`** — +7 long-poll tests (early return on command / end / newer state, timeout, PUT host-only, wait cap 422). Suite 682 passed.
 - **`backend/README.md`**, **`backend/docs/CONTEXT.md`** — endpoint table + jam description updated.
 - **Compatibility:** the new app sends `wait_s`, which the 5.6.1 schema rejects (`extra="forbid"` → 422). Backend must be redeployed with the app.
+
+## 2026-11-05 — v5.6.2: jam long-poll
+
+- Version bump `5.6.1` -> `5.6.2` across all five sync locations per `/CLAUDE.md` §3. Ships the jam long-poll endpoints (entry above). Deploy before installing the 5.6.2 app: the app sends `wait_s`, which 5.6.1 rejects with 422.
