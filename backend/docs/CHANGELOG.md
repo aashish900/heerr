@@ -1090,3 +1090,9 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 - **User-reported:** v5.3.6 still 502'd (googlevideo 403 on the first fetch). Replaying the proxy's request in the container with the resolved URL: yt-dlp headers + `bytes=0-4194303` → 403, `bytes=0-1048575` → 206 (same with and without yt-dlp headers) — so the limit is range size, not headers.
 - **`backend/app/api/v1/preview.py`** — `_CHUNK` 4 MiB → 1 MiB with a comment recording the measurement (the earlier "yt-dlp chunks at 10 MiB" comment was wrong for these URLs). Backend suite 647 passed; ruff clean.
 - Version bump `5.3.6` → `5.3.7` across all five sync locations per `/CLAUDE.md` §3.
+
+## 2026-11-05 — JM1: jam_session / jam_command schema
+
+- **`backend/alembic/versions/0015_jam.py`** — new tables `jam_session` (host FK, code, `state` JSONB, `expires_at`, `ended_at`; partial unique index on `code` and partial index on `host_user_id`, both `WHERE ended_at IS NULL`) and `jam_command` (bigserial cursor id, session FK `ON DELETE CASCADE`, sender FK, `kind` CHECK, `payload` JSONB default `{}`, index `(session_id, id)`). Downgrade drops both.
+- **`backend/app/models/jam.py`** — `JamSession`, `JamCommand`, `JAM_COMMAND_KINDS`; exported from `app/models/__init__.py`.
+- **`backend/tests/test_migration_0015.py`** — active-code uniqueness, ended session frees its code, kind CHECK, cascade delete, downgrade/upgrade round trip. Suite 652 passed.

@@ -536,7 +536,7 @@ Each item carries channel `id`/`title`/`image_url` so the client can render the 
 
 Working breakdown: `/PLAN.md` (JM0–JM9). Backend relays guest commands to the host phone via REST polling; Android side is in `android/docs/ROADMAP.md` Phase JM.
 
-### [ ] JM1. `jam_session` / `jam_command` schema
+### [x] JM1. `jam_session` / `jam_command` schema
 **Files:** `alembic/versions/0015_jam.py`, `app/models/jam.py`, migration test. **Commit:** `feat(backend): JM1 — jam_session / jam_command schema`.
 
 ### [ ] JM2. Session create / join / end

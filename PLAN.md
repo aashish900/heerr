@@ -180,7 +180,7 @@ The guest extrapolates the playback position on its own: `position_ms + (now - u
 - Gate: user reviews the assumptions in §4.
 - Commit: `docs: JM0 — jam remote-control ADRs + roadmap`
 
-### [ ] JM1. Backend: migration + models
+### [x] JM1. Backend: migration + models
 - New `backend/alembic/versions/0015_jam.py` (`down_revision="0014"`), schema as in §5.1, with a working downgrade.
 - New `backend/app/models/jam.py` (`JamSession`, `JamCommand`), exported from `backend/app/models/__init__.py`.
 - Tests: `backend/tests/test_migration_0015.py` (upgrade/downgrade and constraints: bad `kind` rejected, partial unique `code`, cascade delete). Extend `backend/tests/test_models_match_schema.py` if it enumerates models.
