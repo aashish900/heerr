@@ -116,12 +116,15 @@ jobs:
       # #36: bake the release tag into the APK's versionName (and a
       # monotonic versionCode from the run number) so the in-app "App
       # version" line in Settings shows the tag the build shipped as,
-      # not whatever pubspec `version:` happened to say.
+      # not whatever pubspec `version:` happened to say. The +1000 offset
+      # (2026-11-05) keeps CI codes above hand-numbered local sideload
+      # builds (those reached 172 during Phase AA while run_number was 169,
+      # so the CI APK was refused as a downgrade).
       - name: Build release APK
         run: |
           flutter build apk --release \
             --build-name="${GITHUB_REF_NAME#v}" \
-            --build-number="${{ github.run_number }}"
+            --build-number="$((1000 + ${{ github.run_number }}))"
 
       # Play Console only accepts App Bundles — the APK above is for direct
       # installs (GitHub / Obtainium); this AAB is the Play upload artifact.
@@ -130,7 +133,7 @@ jobs:
         run: |
           flutter build appbundle --release \
             --build-name="${GITHUB_REF_NAME#v}" \
-            --build-number="${{ github.run_number }}"
+            --build-number="$((1000 + ${{ github.run_number }}))"
 
       - name: Rename artifacts (embed version in filenames)
         run: |

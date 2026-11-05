@@ -1469,3 +1469,13 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Why:** User choice ("Reuse Now Playing look"). One player UI to maintain; the guest sees the host's song with the app's normal art/gradient/controls. Host `PlaybackState` is rebuilt with `updateTime = now`, so the existing 250ms ticker extrapolates position from snapshot arrival — immune to host/guest clock skew.
 
 **Alternatives considered:** restyling the separate Jam page — rejected by user; making the global `playerSnapshotProvider` jam-aware — rejected: home cards, album "now playing" highlights and the home-screen widget would silently switch to the host too.
+
+## 2026-11-05 — CI APK versionCode = 1000 + run number
+
+**Context:** The v5.6.0 CI APK (versionCode 169 = `github.run_number`) was refused on the owner's Pixel as a downgrade: hand-numbered local release builds during Phase AA had reached 172 (`CHANGELOG.md` 2026-11-04, "release 5.5.0+171/+172"). Owner uninstalled to recover (local data lost).
+
+**Decision:** `.github/workflows/android-publish.yml` stamps `--build-number=$((1000 + run_number))` for both the APK and the AAB.
+
+**Why:** Every future CI build outranks any plausible hand-numbered local build; still monotonic, so Play Console uploads keep working. Local sideload builds should stay below 1000.
+
+**Alternatives considered:** deriving the code from the semver (e.g. 50601) — breaks if a tag is re-released or two builds share a version; manual `+N` in `pubspec.yaml` — easy to forget, same collision risk.

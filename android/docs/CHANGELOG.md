@@ -3340,3 +3340,8 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - **`lib/screens/jam_screen.dart`** — guest view reduced to status + "Open Now Playing" + Leave (old inline now-playing/transport/seek removed).
 - **`lib/providers/jam_remote.dart`** — after a send, re-polls host state after 1.2s instead of waiting for the 2s tick; in-flight / backgrounded guards so a send or app resume can't start a second poll loop, and a tick finishing while backgrounded doesn't reschedule.
 - Tests: `test/player/jam_display_test.dart` (new, 4), `jam_remote_test.dart` (+1), `jam_screen_test.dart` (joined view updated). `flutter test` 1184 passed, `flutter analyze` clean.
+
+## 2026-11-05 — v5.6.1: jam fixes + CI versionCode offset
+
+- Version bump `5.6.0` -> `5.6.1` across all five sync locations per `/CLAUDE.md` §3.
+- **`.github/workflows/android-publish.yml`** — APK + AAB `--build-number` is now `1000 + github.run_number` (see DECISIONLOG 2026-11-05). Fixes the v5.6.0 "cannot install older version (172 -> 169)" sideload refusal for future releases.

@@ -1115,3 +1115,7 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 - Version bump `5.5.0` -> `5.6.0` across all five sync locations per `/CLAUDE.md` §3 (`backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml`, both ROADMAP status lines).
 - **`backend/docs/CONTEXT.md`** — jam relay facts (tables, endpoints, polling, pairing/authz, guest node-share prerequisite).
 - Released ahead of the JM7/JM9 two-phone smoke so the image can be deployed for it; fixes found there ship as 5.6.x.
+
+## 2026-11-05 — v5.6.1: version sync only
+
+- Version bump `5.6.0` -> `5.6.1` (`backend/pyproject.toml`, `backend/app/main.py`) for the Android jam fix release; no backend code changes.
