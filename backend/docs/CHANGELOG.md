@@ -1131,3 +1131,7 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 ## 2026-11-05 — v5.6.2: jam long-poll
 
 - Version bump `5.6.1` -> `5.6.2` across all five sync locations per `/CLAUDE.md` §3. Ships the jam long-poll endpoints (entry above). Deploy before installing the 5.6.2 app: the app sends `wait_s`, which 5.6.1 rejects with 422.
+
+## 2026-11-05 — v5.6.3: version sync only
+
+- Version bump `5.6.2` -> `5.6.3` (`backend/pyproject.toml`, `backend/app/main.py`) for the Android Home layout fix; no backend code changes.
