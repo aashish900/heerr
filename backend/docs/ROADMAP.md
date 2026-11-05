@@ -542,7 +542,7 @@ Working breakdown: `/PLAN.md` (JM0–JM9). Backend relays guest commands to the 
 ### [x] JM2. Session create / join / end
 **Files:** `app/schemas/jam.py`, `app/api/v1/jam.py`, `router.py`, `tests/test_jam.py`. **Commit:** `feat(backend): JM2 — jam session create/join/end`.
 
-### [ ] JM3. Command relay + host sync + state
+### [x] JM3. Command relay + host sync + state
 **Files:** `app/api/v1/jam.py`, `tests/test_jam.py`, `README.md` curl round-trip. **Commit:** `feat(backend): JM3 — jam command relay + host state`.
 
 ---

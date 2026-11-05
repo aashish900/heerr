@@ -10,14 +10,24 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_scope
 from app.db import get_session
-from app.models import JamSession, Token, User
-from app.schemas.jam import JamCreateResponse, JamJoinRequest, JamJoinResponse
+from app.models import JamCommand, JamSession, Token, User
+from app.schemas.jam import (
+    JamCommandCreated,
+    JamCommandItem,
+    JamCommandRequest,
+    JamCreateResponse,
+    JamJoinRequest,
+    JamJoinResponse,
+    JamStateResponse,
+    JamSyncRequest,
+    JamSyncResponse,
+)
 
 router = APIRouter(prefix="/jam", tags=["jam"])
 
@@ -107,4 +117,82 @@ async def join_session(
         id=js.id,
         host_username=await _username(session, js.host_user_id),
         expires_at=js.expires_at,
+    )
+
+
+@router.post(
+    "/{session_id}/commands",
+    status_code=status.HTTP_201_CREATED,
+    response_model=JamCommandCreated,
+)
+async def send_command(
+    session_id: UUID,
+    req: JamCommandRequest,
+    session: AsyncSession = Depends(get_session),
+    tok: Token = Depends(require_scope("read")),
+) -> JamCommandCreated:
+    # Knowing the session id (only handed out by /join) is the guest's authz.
+    js = await _get_session_or_404(session, session_id)
+    if not _is_active(js):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="jam session ended")
+    cmd = JamCommand(
+        session_id=js.id, sender_user_id=tok.user_id, kind=req.kind, payload=req.payload
+    )
+    session.add(cmd)
+    await session.flush()
+    return JamCommandCreated(id=cmd.id)
+
+
+@router.post("/{session_id}/sync", response_model=JamSyncResponse)
+async def host_sync(
+    session_id: UUID,
+    req: JamSyncRequest,
+    session: AsyncSession = Depends(get_session),
+    tok: Token = Depends(require_scope("read")),
+) -> JamSyncResponse:
+    js = await _get_session_or_404(session, session_id)
+    _require_host(js, tok)
+    if not _is_active(js):
+        return JamSyncResponse(commands=[], cursor=req.after or 0, ended=True)
+
+    if req.state is not None:
+        js.state = req.state
+        js.state_at = datetime.now(UTC)
+
+    if req.after is None:
+        cursor = await session.scalar(
+            select(func.coalesce(func.max(JamCommand.id), 0)).where(JamCommand.session_id == js.id)
+        )
+        return JamSyncResponse(commands=[], cursor=cursor or 0, ended=False)
+
+    rows = (
+        await session.execute(
+            select(JamCommand, User.navidrome_username)
+            .join(User, User.id == JamCommand.sender_user_id)
+            .where(JamCommand.session_id == js.id, JamCommand.id > req.after)
+            .order_by(JamCommand.id)
+        )
+    ).all()
+    commands = [
+        JamCommandItem(id=c.id, kind=c.kind, payload=c.payload, sender=name) for c, name in rows
+    ]
+    return JamSyncResponse(
+        commands=commands,
+        cursor=commands[-1].id if commands else req.after,
+        ended=False,
+    )
+
+
+@router.get("/{session_id}/state", response_model=JamStateResponse)
+async def get_state(
+    session_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    tok: Token = Depends(require_scope("read")),
+) -> JamStateResponse:
+    js = await _get_session_or_404(session, session_id)
+    return JamStateResponse(
+        state=js.state,
+        state_at=js.state_at,
+        host_username=await _username(session, js.host_user_id),
+        ended=not _is_active(js),
     )

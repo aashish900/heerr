@@ -1102,3 +1102,10 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 - **`backend/app/api/v1/jam.py`** (new, wired in `app/api/v1/router.py`) — `POST /api/v1/jam` (201; ends the caller's prior live session; 6-char code from an unambiguous alphabet via `secrets.choice`, savepoint retry on partial-unique collision; 12h TTL), `DELETE /api/v1/jam/{id}` (204; 403 non-host, 404 unknown), `POST /api/v1/jam/join` (case-insensitive code; 404 unknown/ended/expired, 409 own session). All `require_scope("read")`.
 - **`backend/app/schemas/jam.py`** (new) — `JamCreateResponse`, `JamJoinRequest`, `JamJoinResponse`.
 - **`backend/tests/test_jam.py`** (new) — 9 tests (create, replace, join, wrong/expired code, own-session 409, end + 403, unknown 404, 401). Suite 661 passed.
+
+## 2026-11-05 — JM3: jam command relay + host sync + guest state
+
+- **`backend/app/api/v1/jam.py`** — `POST /jam/{id}/commands` (201; 404 unknown/ended/expired), `POST /jam/{id}/sync` (host only, 403 otherwise; stores the state snapshot, returns commands with `id > after` ordered by id plus sender username; `after: null` bootstraps the cursor to the current max so stale commands never replay; ended/expired → `ended: true`), `GET /jam/{id}/state`.
+- **`backend/app/schemas/jam.py`** — `JamCommandRequest` with a payload validator (`play_songs`/`enqueue`: 1–500 songs each with a string `id`, `start_index` in range; `seek`: non-negative `position_ms`; other kinds normalised to `{}`), `JamSyncRequest/Response`, `JamCommandItem`, `JamStateResponse`.
+- **`backend/tests/test_jam.py`** — +14 tests (relay + cursor, bootstrap skips stale, non-host sync 403, state round trip, ended session, 8 bad-payload cases, unknown session). Suite 675 passed.
+- **`backend/README.md`** — jam endpoint table + curl round trip. Not yet run against the home server (deploy pending).

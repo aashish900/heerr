@@ -361,6 +361,39 @@ curl -X POST http://localhost:8000/api/v1/admin/jobs/<job_id>/retry \
 # → 200 JobView (state reset to "queued", attempt_count++)
 ```
 
+#### Jam / remote control (phase JM, `read` scope)
+
+A guest phone sends playback commands; the host phone polls them. Full design: `/PLAN.md` §5.
+
+| Method | Path | Caller | Body | Returns |
+|---|---|---|---|---|
+| `POST` | `/api/v1/jam` | host | — | `201 {id, code, expires_at}`; ends the host's previous session |
+| `DELETE` | `/api/v1/jam/{id}` | host | — | `204`; `403` non-host; `404` unknown |
+| `POST` | `/api/v1/jam/join` | guest | `{code}` | `200 {id, host_username, expires_at}`; `404` unknown/ended/expired; `409` own session |
+| `POST` | `/api/v1/jam/{id}/commands` | guest | `{kind, payload}` | `201 {id}`; `404` inactive; `422` bad shape |
+| `POST` | `/api/v1/jam/{id}/sync` | host | `{state, after}` | `200 {commands, cursor, ended}`; `after: null` returns only the cursor; `403` non-host |
+| `GET` | `/api/v1/jam/{id}/state` | guest | — | `200 {state, state_at, host_username, ended}` |
+
+`kind`: `play_songs {songs, start_index?}`, `enqueue {songs}`, `seek {position_ms}`, `play`, `pause`, `next`, `prev` (`{}`). `songs` = 1–500 Subsonic song objects, each with a string `id`.
+
+Round trip (two users' tokens):
+
+```bash
+B=http://localhost:8000/api/v1
+curl -s -X POST $B/jam -H "Authorization: Bearer $HOST_TOKEN"
+# → {"id":"<sid>","code":"K7Q2MX",…}
+curl -s -X POST $B/jam/join -H "Authorization: Bearer $GUEST_TOKEN" \
+  -H "Content-Type: application/json" -d '{"code":"K7Q2MX"}'
+curl -s -X POST $B/jam/<sid>/sync -H "Authorization: Bearer $HOST_TOKEN" \
+  -H "Content-Type: application/json" -d '{"state":null,"after":null}'
+# → {"commands":[],"cursor":0,"ended":false}
+curl -s -X POST $B/jam/<sid>/commands -H "Authorization: Bearer $GUEST_TOKEN" \
+  -H "Content-Type: application/json" -d '{"kind":"pause","payload":{}}'
+curl -s -X POST $B/jam/<sid>/sync -H "Authorization: Bearer $HOST_TOKEN" \
+  -H "Content-Type: application/json" -d '{"state":null,"after":0}'
+# → {"commands":[{"id":1,"kind":"pause","payload":{},"sender":"<guest>"}],"cursor":1,"ended":false}
+```
+
 ### Error format
 
 FastAPI default `{"detail": "…"}` for now. A structured `{"error","code"}` envelope is deferred until there's a UI consumer that needs machine-readable codes.

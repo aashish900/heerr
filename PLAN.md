@@ -198,7 +198,7 @@ The guest extrapolates the playback position on its own: `position_ms + (now - u
   - a non-host DELETE → 403
 - Commit: `feat(backend): JM2 — jam session create/join/end`
 
-### [ ] JM3. Backend: commands + sync + state
+### [x] JM3. Backend: commands + sync + state
 - `POST /jam/{id}/commands`, `POST /jam/{id}/sync`, `GET /jam/{id}/state`, following §5.2 (payload validation, the `after=null` cursor bootstrap, the `ended` flag).
 - Tests:
   - a guest command shows up in the host's `sync` with `after`, and `after=cursor` returns nothing
