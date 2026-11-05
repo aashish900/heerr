@@ -14,7 +14,7 @@ In order:
 5. `android/docs/CHANGELOG.md` (per-task history)
 
 For operational lookup: `android/README.md`.
-For the locked v1 contract: `android/docs/PLAN.md`.
+For the current feature plan: `/PLAN.md` (repo root). Locked decisions live in `docs/DECISIONLOG.md`.
 For the build sequence: `android/docs/ROADMAP.md`.
 
 ---
@@ -25,7 +25,7 @@ For the build sequence: `android/docs/ROADMAP.md`.
 - **Connectivity is Tailscale-only.** App reaches the backend via the host's tailnet IP / MagicDNS name. There is no public ingress; the user enters the backend URL in Settings.
 - **Multi-user via Navidrome IdP only.** As of v3.0.0 (Phase S), the app supports multiple on-device profiles, but identity is delegated to Navidrome through the backend's `POST /api/v1/auth/login` shim — no other Sign-In-With-X providers (Google, Apple, or any other third-party account, etc.) are permitted. The bearer token is either minted by the backend CLI (legacy installs) or by the login IdP shim; the device pastes it into Settings once per profile. Biometric token unlock is still out of scope.
 - **Android-only.** iOS is out of scope (no Xcode / Apple Developer / CocoaPods). Don't suggest Cupertino widgets, iOS-specific plugins, or iOS deployment steps. (See `/CLAUDE.md` §3.)
-- **Polling, not streaming.** The backend exposes REST endpoints only — no WebSocket / SSE. The queue + job-detail screens poll on a timer (see `docs/PLAN.md` "Polling cadence").
+- **Polling, not streaming.** The backend exposes REST endpoints only — no WebSocket / SSE. The queue + job-detail screens poll on a timer (see `docs/DECISIONLOG.md` and `docs/CONTEXT.md`).
 
 ---
 

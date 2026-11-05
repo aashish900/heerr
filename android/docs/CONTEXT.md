@@ -20,7 +20,7 @@ A native Android app where the user (single-user, single-device) searches the on
 
 ## Backend dependency
 
-REST endpoints under `/api/v1` (see `backend/docs/PLAN.md` for the frozen contract):
+REST endpoints under `/api/v1` (see `backend/docs/DECISIONLOG.md` and the backend's OpenAPI docs):
 
 | Method | Path | Scope | Use |
 |---|---|---|---|
@@ -56,7 +56,7 @@ Since the 2026-07-11 Home redesign the Now Playing chrome (Home hero card + Mini
 3. **Queue** — active + recent jobs, polled every 3s. Tap-through to detail.
 4. **Job detail** — single job's status (state, started_at, finished_at, output_path, error_msg). Polled every 2s while state is `queued` or `running`; stops polling once `done`/`failed`.
 
-Polling cadences and error semantics are locked in `PLAN.md`.
+Polling cadences and error semantics are locked in `DECISIONLOG.md`.
 
 ## Polling cadence (locked)
 

@@ -919,7 +919,7 @@ Design doc: `backend/docs/PODCASTS.md`. Scope locked by owner: **full podcast mo
 **Commit:** `feat(flutter): PC4 — podcast episode download via Sync Center (#53)`
 
 ### [x] PC5. Player integration + progress sync + docs/version
-**Backend prereq:** P6. **Files:** `lib/audio/*` (episode `MediaItem` builder — 4th URI kind), progress-reporter, `DECISIONLOG.md` ADR, `PLAN.md` update, `CHANGELOG.md`, version files (`/CLAUDE.md` §3), this ROADMAP status line.
+**Backend prereq:** P6. **Files:** `lib/audio/*` (episode `MediaItem` builder — 4th URI kind), progress-reporter, `DECISIONLOG.md` ADR, `CHANGELOG.md`, version files (`/CLAUDE.md` §3), this ROADMAP status line.
 **Deliverable:** New `MediaItem` kind for episodes alongside file / subsonic / preview (see Cross-cutting "MediaItem.id is the playback URI"): `file://` when downloaded, else the backend `/podcasts/episodes/{id}/audio?token=` (Range-capable, seek/resume) or public enclosure URL; `extras['episodeId']` to distinguish. Throttled progress `PUT` (~every 15 s + on pause/stop/seek-end) and resume-from-position on open. Docs + `v5.0.0`.
 **Test gate:** unit test — episode `MediaItem` builder produces the right id per state; progress reporter throttles + fires on pause/stop. Analyze + full `flutter test` green.
 **Smoke (on-device):** subscribe → download an episode → play offline with seek/resume; stream an undownloaded episode; kill + reopen resumes at saved position; progress reflected on the episode row.
@@ -971,7 +971,7 @@ Design doc: `~/Downloads/ChatGPT Image Jul 20, 2026, 07_29_43 PM.png` ("heerr �
 
 ## Phase SH — Home "Shuffle all" (client-only, v5.4.0)
 
-Working breakdown lives in `android/docs/PLAN.md` (temp file; S0–S8).
+Working breakdown lived in `android/docs/PLAN.md` (S0–S8; removed, see `git show abcf16b:android/docs/PLAN.md`).
 
 ### [x] SH1. Home "Shuffle all" button (full library)
 **Backend prereq:** none (client-only). Navidrome `search3` with an empty query pages the whole library — verified on the home server 2026-11-04 (500 + 500 + 16 = 1016 songs). **Files:** `android/app/lib/services/subsonic_library_service.dart` (`getAllSongs`), `android/app/lib/player/playback_actions.dart` (`playShuffledInChunks`, `songsForShuffleAll`, `shuffleAllSongsFromSubsonic`), `android/app/lib/screens/home/home_screen.dart` (`_GreetingRow` + `_ShuffleAllButton`), tests under `test/services/`, `test/player/`, `test/screens/home/`.
@@ -984,7 +984,7 @@ Working breakdown lives in `android/docs/PLAN.md` (temp file; S0–S8).
 
 ## Phase AA — Android Auto (client-only, v5.5.0)
 
-Working breakdown lives in `android/docs/PLAN.md` (AA1–AA10). Media app via the existing `audio_service` MediaBrowserService; tested on the Desktop Head Unit (DHU) only, sideloaded (no Play Store).
+Working breakdown lived in `android/docs/PLAN.md` (AA1–AA10; removed 2026-11-05, see `git show 814c2f8:android/docs/PLAN.md`). Media app via the existing `audio_service` MediaBrowserService; tested on the Desktop Head Unit (DHU) only, sideloaded (no Play Store).
 
 ### [x] AA1. Manifest descriptor
 **Files:** `res/xml/automotive_app_desc.xml`, `AndroidManifest.xml` (`com.google.android.gms.car.application`), `android/README.md` (DHU setup). **Smoke:** heerr listed in the DHU launcher. **Commit:** `feat(flutter): AA1 — Android Auto manifest descriptor`.
@@ -1008,7 +1008,7 @@ Car bind cold-starts the process + Flutter engine + `main()`; findings in DECISI
 `search` / `playFromSearch` via `search3`; empty query -> shuffle-all. Skipped by user decision 2026-11-04.
 
 ### [x] AA8. Now-playing polish — verified, no code
-Backlog from it: custom shuffle/repeat/favourite actions, white-square Stop control, cold-start `restoreQueue` race. See PLAN.md.
+Backlog from it: custom shuffle/repeat/favourite actions, white-square Stop control, cold-start `restoreQueue` race. See `git show 814c2f8:android/docs/PLAN.md`.
 
 ### [x] AA9. Docs + version
 `v5.5.0` in the five sync locations; this phase; CONTEXT note. **Commit:** `chore: bump version to 5.5.0 (Android Auto)`.
@@ -1026,7 +1026,7 @@ Release build: tabs, drill-downs, play, skip/seek, cold start, VPN-down Download
 - **No `print` in production code** — `debugPrint` only.
 - **No `.env` files for the app** — all credentials live in `flutter_secure_storage`.
 - **No backend change from Android phases** — each Android phase is a pure-client slice; any required backend endpoints ship in the corresponding backend roadmap first.
-- **DECISIONLOG drift:** any contract / stack change → update `DECISIONLOG.md` + `PLAN.md` in the same commit (CLAUDE.md staleness rule).
+- **DECISIONLOG drift:** any contract / stack change → update `DECISIONLOG.md` in the same commit (CLAUDE.md staleness rule).
 - **Owner-only edits** — any new playlist mutation affordance added later must honour the `canEdit(Playlist, SettingsValue)` gate.
 - **`MediaItem.id` is the playback URI** — one of three kinds: `file://` when local (offline), the Subsonic stream URL when streaming a library track, or the heerr `/preview/stream?...&token=` proxy URL for an online-search preview (Phase T, built by `searchResultToMediaItem`). Any deviation breaks offline playback. Preview items also carry `extras['preview'] == true` (vs `extras['subsonicId']` for library tracks) — use `isPreviewMediaItem` to tell them apart.
 

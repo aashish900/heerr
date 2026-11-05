@@ -125,7 +125,7 @@ All under `/api/v1`. JSON in/out. `Authorization: Bearer <raw-token>` on every e
 | `POST` | `/admin/tokens` | admin flag | CLI-equivalent token mint |
 | `POST` | `/admin/jobs/{id}/retry` | admin flag | Re-queue a `failed` job; bumps `attempt_count` |
 
-Frozen contract with full request/response shapes and error envelope: [`backend/docs/PLAN.md`](backend/docs/PLAN.md).
+Full request/response shapes: the backend's OpenAPI docs; contract decisions: [`backend/docs/DECISIONLOG.md`](backend/docs/DECISIONLOG.md).
 
 ---
 
@@ -203,13 +203,12 @@ Full project-wide rules: [`CLAUDE.md`](CLAUDE.md).
 |---|---|
 | [`backend/README.md`](backend/README.md) | Install, run, curl examples, env-var reference, CLI |
 | [`backend/docs/CONTEXT.md`](backend/docs/CONTEXT.md) | Server environment, architecture decisions, hard constraints |
-| [`backend/docs/PLAN.md`](backend/docs/PLAN.md) | Frozen API contract — endpoint shapes, scopes, error envelope |
 | [`backend/docs/ROADMAP.md`](backend/docs/ROADMAP.md) | A1–H1 milestones and current status |
 | [`backend/docs/DECISIONLOG.md`](backend/docs/DECISIONLOG.md) | All backend ADRs |
 | [`backend/docs/CHANGELOG.md`](backend/docs/CHANGELOG.md) | Per-task change log |
 | [`android/README.md`](android/README.md) | Flutter dev commands, release build + signing, sideload instructions |
 | [`android/docs/CONTEXT.md`](android/docs/CONTEXT.md) | App architecture, screen contract, polling cadences, error UX |
-| [`android/docs/PLAN.md`](android/docs/PLAN.md) | Frozen UI contract — screens, widgets, routing, test scope |
+| [`PLAN.md`](PLAN.md) | Current feature plan (cross-app) |
 | [`android/docs/ROADMAP.md`](android/docs/ROADMAP.md) | A1–G1 milestones and current status |
 | [`android/docs/DECISIONLOG.md`](android/docs/DECISIONLOG.md) | All Android ADRs (Riverpod, polling-not-WebSocket, secure storage, etc.) |
 | [`android/docs/CHANGELOG.md`](android/docs/CHANGELOG.md) | Per-task change log |

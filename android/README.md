@@ -30,7 +30,7 @@ Native Android app: search the online music catalog, dispatch downloads to the h
 3. Tap a result → backend dispatches the download (`/download`) → Navidrome auto-indexes the file on the home server within ~1 min.
 4. Queue + job-detail screens poll `/queue` and `/status/{id}` to show what's in flight.
 
-What it explicitly does **not** do (see `docs/PLAN.md` §11): third-party music-service SDK / OAuth on device, push notifications, biometric unlock, light theme, iOS port, admin endpoints, internationalisation.
+What it explicitly does **not** do (see `docs/DECISIONLOG.md`): third-party music-service SDK / OAuth on device, push notifications, biometric unlock, light theme, iOS port, admin endpoints, internationalisation.
 
 ---
 
@@ -71,7 +71,6 @@ android/
 ├── CLAUDE.md              ← Claude rules
 ├── docs/
 │   ├── CONTEXT.md         project brief
-│   ├── PLAN.md            frozen v1 contract
 │   ├── ROADMAP.md         milestone sequence
 │   ├── DECISIONLOG.md     ADRs
 │   └── CHANGELOG.md       per-task history
@@ -87,7 +86,6 @@ android/
     └── test/
 ```
 
-See `docs/PLAN.md` §2 for the full annotated `lib/` tree.
 
 ---
 
@@ -225,7 +223,6 @@ If `key.properties` is missing, Gradle silently falls back to the debug key. Tha
 
 - `CLAUDE.md` — Android-client Claude rules.
 - `docs/CONTEXT.md` — env, target device, what the app does NOT do, user background.
-- `docs/PLAN.md` — locked v1 contract (stack, layout, API, routing, theme, polling, errors, tests, scope).
 - `docs/ROADMAP.md` — A1 → G1 milestones.
 - `docs/DECISIONLOG.md` — ADRs (Riverpod choice, polling-not-WebSocket, etc.).
 - `docs/CHANGELOG.md` — per-task history.
