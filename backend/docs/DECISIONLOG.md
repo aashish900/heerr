@@ -562,3 +562,15 @@ Sub-decisions locked across J1–J10:
 - **Document a manual `chown` step in the README instead of an init container** — rejected: `/data/postgres` already proved the init-container pattern is more reliable than a docs-only instruction (operators forget manual steps; `docker compose up` can't forget a `depends_on`).
 
 **Reference:** `docker-compose.snippet.yml` (`heerr-podcasts-init` service + `heerr-backend`'s `depends_on`), `backend/docs/CONTEXT.md` (deployment-shape bullet list, updated in the same commit per the staleness rule).
+
+## 2026-11-05 — Jam / remote control: backend relays commands via REST polling
+
+**Context:** A passenger wants to control heerr playback on the driver's phone (on Android Auto) from their own phone, without handling the driver's phone. The guest must reach something; connectivity is Tailscale-only (`/CLAUDE.md` §3).
+
+**Decision:** The heerr backend relays commands. New tables `jam_session` (host, 6-char code, latest host state snapshot, 12h TTL) and `jam_command` (bigserial cursor, kind, JSON payload). Guest `POST /jam/{id}/commands`; host polls `POST /jam/{id}/sync` every ~1s, which stores its state and returns commands after a cursor; guest polls `GET /jam/{id}/state`. Authz = any `read`-scoped token that knows an active code (no participant table). The guest reaches the server through a Tailscale node share and logs in with their own Navidrome account (Phase J).
+
+**Why:** Reuses existing auth, per-user tokens and the shared Navidrome library (song ids are identical on both phones). Postgres is already the queue substrate (`backend/CLAUDE.md`: no Redis/queues); a 1s poll is trivial load for one session.
+
+**Alternatives considered:** phone-to-phone over hotspot/Bluetooth (no tailnet needed, but requires an on-phone server, discovery, and contends with wireless Android Auto's Wi-Fi) — rejected by user; WebSocket/SSE push — rejected (polling contract, `android/CLAUDE.md`); in-memory command queue — rejected (lost on restart, breaks with >1 worker).
+
+**Reference:** `/PLAN.md` §5.

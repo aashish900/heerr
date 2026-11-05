@@ -1018,6 +1018,33 @@ Release build: tabs, drill-downs, play, skip/seek, cold start, VPN-down Download
 
 ---
 
+## Phase JM — Jam / remote control (v5.6.0)
+
+Working breakdown: `/PLAN.md` (JM0–JM9). A guest phone controls playback on the host phone through the backend (backend prereq: JM1–JM3 in `backend/docs/ROADMAP.md`).
+
+### [x] JM0. ADRs + roadmap
+**Commit:** `docs: JM0 — jam remote-control ADRs + roadmap`.
+
+### [ ] JM4. Jam API client
+**Files:** `lib/models/jam.dart`, `lib/services/backend_service.dart`. **Commit:** `feat(flutter): JM4 — jam API client`.
+
+### [ ] JM5. Host command executor + poller
+**Files:** `lib/player/jam_executor.dart`, `lib/providers/jam_host.dart`. **Commit:** `feat(flutter): JM5 — jam host command executor`.
+
+### [ ] JM6. Jam screen (idle + hosting) + Settings entry
+**Files:** `lib/screens/jam_screen.dart`, `lib/router.dart`, `lib/screens/settings/settings_screen.dart`. **Commit:** `feat(flutter): JM6 — jam host screen`.
+
+### [ ] JM7. Background-polling spike (real device)
+Host paused 5 min, screen off: a guest command still executes. **Commit (if code changes):** `fix(flutter): JM7 — keep jam host polling while paused`.
+
+### [ ] JM8. Guest mode (join, routing, remote controls, banner)
+**Files:** `lib/providers/jam_remote.dart`, `lib/player/playback_actions.dart`, `lib/screens/jam_screen.dart`, shell banner. **Commit:** `feat(flutter): JM8 — jam guest remote`.
+
+### [ ] JM9. Two-phone smoke + docs + v5.6.0
+**Commit:** `chore: bump version to 5.6.0 (jam remote control)`.
+
+---
+
 ## Cross-cutting reminders
 
 - **`flutter analyze` green before declaring any milestone done.**

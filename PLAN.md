@@ -174,7 +174,7 @@ The guest extrapolates the playback position on its own: `position_ms + (now - u
 
 ## 7. Tasks
 
-### [ ] JM0. Docs: ADRs + roadmap entry (no code)
+### [x] JM0. Docs: ADRs + roadmap entry (no code)
 - `backend/docs/DECISIONLOG.md` and `android/docs/DECISIONLOG.md`, one ADR each (2026-11-05): backend relay over phone-to-phone; REST polling at a 1s host cadence instead of push; code-only pairing; Song JSON in the payload instead of `getSong`.
 - `backend/docs/ROADMAP.md` and `android/docs/ROADMAP.md`: add "Phase JM — Jam / remote control (v5.6.0)" with the JM1–JM9 headings and a pointer to `/PLAN.md`.
 - Gate: user reviews the assumptions in §4.

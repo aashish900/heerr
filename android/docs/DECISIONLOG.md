@@ -1441,3 +1441,21 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Alternatives considered:** paging via `getChildren` options — deferred (library fits under the cap today); a separate native Kotlin browse service — rejected (AA2: Dart runs headless).
 
 **Reference:** `android/app/lib/player/browse_tree.dart`, `android/app/lib/player/heerr_audio_handler.dart::getChildren`.
+
+## 2026-11-05 — Jam / remote control: host polls the backend; guest sends full Song JSON; code-only pairing
+
+**Context:** Phase JM lets a guest phone control playback on the host phone (see backend DECISIONLOG 2026-11-05 for the relay design).
+
+**Decision:**
+- Host runs a keepAlive Riverpod poller (template `providers/queue.dart`) at 1s while a session is active, executing commands strictly in order, each awaited (the handler's `_isLoadingSource` guard drops overlapping loads). On (re)start the cursor bootstraps to the latest command id, so stale commands never replay.
+- Guest routes the existing play/queue wrappers in `player/playback_actions.dart` to the backend while joined; online previews and shuffle-all stay local-only.
+- Command payloads carry full `Song` JSON (freezed `toJson`); the host builds the `MediaItem` with its own creds via `songItem` (local file if downloaded, else stream URL).
+- Pairing: host shows a 6-char code; guest types it. No QR.
+
+**Why:** Polling is the client contract (no push). Song JSON avoids adding `getSong.view` plus a round trip per song. Code entry needs no new dependencies.
+
+**Alternatives considered:** id-only payload + `getSong` on the host — more requests, more code; QR pairing (`qr_flutter` + `mobile_scanner`) — backlog.
+
+**Open risk:** with `androidStopForegroundOnPause: true` (`lib/main.dart`), a paused host may stop polling; verified/fixed in JM7.
+
+**Reference:** `/PLAN.md` §4–§5.
