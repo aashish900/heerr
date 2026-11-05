@@ -3353,3 +3353,8 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - **`android/app/lib/services/backend_service.dart`** — `jamSync(waitS:)`, `jamPushState`, `jamState(since:, waitS:)`.
 - Tests: `jam_host_test.dart` rewritten (5, incl. push debounce/dedupe/seek), `jam_remote_test.dart` rewritten (6, incl. optimistic UI), `backend_service_jam_test.dart` +3. `flutter test` 1188 passed, `flutter analyze` clean.
 - **`android/docs/CONTEXT.md`** — jam section updated for long-poll/push.
+
+## 2026-11-05 — Home: JAM pill next to Play All (mockup "Neon Music App Home Dashboard")
+
+- **`android/app/lib/screens/home/home_screen.dart`** — new `_JamButton` (outlined magenta stadium, `Icons.group_outlined`, "JAM", 46dp tall like Play All; opens `/jam`). `_GreetingRow` is now a `Wrap` (greeting, then Play All + JAM): when greeting + both pills don't fit on one line the pills drop under the greeting instead of squeezing it. Verified with real-Roboto renders at 412dp and 360dp (nickname "Aashish"): the pills wrap under the greeting at both widths — the mockup's side-by-side layout doesn't fit a phone with the current greeting size.
+- **`android/app/test/screens/home/home_screen_test.dart`** — +1 test (JAM right of Play All, same row, opens `/jam`). `flutter test` 1189 passed, `flutter analyze` clean.

@@ -53,6 +53,10 @@ GoRouter _testRouter() {
         path: '/profile',
         builder: (_, _) => const Scaffold(body: Text('Profile page')),
       ),
+      GoRoute(
+        path: '/jam',
+        builder: (_, _) => const Scaffold(body: Text('JAM_SCREEN')),
+      ),
     ],
   );
 }
@@ -134,6 +138,25 @@ void main() {
     await tester.tap(button);
     await tester.pumpAndSettle();
     expect(find.textContaining('Navidrome creds missing'), findsOneWidget);
+  });
+
+  testWidgets('JAM pill sits right of Play All and opens the jam screen',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(_wrap(overrides: _homeOverrides()));
+    await tester.pumpAndSettle();
+
+    final Finder jam = find.byKey(const Key('home-jam-button'));
+    expect(jam, findsOneWidget);
+    expect(find.text('JAM'), findsOneWidget);
+    final Offset j = tester.getCenter(jam);
+    final Offset p =
+        tester.getCenter(find.byKey(const Key('home-shuffle-all-button')));
+    expect(j.dx, greaterThan(p.dx));
+    expect((j.dy - p.dy).abs(), lessThan(1));
+
+    await tester.tap(jam);
+    await tester.pumpAndSettle();
+    expect(find.text('JAM_SCREEN'), findsOneWidget);
   });
 
   for (final String? nick in <String?>['Aashish', null]) {

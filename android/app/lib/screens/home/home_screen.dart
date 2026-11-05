@@ -232,20 +232,75 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
   }
 }
 
-/// Greeting on the left, "Shuffle all" on the right.
+/// Greeting on the left; "Play All" (shuffle) and "JAM" on the right. A
+/// [Wrap] so a narrow phone / long nickname drops the buttons under the
+/// greeting instead of squeezing the greeting to a sliver.
 class _GreetingRow extends StatelessWidget {
   const _GreetingRow();
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
-      children: <Widget>[
-        Expanded(child: GreetingBlock()),
-        Padding(
-          padding: EdgeInsets.only(right: 16),
-          child: _ShuffleAllButton(),
+    return const Padding(
+      padding: EdgeInsets.only(right: 16),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.end,
+        children: <Widget>[
+          GreetingBlock(),
+          Padding(
+            padding: EdgeInsets.only(left: 16, bottom: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                _ShuffleAllButton(),
+                SizedBox(width: 8),
+                _JamButton(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Mockup "JAM" pill (Phase JM): outlined magenta stadium, people icon.
+/// Opens the jam screen (host a session or join one).
+class _JamButton extends StatelessWidget {
+  const _JamButton();
+
+  @override
+  Widget build(BuildContext context) {
+    const Color fg = Colors.white;
+    return Tooltip(
+      message: 'Jam session',
+      child: InkWell(
+        key: const Key('home-jam-button'),
+        customBorder: const StadiumBorder(),
+        onTap: () => context.push(Routes.jam),
+        child: Container(
+          height: 46,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(23),
+            border: Border.all(color: heerrMagenta, width: 1.5),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Icon(Icons.group_outlined, color: heerrMagenta, size: 22),
+              const SizedBox(width: 6),
+              Text(
+                'JAM',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: fg,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ],
+          ),
         ),
-      ],
+      ),
     );
   }
 }
