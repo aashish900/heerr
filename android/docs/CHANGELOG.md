@@ -3362,3 +3362,7 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 ## 2026-11-05 — v5.6.2: jam latency + Home JAM pill
 
 - Version bump `5.6.1` -> `5.6.2` across all five sync locations per `/CLAUDE.md` §3. Ships the jam long-poll / state push / optimistic guest UI and the Home JAM pill (entries above). Requires the 5.6.2 backend. JM7 / JM9 device checks still open.
+
+## 2026-11-05 — Home: Play All + JAM beside the greeting (not below)
+
+- **`android/app/lib/screens/home/home_screen.dart`** — `_GreetingRow` back to a `Row` (bottom-aligned, as in the mockup): `GreetingBlock` wrapped in `FittedBox(scaleDown)` so it shrinks instead of wrapping when greeting + both pills exceed the width (user: pills must sit next to the greeting). Real-Roboto renders: 412dp ≈ full-size greeting; 360dp greeting scaled to fit, readable, no overflow.

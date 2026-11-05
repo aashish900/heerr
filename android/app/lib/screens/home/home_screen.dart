@@ -232,34 +232,36 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
   }
 }
 
-/// Greeting on the left; "Play All" (shuffle) and "JAM" on the right. A
-/// [Wrap] so a narrow phone / long nickname drops the buttons under the
-/// greeting instead of squeezing the greeting to a sliver.
+/// Greeting on the left; "Play All" (shuffle) and "JAM" on the right, bottom-
+/// aligned with the name line (mockup). Greeting + both pills don't fit a
+/// phone at natural size, so the greeting scales down instead of wrapping.
 class _GreetingRow extends StatelessWidget {
   const _GreetingRow();
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.only(right: 16),
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.end,
-        children: <Widget>[
-          GreetingBlock(),
-          Padding(
-            padding: EdgeInsets.only(left: 16, bottom: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                _ShuffleAllButton(),
-                SizedBox(width: 8),
-                _JamButton(),
-              ],
-            ),
+    return const Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: <Widget>[
+        Expanded(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.bottomLeft,
+            child: GreetingBlock(),
           ),
-        ],
-      ),
+        ),
+        Padding(
+          padding: EdgeInsets.only(right: 16, bottom: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              _ShuffleAllButton(),
+              SizedBox(width: 8),
+              _JamButton(),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
