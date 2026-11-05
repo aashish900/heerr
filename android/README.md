@@ -154,6 +154,14 @@ The CI workflow on `main` runs `flutter analyze` + `flutter test` for every PR t
 
 ---
 
+### Jam session guest setup (v5.6.0)
+
+To let a friend control playback on your phone (Settings -> Jam session):
+1. Create a Navidrome user for them (Navidrome web UI -> Settings -> Users -> +).
+2. Share the server with their tailnet: Tailscale admin console (https://login.tailscale.com/admin/machines) -> the heerr server -> ⋯ -> **Share...** -> invite their email. They accept and install Tailscale on their phone.
+3. They install the heerr APK and log in with the backend URL + their Navidrome user.
+4. You: Settings -> Jam session -> **Start session**. They: Settings -> Jam session -> type the code -> **Join session**.
+
 ## Building a release APK
 
 ### One-time setup — generate the signing keystore

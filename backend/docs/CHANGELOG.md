@@ -1109,3 +1109,9 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 - **`backend/app/schemas/jam.py`** — `JamCommandRequest` with a payload validator (`play_songs`/`enqueue`: 1–500 songs each with a string `id`, `start_index` in range; `seek`: non-negative `position_ms`; other kinds normalised to `{}`), `JamSyncRequest/Response`, `JamCommandItem`, `JamStateResponse`.
 - **`backend/tests/test_jam.py`** — +14 tests (relay + cursor, bootstrap skips stale, non-host sync 403, state round trip, ended session, 8 bad-payload cases, unknown session). Suite 675 passed.
 - **`backend/README.md`** — jam endpoint table + curl round trip. Not yet run against the home server (deploy pending).
+
+## 2026-11-05 — v5.6.0: jam / remote control (Phase JM)
+
+- Version bump `5.5.0` -> `5.6.0` across all five sync locations per `/CLAUDE.md` §3 (`backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml`, both ROADMAP status lines).
+- **`backend/docs/CONTEXT.md`** — jam relay facts (tables, endpoints, polling, pairing/authz, guest node-share prerequisite).
+- Released ahead of the JM7/JM9 two-phone smoke so the image can be deployed for it; fixes found there ship as 5.6.x.

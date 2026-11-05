@@ -99,6 +99,10 @@ Zero Flutter / Dart / mobile-app experience. Hand-hold every file path, every co
 
 heerr is an Android Auto **media app**: the `audio_service` MediaBrowserService (already exported) serves a browse tree, declared via `res/xml/automotive_app_desc.xml` + the `com.google.android.gms.car.application` manifest meta-data. A car bind cold-starts the app process and runs `main()`; `main.dart` attaches the `ProviderContainer` to `HeerrAudioHandler`, whose `getChildren` / `playFromMediaId` read the same cache-aware providers as the UI (`lib/player/browse_tree.dart`, `browse_play.dart`, `browse_ids.dart`). Tree: Recents, Favourites, Playlists, Albums, Artists, Downloaded (200 items per level). Not done: voice/search (backlog), custom shuffle/repeat buttons. Tested on the Desktop Head Unit only (setup in `android/README.md`); sideloaded builds need Android Auto developer mode -> "Unknown sources". No `androidx.car.app`.
 
+## Jam / remote control (v5.6.0)
+
+Settings -> Remote control -> Jam session. **Host** (`providers/jam_host.dart`): creates a session, shows a 6-char code, and every 1s syncs its player snapshot to the backend and runs returned guest commands in order through `player/jam_executor.dart` (songs arrive as `Song` JSON; the host builds `MediaItem`s with its own creds via `songItem`). **Guest** (`providers/jam_remote.dart`): joins by code; while joined, `player/playback_actions.dart` sends play / queue actions to the host instead of the local player (previews and shuffle-all blocked; podcasts stay local), the jam screen shows the host's now-playing + transport, and `widgets/jam_remote_banner.dart` sits above the mini-player. Polling only (no push). Guests need a Tailscale node share of the server and their own Navidrome user. Design: `/PLAN.md`.
+
 ## Out of scope for v1
 
 - Push notifications / FCM.

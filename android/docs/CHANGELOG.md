@@ -3325,3 +3325,9 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - **`android/app/lib/screens/jam_screen.dart`** — idle state gains "Join session" (code field); new joined state: host now-playing (cover, title, artist), seek slider (sends `seek` on release), prev / play-pause / next, next 10 queue items, Leave. Position shown as of the last poll (no extrapolation; host and guest clocks can differ).
 - **`android/app/lib/widgets/jam_remote_banner.dart`** (new) + **`android/app/lib/router.dart`** — "Controlling <host> · Leave" strip above the mini-player in the shell while joined; tap opens `/jam`.
 - Tests: `test/providers/jam_remote_test.dart` (5), `test/player/playback_actions_jam_test.dart` (6: routing, start index, 500 window, enqueue, preview + shuffle blocked, 404 leaves), `test/screens/jam_screen_test.dart` (+2: join, joined view + transport + leave). `flutter test` 1178 passed, `flutter analyze` clean.
+
+## 2026-11-05 — v5.6.0: jam / remote control (Phase JM)
+
+- Version bump `5.5.0` -> `5.6.0` across all five sync locations per `/CLAUDE.md` §3.
+- **`android/docs/CONTEXT.md`** — new "Jam / remote control (v5.6.0)" section. **`android/README.md`** — jam guest setup (Navidrome user, Tailscale node share, join flow).
+- JM7 (paused-host background polling) and JM9 (two-phone smoke) not yet run; their ROADMAP boxes stay open.
