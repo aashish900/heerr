@@ -232,7 +232,8 @@ The guest extrapolates the playback position on its own: `position_ms + (now - u
 - Widget tests: idle shows Start and Join; Start shows the code; Stop goes back to idle.
 - Commit: `feat(flutter): JM6 — jam host screen`
 
-### [ ] JM7. Spike: background polling on a real device (no feature code unless needed)
+### [x] JM7. Spike: background polling on a real device (no feature code unless needed)
+- Done 2026-11-05: owner ran the paused-host check on v5.6.3 (host paused + screen off ~5 min, guest Play resumed it). Passed; no code change needed — `androidStopForegroundOnPause: true` kept as is.
 - Host on the phone with the screen off, then playing → paused for 5 minutes. Watch `adb logcat` for the sync requests (backend access log as well).
 - If polling stops while paused: when a jam session is active, keep the foreground service alive (switch `androidStopForegroundOnPause` behaviour, or call `AudioService` to keep it). Record the result in the android DECISIONLOG.
 - Gate: a command sent during a 5-minute pause executes within about 2s.

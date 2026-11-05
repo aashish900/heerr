@@ -1493,3 +1493,13 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Why:** User choice. Expected host reaction ≈ one guest→backend round trip + one backend→host round trip (inference; not yet measured), and the guest sees the host's real state one push later. Fewer requests than 1s polling when idle (one per 8s each side).
 
 **Alternatives considered:** 300ms polling (≈12k req/h on the host) — rejected by user; in-process `asyncio.Event` wake-ups — rejected (breaks with >1 uvicorn worker, lost on restart); Postgres LISTEN/NOTIFY — deferred, the 100ms re-check is enough for a handful of sessions (`ponytail:` note in `backend/app/api/v1/jam.py`).
+
+## 2026-11-05 — JM7: keep `androidStopForegroundOnPause: true` during jam sessions
+
+**Context:** Open risk from the Phase JM plan: with `androidStopForegroundOnPause: true` (`lib/main.dart`), a paused host might lose its foreground service and stop polling, so a guest's "play" would never arrive.
+
+**Decision:** No change. Owner-run device check on v5.6.3 (host paused, screen off ~5 min, then guest Play) passed: the host's `sync` long-poll kept running and resumed playback.
+
+**Why:** Verified behaviour on the owner's device; keeping the foreground service alive while paused would cost battery and a persistent notification for no observed benefit.
+
+**Caveat:** One device, one ~5 min run. Aggressive OEM battery managers or much longer pauses are untested; if a host stops reacting after a long pause, revisit (keep the service alive while `jamHostProvider` is non-null).

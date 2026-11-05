@@ -3374,3 +3374,7 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 ## 2026-11-05 — JM9 ticked: two-phone smoke passed on v5.6.3
 
 - Owner reported the jam feature working end to end on v5.6.3 (two phones, backend 5.6.2+). `/PLAN.md` and `android/docs/ROADMAP.md` JM9 ticked; `/PLAN.md` §5.2 notes the long-poll / Now Playing changes that superseded the original polling design (staleness rule). JM7 (5-min paused-host check) not explicitly confirmed — left open.
+
+## 2026-11-05 — JM7 ticked: paused-host check passed (Phase JM complete)
+
+- Owner confirmed the 5-min paused-host / screen-off check on v5.6.3: guest Play still reached the host. `/PLAN.md` and `android/docs/ROADMAP.md` JM7 ticked; DECISIONLOG entry records keeping `androidStopForegroundOnPause: true`. No code change. All JM0–JM9 done.
