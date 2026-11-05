@@ -217,7 +217,7 @@ The guest extrapolates the playback position on its own: `position_ms + (now - u
 - Tests: model JSON round-trip; service methods against the existing dio-mock pattern in `android/app/test/services/`.
 - Commit: `feat(flutter): JM4 — jam API client`
 
-### [ ] JM5. Android: host executor + poller
+### [x] JM5. Android: host executor + poller
 - New `player/jam_executor.dart` (`runJamCommand`), following §5.4.
 - New `providers/jam_host.dart`: `start()`, `stop()`, the 1s loop, the cursor bootstrap, and in-order execution. Interval provider `jamHostPollInterval`.
 - Tests:

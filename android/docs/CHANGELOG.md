@@ -3304,3 +3304,9 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - **`android/app/lib/api/endpoints.dart`** — `jam`, `jamJoin`, `jamSession(id)`, `jamCommands(id)`, `jamSync(id)`, `jamState(id)`.
 - **`android/app/lib/services/backend_service.dart`** — `jamCreate`, `jamEnd`, `jamJoin`, `jamSend`, `jamSync` (always sends `after`, null = cursor bootstrap), `jamState`, all through `apiCall`.
 - **`android/app/test/services/backend_service_jam_test.dart`** (new) — 6 scripted-adapter tests.
+
+## 2026-11-05 — JM5: jam host command executor + poller
+
+- **`android/app/lib/player/jam_executor.dart`** (new) — `runJamCommand(cmd, handler, toItem)`: `play_songs` -> `playAll(items, startIndex)` (out-of-range index -> 0), `enqueue` -> `playAll` on an empty queue else `addQueueItems` (matches `addSongsToQueue`), `play`/`pause`/`next`/`prev`/`seek` -> handler methods; unknown kinds / malformed payloads ignored. `jamHostState(...)` builds the `/PLAN.md` §5.3 snapshot (Song JSON via `songFromMediaItem`, queue capped at 50 from the current index, non-Subsonic items skipped).
+- **`android/app/lib/providers/jam_host.dart`** (new, keepAlive) — `JamHost` notifier (`JamHostStatus?`, null = idle): `start()` creates the session and bootstraps the cursor (`after: null`), then a one-shot 1s `Timer` loop (`jamHostPollIntervalProvider`) syncs state, runs returned commands sequentially (each awaited; a failing command is skipped, not retried), advances the cursor; `ended` clears state and stops; sync errors are surfaced in `error` and polling continues; `stop()` best-effort `DELETE`s the session. Songs become `MediaItem`s via `play_core.songItem` with this phone's `serverCredsProvider`.
+- Tests: `android/app/test/player/jam_executor_test.dart` (7), `android/app/test/providers/jam_host_test.dart` (4, `fake_async`: ordering with a slow command, cursor advance, ended, error resilience, stop). `flutter test` 1162 passed, `flutter analyze` clean.
