@@ -22,6 +22,7 @@ import '../providers/library/library_artist.dart';
 import '../providers/library/library_playlist.dart';
 import '../providers/profiles/active_profile.dart';
 import '../providers/downloaded_songs.dart';
+import '../providers/jam_remote.dart';
 import '../providers/server_creds.dart';
 import '../services/subsonic_library_service.dart';
 import '../widgets/error_snackbar.dart';
@@ -73,12 +74,67 @@ void _errSnack(BuildContext context, Object e) {
 Future<MediaItem> _toMediaItem(WidgetRef ref, Song s, _Creds c) =>
     songItem(ref.read, s, url: c.url, user: c.user, pass: c.pass);
 
+/// Backend cap on songs per jam command (`MAX_SONGS_PER_COMMAND`).
+const int kJamMaxSongs = 500;
+
+/// JM8: while this phone controls a jam host, play / queue actions go to the
+/// host instead of the local player. Returns true when the action was routed
+/// (the caller must not touch the local player).
+Future<bool> _routedToJamHost(
+  WidgetRef ref,
+  BuildContext context,
+  String kind,
+  Map<String, dynamic> payload,
+) async {
+  final JamRemoteStatus? jam = ref.read(jamRemoteProvider);
+  if (jam == null) return false;
+  final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+  try {
+    await ref.read(jamRemoteProvider.notifier).send(kind, payload);
+    messenger.showSnackBar(SnackBar(
+      duration: kSnackBarDuration,
+      content: Text('Sent to ${jam.hostUsername}'),
+    ));
+  } on NotFoundError {
+    ref.read(jamRemoteProvider.notifier).leave();
+    messenger.showSnackBar(const SnackBar(
+      duration: kSnackBarDuration,
+      content: Text('Jam session ended — playing on this phone again.'),
+    ));
+  } catch (e) {
+    if (context.mounted) _errSnack(context, e);
+  }
+  return true;
+}
+
+/// JM8: actions that can't be sent to a jam host (online previews,
+/// shuffle-all). Returns true (and explains) when blocked.
+bool _blockedByJam(WidgetRef ref, BuildContext context) {
+  final JamRemoteStatus? jam = ref.read(jamRemoteProvider);
+  if (jam == null) return false;
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    duration: kSnackBarDuration,
+    content: Text('Not available while controlling ${jam.hostUsername}'),
+  ));
+  return true;
+}
+
+List<Map<String, dynamic>> _songsJson(Iterable<Song> songs) =>
+    <Map<String, dynamic>>[for (final Song s in songs) s.toJson()];
+
 /// Play a single Subsonic [Song]. Replaces the queue with just this song.
 Future<void> playSongFromSubsonic(
   WidgetRef ref,
   BuildContext context,
   Song song,
 ) async {
+  if (await _routedToJamHost(ref, context, 'play_songs', <String, dynamic>{
+    'songs': _songsJson(<Song>[song]),
+    'start_index': 0,
+  })) {
+    return;
+  }
+  if (!context.mounted) return;
   final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
   try {
     final _Creds? creds = await _resolveCreds(ref);
@@ -111,6 +167,7 @@ Future<void> playPreview(
   BuildContext context,
   SearchResultItem item,
 ) async {
+  if (_blockedByJam(ref, context)) return;
   final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
   try {
     final Profile? profile = ref.read(activeProfileProvider);
@@ -149,6 +206,12 @@ Future<void> addSongsToQueue(
   List<Song> songs,
 ) async {
   if (songs.isEmpty) return;
+  if (await _routedToJamHost(ref, context, 'enqueue', <String, dynamic>{
+    'songs': _songsJson(songs.take(kJamMaxSongs)),
+  })) {
+    return;
+  }
+  if (!context.mounted) return;
   final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
   try {
     final _Creds? creds = await _resolveCreds(ref);
@@ -196,6 +259,16 @@ Future<void> playAllSongsFromSubsonic(
       duration: kSnackBarDuration,
       content: Text('Nothing to play.'),
     ));
+    return;
+  }
+  // Over the per-command cap, send the window starting at the tapped song.
+  final bool windowed = songs.length > kJamMaxSongs;
+  if (await _routedToJamHost(ref, context, 'play_songs', <String, dynamic>{
+    'songs': _songsJson(
+      windowed ? songs.skip(startIndex).take(kJamMaxSongs) : songs,
+    ),
+    'start_index': windowed ? 0 : startIndex,
+  })) {
     return;
   }
   try {
@@ -269,6 +342,7 @@ Future<void> shuffleAllSongsFromSubsonic(
   WidgetRef ref,
   BuildContext context,
 ) async {
+  if (_blockedByJam(ref, context)) return;
   if (_shuffleAllBusy) return;
   _shuffleAllBusy = true;
   try {

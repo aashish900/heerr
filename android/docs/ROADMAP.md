@@ -1037,7 +1037,7 @@ Working breakdown: `/PLAN.md` (JM0–JM9). A guest phone controls playback on th
 ### [ ] JM7. Background-polling spike (real device)
 Host paused 5 min, screen off: a guest command still executes. **Commit (if code changes):** `fix(flutter): JM7 — keep jam host polling while paused`.
 
-### [ ] JM8. Guest mode (join, routing, remote controls, banner)
+### [x] JM8. Guest mode (join, routing, remote controls, banner)
 **Files:** `lib/providers/jam_remote.dart`, `lib/player/playback_actions.dart`, `lib/screens/jam_screen.dart`, shell banner. **Commit:** `feat(flutter): JM8 — jam guest remote`.
 
 ### [ ] JM9. Two-phone smoke + docs + v5.6.0

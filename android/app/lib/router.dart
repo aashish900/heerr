@@ -31,6 +31,7 @@ import 'screens/profile/profile_screen.dart';
 import 'screens/queue_screen.dart';
 import 'screens/recommendations_screen.dart';
 import 'screens/settings/settings_screen.dart';
+import 'widgets/jam_remote_banner.dart';
 import 'widgets/mini_player.dart';
 
 // Route paths — kept as constants so widget tests and link callers don't
@@ -424,6 +425,7 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
         bottomNavigationBar: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
+            const JamRemoteBanner(),
             const MiniPlayer(),
             NavigationBar(
               selectedIndex: currentIndex,

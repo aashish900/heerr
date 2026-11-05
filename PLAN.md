@@ -236,7 +236,7 @@ The guest extrapolates the playback position on its own: `position_ms + (now - u
 - Gate: a command sent during a 5-minute pause executes within about 2s.
 - Commit (only if code changed): `fix(flutter): JM7 — keep jam host polling while paused`
 
-### [ ] JM8. Android: guest mode (join, routing, remote controls, banner)
+### [x] JM8. Android: guest mode (join, routing, remote controls, banner)
 - New `providers/jam_remote.dart`: join/leave plus the 2s state poll with lifecycle pause/resume.
 - Guards in `player/playback_actions.dart`: `playSongFromSubsonic`, `addSongsToQueue` and `playAllSongsFromSubsonic` route to `jamSend`; `playPreview` and `shuffleAllSongsFromSubsonic` show the not-available snackbar.
 - The joined state of `jam_screen.dart`: now-playing, extrapolated progress, transport, queue preview, Leave, and the "Session ended" handling.
