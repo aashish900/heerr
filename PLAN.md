@@ -200,7 +200,7 @@ Backend first, TDD (`backend/CLAUDE.md`, `android/CLAUDE.md`):
    ```
 - Commit: `feat(flutter): MX6 mix data layer`.
 
-### [ ] MX7. Android: `playPreviews` and the mix screen
+### [x] MX7. Android: `playPreviews` and the mix screen
 1. Tests first:
    - `test/player/playback_actions_previews_test.dart`: maps N items to N preview `MediaItem`s, calls `playAll` with `startIndex`, and is blocked during a jam
    - `test/screens/mixes/mix_screen_test.dart`:

@@ -12,6 +12,7 @@ import 'providers/profiles/profile_registry.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/downloads/downloads_screen.dart';
 import 'screens/jam_screen.dart';
+import 'screens/mixes/mix_screen.dart';
 import 'screens/job_detail_screen.dart';
 import 'screens/library/album_detail_screen.dart';
 import 'screens/library/artist_detail_screen.dart';
@@ -49,6 +50,8 @@ class Routes {
   static const String editServerDetails = '/edit-server-details';
   // Phase JM: jam session (remote control). Top-level push, like /player.
   static const String jam = '/jam';
+  // Phase MX: a vibe mix. Top-level push, like /jam.
+  static String mix(String id) => '/mixes/$id';
 
   // Library detail (Subsonic via Navidrome). Nested under the library
   // route so the URL shape and the navigation hierarchy match.
@@ -158,8 +161,9 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
             path: Routes.library,
             builder: (BuildContext context, GoRouterState state) =>
                 LibraryScreen(
-                  initialTabIndex:
-                      _tabIndexFor(state.uri.queryParameters['tab']),
+                  initialTabIndex: _tabIndexFor(
+                    state.uri.queryParameters['tab'],
+                  ),
                 ),
             routes: <RouteBase>[
               GoRoute(
@@ -236,6 +240,11 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
         builder: (BuildContext context, GoRouterState state) =>
             const JamScreen(),
       ),
+      GoRoute(
+        path: '/mixes/:id',
+        builder: (BuildContext context, GoRouterState state) =>
+            MixScreen(vibeId: state.pathParameters['id']!),
+      ),
       // Podcasts Discover (PC2, #53) — top-level push, same as Now Playing.
       // No nav-tab entry point yet (PC3 wires that in); reachable via
       // context.push(Routes.podcastsDiscover) until then.
@@ -277,8 +286,8 @@ GoRouter buildHeerrRouter({ProviderContainer? container}) {
         path: Routes.editServerDetails,
         builder: (BuildContext context, GoRouterState state) =>
             EditServerDetailsScreen(
-          profileId: state.uri.queryParameters['profileId'],
-        ),
+              profileId: state.uri.queryParameters['profileId'],
+            ),
       ),
     ],
   );
@@ -319,7 +328,6 @@ class _ShellScaffold extends ConsumerStatefulWidget {
 }
 
 class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
-
   static const List<_NavTab> _tabs = <_NavTab>[
     _NavTab(
       path: Routes.home,

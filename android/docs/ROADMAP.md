@@ -1068,7 +1068,7 @@ Working breakdown: `/PLAN.md` (MX0–MX10). Backend prereq: MX1–MX5 in `backen
 ### [x] MX6. Mix data layer
 **Files:** `lib/models/mix.dart`, `lib/services/backend_service.dart`, `lib/providers/mixes.dart`, `lib/providers/recommendations.dart` (extract `hydrateLibraryMatches`). **Commit:** `feat(flutter): MX6 mix data layer`.
 
-### [ ] MX7. `playPreviews` + mix screen
+### [x] MX7. `playPreviews` + mix screen
 **Files:** `lib/player/playback_actions.dart`, `lib/screens/mixes/mix_screen.dart`, `lib/router.dart`. **Commit:** `feat(flutter): MX7 mix screen`.
 
 ### [ ] MX8. Your Mixes on Home

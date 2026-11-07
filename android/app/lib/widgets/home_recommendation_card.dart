@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_error.dart';
 import '../models/recommended_track.dart';
+import '../models/search_result_item.dart';
 import '../models/subsonic/song.dart';
 import '../player/playback_actions.dart';
 import '../providers/download.dart';
@@ -38,6 +39,67 @@ Future<void> downloadRecommendation(
   } on ApiError catch (e) {
     if (!context.mounted) return;
     showApiError(context, e, action: 'download');
+  }
+}
+
+/// A recommendation as a preview-stream item for [playPreview] /
+/// [playPreviews] (it isn't in the library, so it streams via the backend).
+SearchResultItem previewItemFor(RecommendedTrack track) => SearchResultItem(
+  sourceUrl: track.sourceUrl,
+  sourceType: 'song',
+  title: track.title,
+  artist: track.artist,
+  coverUrl: track.coverUrl,
+  alreadyDownloaded: false,
+);
+
+/// 32px translucent download disc (same look as the For You screen's
+/// download chip), used on Home For You cards and vibe-mix rows. Spins while the song is being queued;
+/// taps then are ignored, so one tap = one `POST /download`.
+// ponytail: on Home cards, 32 + 40 + 2*6 insets = 84px fits art >= 84, i.e. screens
+// >= 370dp wide (art = (w - 70) / 3 - 16). Narrower phones overlap the two
+// discs slightly; shrink the discs if such a device ever shows up.
+class RecommendationDownloadButton extends ConsumerWidget {
+  const RecommendationDownloadButton({required this.track, super.key});
+
+  final RecommendedTrack track;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bool inFlight = ref.watch(
+      downloadDispatcherProvider.select(
+        (Set<String> s) => s.contains(track.sourceUrl),
+      ),
+    );
+    return Tooltip(
+      message: 'Download ${track.title}',
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.55),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: inFlight
+              ? null
+              : () => unawaited(downloadRecommendation(context, ref, track)),
+          child: SizedBox(
+            width: 32,
+            height: 32,
+            child: Center(
+              child: inFlight
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const DownloadIcon(filled: false, size: 18),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

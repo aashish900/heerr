@@ -46,29 +46,33 @@ Future<_Creds?> _resolveCreds(WidgetRef ref) async {
   final String? url = settings.navidromeBaseUrl;
   final String? user = settings.navidromeUsername;
   final String? pass = settings.navidromePassword;
-  if (url == null || url.isEmpty ||
-      user == null || user.isEmpty ||
-      pass == null || pass.isEmpty) {
+  if (url == null ||
+      url.isEmpty ||
+      user == null ||
+      user.isEmpty ||
+      pass == null ||
+      pass.isEmpty) {
     return null;
   }
   return _Creds(url, user, pass);
 }
 
 void _credsMissingSnack(BuildContext context) {
-  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-    duration: kSnackBarDuration,
-    content: Text(
-      'Navidrome creds missing — fill them in under Settings → Servers',
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      duration: kSnackBarDuration,
+      content: Text(
+        'Navidrome creds missing — fill them in under Settings → Servers',
+      ),
     ),
-  ));
+  );
 }
 
 void _errSnack(BuildContext context, Object e) {
   final String msg = e is ApiError ? e.message : 'Play failed: $e';
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-    duration: kSnackBarDuration,
-    content: Text(msg),
-  ));
+  ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(duration: kSnackBarDuration, content: Text(msg)));
 }
 
 Future<MediaItem> _toMediaItem(WidgetRef ref, Song s, _Creds c) =>
@@ -91,16 +95,20 @@ Future<bool> _routedToJamHost(
   final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
   try {
     await ref.read(jamRemoteProvider.notifier).send(kind, payload);
-    messenger.showSnackBar(SnackBar(
-      duration: kSnackBarDuration,
-      content: Text('Sent to ${jam.hostUsername}'),
-    ));
+    messenger.showSnackBar(
+      SnackBar(
+        duration: kSnackBarDuration,
+        content: Text('Sent to ${jam.hostUsername}'),
+      ),
+    );
   } on NotFoundError {
     ref.read(jamRemoteProvider.notifier).leave();
-    messenger.showSnackBar(const SnackBar(
-      duration: kSnackBarDuration,
-      content: Text('Jam session ended — playing on this phone again.'),
-    ));
+    messenger.showSnackBar(
+      const SnackBar(
+        duration: kSnackBarDuration,
+        content: Text('Jam session ended — playing on this phone again.'),
+      ),
+    );
   } catch (e) {
     if (context.mounted) _errSnack(context, e);
   }
@@ -112,10 +120,12 @@ Future<bool> _routedToJamHost(
 bool _blockedByJam(WidgetRef ref, BuildContext context) {
   final JamRemoteStatus? jam = ref.read(jamRemoteProvider);
   if (jam == null) return false;
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-    duration: kSnackBarDuration,
-    content: Text('Not available while controlling ${jam.hostUsername}'),
-  ));
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      duration: kSnackBarDuration,
+      content: Text('Not available while controlling ${jam.hostUsername}'),
+    ),
+  );
   return true;
 }
 
@@ -144,10 +154,12 @@ Future<void> playSongFromSubsonic(
     }
     final MediaItem item = await _toMediaItem(ref, song, creds);
     await ref.read(audioHandlerProvider).playSong(item);
-    messenger.showSnackBar(SnackBar(
-      duration: kSnackBarDuration,
-      content: Text('Playing: ${song.title}'),
-    ));
+    messenger.showSnackBar(
+      SnackBar(
+        duration: kSnackBarDuration,
+        content: Text('Playing: ${song.title}'),
+      ),
+    );
   } catch (e) {
     if (context.mounted) _errSnack(context, e);
   }
@@ -170,29 +182,76 @@ Future<void> playPreview(
   if (_blockedByJam(ref, context)) return;
   final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
   try {
-    final Profile? profile = ref.read(activeProfileProvider);
-    if (profile == null ||
-        profile.heerrBaseUrl.isEmpty ||
-        profile.heerrBearerToken.isEmpty) {
-      messenger.showSnackBar(const SnackBar(
-        duration: kSnackBarDuration,
-        content: Text('Not signed in — sign in under Settings.'),
-      ));
-      return;
-    }
+    final Profile? profile = _previewProfile(ref, messenger);
+    if (profile == null) return;
     final MediaItem mediaItem = searchResultToMediaItem(
       item: item,
       heerrBaseUrl: profile.heerrBaseUrl,
       token: profile.heerrBearerToken,
     );
     await ref.read(audioHandlerProvider).playSong(mediaItem);
-    messenger.showSnackBar(SnackBar(
-      duration: kSnackBarDuration,
-      content: Text('Preview: ${item.title}'),
-    ));
+    messenger.showSnackBar(
+      SnackBar(
+        duration: kSnackBarDuration,
+        content: Text('Preview: ${item.title}'),
+      ),
+    );
   } catch (e) {
     if (context.mounted) _errSnack(context, e);
   }
+}
+
+/// Phase MX: queue a list of not-in-library tracks (a vibe mix) as previews
+/// and start at [startIndex]. Same per-item MediaItem as [playPreview]
+/// ([searchResultToMediaItem]); the queue is replaced. Jam-blocked likewise.
+Future<void> playPreviews(
+  WidgetRef ref,
+  BuildContext context,
+  List<SearchResultItem> items, {
+  int startIndex = 0,
+}) async {
+  if (items.isEmpty) return;
+  if (_blockedByJam(ref, context)) return;
+  final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+  try {
+    final Profile? profile = _previewProfile(ref, messenger);
+    if (profile == null) return;
+    final List<MediaItem> queue = <MediaItem>[
+      for (final SearchResultItem item in items)
+        searchResultToMediaItem(
+          item: item,
+          heerrBaseUrl: profile.heerrBaseUrl,
+          token: profile.heerrBearerToken,
+        ),
+    ];
+    await ref.read(audioHandlerProvider).playAll(queue, startIndex: startIndex);
+    messenger.showSnackBar(
+      SnackBar(
+        duration: kSnackBarDuration,
+        content: Text('Preview: ${items[startIndex].title}'),
+      ),
+    );
+  } catch (e) {
+    if (context.mounted) _errSnack(context, e);
+  }
+}
+
+/// The active profile when it can stream previews (heerr URL + token set);
+/// otherwise explains and returns null.
+Profile? _previewProfile(WidgetRef ref, ScaffoldMessengerState messenger) {
+  final Profile? profile = ref.read(activeProfileProvider);
+  if (profile == null ||
+      profile.heerrBaseUrl.isEmpty ||
+      profile.heerrBearerToken.isEmpty) {
+    messenger.showSnackBar(
+      const SnackBar(
+        duration: kSnackBarDuration,
+        content: Text('Not signed in — sign in under Settings.'),
+      ),
+    );
+    return null;
+  }
+  return profile;
 }
 
 /// #35: append [songs] to the end of the Now Playing queue without
@@ -229,18 +288,20 @@ Future<void> addSongsToQueue(
     } else {
       await handler.addQueueItems(items);
     }
-    messenger.showSnackBar(SnackBar(
-      duration: kSnackBarDuration,
-      content: Text(
-        songs.length == 1
-            ? (wasEmpty
-                ? 'Playing: ${songs.first.title}'
-                : 'Added to queue: ${songs.first.title}')
-            : (wasEmpty
-                ? 'Playing ${songs.length} songs'
-                : 'Added ${songs.length} songs to queue'),
+    messenger.showSnackBar(
+      SnackBar(
+        duration: kSnackBarDuration,
+        content: Text(
+          songs.length == 1
+              ? (wasEmpty
+                    ? 'Playing: ${songs.first.title}'
+                    : 'Added to queue: ${songs.first.title}')
+              : (wasEmpty
+                    ? 'Playing ${songs.length} songs'
+                    : 'Added ${songs.length} songs to queue'),
+        ),
       ),
-    ));
+    );
   } catch (e) {
     if (context.mounted) _errSnack(context, e);
   }
@@ -255,10 +316,12 @@ Future<void> playAllSongsFromSubsonic(
   int startIndex = 0,
 }) async {
   if (songs.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      duration: kSnackBarDuration,
-      content: Text('Nothing to play.'),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        duration: kSnackBarDuration,
+        content: Text('Nothing to play.'),
+      ),
+    );
     return;
   }
   // Over the per-command cap, send the window starting at the tapped song.
@@ -280,9 +343,7 @@ Future<void> playAllSongsFromSubsonic(
     final List<MediaItem> items = await Future.wait<MediaItem>(
       songs.map((Song s) => _toMediaItem(ref, s, creds)),
     );
-    await ref
-        .read(audioHandlerProvider)
-        .playAll(items, startIndex: startIndex);
+    await ref.read(audioHandlerProvider).playAll(items, startIndex: startIndex);
   } catch (e) {
     if (context.mounted) _errSnack(context, e);
   }
@@ -308,7 +369,11 @@ Future<int> playShuffledInChunks(
   if (songs.isEmpty) return 0;
   final List<Song> shuffled = <Song>[...songs]..shuffle(rng);
   await play(shuffled.take(shuffleFirstChunk).toList());
-  for (int i = shuffleFirstChunk; i < shuffled.length; i += shuffleAppendChunk) {
+  for (
+    int i = shuffleFirstChunk;
+    i < shuffled.length;
+    i += shuffleAppendChunk
+  ) {
     if (shouldContinue != null && !shouldContinue()) break;
     await append(shuffled.skip(i).take(shuffleAppendChunk).toList());
   }
@@ -353,23 +418,24 @@ Future<void> shuffleAllSongsFromSubsonic(
     }
     final List<Song> songs = await songsForShuffleAll(
       online: () async =>
-          (await ref.read(subsonicLibraryServiceProvider.future))
-              .getAllSongs(),
+          (await ref.read(subsonicLibraryServiceProvider.future)).getAllSongs(),
       downloaded: () => ref.read(downloadedSongsProvider.future),
     );
     if (songs.isEmpty) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          duration: kSnackBarDuration,
-          content: Text('Nothing to play.'),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            duration: kSnackBarDuration,
+            content: Text('Nothing to play.'),
+          ),
+        );
       }
       return;
     }
     final HeerrAudioHandler handler = ref.read(audioHandlerProvider);
     Future<List<MediaItem>> items(List<Song> chunk) => Future.wait<MediaItem>(
-          chunk.map((Song s) => _toMediaItem(ref, s, creds)),
-        );
+      chunk.map((Song s) => _toMediaItem(ref, s, creds)),
+    );
     String? firstId;
     await playShuffledInChunks(
       songs,
@@ -422,14 +488,17 @@ Future<void> playArtistFromSubsonic(
   String artistId,
 ) async {
   try {
-    final Artist artist =
-        await ref.read(libraryArtistProvider(artistId).future);
+    final Artist artist = await ref.read(
+      libraryArtistProvider(artistId).future,
+    );
     if (artist.album.isEmpty) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          duration: kSnackBarDuration,
-          content: Text('No albums for this artist.'),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            duration: kSnackBarDuration,
+            content: Text('No albums for this artist.'),
+          ),
+        );
       }
       return;
     }
@@ -448,8 +517,9 @@ Future<void> playPlaylistFromSubsonic(
   String playlistId,
 ) async {
   try {
-    final Playlist p =
-        await ref.read(libraryPlaylistProvider(playlistId).future);
+    final Playlist p = await ref.read(
+      libraryPlaylistProvider(playlistId).future,
+    );
     if (!context.mounted) return;
     await playAllSongsFromSubsonic(ref, context, p.entry);
   } catch (e) {
@@ -477,10 +547,12 @@ Future<void> playJobDoneFromSubsonic(
   try {
     final List<String> candidates = _jobSearchCandidates(job);
     if (candidates.isEmpty) {
-      messenger.showSnackBar(const SnackBar(
-        duration: kSnackBarDuration,
-        content: Text("Can't search — job has no output path or title."),
-      ));
+      messenger.showSnackBar(
+        const SnackBar(
+          duration: kSnackBarDuration,
+          content: Text("Can't search — job has no output path or title."),
+        ),
+      );
       return;
     }
     final Dio dio = await ref.read(subsonicDioClientProvider.future);
@@ -504,10 +576,12 @@ Future<void> playJobDoneFromSubsonic(
         return;
       }
     }
-    messenger.showSnackBar(const SnackBar(
-      duration: kSnackBarDuration,
-      content: Text('Not in library yet — try again in a minute.'),
-    ));
+    messenger.showSnackBar(
+      const SnackBar(
+        duration: kSnackBarDuration,
+        content: Text('Not in library yet — try again in a minute.'),
+      ),
+    );
   } catch (e) {
     if (context.mounted) _errSnack(context, e);
   }

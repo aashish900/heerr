@@ -6,16 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../models/recommended_track.dart';
-import '../../models/search_result_item.dart';
 import '../../player/playback_actions.dart';
-import '../../providers/download.dart';
 import '../../providers/profiles/profile_meta.dart';
 import '../../providers/recommendations.dart';
 import '../../router.dart' show Routes;
 import '../../theme.dart';
-import '../../widgets/download_icon.dart';
 import '../../widgets/home_recommendation_card.dart'
-    show RecommendationCoverArt, downloadRecommendation;
+    show RecommendationCoverArt, RecommendationDownloadButton, previewItemFor;
 import '../../widgets/recommendations_refresh_button.dart';
 
 /// Home "For You" grid (heerr-home-for-you.html), between Quick Access and
@@ -32,7 +29,7 @@ import '../../widgets/recommendations_refresh_button.dart';
 /// Since RX8 every result is a song the user does not own, so Play streams it
 /// through the backend preview proxy ([playPreview]) — the same path as an
 /// online search result. The bottom-left download button queues it via
-/// [downloadRecommendation], same as the full For You screen.
+/// [RecommendationDownloadButton], same as the full For You screen.
 class ForYouSection extends ConsumerWidget {
   const ForYouSection({super.key});
 
@@ -156,20 +153,7 @@ class _ForYouCard extends ConsumerWidget {
   final RecommendedTrack track;
 
   void _play(BuildContext context, WidgetRef ref) {
-    unawaited(
-      playPreview(
-        ref,
-        context,
-        SearchResultItem(
-          sourceUrl: track.sourceUrl,
-          sourceType: 'song',
-          title: track.title,
-          artist: track.artist,
-          coverUrl: track.coverUrl,
-          alreadyDownloaded: false,
-        ),
-      ),
-    );
+    unawaited(playPreview(ref, context, previewItemFor(track)));
   }
 
   @override
@@ -208,7 +192,7 @@ class _ForYouCard extends ConsumerWidget {
                       Positioned(
                         left: 6,
                         bottom: 6,
-                        child: _DownloadButton(track: track),
+                        child: RecommendationDownloadButton(track: track),
                       ),
                       Positioned(
                         right: 6,
@@ -240,56 +224,6 @@ class _ForYouCard extends ConsumerWidget {
                 style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 32px translucent download disc on the art's bottom-left (same look as the
-/// For You screen's download chip). Spins while the song is being queued;
-/// taps then are ignored, so one tap = one `POST /download`.
-// ponytail: 32 + 40 + 2*6 insets = 84px fits art >= 84, i.e. screens
-// >= 370dp wide (art = (w - 70) / 3 - 16). Narrower phones overlap the two
-// discs slightly; shrink the discs if such a device ever shows up.
-class _DownloadButton extends ConsumerWidget {
-  const _DownloadButton({required this.track});
-
-  final RecommendedTrack track;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final bool inFlight = ref.watch(
-      downloadDispatcherProvider.select(
-        (Set<String> s) => s.contains(track.sourceUrl),
-      ),
-    );
-    return Tooltip(
-      message: 'Download ${track.title}',
-      child: Material(
-        color: Colors.black.withValues(alpha: 0.55),
-        shape: const CircleBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: inFlight
-              ? null
-              : () => unawaited(downloadRecommendation(context, ref, track)),
-          child: SizedBox(
-            width: 32,
-            height: 32,
-            child: Center(
-              child: inFlight
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const DownloadIcon(filled: false, size: 18),
-            ),
           ),
         ),
       ),
