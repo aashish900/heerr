@@ -556,7 +556,7 @@ Working breakdown: `/PLAN.md` (RX0–RX9). Consensus multi-seed candidates, per-
 ### [x] RX1. `rerank()` pure function
 **Files:** `app/services/recommenders/rerank.py`, `tests/test_rerank.py`. **Commit:** `feat(backend): RX1 rerank recommendations (exclude, demote, artist cap)`.
 
-### [ ] RX2. `rec_feedback` schema
+### [x] RX2. `rec_feedback` schema
 **Files:** `alembic/versions/0016_rec_feedback.py`, `app/models/rec_feedback.py`. **Commit:** `feat(backend): RX2 rec_feedback table (migration 0016)`.
 
 ### [ ] RX3. Per-user re-rank in `/recommend` + `/recommend/dismiss`

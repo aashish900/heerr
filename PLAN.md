@@ -166,7 +166,7 @@ Backend first, TDD (`backend/CLAUDE.md`). Run `poetry run pytest` green before a
 2. Implement `app/services/recommenders/rerank.py` (about 30 lines), with constants `SHOWN_PENALTY = 0.3` and `PER_ARTIST = 2`.
 - Commit: `feat(backend): RX1 rerank recommendations (exclude, demote, artist cap)`.
 
-### [ ] RX2. Backend: migration + model
+### [x] RX2. Backend: migration + model
 1. Add `alembic/versions/0016_rec_feedback.py` (§5.6), following the 0015 file layout.
 2. Add `app/models/rec_feedback.py` (`RecFeedback`) and export it from `app/models/__init__.py`.
 3. Gate: `alembic upgrade head` and `alembic downgrade -1` both run clean against the dev Postgres.

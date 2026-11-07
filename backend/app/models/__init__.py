@@ -6,6 +6,7 @@ from app.models.podcast_channel import PodcastChannel
 from app.models.podcast_episode import PodcastEpisode
 from app.models.podcast_progress import PodcastProgress
 from app.models.podcast_subscription import PodcastSubscription
+from app.models.rec_feedback import RecFeedback
 from app.models.token import Token
 from app.models.user import User
 
@@ -19,6 +20,7 @@ __all__ = [
     "PodcastEpisode",
     "PodcastProgress",
     "PodcastSubscription",
+    "RecFeedback",
     "Token",
     "User",
 ]

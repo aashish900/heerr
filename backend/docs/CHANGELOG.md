@@ -1149,3 +1149,10 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 - `app/services/recommenders/rerank.py` (new): `rerank(candidates, *, excluded, recently_shown, limit, per_artist=2)`. It drops excluded URLs, multiplies the score of recently shown items by `SHOWN_PENALTY = 0.3`, uses positional fallback scores (`1/(1+0.1·i)`) when an engine returns none, sorts stably by score, and greedily keeps at most `PER_ARTIST = 2` tracks per case-insensitive artist up to `limit`. Not wired into any route yet (RX3).
 - `tests/test_rerank.py` (new): 10 tests covering empty input, score order, exclusion, demotion (including that demoted items aren't excluded), the case-insensitive artist cap, the limit, positional fallback, and demotion visible in the output score.
 - Suite: 682 → 692 passed.
+
+## 2026-11-07 — RX2: `rec_feedback` table (migration 0016)
+
+- `alembic/versions/0016_rec_feedback.py` (new): table `rec_feedback`. Columns: `user_id` uuid and `source_url` text (composite primary key), `shown_count` int not null default 0, `last_shown_at` and `dismissed_at` (both nullable timestamptz). FK `rec_feedback_user_id_fkey` → `users.id` `ON DELETE CASCADE`. Downgrade drops the table.
+- `app/models/rec_feedback.py` (new): `RecFeedback` ORM model mirroring the migration, exported from `app/models/__init__.py`.
+- `tests/test_migration_0016.py` (new): defaults, one row per (user, url), the same URL allowed for different users, cascade on user delete, FK rejection of an unknown user, and downgrade to 0015 followed by upgrade back to head.
+- Gate: the migration tests run `alembic downgrade`/`upgrade` against real Postgres (testcontainers), and `test_models_match_schema` checks ORM/schema parity. Suite: 692 → 698 passed. Not yet run against the home-server DB; `heerr-migrate` applies it on the RX7 deploy.
