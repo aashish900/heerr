@@ -74,7 +74,8 @@ class _ActionPill extends StatelessWidget {
                 child: _PillSlot(
                   key: const Key('now-playing-add-to-playlist'),
                   icon: Icons.playlist_add,
-                  label: 'Add to playlist',
+                  label: 'Playlist+',
+                  semanticsLabel: 'Add to playlist',
                   onTap: onAddToPlaylistTap,
                 ),
               ),
@@ -105,11 +106,15 @@ class _PillSlot extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.semanticsLabel,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+
+  /// What screen readers announce when the visible [label] is shorthand.
+  final String? semanticsLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -125,6 +130,7 @@ class _PillSlot extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               label,
+              semanticsLabel: semanticsLabel,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,

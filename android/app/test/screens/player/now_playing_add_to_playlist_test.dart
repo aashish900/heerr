@@ -137,13 +137,18 @@ void main() {
     waveformSeekBarAnimateEnabled = true;
   });
 
-  testWidgets('action pill exposes an "Add to playlist" slot',
+  testWidgets('action pill exposes a "Playlist+" slot (read as "Add to playlist")',
       (WidgetTester tester) async {
+    final SemanticsHandle semantics = tester.ensureSemantics();
     await tester.pumpWidget(_wrap());
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('now-playing-add-to-playlist')), findsOneWidget);
-    expect(find.text('Add to playlist'), findsOneWidget);
+    expect(find.text('Playlist+'), findsOneWidget);
+    expect(find.text('Add to playlist'), findsNothing);
+    // Screen readers still hear the full action, not "Playlist plus".
+    expect(find.bySemanticsLabel('Add to playlist'), findsOneWidget);
+    semantics.dispose();
     // Other pill slots present alongside it.
     expect(find.byKey(const Key('now-playing-queue-button')), findsOneWidget);
     expect(find.byKey(const Key('now-playing-pill-lyrics')), findsOneWidget);

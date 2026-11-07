@@ -3514,3 +3514,9 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 ## 2026-11-07 — v5.7.5: version sync only
 
 - Version bump `5.7.4` → `5.7.5` (`android/app/pubspec.yaml`) for the backend Phase MX release (download cap + vibe-mix endpoints). No Android code changes; the mixes UI lands in MX6–MX9.
+
+## 2026-11-07 — Now Playing: "Add to playlist" pill slot renamed to "Playlist+"
+
+- `lib/screens/player/now_playing_action_pill.dart`: the action-pill slot's visible label changed from `'Add to playlist'` to `'Playlist+'` (user request). `_PillSlot` gained an optional `semanticsLabel`, passed to `Text.semanticsLabel`, and this slot sets it to `'Add to playlist'` so TalkBack announces the action rather than "Playlist plus". The key `now-playing-add-to-playlist`, the icon and the behaviour are unchanged.
+- `test/screens/player/now_playing_add_to_playlist_test.dart`: the slot test now expects the visible `Playlist+`, no `Add to playlist` text, and the semantics label `Add to playlist` (via `ensureSemantics`). It was seen failing first.
+- Gates: `flutter analyze` clean; `flutter test` 1222 passed. Not committed or released yet.
