@@ -1,273 +1,272 @@
-# PLAN — Jam / remote control (phase JM)
+# PLAN — Better "For You" recommendations (phase RX)
 
-Status: planned, nothing executed. Do one task at a time. After each task, tick its box and commit. Use TDD. Tests and lint must be green before and after every task:
-- backend: `poetry run pytest`
-- android: `flutter test` + `flutter analyze`
+Status: **planned, nothing built.** Step 1 (the engine) is RX0–RX9. Step 2 (a For You section on Home, plus a "Not interested" action) will be planned separately once RX ships.
+
+> The previous plan in this file, Jam / remote control (phase JM, complete), lives in git history at `f4ce359:PLAN.md`. Older references to `/PLAN.md §5` in code and docs point there.
 
 ## 1. Goal
 
-The host's phone is in the car, connected to Android Auto, playing heerr and running Maps. A passenger runs heerr on their own phone and controls the host's playback: play now, add to queue, play/pause, next/prev, seek. Audio plays only on the host's phone. The passenger's phone is just a remote.
+Recommend **songs you don't already own** that fit your taste: varied, not repeated, and never anything you've dismissed. Spotify Discover / YT Music "For you" is the benchmark.
 
-## 2. Decisions (user-confirmed 2026-11-05)
+## 2. Decisions (user-confirmed 2026-11-07)
 
-- **Transport:** commands go through the existing heerr backend. Phone-to-phone was rejected because it needs a local server on the phone, device discovery, and has a Wi-Fi conflict with wireless Android Auto.
-- **Guest access:** the guest reaches the backend through a **Tailscale node share** and logs in with their own Navidrome account (the existing Phase J login).
-- **Remote scope:** full control (play now, enqueue, play/pause, next/prev, seek).
-- **Pairing:** the host starts a session and its phone shows a short code. The guest types the code in. The session lives until the host stops it, or until a TTL runs out.
+- **"New" means not in your library.** Artists already in the library are fine.
+- **Feedback is in scope.** Dismissed songs never come back, and recently shown songs are pushed down.
+- **Engine config on the server is unknown.** Design for `ytmusic` as primary, with the shared re-ranking applied to every engine (`ytmusic`, `lastfm`, `listenbrainz`).
+- **Step 2 (Home UI) is separate.** The dismiss *endpoint* ships here, and the *button* ships with step 2.
 
-## 3. Facts (from code / docs)
+## 3. Facts (from code)
 
-**Constraints**
-- No WebSocket, SSE or FCM. Polling is the contract (`android/CLAUDE.md` "Polling, not streaming", `android/docs/CONTEXT.md:17`).
-- No Redis or queues (`backend/CLAUDE.md`). The backend has no long-poll, SSE or in-memory pub/sub today.
-- There is one Navidrome library per heerr instance (`backend/docs/CONTEXT.md:32`), so a Navidrome song id means the same song on both phones.
+| # | Fact | Source |
+|---|---|---|
+| F1 | `YTMusicEngine.recommend` loops over seeds in order and `break`s once `len(out) >= limit`. | `backend/app/services/recommenders/ytmusic_engine.py`, `recommend()` |
+| F2 | `get_watch_playlist` returns 25 tracks by default, so one seed fills the client's `limit=20`. | `.venv/.../ytmusicapi/mixins/watch.py:14` (`limit: int = 25`) |
+| F3 | `get_watch_playlist` also returns a `related` browseId, and `get_song_related(browseId)` returns the "You might also like" shelves. | `ytmusicapi/mixins/watch.py:193`, `mixins/browsing.py:883` |
+| F4 | Frequent albums become seeds shaped `SeedTrack(title: album.name, artist: album.artist)`. | `android/app/lib/providers/recommendations.dart`, `buildSeedCollection` |
+| F5 | The backend resolves seeds without a URL via `search(f"{artist} {title}", filter="songs", limit=1)`. | `ytmusic_engine.py`, `_resolve_via_search` |
+| F6 | Library songs are flagged `inLibrary` via `findLibraryMatch` (search3) but **not removed**. | `recommendations.dart`, `_hydrateLibraryMatches` |
+| F7 | The client sends 8 randomly sampled seeds from up to 20, with `limit: 20` and a 30-minute keep-alive TTL. | `recommendations.dart`: `kSeedSampleSize`, `_kRecommendationsLimit`, `_kRecsMaxAge` |
+| F8 | `POST /recommend` takes only `require_scope("read")` and doesn't resolve the user, so it can't filter per user. | `backend/app/api/v1/recommend.py` |
+| F9 | `RecommendSeed` uses `extra="forbid"`, `title` is required (`min_length=1`), and `limit` is capped at 50. | `backend/app/schemas/recommend.py` |
+| F10 | `jobs` has `user_id` and `source_url`, so per-user "already requested" is a single query. | `backend/app/models/job.py:68`, DECISIONLOG 2026-06-16 |
+| F11 | The latest migration is `0015` (jam). | `backend/alembic/versions/0015_jam.py` |
+| F12 | Home already shows "Picked for you" cards fed by `recommendationsProvider`. | `android/app/lib/screens/recommendations_screen.dart:71` (comment #21) |
 
-**Backend**
-- Auth deps: `require_scope("read")` (`backend/app/api/deps.py:96`) returns the token, and `tok.user_id` gives per-user isolation. `current_user` is at `deps.py:91`.
-- Routers: one module per feature in `backend/app/api/v1/`, wired in `backend/app/api/v1/router.py:19-32`.
-- DB: async SQLAlchemy 2.0 (`backend/app/db.py`). Migrations are hand-written Alembic (`target_metadata=None`, `alembic/env.py:26`). The head is `0014_jobs_episode.py`.
-- Reference pattern: model `backend/app/models/podcast_progress.py`; endpoint `backend/app/api/v1/podcasts.py:409-436`; schemas `backend/app/schemas/podcast.py:108-115`.
-- Tests: testcontainers Postgres. Fixtures `make_token`, `app_sm` (`backend/tests/conftest.py`). App-test pattern in `backend/tests/test_podcast_progress.py:15-36`. Schema guard `backend/tests/test_models_match_schema.py`.
-- Version is `5.5.0` (`backend/pyproject.toml:3`, `backend/app/main.py:40`).
+**Root cause of the weak feed (inference from F1, F2, F4 and F6):** the first resolved seed alone fills all 20 slots, album-title seeds resolve to arbitrary songs, and owned songs aren't filtered. So the feed is one seed's radio, padded with songs you already have.
 
-**Android: playback**
-- Handler: `HeerrAudioHandler` (`android/app/lib/player/heerr_audio_handler.dart`).
-  - `playSong` :254, `playAll(items, startIndex:)` :271, `addQueueItems` :190
-  - `play` :326, `pause` :329, `seek` :338, `skipToNext` :341, `skipToPrevious` :348
-  - `snapshotStream()` :418 returns `PlayerSnapshot {item, state}`
-- **The `_isLoadingSource` guard (:97) silently drops a load issued while another load is in flight.**
-- `MediaItem.id` is the playback URL. The Navidrome id lives in `extras['subsonicId']` (`player/song_to_media_item.dart`). The reverse map `songFromMediaItem` is in the same file.
-- **Song to MediaItem:** `songItem(read, song, url:, user:, pass:)` (`player/play_core.dart`). It takes a `ProviderReader`, so `ProviderContainer.read` works.
-- **No-UI play path to copy:** `playBrowseId` (`player/browse_play.dart:17-60`). It reads creds from `serverCredsProvider`, builds items, then calls `playAll`.
-- **UI play wrappers**, all in `player/playback_actions.dart`, all take `(WidgetRef, BuildContext)`:
-  - `playSongFromSubsonic` :77
-  - `addSongsToQueue` :146 (plays instead when the queue is empty)
-  - `playAllSongsFromSubsonic` :188
-  - `shuffleAllSongsFromSubsonic` :268
-  - album :323, artist :345 and playlist :371 all funnel into `playAllSongsFromSubsonic`
-  - `playPreview` :109 is an online preview with no Subsonic id
-- `Song` is freezed and has `fromJson`/`toJson` (`models/subsonic/song.dart:14-36`).
+## 4. Assumptions (review before RX1)
 
-**Android: everything else**
-- Polling template: `providers/queue.dart`. A keepAlive notifier reschedules a one-shot `Timer` after each tick; the interval is an overridable provider (:10-16); it has `pause()`/`resume()`.
-- Backend HTTP: `BackendService` (`services/backend_service.dart`) on `dioClientProvider` (`api/client.dart`), using the bearer interceptor.
-- Settings sections: `screens/settings/settings_screen.dart:55-83`. Tile widgets: `screens/settings/settings_tiles.dart`. Routes: `router.dart` (`Routes` class :38-75, full-screen pushes next to `/player`).
-- `AudioService.init` has `androidStopForegroundOnPause: true` (`main.dart:41`).
-- No QR packages are installed (`pubspec.yaml`).
-
-## 4. Assumptions (please review before JM1)
-
-- A. **Library songs only.** Online YTM results (`playPreview`) and shuffle-all can't be sent to the host. Those actions stay local and show a snackbar saying "not available while controlling <host>".
-- B. **Payload carries full `Song` JSON**, not just the id. The guest already has the `Song` objects. The host deserializes them and calls `songItem` with its own Navidrome creds, which gives it the correct local-file or stream URL. This avoids adding `getSong.view` and N extra round trips. The host only trusts `id` for the stream URL; the other fields are display metadata.
-- C. **One active session per host.** Starting a new session ends the old one. Any number of guests can join.
-- D. **Authz** = a valid heerr token with `read` scope + knowledge of an active, unexpired code. There's no participant table. The code is 6 chars from an unambiguous alphabet (no 0/O/1/I), and the TTL is 12h. This is acceptable because the backend is reachable only over the tailnet.
-- E. **Host poll is 1s, guest state poll is 2s.** Both are overridable providers.
-- F. **Commands run strictly in order, one at a time**, each awaited, so the `_isLoadingSource` guard can't drop them.
-- G. **Stale commands are discarded.** On a cold start, or when the host (re)starts polling, the cursor starts at the session's current max command id, so old commands don't replay.
-- H. **Pairing is code-only.** No QR, because QR needs 2 new deps (`qr_flutter`, `mobile_scanner`). That's a backlog item.
-- I. **(Unverified, gated by JM7)** the Dart `Timer` keeps firing while the app is in the background, as long as the audio_service foreground service is up. With `androidStopForegroundOnPause: true`, a paused host may stop polling, so a guest's "play" never arrives. The candidate fix is to keep the foreground service while a jam session is active.
+1. The ytmusicapi calls (`get_song_related`, `get_artist`, `search(filter="artists")`) work unauthenticated from the server, as `get_watch_playlist` already does. RX4 verifies this first in a REPL.
+2. 8 seeds × about 2 YTM calls each, with concurrency 4, finishes in **under 6 s**. If not, RX4 adds a per-videoId in-memory TTL cache, marked `ponytail:`.
+3. The library filter (F6) also applies to the "Find similar" screen, which then shows only songs you don't own. Say so if Find similar should keep showing owned songs.
+4. A "shown" mark expires after **7 days**, and a demoted score is multiplied by **0.3**. Both are tunable constants.
+5. **At most 2 songs per artist** in a feed of 20.
 
 ## 5. Design
 
-### 5.1 Data model (migration `0015_jam`)
+### 5.1 Pipeline
 
 ```
-jam_session
-  id            uuid pk default gen_random_uuid()
-  host_user_id  uuid not null fk users(id) on delete restrict
-  code          text not null            -- unique among active rows (partial unique index where ended_at is null)
-  state         jsonb null               -- latest host snapshot (see 5.3)
-  state_at      timestamptz null
-  created_at    timestamptz not null default now()
-  expires_at    timestamptz not null     -- created_at + 12h
-  ended_at      timestamptz null
-  index (host_user_id) where ended_at is null
-
-jam_command
-  id            bigserial pk             -- monotonic cursor
-  session_id    uuid not null fk jam_session(id) on delete cascade
-  sender_user_id uuid not null fk users(id) on delete restrict
-  kind          text not null check (kind in ('play_songs','enqueue','play','pause','next','prev','seek'))
-  payload       jsonb not null default '{}'
-  created_at    timestamptz not null default now()
-  index (session_id, id)
+Android                            Backend
+seeds (song w=1.0,                 POST /recommend
+ artist w=0.7/0.4) ── sample 8 ──▶   engine.recommend(seeds, limit*2)   ← candidates + consensus score
+ limit=40                            rerank(excl. jobs+dismissed, demote shown, ≤2/artist) → limit
+                                     upsert rec_feedback.shown
+◀── results ───────────────────────
+hydrate inLibrary (search3) → drop owned → take 20
 ```
 
-`ponytail:` there's no cleanup job, so ended sessions and their commands stay in the table forever. Add a prune of `ended_at < now() - 7d` to the startup `lifespan` (`backend/app/main.py:18-32`) once the rows are actually noticeable.
+### 5.2 Seeds (Android)
 
-### 5.2 API (all under `/api/v1/jam`, all `require_scope("read")`)
+| Source | Seed kind | Weight |
+|---|---|---|
+| `getStarred2` songs | song `(title, artist)` | 1.0 |
+| `getAlbumList2?type=frequent&size=30` | **artist** `(artist)` | 0.7 |
+| `getAlbumList2?type=recent&size=20` | **artist** `(artist)` | 0.4 |
+| Favourites playlist (only if all of the above are empty) | song | 1.0 |
 
-> **Superseded in part (v5.6.2):** 1s/2s polling was replaced by long-polls (`sync` `wait_s`, `GET /state?since=&wait_s=`) plus host `PUT /jam/{id}/state` pushes, and guest controls moved onto Now Playing + the mini-player (v5.6.1). See `android/docs/DECISIONLOG.md` 2026-11-05 and `backend/README.md` for the current contract.
+Dedupe songs by `title|artist` and artists by lowercased name. When an artist appears more than once, keep its highest weight. The cap stays at 20 and `sampleSeeds` (8 per request) is unchanged.
 
-| Method | Path | Caller | Body | Returns | Errors |
-|---|---|---|---|---|---|
-| POST | `/jam` | host | — | `{id, code, expires_at}` | ends any prior active session of the caller |
-| DELETE | `/jam/{id}` | host | — | 204 | 403 not host, 404 unknown |
-| POST | `/jam/join` | guest | `{code}` | `{id, host_username, expires_at}` | 404 unknown/ended/expired, 409 joining own session |
-| POST | `/jam/{id}/commands` | guest or host | `{kind, payload}` | `{id}` 201 | 404 inactive, 422 bad kind/payload |
-| POST | `/jam/{id}/sync` | host | `{state, after}` | `{commands:[{id,kind,payload,sender}], ended:false}` | 403 not host, 404 unknown |
-| GET | `/jam/{id}/state` | guest | — | `{state, state_at, host_username, ended}` | 404 unknown |
+### 5.3 Wire contract (additive, old clients keep working)
 
-- `after = null` means: return no commands, plus `cursor = max(id)`. This is how assumption G is implemented. The response always includes `cursor`.
-- `sync` on an ended or expired session returns `ended: true`, and the host stops polling.
-- `GET /state` returns `ended: true` after the host stops, and the guest app shows "Session ended".
-
-**Command payloads:**
-- `play_songs`: `{songs:[Song], start_index:int}`
-- `enqueue`: `{songs:[Song]}`
-- `seek`: `{position_ms:int}`
-- every other kind: `{}`
-
-The backend validates the shape: `songs` must be a list of 1–500 objects that each have a string `id`. It does not validate the rest of each `Song`.
-
-### 5.3 Host state snapshot (JSON written by `sync`)
-
-```
-{ "playing": bool, "position_ms": int, "updated_at_ms": int,
-  "current": Song|null, "queue": [Song] (capped 50 from current index), "queue_index": int }
+```python
+class RecommendSeed(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str | None = Field(default=None, min_length=1)  # None ⇒ artist seed
+    artist: str = Field(..., min_length=1)
+    source_url: str | None = None
+    weight: float = Field(default=1.0, ge=0.0, le=1.0)
 ```
 
-The guest extrapolates the playback position on its own: `position_ms + (now - updated_at_ms)` while `playing` is true.
+`SeedTrack` (backend dataclass and Dart freezed model) mirrors this. `RecommendRequest.limit` stays capped at 50.
 
-### 5.4 Android: host side
+### 5.4 Candidate generation (`YTMusicEngine`)
 
-- **`providers/jam_host.dart`:** a keepAlive notifier holding the state `{sessionId, code, commandsReceived, error}`. Loop, using the `queue.dart` template:
-  1. Build the snapshot from the latest `PlayerSnapshot` and `handler.queue.value`, mapping each item through `songFromMediaItem`.
-  2. Call `sync(state, after)`.
-  3. Run each returned command in order, awaiting each one.
-  4. Advance the cursor.
-  5. Reschedule after 1s.
-  - On error: keep polling, as `queue.dart` does.
-  - On `ended: true`: clear the state.
-- **`player/jam_executor.dart`:** a pure function `runJamCommand(ProviderReader read, HeerrAudioHandler h, JamCommand cmd)`, modelled on `playBrowseId`:
-  - `play_songs` → `Song.fromJson` → `songItem` → `h.playAll(items, startIndex)`
-  - `enqueue` → when the queue is empty, `playAll` (matching `addSongsToQueue`); otherwise `addQueueItems`
-  - `play`/`pause`/`next`/`prev`/`seek` → the matching handler methods
-  - An unknown kind is ignored.
-- **Lifetime:** the session is started and stopped from the Jam screen. It is held in memory only. If the app process dies, the session is gone on the device, and the backend TTL ends it.
+For each seed, concurrently via `asyncio.gather` with `asyncio.Semaphore(4)` (calls stay in `asyncio.to_thread`):
 
-### 5.5 Android: guest side
+- **Song seed:** resolve the videoId (reuse `_video_id_from_url` and `_resolve_via_search`). Call `get_watch_playlist(videoId)` and take its `tracks`, skipping the seed itself. If `watch["related"]` is set, call `get_song_related(...)` and take the `contents` from shelves that have a `videoId` (songs only, so skip album and artist shelves).
+- **Artist seed:** call `search(artist, filter="artists", limit=1)` and take its `browseId`. Call `get_artist(browseId)` and take `["songs"]["results"]`, the artist's top songs.
 
-- **`providers/jam_remote.dart`:** a keepAlive notifier holding `{sessionId, hostUsername}` plus a state poll every 2s, with `pause()`/`resume()` driven by app lifecycle.
-- **`player/playback_actions.dart`:** this is the routing point. Add a single guard at the top of each wrapper:
-  - Covered: `playSongFromSubsonic`, `addSongsToQueue`, `playAllSongsFromSubsonic`, which album/artist/playlist already go through.
-  - When joined, the wrapper sends a command instead of calling the handler, and shows the snackbar "Sent to <host>".
-  - `playPreview` and `shuffleAllSongsFromSubsonic` show the "not available while controlling" snackbar instead (assumption A).
-- **Transport buttons:** the Jam screen (guest mode) has its own controls that send `play`/`pause`/`next`/`prev`/`seek`. The local mini-player and Now Playing screen still control the guest's own phone. A banner makes it obvious which phone you're controlling.
-- **Banner:** a "Controlling <host> · Leave" strip shown above the mini-player while joined. Tapping it opens the Jam screen.
+Each seed yields an ordered list. **Consensus scoring:**
 
-### 5.6 UI
+```
+score(track) = Σ over seeds that produced it:  seed.weight / (1 + 0.1 · rank_in_that_seed_list)
+```
 
-- Settings: a new section header "Remote control" with one tile, "Jam session", that pushes `Routes.jam` (`/jam`).
-- `screens/jam_screen.dart` has three states:
-  - **Idle:** a "Start session (this phone plays)" button, and a "Join session" code field with a Join button.
-  - **Hosting:** the big code in large monospace, "Guests can type this in heerr → Settings → Jam session", the number of commands received, and a Stop button.
-  - **Joined:** the host's now-playing (art, title, artist, a progress bar from the extrapolated position), transport buttons, the next ~10 queue items, and Leave.
-- Browsing and search screens are unchanged. Their play and queue taps get routed by 5.5.
+Then drop the seeds' own videoIds, sort by score descending, and return the top `limit` as `RecommendedTrack(score=...)`. A failure on one seed is logged at WARNING and skipped, as today.
 
-## 6. Out of scope
+### 5.5 Re-rank and feedback (any engine, `rerank.py`)
 
-- QR pairing (backlog).
-- Sending online YTM results or downloads to the host.
-- Guest reorder/remove of queue items, or editing the host's queue beyond play/enqueue.
-- Android Auto UI changes: the car keeps showing whatever the host's handler is playing, which already works.
-- Push or real-time transport (forbidden).
-- Cross-instance jams (a guest on a different heerr server).
+A pure function, so it can be tested without a database:
+
+```python
+def rerank(
+    candidates: list[RecommendedTrack],
+    *, excluded: set[str], recently_shown: set[str], limit: int, per_artist: int = 2,
+) -> list[RecommendedTrack]
+```
+
+1. Drop `source_url ∈ excluded`.
+2. Multiply the score by `0.3` if `source_url ∈ recently_shown`. A missing score (Last.fm / ListenBrainz) counts as `1.0 / (1 + 0.1 · index)`.
+3. Sort by score descending, then greedily take items while skipping any artist (lowercased) that already has `per_artist` songs.
+4. Stop at `limit`.
+
+Route flow in `POST /recommend`:
+`user = current_user` → `candidates = engine.recommend(seeds, min(limit*2, 100))` → `excluded = user's jobs (status != failed) ∪ user's dismissed` → `recently_shown = last_shown_at > now() - 7d` → `rerank` → upsert the shown rows → respond.
+
+### 5.6 Data model (migration `0016_rec_feedback`)
+
+```sql
+CREATE TABLE rec_feedback (
+  user_id       uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  source_url    text        NOT NULL,
+  shown_count   integer     NOT NULL DEFAULT 0,
+  last_shown_at timestamptz,
+  dismissed_at  timestamptz,
+  PRIMARY KEY (user_id, source_url)
+);
+```
+
+The upsert for shown rows is `INSERT ... ON CONFLICT (user_id, source_url) DO UPDATE SET shown_count = rec_feedback.shown_count + 1, last_shown_at = now()`. Rows are never pruned. Size is bounded by about 20 rows per refresh, which is fine for a family app (`ponytail:` note: prune when `last_shown_at` is older than 90 days if the table ever matters).
+
+### 5.7 API
+
+| Method | Path | Body | Response | Notes |
+|---|---|---|---|---|
+| POST | `/api/v1/recommend` | `{seeds, limit}` (5.3) | unchanged | now per user (5.5) |
+| POST | `/api/v1/recommend/dismiss` | `{source_url}` | `204` | idempotent upsert of `dismissed_at = now()`; `read` scope; scoped to current user |
+| GET | `/api/v1/recommend/health` | n/a | unchanged | n/a |
+
+## 6. Out of scope (step 1)
+
+- Home "For You" section and the "Not interested" button (step 2).
+- Artist-level dislike, genre or mood shelves, time-of-day mixes.
+- A backend-side play-history store. Navidrome stays the history source through Subsonic, and the backend never calls Navidrome as the user (it stores no passwords, ADR 2026-06-16).
+- Embeddings / pgvector similarity. Revisit only if consensus ranking proves insufficient.
+- Changes to the `lastfm` / `listenbrainz` engines beyond the shared re-rank.
 
 ## 7. Tasks
 
-### [x] JM0. Docs: ADRs + roadmap entry (no code)
-- `backend/docs/DECISIONLOG.md` and `android/docs/DECISIONLOG.md`, one ADR each (2026-11-05): backend relay over phone-to-phone; REST polling at a 1s host cadence instead of push; code-only pairing; Song JSON in the payload instead of `getSong`.
-- `backend/docs/ROADMAP.md` and `android/docs/ROADMAP.md`: add "Phase JM — Jam / remote control (v5.6.0)" with the JM1–JM9 headings and a pointer to `/PLAN.md`.
-- Gate: user reviews the assumptions in §4.
-- Commit: `docs: JM0 — jam remote-control ADRs + roadmap`
+Backend first, TDD (`backend/CLAUDE.md`). Run `poetry run pytest` green before and after each task, and run `graphify update .` after code changes. Commit one task at a time with Conventional Commits.
 
-### [x] JM1. Backend: migration + models
-- New `backend/alembic/versions/0015_jam.py` (`down_revision="0014"`), schema as in §5.1, with a working downgrade.
-- New `backend/app/models/jam.py` (`JamSession`, `JamCommand`), exported from `backend/app/models/__init__.py`.
-- Tests: `backend/tests/test_migration_0015.py` (upgrade/downgrade and constraints: bad `kind` rejected, partial unique `code`, cascade delete). Extend `backend/tests/test_models_match_schema.py` if it enumerates models.
-- Gate: `poetry run pytest` green.
-- Commit: `feat(backend): JM1 — jam_session / jam_command schema`
+### [x] RX0. Docs: ADR + roadmap entries (no code)
+- `backend/docs/DECISIONLOG.md`: ADR "Recommendations v2: consensus candidates + per-user re-rank + feedback table", covering the decisions in §2 and the design in §5.4–5.6.
+- `android/docs/DECISIONLOG.md`: ADR "For You seeds: artist seeds from frequent/recent albums; owned songs filtered client-side".
+- `backend/docs/ROADMAP.md` and `android/docs/ROADMAP.md`: add "Phase RX — Better recommendations (v5.7.0)" with RX headings and a pointer to `/PLAN.md`.
+- Commit: `docs: plan phase RX (recommendations v2)`.
 
-### [x] JM2. Backend: session lifecycle endpoints
-- New `backend/app/schemas/jam.py` and `backend/app/api/v1/jam.py`. Wire it in `router.py`.
-- `POST /jam`, `DELETE /jam/{id}`, `POST /jam/join`. Code generation uses `secrets.choice` over the unambiguous alphabet, retrying on a unique-index collision.
-- Tests in `backend/tests/test_jam.py`:
-  - create returns a code
-  - a second create ends the first
-  - join with the right code works; wrong, ended or expired codes → 404
-  - joining your own session → 409
-  - a non-host DELETE → 403
-- Commit: `feat(backend): JM2 — jam session create/join/end`
+### [ ] RX1. Backend: `rerank()` pure function
+1. Write `tests/test_rerank.py` first. Cover:
+   - excluded URLs are dropped
+   - recently shown items are demoted below unshown items of equal score
+   - at most 2 per artist, case-insensitive
+   - a missing score falls back to positional order
+   - the output is capped at `limit`
+   - an empty input gives an empty output
+2. Implement `app/services/recommenders/rerank.py` (about 30 lines), with constants `SHOWN_PENALTY = 0.3` and `PER_ARTIST = 2`.
+- Commit: `feat(backend): RX1 rerank recommendations (exclude, demote, artist cap)`.
 
-### [x] JM3. Backend: commands + sync + state
-- `POST /jam/{id}/commands`, `POST /jam/{id}/sync`, `GET /jam/{id}/state`, following §5.2 (payload validation, the `after=null` cursor bootstrap, the `ended` flag).
-- Tests:
-  - a guest command shows up in the host's `sync` with `after`, and `after=cursor` returns nothing
-  - `after=null` returns only the cursor
-  - a non-host `sync` → 403
-  - a state written by `sync` is readable by the guest
-  - commands on an ended session → 404
-  - bad kind/payload → 422
-- Gate: a manual curl round trip with two tokens, documented in `backend/README.md` (create → join → command → sync).
-- Commit: `feat(backend): JM3 — jam command relay + host state`
+### [ ] RX2. Backend: migration + model
+1. Add `alembic/versions/0016_rec_feedback.py` (§5.6), following the 0015 file layout.
+2. Add `app/models/rec_feedback.py` (`RecFeedback`) and export it from `app/models/__init__.py`.
+3. Gate: `alembic upgrade head` and `alembic downgrade -1` both run clean against the dev Postgres.
+- Commit: `feat(backend): RX2 rec_feedback table (migration 0016)`.
 
-### [x] JM4. Android: models + BackendService methods
-- New `android/app/lib/models/jam.dart` (freezed): `JamSession`, `JamJoin`, `JamCommand`, `JamSyncResponse`, `JamState`.
-- `services/backend_service.dart`: add `jamCreate`, `jamEnd`, `jamJoin`, `jamSend`, `jamSync`, `jamState`, all through `apiCall`.
-- Run codegen: `cd android/app && dart run build_runner build --delete-conflicting-outputs`.
-- Tests: model JSON round-trip; service methods against the existing dio-mock pattern in `android/app/test/services/`.
-- Commit: `feat(flutter): JM4 — jam API client`
+### [ ] RX3. Backend: route wiring + dismiss endpoint
+1. Add tests to `tests/test_recommend.py`, reusing `FakeEngine` and testcontainers Postgres:
+   - `/recommend` excludes the user's job URLs
+   - another user's jobs are **not** excluded
+   - a dismissed URL never returns
+   - a second call demotes items shown on the first call
+   - returned items are upserted (`shown_count` increments)
+   - the engine is asked for `min(limit*2, 100)`
+   - `/recommend/dismiss` returns 204, is idempotent, needs auth (401 without a token), and only affects the caller
+2. Implement:
+   - schema `DismissRequest {source_url: str}`
+   - `POST /recommend` depends on `current_user` and runs the §5.5 flow
+   - `POST /recommend/dismiss`
+- Commit: `feat(backend): RX3 per-user recommend re-rank + /recommend/dismiss`.
 
-### [x] JM5. Android: host executor + poller
-- New `player/jam_executor.dart` (`runJamCommand`), following §5.4.
-- New `providers/jam_host.dart`: `start()`, `stop()`, the 1s loop, the cursor bootstrap, and in-order execution. Interval provider `jamHostPollInterval`.
-- Tests:
-  - executor: use the mocktail handler from `android/app/test/player/heerr_audio_handler_modes_test.dart`. Each kind calls the right handler method; `enqueue` on an empty queue calls `playAll`.
-  - poller: with `fake_async`, commands run in order and one at a time; the cursor advances; `ended` stops polling; an error keeps polling.
-- Commit: `feat(flutter): JM5 — jam host command executor`
+### [ ] RX4. Backend: verify ytmusicapi calls (spike, no feature code)
+1. In `backend/.venv`, run a REPL on the server (inside the backend container) for one known song and one known artist. Call `get_watch_playlist`, then `get_song_related(watch["related"])`, `search(artist, filter="artists", limit=1)`, and `get_artist(browseId)["songs"]["results"]`.
+2. Record the real response shapes, which keys hold `videoId` / `artists`, and the timings in `backend/docs/CHANGELOG.md`.
+3. If any call fails unauthenticated, stop and revise §5.4 before RX5.
 
-### [x] JM6. Android: Jam screen (idle + hosting) + Settings entry
-- New `screens/jam_screen.dart` (idle and hosting states). Add `Routes.jam` and a `GoRoute` in `router.dart`. Add the "Remote control" section in `screens/settings/settings_screen.dart`.
-- Widget tests: idle shows Start and Join; Start shows the code; Stop goes back to idle.
-- Commit: `feat(flutter): JM6 — jam host screen`
+### [ ] RX5. Backend: schema — artist seeds + weights
+1. Tests first:
+   - a payload without `weight` or `title` validates as an artist seed
+   - an old-client payload (title + artist only) is unchanged
+   - `weight > 1` gives 422
+   - an empty-string title gives 422
+2. Update `RecommendSeed` (§5.3), the `SeedTrack` dataclass (`title: str | None`, `weight: float = 1.0`) and the route mapping.
+3. Check that `lastfm_engine.py` and `listenbrainz_engine.py` skip seeds with no title (or treat them as artist seeds via `artist.getTopTracks`, which Last.fm already has as `_ARTIST_TOP_WEIGHT`). Add tests for this.
+- Commit: `feat(backend): RX5 artist seeds + seed weights in /recommend`.
 
-### [x] JM7. Spike: background polling on a real device (no feature code unless needed)
-- Done 2026-11-05: owner ran the paused-host check on v5.6.3 (host paused + screen off ~5 min, guest Play resumed it). Passed; no code change needed — `androidStopForegroundOnPause: true` kept as is.
-- Host on the phone with the screen off, then playing → paused for 5 minutes. Watch `adb logcat` for the sync requests (backend access log as well).
-- If polling stops while paused: when a jam session is active, keep the foreground service alive (switch `androidStopForegroundOnPause` behaviour, or call `AudioService` to keep it). Record the result in the android DECISIONLOG.
-- Gate: a command sent during a 5-minute pause executes within about 2s.
-- Commit (only if code changed): `fix(flutter): JM7 — keep jam host polling while paused`
+### [ ] RX6. Backend: YTMusic engine rewrite
+1. Tests first, in `tests/test_recommend_ytmusic.py` (or extend the existing engine tests), with a fake `_YTMusicLike` that also covers `get_song_related` and `get_artist`:
+   - 3 song seeds each returning 25 tracks: the output contains tracks from all 3 (the F1 regression)
+   - a track produced by 2 seeds outranks single-seed tracks
+   - a weight-1.0 seed outranks a weight-0.4 seed at the same rank
+   - seed videoIds are never in the output
+   - an artist seed goes through `search(filter="artists")` and `get_artist`, and yields its top songs
+   - one seed raising an exception doesn't kill the others
+   - a missing `related` key skips `get_song_related`
+   - concurrency never exceeds 4 (track max in-flight inside the fake)
+2. Implement §5.4 in `ytmusic_engine.py`, extending the `_YTMusicLike` protocol with `get_song_related` and `get_artist`.
+3. Time a real `/recommend` call with 8 seeds over Tailscale. If it takes more than 6 s, add an in-memory TTL cache keyed by videoId or artist (marked `ponytail:`).
+- Commit: `feat(backend): RX6 ytmusic engine — concurrent multi-seed, related songs, artist seeds, consensus score`.
 
-### [x] JM8. Android: guest mode (join, routing, remote controls, banner)
-- New `providers/jam_remote.dart`: join/leave plus the 2s state poll with lifecycle pause/resume.
-- Guards in `player/playback_actions.dart`: `playSongFromSubsonic`, `addSongsToQueue` and `playAllSongsFromSubsonic` route to `jamSend`; `playPreview` and `shuffleAllSongsFromSubsonic` show the not-available snackbar.
-- The joined state of `jam_screen.dart`: now-playing, extrapolated progress, transport, queue preview, Leave, and the "Session ended" handling.
-- A "Controlling <host>" banner above the mini-player in the shell scaffold (`router.dart` shell route).
-- Tests:
-  - routing: when joined, the wrappers call `jamSend` and never touch the handler; when not joined, behaviour is unchanged
-  - remote poller: `ended` leaves the session
-  - widget test for the joined screen
-- Commit: `feat(flutter): JM8 — jam guest remote`
+### [ ] RX7. Backend: curl smoke on the home server
+1. Rebuild and deploy (`docker compose up -d --build heerr-backend`), and confirm `heerr-migrate` applied `0016`.
+2. Call `POST /recommend` with 3 starred-song seeds and 1 artist seed, `limit: 20`. Check that the results include more than 8 distinct artists and nothing you've already requested.
+3. Call `POST /recommend/dismiss` with one result, then call `/recommend` again with the same seeds and confirm the dismissed song is gone and earlier results have moved down.
+4. Confirm `GET /recommend/health` is unchanged.
+5. Log the commands and their output in `backend/docs/CHANGELOG.md`. Per `/CLAUDE.md`, Android work starts only after this passes.
 
-### [x] JM9. End-to-end smoke + docs + version 5.6.0
-- Done 2026-11-05: docs + 5.6.0 bump shipped; two-phone smoke reported working by the owner on v5.6.3 (after the 5.6.1 loop-stall fix and the 5.6.2 long-poll).
-- Two real phones (two Navidrome users, guest via a Tailscale node share), host on the DHU:
-  - play now, enqueue, pause/play, next/prev, seek
-  - host Stop → the guest sees "Session ended"
-  - the host's Android Auto now-playing updates
-- Docs:
-  - `backend/docs/CONTEXT.md` and `android/docs/CONTEXT.md`: jam facts.
-  - `android/README.md`: guest setup — create the Navidrome user; Tailscale admin console → Machines → the server → Share; the guest accepts and installs heerr; logs in.
-  - `backend/README.md`: the jam endpoints.
-  - CHANGELOGs for both apps.
-- Version bump to `5.6.0` in all 5 places (root `CLAUDE.md` §3).
-- Run `graphify update .`.
-- Commit: `chore: bump version to 5.6.0 (jam remote control)`
+### [ ] RX8. Android: seeds, request size, owned-song filter
+Files: `android/app/lib/models/seed_track.dart`, `android/app/lib/providers/recommendations.dart`, `android/app/lib/services/backend_service.dart` (body serialisation only, if needed).
+1. `SeedTrack`: make `title` nullable and add `@Default(1.0) double weight`. Then run code generation:
+   ```bash
+   cd android/app && dart run build_runner build --delete-conflicting-outputs
+   ```
+   Make sure `toJson` leaves out a null `title`, not `"title": null`. The backend would accept `null` too, since it's `str | None`.
+2. `seedForSong` ("Find similar") stays a song seed with weight 1.0.
+3. Update `buildSeedCollection` to take `recent` as well, emit artist seeds per §5.2, and dedupe artists while keeping the max weight.
+4. In `seedCollection`, add `service.getAlbumList(type: 'recent', size: 20)`.
+5. In the `Recommendations.build`, request `limit: 40` (rename `_kRecommendationsLimit` and add `_kRecommendationsShown = 20`). After `_hydrateLibraryMatches`, use `.where((r) => !r.inLibrary).take(20)`.
+6. Tests in `android/app/test/providers/recommendations_provider_test.dart`:
+   - frequent and recent albums produce artist seeds (no album-title seeds)
+   - an artist appearing in both gets weight 0.7
+   - starred songs come first
+   - owned results are filtered out and the list is capped at 20
+   - the Favourites fallback still works
+   Also update the `_StubRecs` users if their signatures change.
+7. Gate: `flutter analyze` and `flutter test` both pass.
+- Commit: `feat(flutter): RX8 artist seeds + weights, hide owned songs in For You`.
+
+### [ ] RX9. End-to-end smoke + version 5.7.0 + docs
+1. Bump the version to **5.7.0** in all five places (`/CLAUDE.md` §3): `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml`, and both ROADMAP status lines.
+2. Install on the Pixel 7:
+   ```bash
+   cd android/app && flutter run --release
+   ```
+   Open For You and pull to refresh twice. Check:
+   - no song you own appears
+   - more than 5 distinct artists
+   - the second refresh is mostly different from the first
+   - Find similar on a song still works
+3. Update docs:
+   - `backend/docs/CONTEXT.md`: the recommendations bullet (engine pipeline, `rec_feedback`)
+   - both CHANGELOGs
+   - tick the RX boxes here and in both ROADMAPs
+- Commit: `chore: bump version to 5.7.0 (recommendations v2)`.
 
 ## 8. Risks
 
-- **The paused host stops polling** (assumption I). JM7 gates this before guest work starts.
-- **Latency:** 0–1s of poll delay plus a Tailscale round trip over mobile data. Inference: about 1–2s end to end in the car.
-- **Data/battery on the host:** 3,600 small POSTs an hour while a session is active. Polling runs only while a session is active.
-- **Song JSON drift:** a guest on an older app version could send fields the host can't parse. `Song.fromJson` must stay tolerant (verify that its unknown-key handling is the default in JM5).
+| Risk | Mitigation |
+|---|---|
+| ytmusicapi is unofficial, so YouTube can change response shapes. | Parse defensively (skip items missing `videoId` / `artists`). RX4 records the real shapes. One failing seed doesn't fail the request. |
+| More YTM calls per refresh (about 16 instead of about 8) could hit rate limits or get slow. | Semaphore of 4, the client's 30-minute TTL, and an optional TTL cache (RX6 step 3). |
+| `findLibraryMatch` (search3, fuzzy) can miss an owned song with different metadata, so it leaks into For You. | Accepted for v1. The user's `jobs` exclusion on the backend catches anything downloaded through heerr. |
+| Filtering owned songs from 40 candidates leaves fewer than 20. | Raise `limit` to 50 (the schema cap) if it happens often. Decide during RX9. |
+| Demoting shown songs for 7 days can thin the feed for users with few seeds. | The demotion only multiplies the score; nothing is excluded except dismissed and requested songs. |

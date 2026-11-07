@@ -1135,3 +1135,11 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 ## 2026-11-05 — v5.6.3: version sync only
 
 - Version bump `5.6.2` -> `5.6.3` (`backend/pyproject.toml`, `backend/app/main.py`) for the Android Home layout fix; no backend code changes.
+
+## 2026-11-07 — RX0: plan phase RX (recommendations v2), docs only
+
+- `/PLAN.md`: replaced the completed Jam plan (still in git history at `f4ce359:PLAN.md`) with the phase RX plan (RX0–RX9).
+- `backend/docs/DECISIONLOG.md`: ADR "Recommendations v2: consensus candidates + per-user re-rank + feedback table".
+- `android/docs/DECISIONLOG.md`: ADR "For You seeds: artist seeds from frequent/recent albums; owned songs filtered client-side".
+- `backend/docs/ROADMAP.md` (RX0–RX7) and `android/docs/ROADMAP.md` (RX0, RX8, RX9): new "Phase RX" sections.
+- No code changes, no version change.

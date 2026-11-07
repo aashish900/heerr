@@ -3378,3 +3378,11 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 ## 2026-11-05 — JM7 ticked: paused-host check passed (Phase JM complete)
 
 - Owner confirmed the 5-min paused-host / screen-off check on v5.6.3: guest Play still reached the host. `/PLAN.md` and `android/docs/ROADMAP.md` JM7 ticked; DECISIONLOG entry records keeping `androidStopForegroundOnPause: true`. No code change. All JM0–JM9 done.
+
+## 2026-11-07 — RX0: plan phase RX (recommendations v2), docs only
+
+- `/PLAN.md`: replaced the completed Jam plan (still in git history at `f4ce359:PLAN.md`) with the phase RX plan (RX0–RX9).
+- `backend/docs/DECISIONLOG.md`: ADR "Recommendations v2: consensus candidates + per-user re-rank + feedback table".
+- `android/docs/DECISIONLOG.md`: ADR "For You seeds: artist seeds from frequent/recent albums; owned songs filtered client-side".
+- `backend/docs/ROADMAP.md` (RX0–RX7) and `android/docs/ROADMAP.md` (RX0, RX8, RX9): new "Phase RX" sections.
+- No code changes, no version change.

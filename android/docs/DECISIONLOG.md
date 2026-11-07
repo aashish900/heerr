@@ -1503,3 +1503,20 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Why:** Verified behaviour on the owner's device; keeping the foreground service alive while paused would cost battery and a persistent notification for no observed benefit.
 
 **Caveat:** One device, one ~5 min run. Aggressive OEM battery managers or much longer pauses are untested; if a host stops reacting after a long pause, revisit (keep the service alive while `jamHostProvider` is non-null).
+
+## 2026-11-07 — For You seeds: artist seeds from frequent/recent albums; owned songs filtered client-side
+
+**Context:** `buildSeedCollection` turns frequently played albums into song seeds shaped `(album.name, album.artist)`. The backend then searches the album title as a song and resolves an arbitrary track. Results that `_hydrateLibraryMatches` flags `inLibrary` are still shown, so For You recommends songs the user already owns. The user decided that "new" means not owned (backend ADR 2026-11-07).
+
+**Decision:**
+- `SeedTrack` gains `weight` (default 1.0) and an optional `title`; a null title means an artist seed.
+- Seeds are built as follows: starred songs as song seeds (weight 1.0); artists of `getAlbumList2?type=frequent` as artist seeds (0.7); artists of `type=recent` as artist seeds (0.4); the Favourites playlist only as a fallback when all of those are empty. Artists are deduped keeping the highest weight. `sampleSeeds` (8 per request, #38) is unchanged.
+- The client requests `limit: 40`, drops `inLibrary` rows after hydration, and shows the first 20. This also applies to "Find similar".
+
+**Why:** Artist seeds represent "albums I play a lot" without inventing song titles. Filtering owned songs reuses the existing `findLibraryMatch` hydration, and the client is the only side that can query Navidrome as the user.
+
+**Alternatives considered:**
+- Fetch each frequent album's tracks (`getAlbum` × 30) to get real song seeds: too many round trips per refresh.
+- Filter owned songs on the backend: it has no per-user Navidrome credentials.
+
+**Reference:** `/PLAN.md` (phase RX). Backend counterpart: `backend/docs/DECISIONLOG.md`, same date.

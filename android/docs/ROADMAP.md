@@ -1043,6 +1043,20 @@ Host paused 5 min, screen off: a guest command still executes. **Commit (if code
 ### [x] JM9. Two-phone smoke + docs + v5.6.0
 **Commit:** `chore: bump version to 5.6.0 (jam remote control)`.
 
+
+## Phase RX — Better recommendations (v5.7.0)
+
+Working breakdown: `/PLAN.md` (RX0–RX9). Backend prereq: RX1–RX7 in `backend/docs/ROADMAP.md`.
+
+### [x] RX0. ADRs + roadmap
+**Commit:** `docs: plan phase RX (recommendations v2)`.
+
+### [ ] RX8. Artist seeds + weights, hide owned songs in For You
+**Files:** `lib/models/seed_track.dart`, `lib/providers/recommendations.dart`, `test/providers/recommendations_provider_test.dart`. **Commit:** `feat(flutter): RX8 artist seeds + weights, hide owned songs in For You`.
+
+### [ ] RX9. On-device smoke + docs + v5.7.0
+**Commit:** `chore: bump version to 5.7.0 (recommendations v2)`.
+
 ---
 
 ## Cross-cutting reminders

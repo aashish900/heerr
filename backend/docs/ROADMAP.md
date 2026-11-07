@@ -545,6 +545,35 @@ Working breakdown: `/PLAN.md` (JM0–JM9). Backend relays guest commands to the 
 ### [x] JM3. Command relay + host sync + state
 **Files:** `app/api/v1/jam.py`, `tests/test_jam.py`, `README.md` curl round-trip. **Commit:** `feat(backend): JM3 — jam command relay + host state`.
 
+
+## Phase RX — Better recommendations (v5.7.0)
+
+Working breakdown: `/PLAN.md` (RX0–RX9). Consensus multi-seed candidates, per-user re-rank (exclude requested/dismissed, demote recently shown, ≤2 per artist), `rec_feedback` table + `POST /recommend/dismiss`. Android side is in `android/docs/ROADMAP.md` Phase RX.
+
+### [x] RX0. ADRs + roadmap
+**Commit:** `docs: plan phase RX (recommendations v2)`.
+
+### [ ] RX1. `rerank()` pure function
+**Files:** `app/services/recommenders/rerank.py`, `tests/test_rerank.py`. **Commit:** `feat(backend): RX1 rerank recommendations (exclude, demote, artist cap)`.
+
+### [ ] RX2. `rec_feedback` schema
+**Files:** `alembic/versions/0016_rec_feedback.py`, `app/models/rec_feedback.py`. **Commit:** `feat(backend): RX2 rec_feedback table (migration 0016)`.
+
+### [ ] RX3. Per-user re-rank in `/recommend` + `/recommend/dismiss`
+**Files:** `app/api/v1/recommend.py`, `app/schemas/recommend.py`, `tests/test_recommend.py`. **Commit:** `feat(backend): RX3 per-user recommend re-rank + /recommend/dismiss`.
+
+### [ ] RX4. ytmusicapi shape spike (no feature code)
+Verify `get_song_related`, `search(filter="artists")`, `get_artist` unauthenticated on the server; record shapes + timings in CHANGELOG.
+
+### [ ] RX5. Artist seeds + seed weights
+**Files:** `app/schemas/recommend.py`, `app/services/recommenders/base.py`, `lastfm_engine.py`, `listenbrainz_engine.py`, tests. **Commit:** `feat(backend): RX5 artist seeds + seed weights in /recommend`.
+
+### [ ] RX6. YTMusic engine rewrite
+**Files:** `app/services/recommenders/ytmusic_engine.py`, engine tests. **Commit:** `feat(backend): RX6 ytmusic engine — concurrent multi-seed, related songs, artist seeds, consensus score`.
+
+### [ ] RX7. Home-server curl smoke
+Gate for Android RX8 (`/CLAUDE.md` backend-first rule).
+
 ---
 
 ## Cross-cutting reminders

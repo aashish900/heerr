@@ -574,3 +574,25 @@ Sub-decisions locked across J1–J10:
 **Alternatives considered:** phone-to-phone over hotspot/Bluetooth (no tailnet needed, but requires an on-phone server, discovery, and contends with wireless Android Auto's Wi-Fi) — rejected by user; WebSocket/SSE push — rejected (polling contract, `android/CLAUDE.md`); in-memory command queue — rejected (lost on restart, breaks with >1 worker).
 
 **Reference:** `/PLAN.md` §5.
+
+## 2026-11-07 — Recommendations v2: consensus candidates + per-user re-rank + feedback table
+
+**Context:** The For You feed is repetitive and full of songs the user already owns. Three causes in the code: `YTMusicEngine.recommend` stops once it reaches `limit`, and `get_watch_playlist` returns 25 tracks, so the **first seed alone fills the client's 20 slots**. The client sends frequent *albums* as `(album name, artist)` song seeds, which resolve to arbitrary songs. And nothing is filtered or remembered per user (`POST /recommend` never resolves the user). The user wants new songs matching their taste. "New" means **not already owned**; artists already in the library are fine. Feedback is in scope.
+
+**Decision:**
+1. **Weighted, mixed seeds.** `RecommendSeed` gets `weight: float = 1.0` (0–1), and `title` becomes optional: a seed without a title is an **artist seed**. The change is additive, so old clients still validate.
+2. **YTMusic engine: concurrent multi-seed with consensus scoring.** Every seed contributes (`asyncio.gather`, semaphore 4). A song seed contributes its watch-playlist radio plus `get_song_related` ("You might also like"). An artist seed contributes its top songs via `search(filter="artists")` and `get_artist`. Score = Σ `seed.weight / (1 + 0.1·rank)` across the seeds that produced the track, so tracks several seeds agree on rank first.
+3. **Engine-agnostic per-user re-rank** (`rerank.py`, a pure function) applied in the route to every engine's output. It excludes the user's own non-failed jobs and anything they dismissed, multiplies the score of items shown in the last 7 days by 0.3, allows at most 2 per artist, and trims to `limit`. The route over-fetches `min(limit*2, 100)` from the engine.
+4. **`rec_feedback` table** (migration 0016): one row per `(user_id, source_url)` with `shown_count`, `last_shown_at` and `dismissed_at`. The route upserts every returned item as shown. New `POST /recommend/dismiss {source_url}` sets `dismissed_at` (idempotent, `read` scope).
+5. **"Owned" filtering stays client-side.** The client already hydrates `inLibrary` via Subsonic `search3`. The backend can't query Navidrome as the user because it stores no passwords (2026-06-16 ADR).
+
+**Why:** The fixes target the measured root causes with the smallest surface. The `RecommendationEngine` Protocol, factory and fallback chain are unchanged. Postgres stays the only state store (no Redis, per `backend/CLAUDE.md`). Re-ranking at route level means `lastfm` and `listenbrainz` deployments get the same filtering and feedback without engine-specific code.
+
+**Alternatives considered:**
+- Round-robin seeds without scoring: fixes diversity but ignores agreement between seeds, which is the strongest taste signal available.
+- Embeddings / pgvector similarity over the library: much larger build with no evidence it's needed yet.
+- A backend play-history store: duplicates Navidrome, and would need the client to double-report plays.
+- Server-side "owned" check by reading `MUSIC_OUTPUT_DIR` or the `downloads` table: misses files that heerr didn't download.
+- Client-side dismiss list: lost on reinstall and not shared across the user's devices.
+
+**Reference:** `/PLAN.md` (phase RX). Android counterpart: `android/docs/DECISIONLOG.md`, same date.
