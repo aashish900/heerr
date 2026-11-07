@@ -84,8 +84,8 @@ class RecommendSeed(BaseModel):
 
 For each seed, concurrently via `asyncio.gather` with `asyncio.Semaphore(4)` (calls stay in `asyncio.to_thread`):
 
-- **Song seed:** resolve the videoId (reuse `_video_id_from_url` and `_resolve_via_search`). Call `get_watch_playlist(videoId)` and take its `tracks`, skipping the seed itself. If `watch["related"]` is set, call `get_song_related(...)` and take the `contents` from shelves that have a `videoId` (songs only, so skip album and artist shelves).
-- **Artist seed:** call `search(artist, filter="artists", limit=1)` and take its `browseId`. Call `get_artist(browseId)` and take `["songs"]["results"]`, the artist's top songs.
+- **Song seed:** resolve the videoId (reuse `_video_id_from_url` and `_resolve_via_search`). Call `get_watch_playlist(videoId)` and take its `tracks` (**50 in practice, with the seed itself first**, per RX4), skipping the seed. If `watch["related"]` is set, call `get_song_related(...)` and take **only the shelf titled "You might also like"** (20 songs). Never use "Other performances": it's covers and mashups *of the seed song*. The playlist, similar-artist and artist shelves have no `videoId`, and "About the artist" has string `contents`, so non-list contents are treated as empty. The ytmusicapi client defaults to `language="en"`, so the shelf title is stable. Merge the shelf songs into the radio list and **dedupe within the seed** before scoring (RX4 saw the same track in both lists for one seed).
+- **Artist seed:** call `search(artist, filter="artists", limit=1)` and take its `browseId`. Call `get_artist(browseId)` and take `["songs"]["results"]`, the artist's top songs (**5 in practice**). `artists[0]` on these songs isn't always the seed artist, e.g. "Gehra Hua" lists Shashwat Sachdev before Arijit Singh. The 2-per-artist cap keys on `artists[0]`, which is accepted.
 
 Each seed yields an ordered list. **Consensus scoring:**
 
@@ -187,7 +187,7 @@ Backend first, TDD (`backend/CLAUDE.md`). Run `poetry run pytest` green before a
    - `POST /recommend/dismiss`
 - Commit: `feat(backend): RX3 per-user recommend re-rank + /recommend/dismiss`.
 
-### [ ] RX4. Backend: verify ytmusicapi calls (spike, no feature code)
+### [x] RX4. Backend: verify ytmusicapi calls (spike, no feature code)
 1. In `backend/.venv`, run a REPL on the server (inside the backend container) for one known song and one known artist. Call `get_watch_playlist`, then `get_song_related(watch["related"])`, `search(artist, filter="artists", limit=1)`, and `get_artist(browseId)["songs"]["results"]`.
 2. Record the real response shapes, which keys hold `videoId` / `artists`, and the timings in `backend/docs/CHANGELOG.md`.
 3. If any call fails unauthenticated, stop and revise §5.4 before RX5.

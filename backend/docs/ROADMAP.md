@@ -562,7 +562,7 @@ Working breakdown: `/PLAN.md` (RX0–RX9). Consensus multi-seed candidates, per-
 ### [x] RX3. Per-user re-rank in `/recommend` + `/recommend/dismiss`
 **Files:** `app/api/v1/recommend.py`, `app/schemas/recommend.py`, `tests/test_recommend.py`. **Commit:** `feat(backend): RX3 per-user recommend re-rank + /recommend/dismiss`.
 
-### [ ] RX4. ytmusicapi shape spike (no feature code)
+### [x] RX4. ytmusicapi shape spike (no feature code)
 Verify `get_song_related`, `search(filter="artists")`, `get_artist` unauthenticated on the server; record shapes + timings in CHANGELOG.
 
 ### [ ] RX5. Artist seeds + seed weights

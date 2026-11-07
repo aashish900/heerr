@@ -1171,3 +1171,22 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
   The existing stub test now expects the engine limit to be 20 (2 × 10). `tests/test_rerank.py`: +1 duplicate-URL test.
 - Known ceiling: exclusion matches `source_url` exactly. Recommendation and search URLs share the `https://music.youtube.com/watch?v=<id>` form, so a job created from a different URL form (`www.youtube.com`, extra query params) wouldn't match. Accepted for now.
 - Suite: 698 → 708 passed. mypy and ruff clean.
+
+## 2026-11-07 — RX4: ytmusicapi spike (no feature code)
+
+Probe script (not committed): unauthenticated `YTMusic()`, two seeds: "Radiohead High and Dry" with artist "Arijit Singh", and "Arijit Singh Tum Hi Ho" with artist "Prateek Kuhad". It ran on the dev Mac and **inside `heerr-backend` on the home server** (`docker exec heerr-backend /app/.venv/bin/python /tmp/rx4_probe.py`). ytmusicapi 1.12.1 in both places. **No failures.** Shapes were identical in both places.
+
+| Call | Server timing | Shape |
+|---|---|---|
+| `search(q, filter="songs", limit=1)` | 1.03–1.16 s | `[{videoId, title, artists[{name}]}]` |
+| `get_watch_playlist(videoId)` | 0.51–0.90 s | keys `tracks, related, lyrics, playlistId`; **50 tracks, first is the seed itself** |
+| `get_song_related(related)` | 0.32–0.45 s | list of shelves `{title, contents}`: "You might also like" (20, all with `videoId`), "Recommended playlists" (no `videoId`), "Other performances" (covers/mashups of the seed, with `videoId`), "Similar artists" (no `videoId`), artist shelf (no `videoId`), "About the artist" (`contents` is a **str**) |
+| `search(artist, filter="artists", limit=1)` | 0.45–0.49 s | `[{browseId, artist, …}]` |
+| `get_artist(browseId)` | 0.27–0.34 s | `songs.results` (**5** top songs), `related.results` (10 artists) |
+
+Design consequences, written into `/PLAN.md` §5.4:
+- Use only the "You might also like" shelf. "Other performances" would recommend covers of the seed.
+- Guard against non-list shelf `contents`.
+- Merge and dedupe radio + related **within each seed** before consensus scoring. One track ("Sunn Raha Hai") appeared in both lists for the same seed.
+- Radio order varies between calls: the 2nd track differed between the Mac and server runs. This gives free variety on refresh.
+- Budget: about 2–3 calls per song seed and 2 per artist seed, about 0.3–1.2 s each, so 8 seeds at concurrency 4 should take about 3–5 s. No cache for now (RX6 re-measures).
