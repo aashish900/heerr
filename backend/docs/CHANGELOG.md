@@ -1282,3 +1282,9 @@ Response times are under the 6 s budget, so no cache is needed (RX6 `ponytail:` 
 - **Fix:** move `session.add(job)` inside the savepoint. Rolling back the savepoint now expunges the rejected row, and the re-fetch returns the winner. The same pattern in `app/api/v1/jam.py` (create session) already added inside the savepoint and is unaffected.
 - **Test:** new `test_create_race_loser_returns_existing_without_poisoning_session`. It deterministically forces the loser path: the winner is committed first, then `find_active_for_url` is patched to miss once, so the INSERT hits the index. It failed before the fix with the exact CI error and passes after. The timing-based concurrent test passed 5/5 repeated runs after the fix.
 - Suite: 752 → 753 passed. mypy and ruff clean.
+
+## 2026-11-07 — v5.7.2: `/download` race fix + Android RX8 and Home For You
+
+- Version bump `5.7.1` → `5.7.2` (`backend/pyproject.toml`, `backend/app/main.py`). The backend change is the `create_job_idempotent` race-loser fix (`2f144dc`, entry above). No schema or contract change: redeploying `heerr-backend` is enough.
+- `docs/CONTEXT.md`: new "Recommendations" architecture bullet (staleness rule: CONTEXT had no description of the recommendation pipeline).
+- `/PLAN.md` RX9: released at the user's request before the on-device smoke. The box stays unticked until the Pixel smoke passes.

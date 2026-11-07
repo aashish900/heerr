@@ -3440,3 +3440,8 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
   - `test/screens/home/home_screen_test.dart`: `_homeOverrides` stubs `recommendationsProvider`, defaulting to empty. +2 tests: the grid's vertical position is between Quick Access and Recently Added, and there's no grid when there are no recommendations.
 - Gates: `flutter analyze` clean; `flutter test` 1201 → 1213 passed.
 - Design reference `heerr-home-for-you.html` (repo root, untracked) was left as is.
+
+## 2026-11-07 — v5.7.2: For You seeds (RX8) + Home For You grid
+
+- Version bump `5.7.1` → `5.7.2` (`android/app/pubspec.yaml`). Ships RX8 (`643791f`: artist seeds, weights, owned songs hidden) and the Home "For You" grid (`0e4edb0`).
+- **Not smoke-tested on device.** Released at the user's request before RX9's Pixel check. `flutter analyze` clean and `flutter test` 1213 passed at `0e4edb0`.

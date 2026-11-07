@@ -250,6 +250,7 @@ Files: `android/app/lib/models/seed_track.dart`, `android/app/lib/providers/reco
 - Commit: `feat(flutter): RX8 artist seeds + weights, hide owned songs in For You`.
 
 ### [ ] RX9. End-to-end smoke + version 5.7.2 + docs
+> 2026-11-07: version 5.7.2, docs and `backend/docs/CONTEXT.md` were done at the user's request **before** the on-device smoke (steps 1 and 3 done; step 2 not run). Tick RX9 once the Pixel smoke passes.
 1. Bump the version to **5.7.2** in all five places (5.7.0 shipped the backend half and 5.7.1 the RX7a cover filter, both 2026-11-07) (`/CLAUDE.md` §3): `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml`, and both ROADMAP status lines.
 2. Install on the Pixel 7:
    ```bash
