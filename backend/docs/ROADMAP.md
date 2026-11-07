@@ -568,7 +568,7 @@ Verify `get_song_related`, `search(filter="artists")`, `get_artist` unauthentica
 ### [x] RX5. Artist seeds + seed weights
 **Files:** `app/schemas/recommend.py`, `app/services/recommenders/base.py`, `lastfm_engine.py`, `listenbrainz_engine.py`, tests. **Commit:** `feat(backend): RX5 artist seeds + seed weights in /recommend`.
 
-### [ ] RX6. YTMusic engine rewrite
+### [x] RX6. YTMusic engine rewrite
 **Files:** `app/services/recommenders/ytmusic_engine.py`, engine tests. **Commit:** `feat(backend): RX6 ytmusic engine — concurrent multi-seed, related songs, artist seeds, consensus score`.
 
 ### [ ] RX7. Home-server curl smoke

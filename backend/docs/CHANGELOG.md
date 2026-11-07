@@ -1200,3 +1200,30 @@ Design consequences, written into `/PLAN.md` §5.4:
 - `app/services/recommenders/ytmusic_engine.py`: artist seeds are **skipped** for now. Before this, an artist seed would have been searched as the song "<artist> None", which the new test exposed. RX6 resolves them via `get_artist`.
 - Tests: +7 in `test_recommend.py`: artist seed accepted and passed through with its weight, explicit `title: null` accepted, old payload defaults to weight 1.0, and a 422 for each of weight > 1, weight < 0, empty title, and missing artist. +2 in `test_lastfm_engine.py` and +1 in `test_ytmusic_engine.py`.
 - Suite: 708 → 718 passed. mypy and ruff clean.
+
+## 2026-11-07 — RX6: YTMusic engine rewrite (concurrent multi-seed, related shelf, artist seeds, consensus score)
+
+- `app/services/recommenders/ytmusic_engine.py`: `recommend()` rewritten.
+  - **Concurrency:** every seed is expanded concurrently via `asyncio.gather`, with an `asyncio.Semaphore(4)` around each `asyncio.to_thread` ytmusicapi call.
+  - **Song seed:** resolve the videoId (from `source_url`, else `search(filter="songs")`), then call `get_watch_playlist` and, when `related` is present, `get_song_related`, using **only** the "You might also like" shelf (RX4). Radio and related are interleaved and deduped within the seed.
+  - **Artist seed** (`title is None`): `search(filter="artists", limit=1)` → `get_artist(browseId)` → `songs.results`.
+  - **Score:** `Σ seed.weight / (1 + 0.1·rank)` over the seeds that produced the track. Rank is counted after removing every seed's own videoId, since the radio lists the seed first. A test caught the off-by-one before this fix.
+  - **Output:** sorted stably and capped at `limit`. `RecommendedTrack.score` is now always set.
+  - **Failures:** a failing seed (search, watch, related, or artist call) is logged at WARNING and contributes nothing. A `get_song_related` failure keeps that seed's radio.
+  - The `_YTMusicLike` protocol gains `get_song_related` and `get_artist`. The shared `_candidates()` parser skips non-list contents and items missing `videoId`, `title` or artist.
+- `tests/test_ytmusic_engine.py`: the fake client gains `get_song_related`, `get_artist`, artist search and an in-flight counter. 12 new tests:
+  - every seed contributes when the first would fill `limit` (the pre-RX6 regression)
+  - consensus outranks single-seed tracks
+  - weight ordering
+  - seed videos are never recommended, even via another seed
+  - only the related shelf "You might also like" is used (covers, string contents and artist shelves ignored)
+  - a radio/related duplicate is counted once per seed
+  - `get_song_related` is skipped when `related` is absent, and its failure keeps the radio
+  - artist seed top songs with weight
+  - an unknown artist yields nothing
+  - an artist failure doesn't affect song seeds
+  - concurrency stays ≤ 4
+
+  The RX5 "artist seed skipped" test was replaced by the real artist-seed tests, and the first test now asserts rank-decayed scores instead of `None`.
+- Live timing (dev Mac against YouTube Music, 5 song seeds + 3 artist seeds, `limit=40`, then `rerank` to 20): 2.53 s, 2.65 s, 3.29 s, 5.21 s and 5.91 s, plus one 11.43 s outlier on the first run. Each run gave 17–19 distinct artists out of 20, with 7 multi-seed (score > 1) tracks in the top 40. No cache added (a `ponytail:` note sits on `_CONCURRENCY`). RX7 re-measures on the server through the API.
+- Suite: 718 → 729 passed. mypy and ruff clean.

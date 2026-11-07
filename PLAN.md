@@ -202,7 +202,7 @@ Backend first, TDD (`backend/CLAUDE.md`). Run `poetry run pytest` green before a
 3. Check that `lastfm_engine.py` and `listenbrainz_engine.py` skip seeds with no title (or treat them as artist seeds via `artist.getTopTracks`, which Last.fm already has as `_ARTIST_TOP_WEIGHT`). Add tests for this.
 - Commit: `feat(backend): RX5 artist seeds + seed weights in /recommend`.
 
-### [ ] RX6. Backend: YTMusic engine rewrite
+### [x] RX6. Backend: YTMusic engine rewrite
 1. Tests first, in `tests/test_recommend_ytmusic.py` (or extend the existing engine tests), with a fake `_YTMusicLike` that also covers `get_song_related` and `get_artist`:
    - 3 song seeds each returning 25 tracks: the output contains tracks from all 3 (the F1 regression)
    - a track produced by 2 seeds outranks single-seed tracks

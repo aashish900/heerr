@@ -1,3 +1,6 @@
+import threading
+import time
+
 import pytest
 
 from app.services.recommenders.base import SeedTrack
@@ -8,21 +11,57 @@ class FakeYTMusic:
     def __init__(self) -> None:
         # videoId -> get_watch_playlist response
         self.watch_responses: dict[str, dict] = {}
-        # query -> search response list
+        # query -> search response list (keyed by (query, filter) when filter="artists")
         self.search_responses: dict[str, list[dict]] = {}
+        self.artist_search_responses: dict[str, list[dict]] = {}
+        # related browseId -> get_song_related shelves
+        self.related_responses: dict[str, list] = {}
+        # artist browseId -> get_artist response
+        self.artist_responses: dict[str, dict] = {}
         self.get_watch_playlist_calls: list[str] = []
         self.search_calls: list[tuple[str, str | None, int]] = []
+        self.related_calls: list[str] = []
+        self.artist_calls: list[str] = []
         self.fail_watch_ids: set[str] = set()
+        self.delay_s = 0.0
+        self._lock = threading.Lock()
+        self.in_flight = 0
+        self.max_in_flight = 0
+
+    def _enter(self) -> None:
+        with self._lock:
+            self.in_flight += 1
+            self.max_in_flight = max(self.max_in_flight, self.in_flight)
+        if self.delay_s:
+            time.sleep(self.delay_s)
+
+    def _exit(self) -> None:
+        with self._lock:
+            self.in_flight -= 1
 
     def get_watch_playlist(self, videoId: str, **kwargs: object) -> dict:
         self.get_watch_playlist_calls.append(videoId)
-        if videoId in self.fail_watch_ids:
-            raise RuntimeError(f"watch failure for {videoId}")
-        return self.watch_responses.get(videoId, {"tracks": []})
+        self._enter()
+        try:
+            if videoId in self.fail_watch_ids:
+                raise RuntimeError(f"watch failure for {videoId}")
+            return self.watch_responses.get(videoId, {"tracks": []})
+        finally:
+            self._exit()
 
     def search(self, query: str, filter: str | None = None, limit: int = 20) -> list[dict]:
         self.search_calls.append((query, filter, limit))
+        if filter == "artists":
+            return self.artist_search_responses.get(query, [])
         return self.search_responses.get(query, [])
+
+    def get_song_related(self, browseId: str) -> list:
+        self.related_calls.append(browseId)
+        return self.related_responses.get(browseId, [])
+
+    def get_artist(self, channelId: str) -> dict:
+        self.artist_calls.append(channelId)
+        return self.artist_responses.get(channelId, {})
 
 
 def _track(video_id: str, title: str, artist: str) -> dict:
@@ -62,7 +101,9 @@ async def test_seed_with_watch_url_calls_get_watch_playlist():
     ]
     assert results[0].title == "Rec One"
     assert results[0].artist == "Artist A"
-    assert results[0].score is None
+    # RX6: consensus score, rank-decayed within the seed's list.
+    assert results[0].score == pytest.approx(1.0)
+    assert results[1].score == pytest.approx(1 / 1.1)
 
 
 async def test_seed_without_url_resolves_via_search_first():
@@ -282,12 +323,187 @@ def test_factory_unknown_name_raises(monkeypatch: pytest.MonkeyPatch):
         build_recommendation_engine()
 
 
-async def test_artist_seed_never_searched_as_song():
-    # RX5: artist seeds are skipped until the RX6 rewrite resolves them via get_artist.
+# --- RX6: concurrent multi-seed, related shelf, artist seeds, consensus ------
+
+
+def _url(vid: str) -> str:
+    return f"https://music.youtube.com/watch?v={vid}"
+
+
+def _seed(vid: str, weight: float = 1.0) -> SeedTrack:
+    return SeedTrack(title="t", artist="a", source_url=_url(vid), weight=weight)
+
+
+def _vids(results) -> list[str]:
+    return [r.source_url.rsplit("=", 1)[1] for r in results]
+
+
+async def test_every_seed_contributes_even_when_first_fills_limit():
+    # Pre-RX6 regression: seed 1's radio (25 tracks) filled limit=20 alone.
+    yt = FakeYTMusic()
+    for s in ("S1", "S2", "S3"):
+        yt.watch_responses[s] = {
+            "tracks": [_track(s, "seed", "x")]
+            + [_track(f"{s}_{i}", f"T{i}", f"{s}-artist{i}") for i in range(25)]
+        }
+    engine = YTMusicEngine(yt=yt)
+
+    results = await engine.recommend([_seed("S1"), _seed("S2"), _seed("S3")], limit=20)
+
+    assert len(results) == 20
+    assert {v.split("_")[0] for v in _vids(results)} == {"S1", "S2", "S3"}
+
+
+async def test_consensus_track_outranks_single_seed_tracks():
+    yt = FakeYTMusic()
+    yt.watch_responses["S1"] = {
+        "tracks": [_track("A1", "a1", "x"), _track("A2", "a2", "x"), _track("BOTH", "b", "y")]
+    }
+    yt.watch_responses["S2"] = {"tracks": [_track("B1", "b1", "z"), _track("BOTH", "b", "y")]}
+    engine = YTMusicEngine(yt=yt)
+
+    results = await engine.recommend([_seed("S1"), _seed("S2")], limit=20)
+
+    assert _vids(results)[0] == "BOTH"
+    assert results[0].score == pytest.approx(1 / 1.2 + 1 / 1.1)
+
+
+async def test_higher_weight_seed_wins_at_same_rank():
+    yt = FakeYTMusic()
+    yt.watch_responses["LOW"] = {"tracks": [_track("FROM_LOW", "l", "x")]}
+    yt.watch_responses["HIGH"] = {"tracks": [_track("FROM_HIGH", "h", "y")]}
+    engine = YTMusicEngine(yt=yt)
+
+    results = await engine.recommend([_seed("LOW", 0.4), _seed("HIGH", 1.0)], limit=20)
+
+    assert _vids(results) == ["FROM_HIGH", "FROM_LOW"]
+    assert results[1].score == pytest.approx(0.4)
+
+
+async def test_seed_videos_never_recommended_even_via_other_seeds():
+    yt = FakeYTMusic()
+    yt.watch_responses["S1"] = {"tracks": [_track("S1", "s", "x"), _track("S2", "s2", "y")]}
+    yt.watch_responses["S2"] = {"tracks": [_track("S2", "s2", "y"), _track("S1", "s", "x")]}
+    engine = YTMusicEngine(yt=yt)
+
+    assert await engine.recommend([_seed("S1"), _seed("S2")], limit=20) == []
+
+
+async def test_related_shelf_you_might_also_like_only():
+    yt = FakeYTMusic()
+    yt.watch_responses["S1"] = {
+        "tracks": [_track("S1", "seed", "x"), _track("RADIO", "r", "r")],
+        "related": "MPTR1",
+    }
+    yt.related_responses["MPTR1"] = [
+        {"title": "You might also like", "contents": [_track("LIKE", "l", "l")]},
+        {"title": "Other performances", "contents": [_track("COVER", "seed cover", "c")]},
+        {"title": "Similar artists", "contents": [{"title": "Artist", "browseId": "UC1"}]},
+        {"title": "About the artist", "contents": "a string, not a list"},
+    ]
+    engine = YTMusicEngine(yt=yt)
+
+    results = await engine.recommend([_seed("S1")], limit=20)
+
+    assert yt.related_calls == ["MPTR1"]
+    assert sorted(_vids(results)) == ["LIKE", "RADIO"]
+
+
+async def test_related_and_radio_duplicate_counted_once_per_seed():
+    yt = FakeYTMusic()
+    yt.watch_responses["S1"] = {
+        "tracks": [_track("S1", "seed", "x"), _track("DUP", "d", "d")],
+        "related": "MPTR1",
+    }
+    yt.related_responses["MPTR1"] = [
+        {"title": "You might also like", "contents": [_track("DUP", "d", "d")]}
+    ]
+    engine = YTMusicEngine(yt=yt)
+
+    results = await engine.recommend([_seed("S1")], limit=20)
+
+    assert _vids(results) == ["DUP"]
+    assert results[0].score == pytest.approx(1.0)
+
+
+async def test_missing_related_key_skips_get_song_related():
+    yt = FakeYTMusic()
+    yt.watch_responses["S1"] = {"tracks": [_track("R", "r", "r")]}
+    engine = YTMusicEngine(yt=yt)
+
+    await engine.recommend([_seed("S1")], limit=20)
+
+    assert yt.related_calls == []
+
+
+async def test_related_failure_keeps_radio():
+    yt = FakeYTMusic()
+    yt.watch_responses["S1"] = {"tracks": [_track("R", "r", "r")], "related": "MPTR1"}
+
+    def _boom(browseId: str) -> list:
+        raise RuntimeError("related down")
+
+    yt.get_song_related = _boom  # type: ignore[method-assign]
+    engine = YTMusicEngine(yt=yt)
+
+    assert _vids(await engine.recommend([_seed("S1")], limit=20)) == ["R"]
+
+
+async def test_artist_seed_uses_artist_top_songs():
+    yt = FakeYTMusic()
+    yt.artist_search_responses["Prateek Kuhad"] = [{"browseId": "UCPK", "artist": "Prateek Kuhad"}]
+    yt.artist_responses["UCPK"] = {
+        "songs": {
+            "browseId": "VLx",
+            "results": [_track("CO2", "Co2", "Prateek Kuhad"), _track("MUL", "Mulaqat", "PK")],
+        }
+    }
+    engine = YTMusicEngine(yt=yt)
+
+    results = await engine.recommend(
+        [SeedTrack(title=None, artist="Prateek Kuhad", weight=0.7)], limit=20
+    )
+
+    assert yt.search_calls == [("Prateek Kuhad", "artists", 1)]
+    assert yt.artist_calls == ["UCPK"]
+    assert yt.get_watch_playlist_calls == []
+    assert _vids(results) == ["CO2", "MUL"]
+    assert results[0].score == pytest.approx(0.7)
+
+
+async def test_artist_seed_unknown_artist_yields_nothing():
     yt = FakeYTMusic()
     engine = YTMusicEngine(yt=yt)
 
-    results = await engine.recommend([SeedTrack(title=None, artist="Prateek Kuhad")], limit=20)
+    assert await engine.recommend([SeedTrack(title=None, artist="Nobody")], limit=20) == []
+    assert yt.artist_calls == []
 
-    assert yt.search_calls == []
-    assert results == []
+
+async def test_artist_seed_failure_does_not_kill_song_seeds():
+    yt = FakeYTMusic()
+    yt.artist_search_responses["A"] = [{"browseId": "UCA"}]
+
+    def _boom(channelId: str) -> dict:
+        raise RuntimeError("artist down")
+
+    yt.get_artist = _boom  # type: ignore[method-assign]
+    yt.watch_responses["S1"] = {"tracks": [_track("R", "r", "r")]}
+    engine = YTMusicEngine(yt=yt)
+
+    results = await engine.recommend([SeedTrack(title=None, artist="A"), _seed("S1")], limit=20)
+
+    assert _vids(results) == ["R"]
+
+
+async def test_concurrency_capped_at_four():
+    yt = FakeYTMusic()
+    yt.delay_s = 0.02
+    seeds = [_seed(f"S{i}") for i in range(10)]
+    for i in range(10):
+        yt.watch_responses[f"S{i}"] = {"tracks": [_track(f"R{i}", "r", f"a{i}")]}
+    engine = YTMusicEngine(yt=yt)
+
+    results = await engine.recommend(seeds, limit=20)
+
+    assert len(results) == 10
+    assert 1 < yt.max_in_flight <= 4
