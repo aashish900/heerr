@@ -10,7 +10,7 @@ import '../../models/search_result_item.dart';
 import '../../player/playback_actions.dart';
 import '../../providers/mixes.dart';
 import '../../providers/profiles/profile_meta.dart';
-import '../../theme.dart';
+import '../home/your_mixes_section.dart' show vibeStyle;
 import '../../widgets/empty_state.dart';
 import '../../widgets/home_recommendation_card.dart'
     show RecommendationCoverArt, RecommendationDownloadButton, previewItemFor;
@@ -110,11 +110,11 @@ class _MixList extends ConsumerWidget {
                       width: 96,
                       height: 96,
                       decoration: BoxDecoration(
-                        gradient: heerrGradient,
+                        gradient: vibeStyle(mix.id).gradient,
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Icon(
-                        Icons.graphic_eq,
+                      child: Icon(
+                        vibeStyle(mix.id).icon,
                         size: 44,
                         color: Colors.white,
                       ),

@@ -3573,3 +3573,20 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
     - row download dispatches without playing
     - Regenerate calls the notifier
 - Gates: `flutter analyze` clean; `flutter test` 1233 → 1248 passed. Not reachable from Home yet (MX8); not run on device.
+
+## 2026-11-07 — MX8: "Your Mixes" on Home
+
+- `lib/screens/home/your_mixes_section.dart` (new):
+  - `vibeStyle(id)` returns `(icon, gradient)` per vibe: chill `local_cafe_outlined`, feel-good `wb_sunny_outlined`, party `celebration_outlined`, romance `favorite_border`, heartbreak `heart_broken_outlined`, workout `fitness_center`, focus `center_focus_strong_outlined`, sleep `bedtime_outlined`; unknown ids get `graphic_eq`. The gradients are 2-colour pairs built only from `heerrMagenta`, `heerrPurple` and `heerrViolet`.
+  - `YourMixesSection`: a "Your Mixes" header and a sideways `SingleChildScrollView` row of 132px square tiles (16px gutters, 12px gaps). Each tile is the gradient with the white icon and the title, keyed `mix-tile`; a tap does `context.push(Routes.mix(id))`. It's hidden while loading, on error and when the list is empty.
+- `lib/screens/home/home_screen.dart`: `const YourMixesSection()` after `ForYouSection`, before Recently Added, plus a doc comment. The diff is kept to the insert only: an accidental folder-wide `dart format` that touched 8 unrelated Home files was reverted.
+- `lib/screens/mixes/mix_screen.dart`: the header cover now uses `vibeStyle(mix.id)`, so it matches the tile that opened it.
+- Tests:
+  - `test/screens/home/your_mixes_section_test.dart` (new, 6):
+    - the header and 8 square tiles in one row
+    - the row slides sideways to the last tile
+    - a tap pushes `/mixes/party`
+    - hidden on error and when empty
+    - 8 distinct icons, an unknown-id fallback, and brand-colour-only gradients
+  - `test/screens/home/home_screen_test.dart`: `_homeOverrides` stubs `mixVibesProvider` (empty by default). +1 test: the section's vertical position is between For You and Recently Added.
+- Gates: `flutter analyze` clean; `flutter test` 1248 → 1255 passed. Not run on device.

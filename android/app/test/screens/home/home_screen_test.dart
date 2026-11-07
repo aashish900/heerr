@@ -12,6 +12,7 @@ import 'package:dio/dio.dart';
 import 'package:heerr/models/episode_feed_response.dart';
 import 'package:heerr/models/episode_with_channel.dart';
 import 'package:heerr/models/profile_meta.dart';
+import 'package:heerr/models/mix.dart';
 import 'package:heerr/models/recommended_track.dart';
 import 'package:heerr/player/heerr_audio_handler.dart';
 import 'package:heerr/player/player_provider.dart';
@@ -20,8 +21,10 @@ import 'package:heerr/models/subsonic/song.dart';
 import 'package:heerr/providers/downloaded_songs.dart';
 import 'package:heerr/providers/home/home_providers.dart';
 import 'package:heerr/providers/profiles/profile_meta.dart';
+import 'package:heerr/providers/mixes.dart';
 import 'package:heerr/providers/recommendations.dart';
 import 'package:heerr/screens/home/for_you_section.dart';
+import 'package:heerr/screens/home/your_mixes_section.dart';
 import 'package:heerr/screens/home/home_screen.dart';
 import 'package:heerr/screens/home/quick_access_row.dart';
 import 'package:heerr/screens/home/recently_added_section.dart';
@@ -84,12 +87,14 @@ Album _album(String id, String name, {String? artist}) {
 List<Override> _homeOverrides({
   List<Album>? newest,
   List<RecommendedTrack> recs = const <RecommendedTrack>[],
+  List<MixVibe> vibes = const <MixVibe>[],
 }) => <Override>[
   homeNewestProvider.overrideWith(
     (_) async => newest ?? <Album>[_album('al-1', 'A', artist: 'B')],
   ),
   downloadedSongsProvider.overrideWith((_) async => <Song>[]),
   recommendationsProvider.overrideWith(() => _StubRecs(recs)),
+  mixVibesProvider.overrideWith((_) async => vibes),
 ];
 
 class _StubRecs extends Recommendations {
@@ -236,6 +241,41 @@ void main() {
       quick < forYou && forYou < recent,
       isTrue,
       reason: 'quick=$quick forYou=$forYou recent=$recent',
+    );
+  });
+
+  testWidgets('Your Mixes sits below For You and above Recently Added', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(1170, 9000);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      _wrap(
+        overrides: _homeOverrides(
+          recs: <RecommendedTrack>[
+            const RecommendedTrack(
+              title: 'Rec Song',
+              artist: 'Rec Artist',
+              sourceUrl: 'https://music.youtube.com/watch?v=r1',
+            ),
+          ],
+          vibes: const <MixVibe>[MixVibe(id: 'chill', title: 'Chill Mix')],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Chill Mix'), findsOneWidget);
+    final double forYou = tester.getTopLeft(find.byType(ForYouSection)).dy;
+    final double mixes = tester.getTopLeft(find.byType(YourMixesSection)).dy;
+    final double recent = tester
+        .getTopLeft(find.byType(RecentlyAddedSection))
+        .dy;
+    expect(
+      forYou < mixes && mixes < recent,
+      isTrue,
+      reason: 'forYou=$forYou mixes=$mixes recent=$recent',
     );
   });
 

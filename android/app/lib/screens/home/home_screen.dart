@@ -20,6 +20,7 @@ import 'for_you_section.dart';
 import 'home_podcasts_body.dart';
 import 'quick_access_row.dart';
 import 'recently_added_section.dart';
+import 'your_mixes_section.dart';
 
 // X1 moved the header trio (greetingForHour, the avatar button, the greeting
 // block) into the shared BrandedAppBar module; re-export the helper so
@@ -34,7 +35,8 @@ export '../../widgets/branded_header.dart' show greetingForHour;
 ///   - Music/Podcasts content switch.
 ///   - Music: search affordance, greeting block, "Continue Listening" hero
 ///     card, Quick Access row, "For You" grid (backend recommendations,
-///     hidden when there are none), "Recently Added" list.
+///     hidden when there are none), "Your Mixes" vibe tiles (Phase MX),
+///     "Recently Added" list.
 ///   - Podcasts: "Continue Listening" carousel + "Latest Episodes" list
 ///     (`screens/home/home_podcasts_body.dart`), both cross-subscription
 ///     feeds from backend Phase PA.
@@ -218,6 +220,8 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
         const QuickAccessRow(),
         // Hidden until the recommendations feed has results.
         const ForYouSection(),
+        // Phase MX vibe mixes; hidden if the vibe list can't load.
+        const YourMixesSection(),
         if (libraryEmpty && playerIdle)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),

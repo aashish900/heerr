@@ -212,7 +212,7 @@ Backend first, TDD (`backend/CLAUDE.md`, `android/CLAUDE.md`):
 2. Implement `playPreviews`, `MixScreen`, and the route `Routes.mix(id)` → `/mixes/:id` in `lib/router.dart`.
 - Commit: `feat(flutter): MX7 mix screen`.
 
-### [ ] MX8. Android: "Your Mixes" on Home
+### [x] MX8. Android: "Your Mixes" on Home
 1. Tests first:
    - `test/screens/home/your_mixes_section_test.dart`: 8 tiles in a horizontal row; a tap pushes `/mixes/<id>`; hidden on error or an empty list
    - `home_screen_test.dart`: the section sits below For You and above Recently Added (stub the provider in `_homeOverrides`)

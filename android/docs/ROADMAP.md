@@ -1071,7 +1071,7 @@ Working breakdown: `/PLAN.md` (MX0–MX10). Backend prereq: MX1–MX5 in `backen
 ### [x] MX7. `playPreviews` + mix screen
 **Files:** `lib/player/playback_actions.dart`, `lib/screens/mixes/mix_screen.dart`, `lib/router.dart`. **Commit:** `feat(flutter): MX7 mix screen`.
 
-### [ ] MX8. Your Mixes on Home
+### [x] MX8. Your Mixes on Home
 **Files:** `lib/screens/home/your_mixes_section.dart`, `lib/screens/home/home_screen.dart`. **Commit:** `feat(flutter): MX8 Your Mixes on Home`.
 
 ### [ ] MX9. Save a mix as a playlist
