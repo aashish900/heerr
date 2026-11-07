@@ -54,18 +54,18 @@ void main() {
         ],
         favourites: const <Song>[],
       );
-      expect(result.map((s) => s.title).toList(),
-          <String>['Star1', 'AlbumName']);
+      // RX8: a frequent album contributes an *artist* seed (no title).
+      expect(result.map((s) => '${s.title}/${s.artist}/${s.weight}').toList(),
+          <String>['Star1/SA/1.0', 'null/AA/0.7']);
     });
 
-    test('dedup by title+artist is case-insensitive', () {
+    test('song dedup by title+artist is case-insensitive', () {
       final result = buildSeedCollection(
         starred: <Song>[
           _song(id: 's1', title: 'Hello', artist: 'Adele'),
+          _song(id: 's2', title: 'HELLO', artist: 'adele'),
         ],
-        frequent: <Album>[
-          _album(id: 'a1', name: 'HELLO', artist: 'adele'),
-        ],
+        frequent: const <Album>[],
         favourites: const <Song>[],
       );
       expect(result, hasLength(1));
@@ -73,17 +73,27 @@ void main() {
       expect(result.first.artist, 'Adele');
     });
 
-    test('dedup trims whitespace before comparing', () {
+    test('song dedup trims whitespace before comparing', () {
       final result = buildSeedCollection(
         starred: <Song>[
           _song(id: 's1', title: '  Hello  ', artist: 'Adele'),
+          _song(id: 's2', title: 'Hello', artist: '  Adele  '),
         ],
-        frequent: <Album>[
-          _album(id: 'a1', name: 'Hello', artist: '  Adele  '),
-        ],
+        frequent: const <Album>[],
         favourites: const <Song>[],
       );
       expect(result, hasLength(1));
+    });
+
+    test('a song seed and an artist seed for the same artist are both kept',
+        () {
+      final result = buildSeedCollection(
+        starred: <Song>[_song(id: 's1', title: 'Hello', artist: 'Adele')],
+        frequent: <Album>[_album(id: 'a1', name: '25', artist: 'Adele')],
+        favourites: const <Song>[],
+      );
+      expect(result.map((s) => '${s.title}/${s.artist}').toList(),
+          <String>['Hello/Adele', 'null/Adele']);
     });
 
     test('skips entries with missing or whitespace-only artist', () {
@@ -179,7 +189,8 @@ void main() {
           _song(id: 'f1', title: 'FavT', artist: 'FavA'),
         ],
       );
-      expect(result.map((s) => s.title).toList(), <String>['Album']);
+      expect(result.map((s) => '${s.title}/${s.artist}').toList(),
+          <String>['null/AA']);
     });
 
     test('Favourites fallback also dedupes and respects the cap', () {
@@ -197,6 +208,105 @@ void main() {
       );
       expect(result, hasLength(5));
       expect(result.first.title, 'F0');
+    });
+
+    // --- RX8: artist seeds from frequent / recent albums ---------------------
+
+    test('frequent albums produce artist seeds at weight 0.7, never album titles',
+        () {
+      final result = buildSeedCollection(
+        starred: const <Song>[],
+        frequent: <Album>[
+          _album(id: 'a1', name: 'Manam', artist: 'Prateek Kuhad'),
+          _album(id: 'a2', name: 'Vaaqif', artist: 'The Local Train'),
+        ],
+        favourites: const <Song>[],
+      );
+      expect(result.every((s) => s.title == null), isTrue);
+      expect(result.map((s) => '${s.artist}/${s.weight}').toList(),
+          <String>['Prateek Kuhad/0.7', 'The Local Train/0.7']);
+    });
+
+    test('recent albums produce artist seeds at weight 0.4, after frequent', () {
+      final result = buildSeedCollection(
+        starred: const <Song>[],
+        frequent: <Album>[_album(id: 'a1', name: 'F', artist: 'FreqArtist')],
+        recent: <Album>[_album(id: 'r1', name: 'R', artist: 'RecentArtist')],
+        favourites: const <Song>[],
+      );
+      expect(result.map((s) => '${s.artist}/${s.weight}').toList(),
+          <String>['FreqArtist/0.7', 'RecentArtist/0.4']);
+    });
+
+    test('artist in both frequent and recent appears once at the higher weight',
+        () {
+      final result = buildSeedCollection(
+        starred: const <Song>[],
+        frequent: <Album>[_album(id: 'a1', name: 'F', artist: 'Anuv Jain')],
+        recent: <Album>[_album(id: 'r1', name: 'R', artist: '  anuv jain ')],
+        favourites: const <Song>[],
+      );
+      expect(result, hasLength(1));
+      expect(result.single.artist, 'Anuv Jain');
+      expect(result.single.weight, 0.7);
+    });
+
+    test('several albums by one artist yield a single artist seed', () {
+      final result = buildSeedCollection(
+        starred: const <Song>[],
+        frequent: <Album>[
+          _album(id: 'a1', name: 'One', artist: 'X'),
+          _album(id: 'a2', name: 'Two', artist: 'x'),
+        ],
+        favourites: const <Song>[],
+      );
+      expect(result, hasLength(1));
+    });
+
+    test('albums with missing or blank artist are skipped', () {
+      final result = buildSeedCollection(
+        starred: const <Song>[],
+        frequent: <Album>[
+          _album(id: 'a1', name: 'NoArtist'),
+          _album(id: 'a2', name: 'Blank', artist: '  '),
+        ],
+        recent: <Album>[_album(id: 'r1', name: 'OK', artist: 'Y')],
+        favourites: const <Song>[],
+      );
+      expect(result.map((s) => s.artist).toList(), <String>['Y']);
+    });
+
+    test('song seeds carry weight 1.0', () {
+      final result = buildSeedCollection(
+        starred: <Song>[_song(id: 's1', title: 'A', artist: 'X')],
+        frequent: const <Album>[],
+        favourites: const <Song>[],
+      );
+      expect(result.single.weight, 1.0);
+    });
+
+    test('Favourites fallback is skipped when recent has at least one seed', () {
+      final result = buildSeedCollection(
+        starred: const <Song>[],
+        frequent: const <Album>[],
+        recent: <Album>[_album(id: 'r1', name: 'R', artist: 'RA')],
+        favourites: <Song>[_song(id: 'f1', title: 'FavT', artist: 'FavA')],
+      );
+      expect(result.map((s) => s.artist).toList(), <String>['RA']);
+    });
+
+    test('maxSeeds caps the combined song + artist list', () {
+      final result = buildSeedCollection(
+        starred: <Song>[_song(id: 's1', title: 'A', artist: 'X')],
+        frequent: <Album>[
+          _album(id: 'a1', name: 'F1', artist: 'F1'),
+          _album(id: 'a2', name: 'F2', artist: 'F2'),
+        ],
+        recent: <Album>[_album(id: 'r1', name: 'R', artist: 'R')],
+        favourites: const <Song>[],
+        maxSeeds: 3,
+      );
+      expect(result.map((s) => s.artist).toList(), <String>['X', 'F1', 'F2']);
     });
   });
 }

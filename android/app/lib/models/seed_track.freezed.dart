@@ -21,10 +21,11 @@ SeedTrack _$SeedTrackFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$SeedTrack {
-  String get title => throw _privateConstructorUsedError;
+  String? get title => throw _privateConstructorUsedError;
   String get artist => throw _privateConstructorUsedError;
   @JsonKey(name: 'source_url')
   String? get sourceUrl => throw _privateConstructorUsedError;
+  double get weight => throw _privateConstructorUsedError;
 
   /// Serializes this SeedTrack to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -42,9 +43,10 @@ abstract class $SeedTrackCopyWith<$Res> {
       _$SeedTrackCopyWithImpl<$Res, SeedTrack>;
   @useResult
   $Res call({
-    String title,
+    String? title,
     String artist,
     @JsonKey(name: 'source_url') String? sourceUrl,
+    double weight,
   });
 }
 
@@ -63,16 +65,17 @@ class _$SeedTrackCopyWithImpl<$Res, $Val extends SeedTrack>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? title = null,
+    Object? title = freezed,
     Object? artist = null,
     Object? sourceUrl = freezed,
+    Object? weight = null,
   }) {
     return _then(
       _value.copyWith(
-            title: null == title
+            title: freezed == title
                 ? _value.title
                 : title // ignore: cast_nullable_to_non_nullable
-                      as String,
+                      as String?,
             artist: null == artist
                 ? _value.artist
                 : artist // ignore: cast_nullable_to_non_nullable
@@ -81,6 +84,10 @@ class _$SeedTrackCopyWithImpl<$Res, $Val extends SeedTrack>
                 ? _value.sourceUrl
                 : sourceUrl // ignore: cast_nullable_to_non_nullable
                       as String?,
+            weight: null == weight
+                ? _value.weight
+                : weight // ignore: cast_nullable_to_non_nullable
+                      as double,
           )
           as $Val,
     );
@@ -97,9 +104,10 @@ abstract class _$$SeedTrackImplCopyWith<$Res>
   @override
   @useResult
   $Res call({
-    String title,
+    String? title,
     String artist,
     @JsonKey(name: 'source_url') String? sourceUrl,
+    double weight,
   });
 }
 
@@ -117,16 +125,17 @@ class __$$SeedTrackImplCopyWithImpl<$Res>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? title = null,
+    Object? title = freezed,
     Object? artist = null,
     Object? sourceUrl = freezed,
+    Object? weight = null,
   }) {
     return _then(
       _$SeedTrackImpl(
-        title: null == title
+        title: freezed == title
             ? _value.title
             : title // ignore: cast_nullable_to_non_nullable
-                  as String,
+                  as String?,
         artist: null == artist
             ? _value.artist
             : artist // ignore: cast_nullable_to_non_nullable
@@ -135,6 +144,10 @@ class __$$SeedTrackImplCopyWithImpl<$Res>
             ? _value.sourceUrl
             : sourceUrl // ignore: cast_nullable_to_non_nullable
                   as String?,
+        weight: null == weight
+            ? _value.weight
+            : weight // ignore: cast_nullable_to_non_nullable
+                  as double,
       ),
     );
   }
@@ -144,25 +157,29 @@ class __$$SeedTrackImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$SeedTrackImpl implements _SeedTrack {
   const _$SeedTrackImpl({
-    required this.title,
+    this.title,
     required this.artist,
     @JsonKey(name: 'source_url') this.sourceUrl,
+    this.weight = 1.0,
   });
 
   factory _$SeedTrackImpl.fromJson(Map<String, dynamic> json) =>
       _$$SeedTrackImplFromJson(json);
 
   @override
-  final String title;
+  final String? title;
   @override
   final String artist;
   @override
   @JsonKey(name: 'source_url')
   final String? sourceUrl;
+  @override
+  @JsonKey()
+  final double weight;
 
   @override
   String toString() {
-    return 'SeedTrack(title: $title, artist: $artist, sourceUrl: $sourceUrl)';
+    return 'SeedTrack(title: $title, artist: $artist, sourceUrl: $sourceUrl, weight: $weight)';
   }
 
   @override
@@ -173,12 +190,14 @@ class _$SeedTrackImpl implements _SeedTrack {
             (identical(other.title, title) || other.title == title) &&
             (identical(other.artist, artist) || other.artist == artist) &&
             (identical(other.sourceUrl, sourceUrl) ||
-                other.sourceUrl == sourceUrl));
+                other.sourceUrl == sourceUrl) &&
+            (identical(other.weight, weight) || other.weight == weight));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, title, artist, sourceUrl);
+  int get hashCode =>
+      Object.hash(runtimeType, title, artist, sourceUrl, weight);
 
   /// Create a copy of SeedTrack
   /// with the given fields replaced by the non-null parameter values.
@@ -196,21 +215,24 @@ class _$SeedTrackImpl implements _SeedTrack {
 
 abstract class _SeedTrack implements SeedTrack {
   const factory _SeedTrack({
-    required final String title,
+    final String? title,
     required final String artist,
     @JsonKey(name: 'source_url') final String? sourceUrl,
+    final double weight,
   }) = _$SeedTrackImpl;
 
   factory _SeedTrack.fromJson(Map<String, dynamic> json) =
       _$SeedTrackImpl.fromJson;
 
   @override
-  String get title;
+  String? get title;
   @override
   String get artist;
   @override
   @JsonKey(name: 'source_url')
   String? get sourceUrl;
+  @override
+  double get weight;
 
   /// Create a copy of SeedTrack
   /// with the given fields replaced by the non-null parameter values.

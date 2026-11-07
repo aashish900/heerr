@@ -180,7 +180,7 @@ class _SearchSubsonicAdapter implements HttpClientAdapter {
 }
 
 void main() {
-  test('POSTs /recommend with the collected seeds + limit 20', () async {
+  test('POSTs /recommend with the collected seeds + limit 40', () async {
     final _FakeAdapter adapter = _FakeAdapter(
       (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
     );
@@ -202,7 +202,7 @@ void main() {
 
     final Map<String, dynamic> body =
         jsonDecode(utf8.decode(adapter.bodies.single)) as Map<String, dynamic>;
-    expect(body['limit'], 20);
+    expect(body['limit'], 40); // RX8: over-fetch; owned rows are dropped
     final List<dynamic> seeds = body['seeds'] as List<dynamic>;
     expect(seeds, hasLength(2));
     // Sampling shuffles the seed order, so assert membership not position.
@@ -279,7 +279,7 @@ void main() {
     final Map<String, dynamic> body =
         jsonDecode(utf8.decode(adapter.bodies.single)) as Map<String, dynamic>;
     expect((body['seeds'] as List<dynamic>), isEmpty);
-    expect(body['limit'], 20);
+    expect(body['limit'], 40); // RX8: over-fetch; owned rows are dropped
   });
 
   test('refresh() re-issues the POST', () async {
@@ -302,8 +302,8 @@ void main() {
   });
 
   test(
-      'cross-reference: results that match Subsonic search3 get '
-      'inLibrary=true + subsonicSongId; the rest stay remote', () async {
+      'cross-reference: results that match Subsonic search3 are owned and '
+      'hidden (RX8); the rest stay remote', () async {
     final _FakeAdapter adapter = _FakeAdapter(
       (_) => _json(<String, dynamic>{
         'results': <Map<String, dynamic>>[
@@ -337,18 +337,10 @@ void main() {
 
     final List<RecommendedTrack> tracks =
         await c.read(recommendationsProvider.future);
-    expect(tracks, hasLength(2));
+    expect(tracks.map((RecommendedTrack t) => t.title).toList(),
+        <String>['RemoteSong']);
 
-    final RecommendedTrack owned =
-        tracks.firstWhere((RecommendedTrack t) => t.title == 'OwnedSong');
-    final RecommendedTrack remote =
-        tracks.firstWhere((RecommendedTrack t) => t.title == 'RemoteSong');
-
-    expect(owned.inLibrary, isTrue);
-    expect(owned.subsonicSongId, 'lib-song-42');
-    // coverArt from the search3 match flows through to the model so the
-    // Home recommendation card can render the cached album art.
-    expect(owned.coverArt, 'cover-art-42');
+    final RecommendedTrack remote = tracks.single;
     expect(remote.inLibrary, isFalse);
     expect(remote.subsonicSongId, isNull);
     expect(remote.coverArt, isNull);
@@ -359,6 +351,40 @@ void main() {
       expect(r.path, '/rest/search3.view');
       expect(r.queryParameters['songCount'], 1);
     }
+  });
+
+  test('shows at most 20 results after dropping owned ones (RX8)', () async {
+    final _FakeAdapter adapter = _FakeAdapter(
+      (_) => _json(<String, dynamic>{
+        'results': <Map<String, dynamic>>[
+          for (int i = 0; i < 40; i++)
+            <String, dynamic>{
+              'title': 'Song$i',
+              'artist': 'Artist$i',
+              'source_url': 'https://music.youtube.com/watch?v=v$i',
+            },
+        ],
+      }),
+    );
+    // Every 4th result (0, 4, 8, ...) is already in the library.
+    final _SearchSubsonicAdapter sub = _SearchSubsonicAdapter(<String, String>{
+      for (int i = 0; i < 40; i += 4) 'Artist$i Song$i': 'lib-$i',
+    });
+    final ProviderContainer c = _container(
+      adapter: adapter,
+      seeds: <SeedTrack>[const SeedTrack(title: 't', artist: 'a')],
+      subsonicAdapter: sub,
+    );
+    addTearDown(c.dispose);
+
+    final List<RecommendedTrack> tracks =
+        await c.read(recommendationsProvider.future);
+
+    expect(tracks, hasLength(20));
+    expect(tracks.any((RecommendedTrack t) => t.inLibrary), isFalse);
+    // Order preserved: backend ranking survives the filter.
+    expect(tracks.first.title, 'Song1');
+    expect(tracks.last.title, 'Song26');
   });
 
   test('cross-reference failure for one result does not break the list',

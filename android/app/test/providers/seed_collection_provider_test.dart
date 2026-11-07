@@ -138,8 +138,9 @@ void main() {
   // gracefully no-op in test rather than throwing on the binding.
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('hits getStarred2.view and getAlbumList2 with type=frequent, size=30',
-      () async {
+  test(
+      'hits getStarred2.view and getAlbumList2 for frequent (30) and '
+      'recent (20)', () async {
     final _RouterAdapter adapter = _RouterAdapter(
       <String, FutureOr<ResponseBody> Function(RequestOptions)>{
         '/rest/getStarred2.view': (_) => _emptyStarred(),
@@ -155,14 +156,17 @@ void main() {
     await c.read(seedCollectionProvider.future);
 
     expect(adapter.countFor('/rest/getStarred2.view'), 1);
-    expect(adapter.countFor('/rest/getAlbumList2.view'), 1);
-    final RequestOptions albumReq =
-        adapter.lastFor('/rest/getAlbumList2.view')!;
-    expect(albumReq.queryParameters['type'], 'frequent');
-    expect(albumReq.queryParameters['size'], 30);
+    expect(adapter.countFor('/rest/getAlbumList2.view'), 2);
+    final Map<dynamic, dynamic> sizeByType = <dynamic, dynamic>{
+      for (final RequestOptions r in adapter.requests
+          .where((RequestOptions r) => r.path == '/rest/getAlbumList2.view'))
+        r.queryParameters['type']: r.queryParameters['size'],
+    };
+    expect(sizeByType, <dynamic, dynamic>{'frequent': 30, 'recent': 20});
   });
 
-  test('parses starred songs and frequent albums into SeedTracks', () async {
+  test('parses starred songs into song seeds and albums into artist seeds',
+      () async {
     final _RouterAdapter adapter = _RouterAdapter(
       <String, FutureOr<ResponseBody> Function(RequestOptions)>{
         '/rest/getStarred2.view': (_) => _starredSongs(<Map<String, dynamic>>[
@@ -188,8 +192,10 @@ void main() {
 
     final List<SeedTrack> seeds =
         await c.read(seedCollectionProvider.future);
-    expect(seeds.map((s) => '${s.title}/${s.artist}').toList(),
-        <String>['StarSong/StarArtist', 'FreqAlbum/FreqArtist']);
+    // The adapter routes by path, so frequent + recent both return FreqAlbum;
+    // its artist dedupes to one seed at the frequent weight.
+    expect(seeds.map((s) => '${s.title}/${s.artist}/${s.weight}').toList(),
+        <String>['StarSong/StarArtist/1.0', 'null/FreqArtist/0.7']);
   });
 
   test(

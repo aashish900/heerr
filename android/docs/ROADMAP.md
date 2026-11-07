@@ -1051,7 +1051,7 @@ Working breakdown: `/PLAN.md` (RX0–RX9). Backend prereq: RX1–RX7 in `backend
 ### [x] RX0. ADRs + roadmap
 **Commit:** `docs: plan phase RX (recommendations v2)`.
 
-### [ ] RX8. Artist seeds + weights, hide owned songs in For You
+### [x] RX8. Artist seeds + weights, hide owned songs in For You
 **Files:** `lib/models/seed_track.dart`, `lib/providers/recommendations.dart`, `test/providers/recommendations_provider_test.dart`. **Commit:** `feat(flutter): RX8 artist seeds + weights, hide owned songs in For You`.
 
 ### [ ] RX9. On-device smoke + docs + v5.7.2

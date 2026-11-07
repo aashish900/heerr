@@ -6,17 +6,18 @@ part of 'recommendations.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$seedCollectionHash() => r'ab8dc14207bc3a37b62e4f7b167cf9300db812bd';
+String _$seedCollectionHash() => r'8d397e7ca0c79b57a78f18ac1d180b181ea8cec5';
 
 /// Recommendation seed collection — input to the backend `POST /recommend`.
 ///
 /// Order of operations:
 ///   1. `getStarred2.view` → starred songs.
 ///   2. `getAlbumList2.view?type=frequent&size=30` → frequently played albums.
-///   3. If both came back empty, read the Favourites playlist via the
+///   3. `getAlbumList2.view?type=recent&size=20` → recently played albums.
+///   4. If all three came back empty, read the Favourites playlist via the
 ///      existing [favouritesPlaylistProvider] + [libraryPlaylistProvider]
 ///      chain.
-///   4. Merge via [buildSeedCollection] — starred first, dedup, cap.
+///   5. Merge via [buildSeedCollection] — song seeds, then artist seeds.
 ///
 /// Errors from the Subsonic calls propagate to the caller as `AsyncError`.
 ///
@@ -36,7 +37,7 @@ final seedCollectionProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef SeedCollectionRef = AutoDisposeFutureProviderRef<List<SeedTrack>>;
-String _$recommendationsHash() => r'4a7ebcac39b9461499985f56d914e6d0c47c6790';
+String _$recommendationsHash() => r'97c8460c55a1c48c5eadc8fe3e4dd7a4cdb2a540';
 
 /// See also [Recommendations].
 @ProviderFor(Recommendations)

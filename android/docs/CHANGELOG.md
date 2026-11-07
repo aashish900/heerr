@@ -3394,3 +3394,25 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 ## 2026-11-07 — v5.7.1: version sync only
 
 - Version bump `5.7.0` → `5.7.1` (`android/app/pubspec.yaml`) for the backend RX7a cover/alternate-version filter. No Android code changes. Android RX8 ships as 5.7.2.
+
+## 2026-11-07 — RX8: For You artist seeds + weights; owned songs hidden
+
+- `lib/models/seed_track.dart`: `title` is now nullable (null means an **artist seed**). New `@Default(1.0) double weight`. A null title is left out of the JSON via the global `include_if_null: false` in `build.yaml`, which the backend (v5.7.0+) reads as an artist seed. `seedForSong` ("Find similar") is unchanged: a song seed at weight 1.0. Regenerated `seed_track.freezed.dart` and `seed_track.g.dart`.
+- `lib/providers/recommendations.dart`:
+  - `buildSeedCollection` has a new optional `recent` album list. Seeds, in order:
+    - starred songs → song seeds (1.0)
+    - frequent-album artists → artist seeds (0.7)
+    - recent-album artists → artist seeds (0.4)
+
+    Artists dedupe by trimmed lowercase name, and the first (highest-weight) occurrence wins. Favourites is still the fallback, now only when all three sources are empty. The overall cap stays 20. Albums no longer become `(album name, artist)` song seeds; that pre-RX8 shape resolved to arbitrary songs on the backend.
+  - `seedCollection` adds a `getAlbumList2?type=recent&size=20` call.
+  - `Recommendations.build` requests `limit: 40` (`_kRecommendationsLimit`), drops results that `search3` hydration marks `inLibrary`, and shows the first 20 (`_kRecommendationsShown`). This applies to "Find similar" too.
+  - Known ceiling, marked with a `ponytail:` comment: 20+ starred songs fill the seed cap and leave no artist seeds.
+  - Regenerated `recommendations.g.dart`.
+- Tests:
+  - `test/providers/seed_collection_logic_test.dart`: album-title expectations replaced by artist seeds, and song dedupe tests now dedupe among songs. 9 new tests: a song and an artist seed for the same artist are both kept; frequent albums give 0.7 artist seeds; recent albums give 0.4 seeds, ordered after frequent; an artist in both lists appears once at 0.7; several albums by one artist give one seed; blank album artists are skipped; song seed weight is 1.0; the Favourites fallback is skipped when recent has data; the cap covers the combined list.
+  - `test/providers/seed_collection_provider_test.dart`: expects two `getAlbumList2` calls (`frequent`/30 and `recent`/20) and artist seeds.
+  - `test/providers/recommendations_provider_test.dart`: limit 40; owned search3 matches are hidden. New test: 40 results with every 4th owned gives exactly 20 non-owned results, in backend order.
+  - `test/models/seed_track_test.dart` (new): song seed JSON, and an artist seed JSON with no `title` key.
+- `lib/providers/jam_host.g.dart` was regenerated with a new hash by `build_runner` (stale from Phase JM, unrelated). Reverted to keep this change in scope.
+- Gates: `flutter analyze` clean; `flutter test` 1189 → 1201 passed.

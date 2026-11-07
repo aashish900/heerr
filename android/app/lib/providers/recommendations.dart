@@ -16,10 +16,14 @@ import 'library/library_playlist.dart';
 
 part 'recommendations.g.dart';
 
-/// Default `limit` sent to the backend's `POST /api/v1/recommend`. Matches
-/// the screen's typical viewport — enough variety, short enough to be
-/// scrollable without pagination.
-const int _kRecommendationsLimit = 20;
+/// `limit` sent to the backend's `POST /api/v1/recommend`. Twice what is
+/// shown: results already in the library are dropped after hydration, so the
+/// over-fetch keeps the feed full (RX8).
+const int _kRecommendationsLimit = 40;
+
+/// Results shown after owned songs are filtered out. Matches the screen's
+/// typical viewport — enough variety, short enough to scroll without paging.
+const int _kRecommendationsShown = 20;
 
 /// Optional override seed for [recommendationsProvider]. When non-null, the
 /// recommendations notifier uses it as the **sole** seed instead of pulling
@@ -42,53 +46,73 @@ const int _kMaxSeeds = 20;
 /// artist fields before bottoming out below `_kMaxSeeds`.
 const int _kFrequentAlbumSize = 30;
 
-/// Pure merge function — kept separate from the provider so the rules
-/// (starred-first ranking, case-insensitive + whitespace-tolerant dedup
-/// by `title+artist`, Favourites fallback when both primary sources are
-/// empty, and the [_kMaxSeeds] cap) are testable without standing up a
-/// Riverpod container.
+/// Size requested from `getAlbumList2.view?type=recent` (RX8).
+const int _kRecentAlbumSize = 20;
+
+/// Seed weights (RX8): a starred song is the strongest signal; an artist you
+/// play a lot beats one you merely played recently.
+const double _kStarredWeight = 1.0;
+const double _kFrequentArtistWeight = 0.7;
+const double _kRecentArtistWeight = 0.4;
+
+/// Pure merge function — kept separate from the provider so the rules are
+/// testable without standing up a Riverpod container.
 ///
-/// `starred` is the user's starred songs (strongest signal). `frequent`
-/// is the user's most-played albums — each album contributes one seed
-/// shaped as `(album.name, album.artist)`. `favourites` are the songs in
-/// the lazy-created Favourites playlist (N2 fallback only — supplied as
-/// `<>` when the primary sources had anything).
+/// Output order, capped at [maxSeeds] overall:
+///   1. `starred` songs → **song seeds** at weight 1.0, deduped by
+///      case-insensitive, whitespace-trimmed `title|artist`.
+///   2. `frequent` albums → **artist seeds** (title null) at weight 0.7.
+///   3. `recent` albums → artist seeds at weight 0.4.
+///   Artist seeds dedupe by trimmed lowercase artist; the first (highest
+///   weight) occurrence wins. An album never becomes a song seed — pre-RX8 the
+///   album name was sent as a song title and the backend resolved it to an
+///   arbitrary track.
+///   4. `favourites` songs → song seeds, **only** when 1–3 produced nothing.
 ///
-/// `favourites` is consulted only when the primary sources produced zero
-/// seeds. This avoids stacking Favourites entries on top of the starred /
-/// frequent ranking on every fetch.
+/// A song seed and an artist seed for the same artist are both kept: they
+/// ask the backend different questions (similar-to-this-song vs this artist's
+/// top songs).
 List<SeedTrack> buildSeedCollection({
   required List<Song> starred,
   required List<Album> frequent,
+  List<Album> recent = const <Album>[],
   required List<Song> favourites,
   int maxSeeds = _kMaxSeeds,
 }) {
+  // ponytail: starred songs fill the cap first; a user with 20+ starred songs
+  // gets no artist seeds. Reserve slots per source if that starves variety.
   final List<SeedTrack> out = <SeedTrack>[];
-  final Set<String> seen = <String>{};
+  final Set<String> seenSongs = <String>{};
+  final Set<String> seenArtists = <String>{};
 
-  String key(String title, String artist) =>
-      '${title.toLowerCase().trim()}|${artist.toLowerCase().trim()}';
+  String norm(String v) => v.toLowerCase().trim();
+  bool blank(String? v) => v == null || v.trim().isEmpty;
 
-  void tryAdd(String? title, String? artist) {
-    if (out.length >= maxSeeds) return;
-    if (title == null || title.trim().isEmpty) return;
-    if (artist == null || artist.trim().isEmpty) return;
-    final String k = key(title, artist);
-    if (seen.contains(k)) return;
-    seen.add(k);
-    out.add(SeedTrack(title: title, artist: artist));
+  void addSong(String? title, String? artist) {
+    if (out.length >= maxSeeds || blank(title) || blank(artist)) return;
+    if (!seenSongs.add('${norm(title!)}|${norm(artist!)}')) return;
+    out.add(SeedTrack(title: title, artist: artist, weight: _kStarredWeight));
+  }
+
+  void addArtist(String? artist, double weight) {
+    if (out.length >= maxSeeds || blank(artist)) return;
+    if (!seenArtists.add(norm(artist!))) return;
+    out.add(SeedTrack(artist: artist, weight: weight));
   }
 
   for (final Song s in starred) {
-    tryAdd(s.title, s.artist);
+    addSong(s.title, s.artist);
   }
   for (final Album a in frequent) {
-    tryAdd(a.name, a.artist);
+    addArtist(a.artist, _kFrequentArtistWeight);
+  }
+  for (final Album a in recent) {
+    addArtist(a.artist, _kRecentArtistWeight);
   }
 
   if (out.isEmpty) {
     for (final Song s in favourites) {
-      tryAdd(s.title, s.artist);
+      addSong(s.title, s.artist);
     }
   }
 
@@ -100,10 +124,11 @@ List<SeedTrack> buildSeedCollection({
 /// Order of operations:
 ///   1. `getStarred2.view` → starred songs.
 ///   2. `getAlbumList2.view?type=frequent&size=30` → frequently played albums.
-///   3. If both came back empty, read the Favourites playlist via the
+///   3. `getAlbumList2.view?type=recent&size=20` → recently played albums.
+///   4. If all three came back empty, read the Favourites playlist via the
 ///      existing [favouritesPlaylistProvider] + [libraryPlaylistProvider]
 ///      chain.
-///   4. Merge via [buildSeedCollection] — starred first, dedup, cap.
+///   5. Merge via [buildSeedCollection] — song seeds, then artist seeds.
 ///
 /// Errors from the Subsonic calls propagate to the caller as `AsyncError`.
 @riverpod
@@ -114,15 +139,18 @@ Future<List<SeedTrack>> seedCollection(SeedCollectionRef ref) async {
   final List<Song> starred = await service.getStarredSongs();
   final List<Album> frequent =
       await service.getAlbumList(type: 'frequent', size: _kFrequentAlbumSize);
+  final List<Album> recent =
+      await service.getAlbumList(type: 'recent', size: _kRecentAlbumSize);
 
   List<Song> favourites = const <Song>[];
-  if (starred.isEmpty && frequent.isEmpty) {
+  if (starred.isEmpty && frequent.isEmpty && recent.isEmpty) {
     favourites = await _fetchFavouriteSongs(ref);
   }
 
   return buildSeedCollection(
     starred: starred,
     frequent: frequent,
+    recent: recent,
     favourites: favourites,
   );
 }
@@ -163,8 +191,8 @@ List<SeedTrack> sampleSeeds(
 /// Recommendation results from the heerr backend (`POST /api/v1/recommend`).
 ///
 /// Reads the user's seed collection via [seedCollectionProvider] (N2), POSTs
-/// `{seeds, limit: 20}` to the backend, returns the parsed [RecommendedTrack]
-/// list for the UI.
+/// `{seeds, limit: 40}` to the backend, and returns up to 20 parsed
+/// [RecommendedTrack]s that are **not** already in the library (RX8).
 ///
 /// When the seed collection is empty, still calls the backend with
 /// `seeds: []` — the listenbrainz engine drives its own history-based
@@ -209,8 +237,13 @@ class Recommendations extends _$Recommendations {
     // Cross-reference each result against the Subsonic library via
     // `search3`. Library-side failures are swallowed per result so one bad
     // search3 doesn't kill the whole list — the result just falls through as
-    // inLibrary=false.
-    return _hydrateLibraryMatches(base);
+    // inLibrary=false. For You recommends songs you don't own yet (RX8), so
+    // owned matches are dropped and the over-fetch is trimmed to the shown size.
+    final List<RecommendedTrack> hydrated = await _hydrateLibraryMatches(base);
+    return hydrated
+        .where((RecommendedTrack r) => !r.inLibrary)
+        .take(_kRecommendationsShown)
+        .toList();
   }
 
   Future<List<RecommendedTrack>> _hydrateLibraryMatches(
