@@ -3498,3 +3498,7 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
     - in flight shows the spinner and no button
     - a preview without `sourceUrl` shows no button
 - Gates: `flutter analyze` clean; `flutter test` 1220 → 1222 passed. Not run on device.
+
+## 2026-11-07 — v5.7.4: download buttons (Home For You cards, Now Playing previews)
+
+- Version bump `5.7.3` → `5.7.4` (`android/app/pubspec.yaml`). Ships the two entries above. Not smoke-tested on device; RX9 is still open.
