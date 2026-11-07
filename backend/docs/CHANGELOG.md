@@ -1233,3 +1233,26 @@ Design consequences, written into `/PLAN.md` §5.4:
 - Version bump `5.6.3` → `5.7.0` (`backend/pyproject.toml`, `backend/app/main.py`). Ships RX1–RX6 (entries above): consensus multi-seed YTMusic engine, per-user re-rank, migration `0016` (`rec_feedback`), and `POST /recommend/dismiss`.
 - Deploy: `heerr-migrate` must apply `0016`. The wire changes are additive, so the current Android client keeps working, and it gets the re-ranked feed immediately.
 - Release split decided at tag time: the backend ships now as 5.7.0 so RX7 can smoke it on the server, and the Android RX8 changes will ship as **5.7.1** (`/PLAN.md` RX9 updated).
+
+## 2026-11-07 — RX7: home-server smoke of v5.7.0 (passed)
+
+Deploy: `docker compose pull` + `up -d heerr-migrate heerr-backend`. `heerr-migrate` logged `Running upgrade 0015 -> 0016, rec_feedback …`.
+
+Smoke script (not committed): a throwaway `--scopes read --user system-admin` token, revoked on exit, so the owner's own `rec_feedback` stays clean. Seeds: 3 song seeds (Tum Hi Ho / Arijit Singh, High and Dry / Radiohead, Co2 / Prateek Kuhad) plus 1 artist seed (The Local Train, weight 0.7), `limit: 20`, against `http://localhost:8000/api/v1`.
+
+| Check | Result |
+|---|---|
+| `GET /recommend/health` | `{"engine":"ytmusic","status":"ok","fallback_active":false}`, so the server runs the default engine |
+| `POST /recommend` #1 | 200 in **2.41 s**, 20 results, **18 distinct artists** |
+| `POST /recommend/dismiss` (top result) | 204 |
+| `POST /recommend` #2 | 200 in **4.25 s**, 20 results, 18 distinct artists, **dismissed URL absent**, overlap with #1: **0/20** |
+| `rec_feedback` (system-admin) | 49 rows, 60 shows, 1 dismissed |
+| Token cleanup | revoked |
+
+An earlier aborted attempt (a script quoting bug, not the API) returned 200 in 2.48 s and recorded 20 shows. That's why the totals are 60 shows, and why call #1's top scores (at most 0.84) sit below consensus level: the strongest tracks were already demoted.
+
+Observations for later, not acted on:
+- With 40 candidates and `SHOWN_PENALTY = 0.3`, a refresh fully rotates the list. Raise the penalty toward 0.5 if favourites should persist across refreshes.
+- Covers and alternate versions leak in from the **radio**, e.g. "(Cover)", "(Live)", "(Acoustic)", "(Em Beihold Version)". The related shelf is already filtered. A title-keyword filter in the engine would remove them if wanted.
+
+Response times are under the 6 s budget, so no cache is needed (RX6 `ponytail:` note stands). RX8 (Android) is unblocked.

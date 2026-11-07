@@ -216,7 +216,7 @@ Backend first, TDD (`backend/CLAUDE.md`). Run `poetry run pytest` green before a
 3. Time a real `/recommend` call with 8 seeds over Tailscale. If it takes more than 6 s, add an in-memory TTL cache keyed by videoId or artist (marked `ponytail:`).
 - Commit: `feat(backend): RX6 ytmusic engine — concurrent multi-seed, related songs, artist seeds, consensus score`.
 
-### [ ] RX7. Backend: curl smoke on the home server
+### [x] RX7. Backend: curl smoke on the home server
 1. Rebuild and deploy (`docker compose up -d --build heerr-backend`), and confirm `heerr-migrate` applied `0016`.
 2. Call `POST /recommend` with 3 starred-song seeds and 1 artist seed, `limit: 20`. Check that the results include more than 8 distinct artists and nothing you've already requested.
 3. Call `POST /recommend/dismiss` with one result, then call `/recommend` again with the same seeds and confirm the dismissed song is gone and earlier results have moved down.

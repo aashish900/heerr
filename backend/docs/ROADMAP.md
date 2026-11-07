@@ -571,7 +571,7 @@ Verify `get_song_related`, `search(filter="artists")`, `get_artist` unauthentica
 ### [x] RX6. YTMusic engine rewrite
 **Files:** `app/services/recommenders/ytmusic_engine.py`, engine tests. **Commit:** `feat(backend): RX6 ytmusic engine — concurrent multi-seed, related songs, artist seeds, consensus score`.
 
-### [ ] RX7. Home-server curl smoke
+### [x] RX7. Home-server curl smoke
 Gate for Android RX8 (`/CLAUDE.md` backend-first rule).
 
 ---
