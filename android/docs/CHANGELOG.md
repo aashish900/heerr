@@ -3390,3 +3390,7 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 ## 2026-11-07 — v5.7.0: version sync only
 
 - Version bump `5.6.3` → `5.7.0` (`android/app/pubspec.yaml`) for the backend recommendations v2 release (Phase RX, RX1–RX6). No Android code changes; the existing For You screen gets the backend's re-ranked feed without a client change. Android RX8 ships as 5.7.1.
+
+## 2026-11-07 — v5.7.1: version sync only
+
+- Version bump `5.7.0` → `5.7.1` (`android/app/pubspec.yaml`) for the backend RX7a cover/alternate-version filter. No Android code changes. Android RX8 ships as 5.7.2.

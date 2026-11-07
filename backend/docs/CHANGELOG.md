@@ -1269,3 +1269,8 @@ Response times are under the 6 s budget, so no cache is needed (RX6 `ponytail:` 
   - 1 test that `rerank` drops an alternate version and keeps the original.
 - `SHOWN_PENALTY` stays 0.3 (user decision). Not yet released: ships with the next tag.
 - Suite: 729 → 752 passed. mypy and ruff clean.
+
+## 2026-11-07 — v5.7.1: recommendations drop covers / alternate versions
+
+- Version bump `5.7.0` → `5.7.1` (`backend/pyproject.toml`, `backend/app/main.py`). Ships RX7a (entry above). No schema or contract change: redeploying `heerr-backend` is enough (no new migration).
+- Android RX8 now ships as **5.7.2** (`/PLAN.md` RX9 and `android/docs/ROADMAP.md` updated).
