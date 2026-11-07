@@ -21,9 +21,13 @@ class _MockHandler extends Mock implements HeerrAudioHandler {}
 class _StubRecs extends Recommendations {
   _StubRecs(this._load);
   final Future<List<RecommendedTrack>> Function() _load;
+  int refreshCalls = 0;
 
   @override
   Future<List<RecommendedTrack>> build() => _load();
+
+  @override
+  Future<void> refresh() async => refreshCalls++;
 }
 
 class _StubMeta extends ProfileMetaNotifier {
@@ -47,6 +51,7 @@ Widget _wrap({
   required Future<List<RecommendedTrack>> Function() recs,
   String? nickname,
   HeerrAudioHandler? handler,
+  _StubRecs? stub,
 }) {
   final GoRouter router = GoRouter(
     routes: <RouteBase>[
@@ -63,7 +68,7 @@ Widget _wrap({
   );
   return ProviderScope(
     overrides: <Override>[
-      recommendationsProvider.overrideWith(() => _StubRecs(recs)),
+      recommendationsProvider.overrideWith(() => stub ?? _StubRecs(recs)),
       profileMetaNotifierProvider.overrideWith(() => _StubMeta(nickname)),
       activeProfileOverride(),
       if (handler != null) audioHandlerProvider.overrideWithValue(handler),
@@ -127,29 +132,92 @@ void main() {
     expect(find.text('RECS_SCREEN'), findsOneWidget);
   });
 
-  testWidgets('3-column grid of equal-width cards, at most 6', (
+  testWidgets('every recommendation gets a card (no 6 cap)', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_wrap(recs: () async => _tracks(20)));
+    await tester.pumpAndSettle();
+
+    expect(_cards(), findsNWidgets(20));
+  });
+
+  testWidgets('two rows filled column by column, equal-width cards', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(_wrap(recs: () async => _tracks(8)));
     await tester.pumpAndSettle();
 
-    expect(_cards(), findsNWidgets(6));
     final List<Rect> r = List<Rect>.generate(
-      6,
+      8,
       (int i) => tester.getRect(_cards().at(i)),
     );
-    // Row 1: three cards side by side, same top, same width.
-    expect(r[0].top, r[1].top);
-    expect(r[1].top, r[2].top);
-    expect(r[0].left < r[1].left && r[1].left < r[2].left, isTrue);
-    expect(r[0].width, closeTo(r[2].width, 0.01));
-    // Row 2 starts under row 1, back at the left edge.
-    expect(r[3].top, greaterThan(r[0].bottom));
-    expect(r[3].left, r[0].left);
-    // 16px page gutters, 10px gaps (design): 3w + 2*10 = screen - 32.
+    // Column 1: Song 0 on top of Song 1.
+    expect(r[1].left, r[0].left);
+    expect(r[1].top, greaterThan(r[0].bottom));
+    // Column 2 starts at the top again, 10px gap to the right.
+    expect(r[2].top, r[0].top);
+    expect(r[2].left - r[0].right, closeTo(10, 0.01));
+    // Only two rows.
+    expect(r[3].top, r[1].top);
+    expect(r[0].width, closeTo(r[7].width, 0.01));
+  });
+
+  testWidgets('three columns visible plus a peek of the fourth', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_wrap(recs: () async => _tracks(12)));
+    await tester.pumpAndSettle();
+
     final double screen =
         tester.view.physicalSize.width / tester.view.devicePixelRatio;
-    expect(r[0].width * 3 + 20, closeTo(screen - 32, 0.5));
+    final Rect col1 = tester.getRect(_cards().at(0));
+    final Rect col3 = tester.getRect(_cards().at(4));
+    final Rect col4 = tester.getRect(_cards().at(6));
+    expect(col1.left, 16);
+    expect(col3.right, lessThan(screen));
+    // Fourth column starts on screen but is cut off by the edge.
+    expect(col4.left, lessThan(screen));
+    expect(col4.right, greaterThan(screen));
+    // 16 gutter + 3 cards + 3 gaps + 24px peek == screen width.
+    expect(16 + col1.width * 3 + 30 + 24, closeTo(screen, 0.5));
+  });
+
+  testWidgets('slides sideways to reveal later recommendations', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_wrap(recs: () async => _tracks(12)));
+    await tester.pumpAndSettle();
+
+    final double screen =
+        tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    expect(tester.getRect(_cards().at(11)).left, greaterThan(screen));
+
+    await tester.drag(_cards().first, const Offset(-2000, 0));
+    await tester.pumpAndSettle();
+
+    final Rect last = tester.getRect(_cards().at(11));
+    expect(last.right, lessThanOrEqualTo(screen));
+    expect(last.left, greaterThan(0));
+  });
+
+  testWidgets('refresh button beside the title fetches new recommendations', (
+    WidgetTester tester,
+  ) async {
+    final _StubRecs stub = _StubRecs(() async => _tracks(3));
+    await tester.pumpWidget(_wrap(recs: () async => _tracks(3), stub: stub));
+    await tester.pumpAndSettle();
+
+    final Finder button = find.byTooltip('New recommendations');
+    expect(button, findsOneWidget);
+    // Sits on the "For You" title line, to its right.
+    final Rect title = tester.getRect(find.text('For You'));
+    final Rect btn = tester.getRect(button);
+    expect(btn.left, greaterThan(title.right));
+    expect(btn.center.dy, closeTo(title.center.dy, 12));
+
+    await tester.tap(button);
+    await tester.pump();
+    expect(stub.refreshCalls, 1);
   });
 
   testWidgets('card: #1C1C1C fill, 1px #2E2E2E border, 14px radius', (
@@ -228,15 +296,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Play Song 1'));
+    await tester.tap(find.byTooltip('Play Song 0'));
     await tester.pump();
 
     final MediaItem item =
         verify(() => handler.playSong(captureAny())).captured.single
             as MediaItem;
-    expect(item.title, 'Song 1');
-    expect(item.artist, 'Artist 1');
+    expect(item.title, 'Song 0');
+    expect(item.artist, 'Artist 0');
     expect(item.extras?['preview'], isTrue);
-    expect(item.extras?['sourceUrl'], 'https://music.youtube.com/watch?v=v1');
+    expect(item.extras?['sourceUrl'], 'https://music.youtube.com/watch?v=v0');
   });
 }

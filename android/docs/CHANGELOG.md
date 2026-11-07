@@ -3445,3 +3445,23 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 
 - Version bump `5.7.1` → `5.7.2` (`android/app/pubspec.yaml`). Ships RX8 (`643791f`: artist seeds, weights, owned songs hidden) and the Home "For You" grid (`0e4edb0`).
 - **Not smoke-tested on device.** Released at the user's request before RX9's Pixel check. `flutter analyze` clean and `flutter test` 1213 passed at `0e4edb0`.
+
+## 2026-11-07 — For You: show all results, Home shelf slides sideways, refresh button
+
+- `lib/providers/recommendations.dart`: `_kRecommendationsLimit` 40 → **50** (the backend cap). `_kRecommendationsShown` and the `.take(20)` are removed: every non-owned result is returned, so this applies to both the For You screen and Home.
+- `lib/screens/home/for_you_section.dart`:
+  - The `Wrap` of up to 6 cards becomes a horizontal `SingleChildScrollView` of 2-row columns holding **all** results.
+  - Card width is `(w - 16 - 30 - 24) / 3`: 3 columns plus a 24px peek of the 4th. 16px gutters, 10px gaps.
+  - The scroll view is keyed by the first `sourceUrl`, so a refresh resets it to the start.
+  - The header's "For You" text becomes a `Row` with `RecommendationsRefreshButton` beside it (tooltip "New recommendations").
+  - Constants: `_kRows`, `_kVisibleColumns`, `_kGutter`, `_kGap`, `_kPeek` (replacing `_kMaxCards`/`_kColumns`).
+- Tests:
+  - `test/providers/recommendations_provider_test.dart`: limit 50 (2 assertions). The "at most 20" test is replaced by "every result left after dropping owned ones": 50 results with every 5th owned gives 40 non-owned results, in order.
+  - `test/screens/home/for_you_section_test.dart`: the "3-column, at most 6" test is replaced by 4 tests:
+    - 20 results give 20 cards
+    - column-major 2-row layout with 10px column gaps and equal widths
+    - 3 columns plus a peek: the 4th column straddles the edge, and `16 + 3w + 30 + 24 == screen`
+    - dragging left reveals the last card, ending at the 16px gutter
+
+    New refresh test: the button sits right of "For You" on the same line and calls `refresh()`. The play test now taps Song 0, since Song 1 is in row 2, below the 600px test viewport.
+- Gates: `flutter analyze` clean; `flutter test` 1213 → 1217 passed. Not run on device.

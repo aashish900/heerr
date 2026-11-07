@@ -16,14 +16,11 @@ import 'library/library_playlist.dart';
 
 part 'recommendations.g.dart';
 
-/// `limit` sent to the backend's `POST /api/v1/recommend`. Twice what is
-/// shown: results already in the library are dropped after hydration, so the
-/// over-fetch keeps the feed full (RX8).
-const int _kRecommendationsLimit = 40;
-
-/// Results shown after owned songs are filtered out. Matches the screen's
-/// typical viewport — enough variety, short enough to scroll without paging.
-const int _kRecommendationsShown = 20;
+/// `limit` sent to the backend's `POST /api/v1/recommend` — its schema cap
+/// (`le=50`). Every result left after owned songs are dropped is shown: the
+/// For You screen scrolls and the Home grid slides sideways, so there is no
+/// display cap.
+const int _kRecommendationsLimit = 50;
 
 /// Optional override seed for [recommendationsProvider]. When non-null, the
 /// recommendations notifier uses it as the **sole** seed instead of pulling
@@ -191,8 +188,8 @@ List<SeedTrack> sampleSeeds(
 /// Recommendation results from the heerr backend (`POST /api/v1/recommend`).
 ///
 /// Reads the user's seed collection via [seedCollectionProvider] (N2), POSTs
-/// `{seeds, limit: 40}` to the backend, and returns up to 20 parsed
-/// [RecommendedTrack]s that are **not** already in the library (RX8).
+/// `{seeds, limit: 50}` to the backend, and returns every parsed
+/// [RecommendedTrack] that is **not** already in the library (RX8).
 ///
 /// When the seed collection is empty, still calls the backend with
 /// `seeds: []` — the listenbrainz engine drives its own history-based
@@ -238,12 +235,9 @@ class Recommendations extends _$Recommendations {
     // `search3`. Library-side failures are swallowed per result so one bad
     // search3 doesn't kill the whole list — the result just falls through as
     // inLibrary=false. For You recommends songs you don't own yet (RX8), so
-    // owned matches are dropped and the over-fetch is trimmed to the shown size.
+    // owned matches are dropped.
     final List<RecommendedTrack> hydrated = await _hydrateLibraryMatches(base);
-    return hydrated
-        .where((RecommendedTrack r) => !r.inLibrary)
-        .take(_kRecommendationsShown)
-        .toList();
+    return hydrated.where((RecommendedTrack r) => !r.inLibrary).toList();
   }
 
   Future<List<RecommendedTrack>> _hydrateLibraryMatches(

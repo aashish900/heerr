@@ -1538,3 +1538,20 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - Card tap opens a details sheet: no such sheet exists, and the design shows the card itself as the play affordance.
 - A Download button on each card: not in the design, and it would crowd a 95px art tile. "See all" reaches the full screen, which still has Download.
 - `GridView(shrinkWrap)` inside Home's `ListView`: a `Wrap` with `LayoutBuilder`-computed widths is simpler and lays out the same 3 columns.
+
+## 2026-11-07 — For You: no display cap; Home grid slides sideways; refresh beside the title
+
+**Context:** After v5.7.2 the user reported that the For You screen tops out at 20 songs and the Home grid at 6. They want to slide the Home section sideways for more, and a refresh button next to "For You" to get new recommendations. This supersedes the "show 20" part of the RX8 ADR and the "6 cards" part of the Home grid ADR (both 2026-11-07, above).
+
+**Decision:**
+- `Recommendations.build` requests `limit: 50`, the backend schema cap (`le=50`), and returns **every** result that survives the owned filter. There's no display cap anywhere.
+- The Home `ForYouSection` is a horizontal `SingleChildScrollView` of **two-row columns**, filled column by column (0 over 1, 2 over 3, …). Card width = `(width - 16 gutter - 3×10 gaps - 24 peek) / 3`, so three columns fit and 24px of the fourth shows as a scroll cue. The card design (fill, border, radius, art and play button) is unchanged.
+- The scroll view is keyed by the feed's first URL, so a refreshed feed starts at the beginning.
+- The existing `RecommendationsRefreshButton` (#38: tonal spinning disc while loading, re-taps ignored) sits on the "For You" title line. The old grid stays visible until the new results land (`valueOrNull`).
+
+**Why:** It reuses the For You screen's refresh button and refresh path. Column-major two-row paging is the standard sideways shelf (YouTube Music / Spotify). A peek is needed because exactly three columns don't read as scrollable.
+
+**Alternatives considered:**
+- A lazily-built horizontal `GridView`: it needs a fixed height, i.e. computing text line heights. The eager `Row` holds at most 50 small cards, which is cheap.
+- Row-major paging (3×2 pages): reads oddly when scrolled mid-page.
+- Asking the backend for more than 50: would need a schema change, and 50 candidates, after over-fetch to 100 and the owned filter, already fills several screens of the shelf.

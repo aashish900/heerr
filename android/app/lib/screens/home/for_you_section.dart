@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,10 +14,14 @@ import '../../router.dart' show Routes;
 import '../../theme.dart';
 import '../../widgets/home_recommendation_card.dart'
     show RecommendationCoverArt;
+import '../../widgets/recommendations_refresh_button.dart';
 
 /// Home "For You" grid (heerr-home-for-you.html), between Quick Access and
-/// Recently Added: up to [_kMaxCards] backend recommendations as a 3-column
-/// grid of song cards, header `Made for <nickname>` / "For You" / See all.
+/// Recently Added: every backend recommendation as a two-row grid of song
+/// cards that slides sideways, filled column by column (0 over 1, 2 over 3,
+/// …). Three columns fit the screen with a [_kPeek] of the fourth showing, so
+/// the row reads as scrollable. Header: `Made for <nickname>`, then "For You"
+/// with a refresh button beside it, then See all.
 ///
 /// Hidden (zero height) until the feed has at least one result — first load,
 /// error and empty all render nothing, so Home never shows a spinner or an
@@ -28,9 +33,11 @@ import '../../widgets/home_recommendation_card.dart'
 class ForYouSection extends ConsumerWidget {
   const ForYouSection({super.key});
 
-  static const int _kMaxCards = 6;
-  static const int _kColumns = 3;
+  static const int _kRows = 2;
+  static const int _kVisibleColumns = 3;
+  static const double _kGutter = 16;
   static const double _kGap = 10;
+  static const double _kPeek = 24;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -44,7 +51,10 @@ class ForYouSection extends ConsumerWidget {
         .watch(profileMetaNotifierProvider)
         .valueOrNull
         ?.nickname;
-    final List<RecommendedTrack> shown = tracks.take(_kMaxCards).toList();
+    final List<List<RecommendedTrack>> columns = <List<RecommendedTrack>>[
+      for (int i = 0; i < tracks.length; i += _kRows)
+        tracks.sublist(i, math.min(i + _kRows, tracks.length)),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -68,12 +78,20 @@ class ForYouSection extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    const Text(
-                      'For You',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    const Row(
+                      children: <Widget>[
+                        Text(
+                          'For You',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(width: 4),
+                        // Same spinning button as the For You screen: fetches
+                        // a freshly sampled set; the grid stays until it lands.
+                        RecommendationsRefreshButton(),
+                      ],
                     ),
                   ],
                 ),
@@ -86,25 +104,43 @@ class ForYouSection extends ConsumerWidget {
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: LayoutBuilder(
-            builder: (BuildContext context, BoxConstraints c) {
-              final double cardWidth =
-                  (c.maxWidth - _kGap * (_kColumns - 1)) / _kColumns;
-              return Wrap(
-                spacing: _kGap,
-                runSpacing: _kGap,
+        LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints c) {
+            final double cardWidth =
+                (c.maxWidth - _kGutter - _kGap * _kVisibleColumns - _kPeek) /
+                _kVisibleColumns;
+            return SingleChildScrollView(
+              // A new feed (refresh) gets a new key, so the row starts over
+              // at the first recommendation instead of the old offset.
+              key: ValueKey<String>(tracks.first.sourceUrl),
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: _kGutter),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  for (final RecommendedTrack t in shown)
-                    SizedBox(
-                      width: cardWidth,
-                      child: _ForYouCard(track: t),
+                  for (int i = 0; i < columns.length; i++)
+                    Padding(
+                      padding: EdgeInsets.only(left: i == 0 ? 0 : _kGap),
+                      child: SizedBox(
+                        width: cardWidth,
+                        child: Column(
+                          children: <Widget>[
+                            for (
+                              int j = 0;
+                              j < columns[i].length;
+                              j++
+                            ) ...<Widget>[
+                              if (j > 0) const SizedBox(height: _kGap),
+                              _ForYouCard(track: columns[i][j]),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
                 ],
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
       ],
     );

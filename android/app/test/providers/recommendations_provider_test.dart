@@ -61,21 +61,19 @@ ProviderContainer _container({
 }) {
   return ProviderContainer(
     overrides: <Override>[
-      dioClientProvider.overrideWith(
-        (Ref<AsyncValue<Dio>> ref) async {
-          final Dio dio = Dio(BaseOptions(baseUrl: 'http://heerr.test'));
-          dio.httpClientAdapter = adapter;
-          return dio;
-        },
+      dioClientProvider.overrideWith((Ref<AsyncValue<Dio>> ref) async {
+        final Dio dio = Dio(BaseOptions(baseUrl: 'http://heerr.test'));
+        dio.httpClientAdapter = adapter;
+        return dio;
+      }),
+      subsonicDioClientProvider.overrideWith((Ref<AsyncValue<Dio>> ref) async {
+        final Dio dio = Dio(BaseOptions(baseUrl: 'http://navi.test'));
+        dio.httpClientAdapter = subsonicAdapter ?? _NullSubsonicAdapter();
+        return dio;
+      }),
+      seedCollectionProvider.overrideWith(
+        (Ref<AsyncValue<List<SeedTrack>>> _) async => seeds,
       ),
-      subsonicDioClientProvider.overrideWith(
-        (Ref<AsyncValue<Dio>> ref) async {
-          final Dio dio = Dio(BaseOptions(baseUrl: 'http://navi.test'));
-          dio.httpClientAdapter = subsonicAdapter ?? _NullSubsonicAdapter();
-          return dio;
-        },
-      ),
-      seedCollectionProvider.overrideWith((Ref<AsyncValue<List<SeedTrack>>> _) async => seeds),
       // Pinned RNG so sampling assertions are deterministic.
       recommendationRngProvider.overrideWithValue(Random(42)),
     ],
@@ -113,7 +111,10 @@ class _NullSubsonicAdapter implements HttpClientAdapter {
 /// Routes search3 calls by request query. Returns a song match when the
 /// query contains a configured `(artist title)` pair.
 class _SearchSubsonicAdapter implements HttpClientAdapter {
-  _SearchSubsonicAdapter(this.matches, {this.covers = const <String, String>{}});
+  _SearchSubsonicAdapter(
+    this.matches, {
+    this.covers = const <String, String>{},
+  });
 
   /// Map of query substring → song id to return.
   final Map<String, String> matches;
@@ -156,9 +157,7 @@ class _SearchSubsonicAdapter implements HttpClientAdapter {
         },
       };
     } else {
-      result = <String, dynamic>{
-        'searchResult3': <String, dynamic>{},
-      };
+      result = <String, dynamic>{'searchResult3': <String, dynamic>{}};
     }
     return ResponseBody.fromString(
       jsonEncode(<String, dynamic>{
@@ -180,7 +179,7 @@ class _SearchSubsonicAdapter implements HttpClientAdapter {
 }
 
 void main() {
-  test('POSTs /recommend with the collected seeds + limit 40', () async {
+  test('POSTs /recommend with the collected seeds + limit 50', () async {
     final _FakeAdapter adapter = _FakeAdapter(
       (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
     );
@@ -202,7 +201,7 @@ void main() {
 
     final Map<String, dynamic> body =
         jsonDecode(utf8.decode(adapter.bodies.single)) as Map<String, dynamic>;
-    expect(body['limit'], 40); // RX8: over-fetch; owned rows are dropped
+    expect(body['limit'], 50); // backend cap; owned rows are dropped after
     final List<dynamic> seeds = body['seeds'] as List<dynamic>;
     expect(seeds, hasLength(2));
     // Sampling shuffles the seed order, so assert membership not position.
@@ -247,8 +246,9 @@ void main() {
     );
     addTearDown(c.dispose);
 
-    final List<RecommendedTrack> tracks =
-        await c.read(recommendationsProvider.future);
+    final List<RecommendedTrack> tracks = await c.read(
+      recommendationsProvider.future,
+    );
     expect(tracks, hasLength(2));
     expect(tracks[0].title, 'Similar Song');
     expect(tracks[0].artist, 'Other Artist');
@@ -271,15 +271,16 @@ void main() {
     );
     addTearDown(c.dispose);
 
-    final List<RecommendedTrack> tracks =
-        await c.read(recommendationsProvider.future);
+    final List<RecommendedTrack> tracks = await c.read(
+      recommendationsProvider.future,
+    );
 
     expect(tracks, isEmpty);
     expect(adapter.requests, hasLength(1));
     final Map<String, dynamic> body =
         jsonDecode(utf8.decode(adapter.bodies.single)) as Map<String, dynamic>;
     expect((body['seeds'] as List<dynamic>), isEmpty);
-    expect(body['limit'], 40); // RX8: over-fetch; owned rows are dropped
+    expect(body['limit'], 50); // backend cap; owned rows are dropped after
   });
 
   test('refresh() re-issues the POST', () async {
@@ -297,12 +298,14 @@ void main() {
 
     await c.read(recommendationsProvider.notifier).refresh();
 
-    expect(adapter.requests.length, greaterThan(before),
-        reason: 'refresh must trigger at least one new POST');
+    expect(
+      adapter.requests.length,
+      greaterThan(before),
+      reason: 'refresh must trigger at least one new POST',
+    );
   });
 
-  test(
-      'cross-reference: results that match Subsonic search3 are owned and '
+  test('cross-reference: results that match Subsonic search3 are owned and '
       'hidden (RX8); the rest stay remote', () async {
     final _FakeAdapter adapter = _FakeAdapter(
       (_) => _json(<String, dynamic>{
@@ -321,12 +324,8 @@ void main() {
       }),
     );
     final _SearchSubsonicAdapter sub = _SearchSubsonicAdapter(
-      <String, String>{
-        'OwnedArtist OwnedSong': 'lib-song-42',
-      },
-      covers: <String, String>{
-        'OwnedArtist OwnedSong': 'cover-art-42',
-      },
+      <String, String>{'OwnedArtist OwnedSong': 'lib-song-42'},
+      covers: <String, String>{'OwnedArtist OwnedSong': 'cover-art-42'},
     );
     final ProviderContainer c = _container(
       adapter: adapter,
@@ -335,10 +334,12 @@ void main() {
     );
     addTearDown(c.dispose);
 
-    final List<RecommendedTrack> tracks =
-        await c.read(recommendationsProvider.future);
-    expect(tracks.map((RecommendedTrack t) => t.title).toList(),
-        <String>['RemoteSong']);
+    final List<RecommendedTrack> tracks = await c.read(
+      recommendationsProvider.future,
+    );
+    expect(tracks.map((RecommendedTrack t) => t.title).toList(), <String>[
+      'RemoteSong',
+    ]);
 
     final RecommendedTrack remote = tracks.single;
     expect(remote.inLibrary, isFalse);
@@ -353,69 +354,77 @@ void main() {
     }
   });
 
-  test('shows at most 20 results after dropping owned ones (RX8)', () async {
-    final _FakeAdapter adapter = _FakeAdapter(
-      (_) => _json(<String, dynamic>{
-        'results': <Map<String, dynamic>>[
-          for (int i = 0; i < 40; i++)
-            <String, dynamic>{
-              'title': 'Song$i',
-              'artist': 'Artist$i',
-              'source_url': 'https://music.youtube.com/watch?v=v$i',
-            },
-        ],
-      }),
-    );
-    // Every 4th result (0, 4, 8, ...) is already in the library.
-    final _SearchSubsonicAdapter sub = _SearchSubsonicAdapter(<String, String>{
-      for (int i = 0; i < 40; i += 4) 'Artist$i Song$i': 'lib-$i',
-    });
-    final ProviderContainer c = _container(
-      adapter: adapter,
-      seeds: <SeedTrack>[const SeedTrack(title: 't', artist: 'a')],
-      subsonicAdapter: sub,
-    );
-    addTearDown(c.dispose);
+  test(
+    'shows every result left after dropping owned ones (no 20 cap)',
+    () async {
+      final _FakeAdapter adapter = _FakeAdapter(
+        (_) => _json(<String, dynamic>{
+          'results': <Map<String, dynamic>>[
+            for (int i = 0; i < 50; i++)
+              <String, dynamic>{
+                'title': 'Song$i',
+                'artist': 'Artist$i',
+                'source_url': 'https://music.youtube.com/watch?v=v$i',
+              },
+          ],
+        }),
+      );
+      // Every 5th result (0, 5, 10, ...) is already in the library.
+      final _SearchSubsonicAdapter sub = _SearchSubsonicAdapter(
+        <String, String>{
+          for (int i = 0; i < 50; i += 5) 'Artist$i Song$i': 'lib-$i',
+        },
+      );
+      final ProviderContainer c = _container(
+        adapter: adapter,
+        seeds: <SeedTrack>[const SeedTrack(title: 't', artist: 'a')],
+        subsonicAdapter: sub,
+      );
+      addTearDown(c.dispose);
 
-    final List<RecommendedTrack> tracks =
-        await c.read(recommendationsProvider.future);
+      final List<RecommendedTrack> tracks = await c.read(
+        recommendationsProvider.future,
+      );
 
-    expect(tracks, hasLength(20));
-    expect(tracks.any((RecommendedTrack t) => t.inLibrary), isFalse);
-    // Order preserved: backend ranking survives the filter.
-    expect(tracks.first.title, 'Song1');
-    expect(tracks.last.title, 'Song26');
-  });
-
-  test('cross-reference failure for one result does not break the list',
-      () async {
-    final _FakeAdapter adapter = _FakeAdapter(
-      (_) => _json(<String, dynamic>{
-        'results': <Map<String, dynamic>>[
-          <String, dynamic>{
-            'title': 'A',
-            'artist': 'X',
-            'source_url': 'https://music.youtube.com/watch?v=a',
-          },
-        ],
-      }),
-    );
-    // Subsonic dio not available → cross-reference no-ops gracefully.
-    final ProviderContainer c = _container(
-      adapter: adapter,
-      seeds: <SeedTrack>[const SeedTrack(title: 't', artist: 'a')],
-      subsonicAdapter: _NullSubsonicAdapter(),
-    );
-    addTearDown(c.dispose);
-
-    final List<RecommendedTrack> tracks =
-        await c.read(recommendationsProvider.future);
-    expect(tracks, hasLength(1));
-    expect(tracks.first.inLibrary, isFalse);
-  });
+      expect(tracks, hasLength(40));
+      expect(tracks.any((RecommendedTrack t) => t.inLibrary), isFalse);
+      // Order preserved: backend ranking survives the filter.
+      expect(tracks.first.title, 'Song1');
+      expect(tracks.last.title, 'Song49');
+    },
+  );
 
   test(
-      'manualSeedProvider override: recommendations uses ONLY that seed '
+    'cross-reference failure for one result does not break the list',
+    () async {
+      final _FakeAdapter adapter = _FakeAdapter(
+        (_) => _json(<String, dynamic>{
+          'results': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'title': 'A',
+              'artist': 'X',
+              'source_url': 'https://music.youtube.com/watch?v=a',
+            },
+          ],
+        }),
+      );
+      // Subsonic dio not available → cross-reference no-ops gracefully.
+      final ProviderContainer c = _container(
+        adapter: adapter,
+        seeds: <SeedTrack>[const SeedTrack(title: 't', artist: 'a')],
+        subsonicAdapter: _NullSubsonicAdapter(),
+      );
+      addTearDown(c.dispose);
+
+      final List<RecommendedTrack> tracks = await c.read(
+        recommendationsProvider.future,
+      );
+      expect(tracks, hasLength(1));
+      expect(tracks.first.inLibrary, isFalse);
+    },
+  );
+
+  test('manualSeedProvider override: recommendations uses ONLY that seed '
       'and ignores seedCollectionProvider', () async {
     final _FakeAdapter adapter = _FakeAdapter(
       (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
@@ -431,8 +440,10 @@ void main() {
     );
     addTearDown(c.dispose);
 
-    c.read(manualSeedProvider.notifier).state =
-        const SeedTrack(title: 'Manual', artist: 'M');
+    c.read(manualSeedProvider.notifier).state = const SeedTrack(
+      title: 'Manual',
+      artist: 'M',
+    );
 
     await c.read(recommendationsProvider.future);
     final Map<String, dynamic> body =
@@ -445,9 +456,9 @@ void main() {
 
   group('seed sampling + TTL (#38)', () {
     List<SeedTrack> manySeeds(int n) => List<SeedTrack>.generate(
-          n,
-          (int i) => SeedTrack(title: 'T$i', artist: 'A$i'),
-        );
+      n,
+      (int i) => SeedTrack(title: 'T$i', artist: 'A$i'),
+    );
 
     List<String> seedTitles(_FakeAdapter adapter, int requestIndex) {
       final Map<String, dynamic> body =
@@ -462,8 +473,10 @@ void main() {
       final _FakeAdapter adapter = _FakeAdapter(
         (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
       );
-      final ProviderContainer c =
-          _container(adapter: adapter, seeds: manySeeds(20));
+      final ProviderContainer c = _container(
+        adapter: adapter,
+        seeds: manySeeds(20),
+      );
       addTearDown(c.dispose);
 
       await c.read(recommendationsProvider.future);
@@ -480,12 +493,16 @@ void main() {
       final _FakeAdapter adapter = _FakeAdapter(
         (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
       );
-      final ProviderContainer c =
-          _container(adapter: adapter, seeds: manySeeds(20));
+      final ProviderContainer c = _container(
+        adapter: adapter,
+        seeds: manySeeds(20),
+      );
       addTearDown(c.dispose);
 
-      c.read(manualSeedProvider.notifier).state =
-          const SeedTrack(title: 'Manual', artist: 'M');
+      c.read(manualSeedProvider.notifier).state = const SeedTrack(
+        title: 'Manual',
+        artist: 'M',
+      );
       await c.read(recommendationsProvider.future);
 
       expect(seedTitles(adapter, 0), <String>['Manual']);
@@ -495,8 +512,10 @@ void main() {
       final _FakeAdapter adapter = _FakeAdapter(
         (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
       );
-      final ProviderContainer c =
-          _container(adapter: adapter, seeds: manySeeds(20));
+      final ProviderContainer c = _container(
+        adapter: adapter,
+        seeds: manySeeds(20),
+      );
       addTearDown(c.dispose);
 
       await c.read(recommendationsProvider.future);
@@ -506,63 +525,80 @@ void main() {
       expect(adapter.requests, hasLength(1));
     });
 
-    test('refreshIfStale(maxAge: zero) re-fetches with a different sample',
-        () async {
-      final _FakeAdapter adapter = _FakeAdapter(
-        (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
-      );
-      final ProviderContainer c =
-          _container(adapter: adapter, seeds: manySeeds(20));
-      addTearDown(c.dispose);
+    test(
+      'refreshIfStale(maxAge: zero) re-fetches with a different sample',
+      () async {
+        final _FakeAdapter adapter = _FakeAdapter(
+          (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
+        );
+        final ProviderContainer c = _container(
+          adapter: adapter,
+          seeds: manySeeds(20),
+        );
+        addTearDown(c.dispose);
 
-      await c.read(recommendationsProvider.future);
-      c
-          .read(recommendationsProvider.notifier)
-          .refreshIfStale(maxAge: Duration.zero);
-      await c.read(recommendationsProvider.future);
+        await c.read(recommendationsProvider.future);
+        c
+            .read(recommendationsProvider.notifier)
+            .refreshIfStale(maxAge: Duration.zero);
+        await c.read(recommendationsProvider.future);
 
-      expect(adapter.requests, hasLength(2));
-      expect(seedTitles(adapter, 0), isNot(equals(seedTitles(adapter, 1))),
-          reason: 'successive samples from the stateful RNG must differ');
-    });
+        expect(adapter.requests, hasLength(2));
+        expect(
+          seedTitles(adapter, 0),
+          isNot(equals(seedTitles(adapter, 1))),
+          reason: 'successive samples from the stateful RNG must differ',
+        );
+      },
+    );
 
-    test('refreshIfStale no-ops when a manual seed is active even if stale',
-        () async {
-      final _FakeAdapter adapter = _FakeAdapter(
-        (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
-      );
-      final ProviderContainer c =
-          _container(adapter: adapter, seeds: manySeeds(20));
-      addTearDown(c.dispose);
+    test(
+      'refreshIfStale no-ops when a manual seed is active even if stale',
+      () async {
+        final _FakeAdapter adapter = _FakeAdapter(
+          (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
+        );
+        final ProviderContainer c = _container(
+          adapter: adapter,
+          seeds: manySeeds(20),
+        );
+        addTearDown(c.dispose);
 
-      c.read(manualSeedProvider.notifier).state =
-          const SeedTrack(title: 'Manual', artist: 'M');
-      await c.read(recommendationsProvider.future);
-      c
-          .read(recommendationsProvider.notifier)
-          .refreshIfStale(maxAge: Duration.zero);
-      await c.read(recommendationsProvider.future);
+        c.read(manualSeedProvider.notifier).state = const SeedTrack(
+          title: 'Manual',
+          artist: 'M',
+        );
+        await c.read(recommendationsProvider.future);
+        c
+            .read(recommendationsProvider.notifier)
+            .refreshIfStale(maxAge: Duration.zero);
+        await c.read(recommendationsProvider.future);
 
-      expect(adapter.requests, hasLength(1));
-    });
+        expect(adapter.requests, hasLength(1));
+      },
+    );
 
-    test('keepAlive: state survives without listeners (no re-POST on re-read)',
-        () async {
-      final _FakeAdapter adapter = _FakeAdapter(
-        (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
-      );
-      final ProviderContainer c =
-          _container(adapter: adapter, seeds: manySeeds(20));
-      addTearDown(c.dispose);
+    test(
+      'keepAlive: state survives without listeners (no re-POST on re-read)',
+      () async {
+        final _FakeAdapter adapter = _FakeAdapter(
+          (_) => _json(<String, dynamic>{'results': <dynamic>[]}),
+        );
+        final ProviderContainer c = _container(
+          adapter: adapter,
+          seeds: manySeeds(20),
+        );
+        addTearDown(c.dispose);
 
-      await c.read(recommendationsProvider.future);
-      // Let any auto-dispose teardown run — keepAlive must prevent it.
-      await Future<void>.delayed(Duration.zero);
-      await Future<void>.delayed(Duration.zero);
-      await c.read(recommendationsProvider.future);
+        await c.read(recommendationsProvider.future);
+        // Let any auto-dispose teardown run — keepAlive must prevent it.
+        await Future<void>.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
+        await c.read(recommendationsProvider.future);
 
-      expect(adapter.requests, hasLength(1));
-    });
+        expect(adapter.requests, hasLength(1));
+      },
+    );
   });
 
   test('backend error surfaces as ApiError', () async {
