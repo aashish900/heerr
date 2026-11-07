@@ -3650,3 +3650,7 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
   - `test/screens/home/home_screen_test.dart`: the order test now asserts Quick Access < Your Mixes < For You < Recently Added. The "no recommendations" test now expects no "Made for you" text at all; it previously counted the Quick Access tile.
 - Gates: `flutter analyze` clean; `flutter test` 1275 → 1274 passed (one test removed with the card). Not committed; not run on device.
 - Note: when the For You section is hidden (no recommendations), the For You screen is still reachable from the Library tab's recommendations entry (`library_tabs.dart`).
+
+## 2026-11-07 — v5.8.1: Home layout tweak
+
+- Version bump `5.8.0` → `5.8.1` (`android/app/pubspec.yaml`). Ships the entry above (For You card removed from Quick Access; Your Mixes moved above For You). Not smoke-tested on device; MX10 is still open.

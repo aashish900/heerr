@@ -1421,3 +1421,7 @@ Deployed v5.7.5 and ran the smoke script (not committed) on the server against `
 - Version bump `5.7.5` → `5.8.0` (`backend/pyproject.toml`, `backend/app/main.py`). No backend code changes since 5.7.5, so redeploying is optional and only updates the reported version.
 - `docs/CONTEXT.md`: new "Vibe mixes" architecture bullet (staleness rule).
 - `/PLAN.md` MX10: released at the user's request before the on-device smoke; it stays open.
+
+## 2026-11-07 — v5.8.1: version sync only
+
+- Version bump `5.8.0` → `5.8.1` (`backend/pyproject.toml`, `backend/app/main.py`) for the Android Home layout tweak. No backend code changes, no redeploy needed.
