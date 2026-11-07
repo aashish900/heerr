@@ -1320,3 +1320,18 @@ Response times are under the 6 s budget, so no cache is needed (RX6 `ponytail:` 
   - the setting defaults to 2, accepts 4, and rejects 0
 - Existing worker tests call `run_job` without `slots`, so they cover the default-pool path. All green.
 - Suite: 753 → 757 passed. mypy and ruff clean.
+
+## 2026-11-07 — MX2: mix scoring (pure functions)
+
+- `app/services/recommenders/mixes.py` (new). Constants: `CANDIDATE_PLAYLISTS=24`, `POOL=8`, `PICK=4`, `PER_ARTIST=3`, `DECAY=0.02`, `BASE=0.5`. Pure functions:
+  - `taste_profile(seeds)`: artist (trimmed, lowercased) → max seed weight. Song and artist seeds both count.
+  - `playlist_affinity(items, taste)`: the taste weight of each track's best-matching artist (**any** listed artist), averaged over the parsed tracks; 0 for an empty playlist. Malformed items are skipped.
+  - `pick_playlists(scored, variant)`: stable sort by affinity (ties keep YTM order), keep the top 8, and take 4 by rotating `variant * PICK` around the pool. No duplicates when the pool is smaller than 4. `personalized = max affinity > 0`; with zero overlap it degrades to YTM's own order.
+  - `score_tracks(chosen, taste)`: each listing adds `(0.5 + affinity) / (1 + 0.02·position)`, summed across playlists. The track's taste weight is then added **once**. Output is `RecommendedTrack`s, best first, with `artist` set to the first listed artist and a `music.youtube.com/watch?v=` URL.
+- `tests/test_mixes_scoring.py` (new, 16 tests):
+  - taste: lowercase, trim and max weight; empty input
+  - affinity: weighted share, any-artist match, best artist counted once, empty playlist, malformed items
+  - pick: the top-8 pool with rotation (variant 0 / 1, and 2 wrapping back to 0), YTM-order ties, the zero-overlap fallback (`personalized=False`), fewer playlists than `PICK`, an empty input
+  - score: position decay and affinity scaling, the taste bonus counted once across playlists, multi-playlist consensus winning, a taste artist beating a stranger, output shape, malformed items skipped
+- Nothing calls these yet; MX3 adds fetching and caching.
+- Suite: 757 → 773 passed. mypy and ruff clean.

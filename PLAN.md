@@ -142,7 +142,7 @@ Backend first, TDD (`backend/CLAUDE.md`, `android/CLAUDE.md`):
 3. In `workers.py`, use a module-level semaphore sized from settings, acquired before `mark_running` and released in `finally`.
 - Commit: `feat(backend): MX1 cap concurrent downloads (DOWNLOAD_CONCURRENCY=2)`.
 
-### [ ] MX2. Backend: mix scoring (pure functions)
+### [x] MX2. Backend: mix scoring (pure functions)
 1. Tests first, in `tests/test_mixes_scoring.py`, with fixture playlists as plain dicts in the RX4 shapes:
    - `taste_profile(seeds)`: lowercases and trims, max weight wins, song and artist seeds both count
    - `playlist_affinity(tracks, taste)`: weighted share of matching tracks, matching on **any** listed artist; 0 for an empty playlist

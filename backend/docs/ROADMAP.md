@@ -585,7 +585,7 @@ Working breakdown: `/PLAN.md` (MX0–MX10). Eight fixed vibe mixes built from Yo
 ### [x] MX1. Cap concurrent downloads
 **Files:** `app/services/workers.py`, `app/config.py`, `.env.example`, worker tests. **Commit:** `feat(backend): MX1 cap concurrent downloads (DOWNLOAD_CONCURRENCY=2)`.
 
-### [ ] MX2. Mix scoring (pure functions)
+### [x] MX2. Mix scoring (pure functions)
 **Files:** `app/services/recommenders/mixes.py`, `tests/test_mixes_scoring.py`. **Commit:** `feat(backend): MX2 mix scoring`.
 
 ### [ ] MX3. YTM mood fetch + 24h cache
