@@ -1367,3 +1367,30 @@ Response times are under the 6 s budget, so no cache is needed (RX6 `ponytail:` 
 
   Seed artists dominate the raw top. MX4's `rerank(per_artist=3)` and cover filter will diversify it, e.g. "Baarishein (Acoustic)" gets dropped.
 - Suite: 773 → 785 passed. mypy and ruff clean.
+
+## 2026-11-07 — MX4: mix endpoints
+
+- `app/services/recommenders/history.py` (new): `user_history(session, user_id, urls) -> (excluded, recently_shown)` and `SHOWN_WINDOW`, moved verbatim from `api/v1/recommend.py`'s private `_history` so For You and mixes share one query. `/recommend` behaviour is unchanged, and all 33 `test_recommend.py` tests passed right after the move.
+- `app/schemas/recommend.py`:
+  - `MixVibeItem {id, title}`
+  - `MixRequest {seeds, limit 1–50 = 50, variant ≥ 0 = 0}`, with `extra="forbid"`
+  - `MixResponse {id, title, personalized, results: [RecommendResultItem]}`
+- `app/api/v1/recommend.py` (both routes need the `read` scope):
+  - `get_mix_builder()`: an `lru_cache` singleton, so the `MixBuilder`'s 24-hour cache outlives each request.
+  - `GET /recommend/mixes`: the 8 vibes, static.
+  - `POST /recommend/mixes/{vibe_id}`:
+    - an unknown id returns **404** before any YTM call; `MoodNotFound` returns **503**
+    - seeds pass through with their weights, and `variant` is forwarded
+    - the builder's tracks then go through `user_history` (non-failed jobs and dismissed songs excluded) and `rerank(recently_shown=∅, per_artist=3, limit)`, which drops covers too
+    - results get a `cover_url`
+    - **no** `rec_feedback` "shown" rows are written
+- `tests/test_mixes_api.py` (new, 17 tests, with a fake builder via `dependency_overrides`):
+  - list: 401, and the 8 vibes in order
+  - mix: 401; result shape and `cover_url`; seeds, weights and variant forwarded; the `personalized` flag passed through
+  - errors: 404 for an unknown vibe without building; 503 when the mood is missing
+  - 422 for limit 51, limit 0, variant −1 and an extra field
+  - limit trimming and the default of 50
+  - at most 3 per artist; an acoustic version dropped
+  - the user's done job and dismissed song excluded while a failed job stays
+  - no shown rows written
+- Suite: 785 → 802 passed. mypy and ruff clean.

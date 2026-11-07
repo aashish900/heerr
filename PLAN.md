@@ -162,7 +162,7 @@ Backend first, TDD (`backend/CLAUDE.md`, `android/CLAUDE.md`):
 2. Implement `VIBES` (§5.1), the `MixBuilder` class (fetch, cache, then the MX2 functions), and `TTLCache`. Calls run via `asyncio.to_thread`, as in `ytmusic_engine.py`.
 - Commit: `feat(backend): MX3 ytm mood fetch + cache`.
 
-### [ ] MX4. Backend: mix endpoints
+### [x] MX4. Backend: mix endpoints
 1. Move the RX3 `_history(session, user_id, urls)` from `api/v1/recommend.py` into `app/services/recommenders/history.py` (no behaviour change; existing tests stay green).
 2. Tests first, in `tests/test_mixes_api.py`, with a fake `MixBuilder` via `dependency_overrides`:
    - `GET /mixes` returns all 8 `{id, title}`, and 401 without a token

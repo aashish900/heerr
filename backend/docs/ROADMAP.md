@@ -591,7 +591,7 @@ Working breakdown: `/PLAN.md` (MX0–MX10). Eight fixed vibe mixes built from Yo
 ### [x] MX3. YTM mood fetch + 24h cache
 **Files:** `app/services/recommenders/mixes.py`, `tests/test_mixes_fetch.py`. **Commit:** `feat(backend): MX3 ytm mood fetch + cache`.
 
-### [ ] MX4. Mix endpoints
+### [x] MX4. Mix endpoints
 **Files:** `app/api/v1/recommend.py`, `app/schemas/recommend.py`, `app/services/recommenders/history.py`, `tests/test_mixes_api.py`. **Commit:** `feat(backend): MX4 mix endpoints`.
 
 ### [ ] MX5. Home-server smoke (docs only)
