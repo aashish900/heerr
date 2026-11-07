@@ -3640,3 +3640,13 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 
 - Version bump `5.7.5` → `5.8.0` (`android/app/pubspec.yaml`). Ships MX6–MX9 (the mix data layer, mix screen, Your Mixes on Home, and save mix as playlist) plus the Now Playing `Playlist+` label (`70f06c0`).
 - **Not smoke-tested on device.** It was released at the user's request before MX10's Pixel check. `flutter analyze` was clean and `flutter test` passed 1275 at `6f88a28`.
+
+## 2026-11-07 — Home: For You card removed from Quick Access; Your Mixes moved above For You
+
+- `lib/screens/home/quick_access_row.dart`: removed the `quick-access-for-you` card (For You has its own Home section, whose See all opens the same `/library/recommendations` screen). Quick Access is now Favorites, Offline, Recently Added. Doc comment updated.
+- `lib/screens/home/home_screen.dart`: the Music body order is now search, greeting, Continue Listening, Quick Access, **Your Mixes, For You**, Recently Added (user request). Doc comment updated.
+- Tests:
+  - `test/screens/home/quick_access_row_test.dart`: the header test now expects three cards and no For You card, text or key. The "For You card navigates" test was removed with the card.
+  - `test/screens/home/home_screen_test.dart`: the order test now asserts Quick Access < Your Mixes < For You < Recently Added. The "no recommendations" test now expects no "Made for you" text at all; it previously counted the Quick Access tile.
+- Gates: `flutter analyze` clean; `flutter test` 1275 → 1274 passed (one test removed with the card). Not committed; not run on device.
+- Note: when the For You section is hidden (no recommendations), the For You screen is still reachable from the Library tab's recommendations entry (`library_tabs.dart`).

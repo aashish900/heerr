@@ -8,9 +8,10 @@ import '../../router.dart' show Routes;
 import '../../widgets/gradient_icon.dart';
 
 /// "Quick Access" shortcut row (mockup zone 5 — HOMESCREEN.md task 3).
-/// Static 4 cards; the mockup's "Edit" customization is deferred (DEBT).
-/// Horizontally scrollable — 4 cards at readable size overflow a phone
-/// width, matching the mockup's edge-cropped 4th card.
+/// Static 3 cards (Favorites, Offline, Recently Added); the mockup's "Edit"
+/// customization is deferred (DEBT). The For You card was dropped once For You
+/// got its own Home section (its See all opens the same screen).
+/// Horizontally scrollable at readable card size.
 class QuickAccessRow extends ConsumerWidget {
   const QuickAccessRow({super.key});
 
@@ -43,14 +44,6 @@ class QuickAccessRow extends ConsumerWidget {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             children: <Widget>[
-              _QuickAccessCard(
-                key: const Key('quick-access-for-you'),
-                icon: Icons.star_outline,
-                title: 'For You',
-                subtitle: 'Made for you',
-                onTap: () => context.push(Routes.libraryRecommendations),
-              ),
-              const SizedBox(width: 12),
               _QuickAccessCard(
                 key: const Key('quick-access-favorites'),
                 icon: Icons.favorite_outline,

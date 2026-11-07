@@ -50,14 +50,16 @@ List<Override> _withDownloads(List<Song> songs) => <Override>[
 Song _song(String id) => Song(id: id, title: 'Song $id');
 
 void main() {
-  testWidgets('renders the section header and all four cards',
+  testWidgets('renders the section header and three cards (no For You)',
       (WidgetTester tester) async {
     await tester.pumpWidget(_wrap(overrides: _withDownloads(<Song>[])));
     await tester.pumpAndSettle();
 
     expect(find.text('Quick Access'), findsOneWidget);
-    expect(find.text('For You'), findsOneWidget);
-    expect(find.text('Made for you'), findsOneWidget);
+    // For You has its own Home section now; no duplicate shortcut.
+    expect(find.text('For You'), findsNothing);
+    expect(find.text('Made for you'), findsNothing);
+    expect(find.byKey(const Key('quick-access-for-you')), findsNothing);
     expect(find.text('Favorites'), findsOneWidget);
     expect(find.text('Loved songs'), findsOneWidget);
     expect(find.text('Offline'), findsOneWidget);
@@ -92,15 +94,6 @@ void main() {
     ]));
     await tester.pumpAndSettle();
     expect(find.text('Downloads'), findsOneWidget);
-  });
-
-  testWidgets('For You card navigates to recommendations',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(_wrap(overrides: _withDownloads(<Song>[])));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('quick-access-for-you')));
-    await tester.pumpAndSettle();
-    expect(find.text('RECS_SCREEN'), findsOneWidget);
   });
 
   testWidgets('Favorites card navigates to /library/favorites',

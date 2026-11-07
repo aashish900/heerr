@@ -244,7 +244,7 @@ void main() {
     );
   });
 
-  testWidgets('Your Mixes sits below For You and above Recently Added', (
+  testWidgets('Home order: Quick Access, Your Mixes, For You, Recently Added', (
     WidgetTester tester,
   ) async {
     tester.view.physicalSize = const Size(1170, 9000);
@@ -267,15 +267,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Chill Mix'), findsOneWidget);
-    final double forYou = tester.getTopLeft(find.byType(ForYouSection)).dy;
+    final double quick = tester.getTopLeft(find.byType(QuickAccessRow)).dy;
     final double mixes = tester.getTopLeft(find.byType(YourMixesSection)).dy;
+    final double forYou = tester.getTopLeft(find.byType(ForYouSection)).dy;
     final double recent = tester
         .getTopLeft(find.byType(RecentlyAddedSection))
         .dy;
     expect(
-      forYou < mixes && mixes < recent,
+      quick < mixes && mixes < forYou && forYou < recent,
       isTrue,
-      reason: 'forYou=$forYou mixes=$mixes recent=$recent',
+      reason: 'quick=$quick mixes=$mixes forYou=$forYou recent=$recent',
     );
   });
 
@@ -285,7 +286,7 @@ void main() {
     await tester.pumpWidget(_wrap(overrides: _homeOverrides()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Made for you'), findsOneWidget); // Quick Access tile only
+    expect(find.text('Made for you'), findsNothing);
     expect(find.byKey(const ValueKey<String>('for-you-card')), findsNothing);
   });
 
