@@ -1583,3 +1583,27 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 **Alternatives considered:**
 - A separate button elsewhere (title row or action pill): two download icons on one screen with different meanings would be confusing.
 - Download from the mini-player too: not asked for. Now Playing is one tap away.
+
+## 2026-11-07 — Vibe mixes on Android: Your Mixes shelf, mix screen, save-as-playlist
+
+**Context:** Phase MX (`/PLAN.md`): the backend generates 8 personalised vibe mixes (see the backend ADR of the same date). The user wants a Home "Your Mixes" shelf, an in-app mix screen, and "Save as playlist".
+
+**Decision:**
+- **Data:** `MixVibe` / `MixResponse` models, two `BackendService` methods, a keep-alive `mixVibesProvider`, and `MixNotifier` (a keep-alive family keyed by vibe). Mixes send the **whole** seed collection, not RX's sample of 8, and drop owned songs. That uses the RX8 hydration, extracted to a shared `hydrateLibraryMatches`. `regenerate()` bumps `variant`.
+- **Home:** `YourMixesSection` below For You, a horizontal row of 8 gradient vibe tiles. It's hidden on error or when empty.
+- **Mix screen** (`/mixes/:id`):
+  - Play all and row-tap play go through a new `playPreviews`, which maps items via `searchResultToMediaItem` into the existing `HeerrAudioHandler.playAll` and is jam-blocked like `playPreview`.
+  - Each row has a download button (the shared `downloadRecommendation`).
+  - Regenerate, and a non-personalised label ("Popular … picks").
+- **Save as playlist:** a keep-alive `MixSaver` notifier.
+  1. Create an empty Navidrome playlist "<title> · <d MMM>".
+  2. Dispatch every download (the backend runs 2 at a time).
+  3. Await each song with `waitForLibrarySong`, which is steps 2–3 of `downloadAndAddToPlaylist` extracted context-free.
+  4. Call `addSongs` in mix order, then show progress and a summary.
+
+**Why:** It reuses the For You hydration, the preview player, the download path and the playlist mutations. The only new orchestration is the batch save, and it lives in a provider so leaving the screen doesn't cancel it.
+
+**Alternatives considered:**
+- Save without downloading: Navidrome playlists can only hold library songs.
+- Run the save in the widget with `context.mounted` guards, like `downloadAndAddToPlaylist`: it would abort when the user navigates away during a multi-minute save.
+- Persisting in-progress saves across an app kill: out of scope (marked with a `ponytail:` note).

@@ -1057,6 +1057,29 @@ Working breakdown: `/PLAN.md` (RX0–RX9). Backend prereq: RX1–RX7 in `backend
 ### [ ] RX9. On-device smoke + docs + v5.7.2
 **Commit:** `chore: bump version to 5.7.2 (For You: artist seeds, hide owned songs)`.
 
+
+## Phase MX — Vibe mixes (v5.8.0)
+
+Working breakdown: `/PLAN.md` (MX0–MX10). Backend prereq: MX1–MX5 in `backend/docs/ROADMAP.md`.
+
+### [x] MX0. ADRs + roadmap
+**Commit:** `docs: plan phase MX (vibe mixes)`.
+
+### [ ] MX6. Mix data layer
+**Files:** `lib/models/mix.dart`, `lib/services/backend_service.dart`, `lib/providers/mixes.dart`, `lib/providers/recommendations.dart` (extract `hydrateLibraryMatches`). **Commit:** `feat(flutter): MX6 mix data layer`.
+
+### [ ] MX7. `playPreviews` + mix screen
+**Files:** `lib/player/playback_actions.dart`, `lib/screens/mixes/mix_screen.dart`, `lib/router.dart`. **Commit:** `feat(flutter): MX7 mix screen`.
+
+### [ ] MX8. Your Mixes on Home
+**Files:** `lib/screens/home/your_mixes_section.dart`, `lib/screens/home/home_screen.dart`. **Commit:** `feat(flutter): MX8 Your Mixes on Home`.
+
+### [ ] MX9. Save a mix as a playlist
+**Files:** `lib/providers/download_to_playlist.dart` (extract `waitForLibrarySong`), `lib/providers/mix_saver.dart`, mix screen. **Commit:** `feat(flutter): MX9 save mix as playlist`.
+
+### [ ] MX10. On-device smoke + v5.8.0
+**Commit:** `chore: bump version to 5.8.0 (vibe mixes)`.
+
 ---
 
 ## Cross-cutting reminders

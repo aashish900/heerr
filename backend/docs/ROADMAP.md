@@ -574,6 +574,29 @@ Verify `get_song_related`, `search(filter="artists")`, `get_artist` unauthentica
 ### [x] RX7. Home-server curl smoke
 Gate for Android RX8 (`/CLAUDE.md` backend-first rule).
 
+
+## Phase MX — Vibe mixes (v5.8.0)
+
+Working breakdown: `/PLAN.md` (MX0–MX10). Eight fixed vibe mixes built from YouTube Music "Moods & moments" playlists, personalised by playlist affinity to the user's seed artists, plus a download-concurrency cap. Android side is in `android/docs/ROADMAP.md` Phase MX.
+
+### [x] MX0. ADRs + roadmap
+**Commit:** `docs: plan phase MX (vibe mixes)`.
+
+### [ ] MX1. Cap concurrent downloads
+**Files:** `app/services/workers.py`, `app/config.py`, `.env.example`, worker tests. **Commit:** `feat(backend): MX1 cap concurrent downloads (DOWNLOAD_CONCURRENCY=2)`.
+
+### [ ] MX2. Mix scoring (pure functions)
+**Files:** `app/services/recommenders/mixes.py`, `tests/test_mixes_scoring.py`. **Commit:** `feat(backend): MX2 mix scoring`.
+
+### [ ] MX3. YTM mood fetch + 24h cache
+**Files:** `app/services/recommenders/mixes.py`, `tests/test_mixes_fetch.py`. **Commit:** `feat(backend): MX3 ytm mood fetch + cache`.
+
+### [ ] MX4. Mix endpoints
+**Files:** `app/api/v1/recommend.py`, `app/schemas/recommend.py`, `app/services/recommenders/history.py`, `tests/test_mixes_api.py`. **Commit:** `feat(backend): MX4 mix endpoints`.
+
+### [ ] MX5. Home-server smoke (docs only)
+Gate for Android MX6. If mixes aren't personalised for the owner's seeds on most vibes, revisit the scoring first.
+
 ---
 
 ## Cross-cutting reminders

@@ -1,278 +1,257 @@
-# PLAN — Better "For You" recommendations (phase RX)
+# PLAN — Vibe mixes ("Chill Mix", "Party Mix", …) (phase MX)
 
-Status: **planned, nothing built.** Step 1 (the engine) is RX0–RX9. Step 2 (a For You section on Home, plus a "Not interested" action) will be planned separately once RX ships.
+Status: **planned, nothing built.** Target release: **v5.8.0**.
 
-> The previous plan in this file, Jam / remote control (phase JM, complete), lives in git history at `f4ce359:PLAN.md`. Older references to `/PLAN.md §5` in code and docs point there.
+> The previous plan in this file, recommendations v2 (phase RX), lives in git history at `e9882b9:PLAN.md`. RX is shipped (v5.7.0–v5.7.4) except **RX9**, the on-device smoke, which is still open and tracked in both ROADMAPs.
 
 ## 1. Goal
 
-Recommend **songs you don't already own** that fit your taste: varied, not repeated, and never anything you've dismissed. Spotify Discover / YT Music "For you" is the benchmark.
+Recommendations also generate **playlists for moods and vibes**: personalised mixes like Spotify's Daily Mixes or YouTube Music's mood mixes. You can stream them, download single songs, and save a whole mix as a Navidrome playlist.
 
 ## 2. Decisions (user-confirmed 2026-11-07)
 
-- **"New" means not in your library.** Artists already in the library are fine.
-- **Feedback is in scope.** Dismissed songs never come back, and recently shown songs are pushed down.
-- **Engine config on the server is unknown.** Design for `ytmusic` as primary, with the shared re-ranking applied to every engine (`ytmusic`, `lastfm`, `listenbrainz`).
-- **Step 2 (Home UI) is separate.** The dismiss *endpoint* ships here, and the *button* ships with step 2.
+- A **fixed set of 8 vibes**, each personalised to your taste.
+- **In-app mix screen:** stream all of it as previews and download single songs. Plus **"Save as playlist"**, which downloads every song and creates a Navidrome playlist.
+- A **"Your Mixes" shelf on Home**, below For You.
+- The vibe names are heerr's own; the user said not to reuse the example names.
 
-## 3. Facts (from code)
+## 3. Feasibility (verified live 2026-11-07, ytmusicapi 1.12.1, unauthenticated)
 
-| # | Fact | Source |
+| Call | Result | Time |
 |---|---|---|
-| F1 | `YTMusicEngine.recommend` loops over seeds in order and `break`s once `len(out) >= limit`. | `backend/app/services/recommenders/ytmusic_engine.py`, `recommend()` |
-| F2 | `get_watch_playlist` returns 25 tracks by default, so one seed fills the client's `limit=20`. | `.venv/.../ytmusicapi/mixins/watch.py:14` (`limit: int = 25`) |
-| F3 | `get_watch_playlist` also returns a `related` browseId, and `get_song_related(browseId)` returns the "You might also like" shelves. | `ytmusicapi/mixins/watch.py:193`, `mixins/browsing.py:883` |
-| F4 | Frequent albums become seeds shaped `SeedTrack(title: album.name, artist: album.artist)`. | `android/app/lib/providers/recommendations.dart`, `buildSeedCollection` |
-| F5 | The backend resolves seeds without a URL via `search(f"{artist} {title}", filter="songs", limit=1)`. | `ytmusic_engine.py`, `_resolve_via_search` |
-| F6 | Library songs are flagged `inLibrary` via `findLibraryMatch` (search3) but **not removed**. | `recommendations.dart`, `_hydrateLibraryMatches` |
-| F7 | The client sends 8 randomly sampled seeds from up to 20, with `limit: 20` and a 30-minute keep-alive TTL. | `recommendations.dart`: `kSeedSampleSize`, `_kRecommendationsLimit`, `_kRecsMaxAge` |
-| F8 | `POST /recommend` takes only `require_scope("read")` and doesn't resolve the user, so it can't filter per user. | `backend/app/api/v1/recommend.py` |
-| F9 | `RecommendSeed` uses `extra="forbid"`, `title` is required (`min_length=1`), and `limit` is capped at 50. | `backend/app/schemas/recommend.py` |
-| F10 | `jobs` has `user_id` and `source_url`, so per-user "already requested" is a single query. | `backend/app/models/job.py:68`, DECISIONLOG 2026-06-16 |
-| F11 | The latest migration is `0015` (jam). | `backend/alembic/versions/0015_jam.py` |
-| F12 | Home already shows "Picked for you" cards fed by `recommendationsProvider`. | `android/app/lib/screens/recommendations_screen.dart:71` (comment #21) |
+| `get_mood_categories()` | **12 moods** (Chill, Commute, Diwali, Energize, Feel good, Focus, Gaming, Party, Romance, Sad, Sleep, Workout) and **38 genres** (incl. Hindi, Punjabi, Indian indie, Desi hip-hop, Tamil) | 0.96 s |
+| `get_mood_playlists(Chill)` | **310** curated playlists, mixed languages ("Coffee Shop Blend", "Uncut Bollywood", "Retro Lounge: Tamil") | 0.40 s |
+| `get_mood_playlists(Party)` | 145 playlists ("Bollywood Dance Essentials", "Punjabi Dance Essentials", …) | 0.31 s |
+| `get_playlist(id, limit=100)` | 97–100 tracks with `videoId`, `title` and `artists` | ~0.5 s |
 
-**Root cause of the weak feed (inference from F1, F2, F4 and F6):** the first resolved seed alone fills all 20 slots, album-title seeds resolve to arbitrary songs, and owned songs aren't filtered. So the feed is one seed's radio, padded with songs you already have.
+- **Feasible:** YouTube Music supplies the mood labels and curated track pools. heerr picks the playlists in each mood that best match your artists, then ranks their tracks.
+- **Not feasible:** filtering *your own* recommendations by mood. YouTube Music has no per-track mood tags, Spotify's audio-features API is deprecated, and Last.fm tags would need an API key plus one call per track. So the design is **mood pool, personalised by taste**.
+- **Found while checking:** downloads have **no concurrency limit** (`backend/app/services/workers.py`: each `/download` starts its own spotDL subprocess via `BackgroundTasks`). "Save as playlist" would start about 25 spotDL processes at once, so MX1 adds a throttle.
 
-## 4. Assumptions (review before RX1)
+## 4. Assumptions (review before MX1)
 
-1. The ytmusicapi calls (`get_song_related`, `get_artist`, `search(filter="artists")`) work unauthenticated from the server, as `get_watch_playlist` already does. RX4 verifies this first in a REPL.
-2. 8 seeds × about 2 YTM calls each, with concurrency 4, finishes in **under 6 s**. If not, RX4 adds a per-videoId in-memory TTL cache, marked `ponytail:`.
-3. The library filter (F6) also applies to the "Find similar" screen, which then shows only songs you don't own. Say so if Find similar should keep showing owned songs.
-4. A "shown" mark expires after **7 days**, and a demoted score is multiplied by **0.3**. Both are tunable constants.
-5. **At most 2 songs per artist** in a feed of 20.
+1. The server's YouTube Music results are localised to its IP region (India, judging by the probe's Bollywood and Tamil playlists). That's good for a Desi flavour. These are inferences, not verified on the server; MX5 checks them.
+2. Looking at the first **24** playlists of a mood is enough to find ones that overlap your artists. MX5 checks this, and the fallback is a non-personalised mix that says so.
+3. spotDL takes roughly 20–40 s per song (a guess, not measured). At 2 at a time, saving a 25-song mix takes about **5–8 minutes**. MX5 measures it.
+4. The backend runs a single uvicorn worker, so an in-process cache is fine.
 
 ## 5. Design
 
-### 5.1 Pipeline
+### 5.1 Vibes (fixed)
 
-```
-Android                            Backend
-seeds (song w=1.0,                 POST /recommend
- artist w=0.7/0.4) ── sample 8 ──▶   engine.recommend(seeds, limit*2)   ← candidates + consensus score
- limit=40                            rerank(excl. jobs+dismissed, demote shown, ≤2/artist) → limit
-                                     upsert rec_feedback.shown
-◀── results ───────────────────────
-hydrate inLibrary (search3) → drop owned → take 20
-```
-
-### 5.2 Seeds (Android)
-
-| Source | Seed kind | Weight |
+| id | Title | YTM "Moods & moments" title |
 |---|---|---|
-| `getStarred2` songs | song `(title, artist)` | 1.0 |
-| `getAlbumList2?type=frequent&size=30` | **artist** `(artist)` | 0.7 |
-| `getAlbumList2?type=recent&size=20` | **artist** `(artist)` | 0.4 |
-| Favourites playlist (only if all of the above are empty) | song | 1.0 |
+| `chill` | Chill Mix | Chill |
+| `feel-good` | Feel Good Mix | Feel good |
+| `party` | Party Mix | Party |
+| `romance` | Romance Mix | Romance |
+| `heartbreak` | Heartbreak Mix | Sad |
+| `workout` | Workout Mix | Workout |
+| `focus` | Focus Mix | Focus |
+| `sleep` | Sleep Mix | Sleep |
 
-Dedupe songs by `title|artist` and artists by lowercased name. When an artist appears more than once, keep its highest weight. The cap stays at 20 and `sampleSeeds` (8 per request) is unchanged.
+### 5.2 Mix algorithm (`backend/app/services/recommenders/mixes.py`)
 
-### 5.3 Wire contract (additive, old clients keep working)
+For each request `(vibe, seeds, variant, limit)`:
 
-```python
-class RecommendSeed(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    title: str | None = Field(default=None, min_length=1)  # None ⇒ artist seed
-    artist: str = Field(..., min_length=1)
-    source_url: str | None = None
-    weight: float = Field(default=1.0, ge=0.0, le=1.0)
-```
+1. **Taste profile:** `artist (trimmed, lowercased) → weight`, built from the client seeds. Every seed carries an artist and a weight (starred-song artists 1.0, frequent-album artists 0.7, recent-album artists 0.4). The highest weight per artist wins.
+2. **Mood lookup:** find the vibe's category in `get_mood_categories()["Moods & moments"]` by title. If it's missing, raise `MoodNotFound` (the API returns 503).
+3. **Candidates:** the first `CANDIDATE_PLAYLISTS = 24` from `get_mood_playlists(params)`, in YTM order. Fetch each with `get_playlist(id, limit=100)` concurrently (semaphore 4). A failing playlist is logged and skipped.
+4. **Playlist affinity:** the taste weight of tracks with any listed artist in the profile, divided by the playlist's track count.
+5. **Pick:** sort playlists by affinity (descending; stable, so ties keep YTM order) and take the top `POOL = 8`. Choose `PICK = 4` of them by rotating with `variant` (the playlists at indices `(variant*PICK + i) % 8`).
+   - `personalized = max affinity > 0`.
+   - If every affinity is 0, use YTM's first 8 in the same way, with `personalized: false`.
+6. **Track score:** for each chosen playlist `p` and each track at position `i`, add `(0.5 + affinity_p) / (1 + 0.02·i)`. Then add the track's best taste weight, once, if any of its artists is in the profile. Duplicates across playlists add up, so consensus wins.
+7. **Shared re-rank:** run `rerank()` (`backend/app/services/recommenders/rerank.py`) with:
+   - `excluded` = the user's non-failed jobs plus dismissed songs (the RX3 history query)
+   - covers and alternate versions dropped (already built in)
+   - `recently_shown = ∅`, so mixes don't rotate on their own
+   - `per_artist = 3`
+   - `limit` (≤ 50)
+8. **Cache:** a 24-hour in-process TTL cache for categories, per-mood playlist lists, and per-playlist tracks. Expected cold time is about 4.5 s; warm, under 1 s.
+   `# ponytail: per-process dict; Redis only if >1 worker or memory matters.`
 
-`SeedTrack` (backend dataclass and Dart freezed model) mirrors this. `RecommendRequest.limit` stays capped at 50.
+### 5.3 API (`backend/app/api/v1/recommend.py`, `read` scope)
 
-### 5.4 Candidate generation (`YTMusicEngine`)
+| Method | Path | Body | Response |
+|---|---|---|---|
+| GET | `/api/v1/recommend/mixes` | n/a | `[{id, title}]`. Static, no network. |
+| POST | `/api/v1/recommend/mixes/{id}` | `{seeds: [RecommendSeed], limit: 1–50 = 50, variant: ≥0 = 0}` | `{id, title, personalized, results: [RecommendResultItem]}`. 404 for an unknown id, 503 when the mood is missing upstream. |
 
-For each seed, concurrently via `asyncio.gather` with `asyncio.Semaphore(4)` (calls stay in `asyncio.to_thread`):
+Mixes don't write "shown" rows to `rec_feedback`. Dismissals still apply through `excluded`.
 
-- **Song seed:** resolve the videoId (reuse `_video_id_from_url` and `_resolve_via_search`). Call `get_watch_playlist(videoId)` and take its `tracks` (**50 in practice, with the seed itself first**, per RX4), skipping the seed. If `watch["related"]` is set, call `get_song_related(...)` and take **only the shelf titled "You might also like"** (20 songs). Never use "Other performances": it's covers and mashups *of the seed song*. The playlist, similar-artist and artist shelves have no `videoId`, and "About the artist" has string `contents`, so non-list contents are treated as empty. The ytmusicapi client defaults to `language="en"`, so the shelf title is stable. Merge the shelf songs into the radio list and **dedupe within the seed** before scoring (RX4 saw the same track in both lists for one seed).
-- **Artist seed:** call `search(artist, filter="artists", limit=1)` and take its `browseId`. Call `get_artist(browseId)` and take `["songs"]["results"]`, the artist's top songs (**5 in practice**). `artists[0]` on these songs isn't always the seed artist, e.g. "Gehra Hua" lists Shashwat Sachdev before Arijit Singh. The 2-per-artist cap keys on `artists[0]`, which is accepted.
+### 5.4 Download throttle (`backend/app/services/workers.py`)
 
-Each seed yields an ordered list. **Consensus scoring:**
+- A module-level `asyncio.Semaphore`, sized by the `DOWNLOAD_CONCURRENCY` env var (default **2**), wraps the download step of `run_job` (spotDL and podcast episodes).
+- A job transitions `queued → running` only **after** it acquires a slot, so the Queue screen stays truthful.
+- It applies to every download, not just mixes.
 
-```
-score(track) = Σ over seeds that produced it:  seed.weight / (1 + 0.1 · rank_in_that_seed_list)
-```
+### 5.5 Android
 
-Then drop the seeds' own videoIds, sort by score descending, and return the top `limit` as `RecommendedTrack(score=...)`. A failure on one seed is logged at WARNING and skipped, as today.
+- **Models** (`android/app/lib/models/mix.dart`, freezed): `MixVibe {id, title}` and `MixResponse {id, title, personalized, results: List<RecommendedTrack>}`.
+- **API** (`android/app/lib/services/backend_service.dart`): `mixVibes()` and `mix(id, {seeds, limit, variant})`.
+- **Providers** (`android/app/lib/providers/mixes.dart`):
+  - `mixVibesProvider`: keep-alive.
+  - `MixNotifier`: a keep-alive family keyed by id. `build` sends **all** seeds from `seedCollectionProvider` (unsampled), then drops owned songs. `regenerate()` increments `variant`.
+- **Shared owned-filter:** extract `Recommendations._hydrateLibraryMatches` into a top-level `hydrateLibraryMatches(ref, tracks)` in `android/app/lib/providers/recommendations.dart`, so For You and mixes both use it.
+- **Playback:** add `playPreviews(ref, context, List<SearchResultItem> items, {int startIndex = 0})` to `android/app/lib/player/playback_actions.dart`. It maps items through `searchResultToMediaItem` and calls the existing `HeerrAudioHandler.playAll`. It's blocked during a jam, like `playPreview`.
+- **Home shelf** (`android/app/lib/screens/home/your_mixes_section.dart`):
+  - A "Your Mixes" header and a horizontal row of 8 square tiles (gradient cover, white title), placed after `ForYouSection`.
+  - Hidden if the vibe list fails or is empty.
+- **Mix screen:** route `/mixes/:id`, file `android/app/lib/screens/mixes/mix_screen.dart`.
+  - **Header:** cover and title, "Made for <nickname>" (or "Popular <mood> picks" when `personalized: false`), and **Play all**, **Regenerate** and **Save as playlist**.
+  - **Rows:** art, title and artist, plus a download button via `downloadRecommendation`. A row tap plays the mix from that song.
+  - **States:** loading (spinner), error (message plus Retry), empty ("Nothing new for this vibe").
+- **Save as playlist** (`android/app/lib/providers/mix_saver.dart`, a keep-alive notifier, so leaving the screen doesn't cancel it):
+  1. Create an empty Navidrome playlist named "<Mix title> · <d MMM>" via `PlaylistMutations.createPlaylist`.
+  2. Dispatch `POST /download` for every song (the backend throttle runs 2 at a time).
+  3. Await each song with `waitForLibrarySong`, which is steps 2–3 of `downloadAndAddToPlaylist` extracted into a context-free function.
+  4. Call `addSongs` **in mix order** once all have resolved or timed out.
+  5. Progress shows on the button ("Saving 12/25"), then a summary ("Saved 23 of 25 · 2 failed").
 
-### 5.5 Re-rank and feedback (any engine, `rerank.py`)
+  `# ponytail: an app kill mid-save leaves a partial playlist (downloads still finish server-side).`
 
-A pure function, so it can be tested without a database:
+## 6. Out of scope
 
-```python
-def rerank(
-    candidates: list[RecommendedTrack],
-    *, excluded: set[str], recently_shown: set[str], limit: int, per_artist: int = 2,
-) -> list[RecommendedTrack]
-```
-
-1. Drop `source_url ∈ excluded`.
-2. Multiply the score by `0.3` if `source_url ∈ recently_shown`. A missing score (Last.fm / ListenBrainz) counts as `1.0 / (1 + 0.1 · index)`.
-3. Sort by score descending, then greedily take items while skipping any artist (lowercased) that already has `per_artist` songs.
-4. Stop at `limit`.
-
-Route flow in `POST /recommend`:
-`user = current_user` → `candidates = engine.recommend(seeds, min(limit*2, 100))` → `excluded = user's jobs (status != failed) ∪ user's dismissed` → `recently_shown = last_shown_at > now() - 7d` → `rerank` → upsert the shown rows → respond.
-
-### 5.6 Data model (migration `0016_rec_feedback`)
-
-```sql
-CREATE TABLE rec_feedback (
-  user_id       uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  source_url    text        NOT NULL,
-  shown_count   integer     NOT NULL DEFAULT 0,
-  last_shown_at timestamptz,
-  dismissed_at  timestamptz,
-  PRIMARY KEY (user_id, source_url)
-);
-```
-
-The upsert for shown rows is `INSERT ... ON CONFLICT (user_id, source_url) DO UPDATE SET shown_count = rec_feedback.shown_count + 1, last_shown_at = now()`. Rows are never pruned. Size is bounded by about 20 rows per refresh, which is fine for a family app (`ponytail:` note: prune when `last_shown_at` is older than 90 days if the table ever matters).
-
-### 5.7 API
-
-| Method | Path | Body | Response | Notes |
-|---|---|---|---|---|
-| POST | `/api/v1/recommend` | `{seeds, limit}` (5.3) | unchanged | now per user (5.5) |
-| POST | `/api/v1/recommend/dismiss` | `{source_url}` | `204` | idempotent upsert of `dismissed_at = now()`; `read` scope; scoped to current user |
-| GET | `/api/v1/recommend/health` | n/a | unchanged | n/a |
-
-## 6. Out of scope (step 1)
-
-- Home "For You" section and the "Not interested" button (step 2).
-- Artist-level dislike, genre or mood shelves, time-of-day mixes.
-- A backend-side play-history store. Navidrome stays the history source through Subsonic, and the backend never calls Navidrome as the user (it stores no passwords, ADR 2026-06-16).
-- Embeddings / pgvector similarity. Revisit only if consensus ranking proves insufficient.
-- Changes to the `lastfm` / `listenbrainz` engines beyond the shared re-rank.
+- Genre mixes (Hindi, Punjabi, …), daily auto-generated mixes, push notifications.
+- Per-track mood tagging (no data source, see §3).
+- Saving a mix without downloading. Navidrome playlists can only hold library songs.
+- Persisting an in-progress save across an app kill.
 
 ## 7. Tasks
 
-Backend first, TDD (`backend/CLAUDE.md`). Run `poetry run pytest` green before and after each task, and run `graphify update .` after code changes. Commit one task at a time with Conventional Commits.
+Backend first, TDD (`backend/CLAUDE.md`, `android/CLAUDE.md`):
+- Run `poetry run pytest` / `flutter analyze` + `flutter test` green before and after every task.
+- Run `graphify update .` after code changes.
+- One commit per task, with the message given.
 
-### [x] RX0. Docs: ADR + roadmap entries (no code)
-- `backend/docs/DECISIONLOG.md`: ADR "Recommendations v2: consensus candidates + per-user re-rank + feedback table", covering the decisions in §2 and the design in §5.4–5.6.
-- `android/docs/DECISIONLOG.md`: ADR "For You seeds: artist seeds from frequent/recent albums; owned songs filtered client-side".
-- `backend/docs/ROADMAP.md` and `android/docs/ROADMAP.md`: add "Phase RX — Better recommendations (v5.7.0)" with RX headings and a pointer to `/PLAN.md`.
-- Commit: `docs: plan phase RX (recommendations v2)`.
+### [x] MX0. Docs: ADRs + roadmap entries (no code)
+1. `backend/docs/DECISIONLOG.md`: add an ADR "Vibe mixes from YTM Moods & moments, personalised by playlist affinity" covering §3 and §5.2–5.4. Include the download throttle as its own ADR.
+2. `android/docs/DECISIONLOG.md`: add an ADR "Your Mixes shelf, mix screen, save-as-playlist via download + wait" covering §5.5.
+3. In both ROADMAPs, add a "Phase MX — Vibe mixes (v5.8.0)" section with the MX headings. Keep RX9 open.
+4. Add a changelog entry in both CHANGELOGs.
+- Commit: `docs: plan phase MX (vibe mixes)`.
 
-### [x] RX1. Backend: `rerank()` pure function
-1. Write `tests/test_rerank.py` first. Cover:
-   - excluded URLs are dropped
-   - recently shown items are demoted below unshown items of equal score
-   - at most 2 per artist, case-insensitive
-   - a missing score falls back to positional order
-   - the output is capped at `limit`
-   - an empty input gives an empty output
-2. Implement `app/services/recommenders/rerank.py` (about 30 lines), with constants `SHOWN_PENALTY = 0.3` and `PER_ARTIST = 2`.
-- Commit: `feat(backend): RX1 rerank recommendations (exclude, demote, artist cap)`.
+### [ ] MX1. Backend: cap concurrent downloads
+1. Tests first, in `tests/test_workers.py` (or a new `tests/test_download_concurrency.py`), with a fake runner that blocks on an event:
+   - 5 jobs enqueued with `DOWNLOAD_CONCURRENCY=2` never have more than 2 in the runner at once
+   - jobs 3–5 stay `queued` until a slot frees up
+   - all 5 end `done`
+   - a failing runner releases its slot
+2. Add `DOWNLOAD_CONCURRENCY` to `app/config.py` Settings (default 2, `ge=1`) and to `.env.example`, with a comment.
+3. In `workers.py`, use a module-level semaphore sized from settings, acquired before `mark_running` and released in `finally`.
+- Commit: `feat(backend): MX1 cap concurrent downloads (DOWNLOAD_CONCURRENCY=2)`.
 
-### [x] RX2. Backend: migration + model
-1. Add `alembic/versions/0016_rec_feedback.py` (§5.6), following the 0015 file layout.
-2. Add `app/models/rec_feedback.py` (`RecFeedback`) and export it from `app/models/__init__.py`.
-3. Gate: `alembic upgrade head` and `alembic downgrade -1` both run clean against the dev Postgres.
-- Commit: `feat(backend): RX2 rec_feedback table (migration 0016)`.
+### [ ] MX2. Backend: mix scoring (pure functions)
+1. Tests first, in `tests/test_mixes_scoring.py`, with fixture playlists as plain dicts in the RX4 shapes:
+   - `taste_profile(seeds)`: lowercases and trims, max weight wins, song and artist seeds both count
+   - `playlist_affinity(tracks, taste)`: weighted share of matching tracks, matching on **any** listed artist; 0 for an empty playlist
+   - `pick_playlists(scored, variant)`: top 8 by affinity with stable ties, 4 chosen by rotation, so variant 0 and variant 1 differ and variant 2 wraps
+   - all-zero affinity falls back to YTM order with `personalized=False`
+   - `score_tracks(chosen, taste)`: position decay, the taste bonus added once, duplicates across playlists summed, items without a `videoId`/title/artist skipped
+2. Implement these in `app/services/recommenders/mixes.py`, with constants `CANDIDATE_PLAYLISTS=24`, `POOL=8`, `PICK=4` and `PER_ARTIST=3`.
+- Commit: `feat(backend): MX2 mix scoring`.
 
-### [x] RX3. Backend: route wiring + dismiss endpoint
-1. Add tests to `tests/test_recommend.py`, reusing `FakeEngine` and testcontainers Postgres:
-   - `/recommend` excludes the user's job URLs
-   - another user's jobs are **not** excluded
-   - a dismissed URL never returns
-   - a second call demotes items shown on the first call
-   - returned items are upserted (`shown_count` increments)
-   - the engine is asked for `min(limit*2, 100)`
-   - `/recommend/dismiss` returns 204, is idempotent, needs auth (401 without a token), and only affects the caller
-2. Implement:
-   - schema `DismissRequest {source_url: str}`
-   - `POST /recommend` depends on `current_user` and runs the §5.5 flow
-   - `POST /recommend/dismiss`
-- Commit: `feat(backend): RX3 per-user recommend re-rank + /recommend/dismiss`.
+### [ ] MX3. Backend: YTM mood fetch + 24-hour cache
+1. Tests first, in `tests/test_mixes_fetch.py`. The fake YTM client gets `get_mood_categories`, `get_mood_playlists` and `get_playlist`, plus call counters and an in-flight counter.
+   - a mood is found by title, and a missing one raises `MoodNotFound`
+   - 24 candidates are fetched with at most 4 in flight
+   - a failing `get_playlist` is skipped
+   - a second build within the TTL makes **no** YTM calls
+   - an expired TTL refetches (time is injected so tests don't sleep)
+2. Implement `VIBES` (§5.1), the `MixBuilder` class (fetch, cache, then the MX2 functions), and `TTLCache`. Calls run via `asyncio.to_thread`, as in `ytmusic_engine.py`.
+- Commit: `feat(backend): MX3 ytm mood fetch + cache`.
 
-### [x] RX4. Backend: verify ytmusicapi calls (spike, no feature code)
-1. In `backend/.venv`, run a REPL on the server (inside the backend container) for one known song and one known artist. Call `get_watch_playlist`, then `get_song_related(watch["related"])`, `search(artist, filter="artists", limit=1)`, and `get_artist(browseId)["songs"]["results"]`.
-2. Record the real response shapes, which keys hold `videoId` / `artists`, and the timings in `backend/docs/CHANGELOG.md`.
-3. If any call fails unauthenticated, stop and revise §5.4 before RX5.
+### [ ] MX4. Backend: mix endpoints
+1. Move the RX3 `_history(session, user_id, urls)` from `api/v1/recommend.py` into `app/services/recommenders/history.py` (no behaviour change; existing tests stay green).
+2. Tests first, in `tests/test_mixes_api.py`, with a fake `MixBuilder` via `dependency_overrides`:
+   - `GET /mixes` returns all 8 `{id, title}`, and 401 without a token
+   - `POST /mixes/chill` returns results with `cover_url`, plus `personalized` and `title`
+   - an unknown id gives 404, and `MoodNotFound` gives 503
+   - `limit` above 50 and a negative `variant` give 422
+   - the user's non-failed jobs and dismissed songs are excluded, while other users' jobs aren't
+   - covers are dropped, and at most 3 per artist
+   - **no** `rec_feedback` "shown" rows are written
+3. Implement the schemas (`MixRequest`, `MixResponse`, `MixVibeItem` in `app/schemas/recommend.py`), the routes, and a `get_mix_builder` dependency (a module-level singleton, so the cache survives between requests).
+- Commit: `feat(backend): MX4 mix endpoints`.
 
-### [x] RX5. Backend: schema — artist seeds + weights
+### [ ] MX5. Backend: home-server smoke (docs only)
+1. Tag a backend release, or build and deploy as you usually do, then run `docker compose pull heerr-backend && docker compose up -d heerr-backend`.
+2. Smoke script (throwaway read-only `system-admin` token, revoked on exit, like RX7):
+   - `GET /recommend/mixes` returns 8 vibes
+   - `POST /recommend/mixes/chill` and `/party` with your real seeds: record cold and warm timings (targets: cold < 6 s, warm < 1 s), `personalized`, the result count, distinct artists, and the top 10 titles. Check that they read like your taste.
+   - `variant=1` returns a different list
+   - 5 rapid `POST /download`s: the queue shows at most 2 `running`. Record the time per song.
+3. Write the results to `backend/docs/CHANGELOG.md`. **If `personalized` is false for your seeds on most vibes, stop and revisit §5.2** (raise `CANDIDATE_PLAYLISTS`, or match related artists) before any Android work.
+
+### [ ] MX6. Android: mix data layer
 1. Tests first:
-   - a payload without `weight` or `title` validates as an artist seed
-   - an old-client payload (title + artist only) is unchanged
-   - `weight > 1` gives 422
-   - an empty-string title gives 422
-2. Update `RecommendSeed` (§5.3), the `SeedTrack` dataclass (`title: str | None`, `weight: float = 1.0`) and the route mapping.
-3. Check that `lastfm_engine.py` and `listenbrainz_engine.py` skip seeds with no title (or treat them as artist seeds via `artist.getTopTracks`, which Last.fm already has as `_ARTIST_TOP_WEIGHT`). Add tests for this.
-- Commit: `feat(backend): RX5 artist seeds + seed weights in /recommend`.
-
-### [x] RX6. Backend: YTMusic engine rewrite
-1. Tests first, in `tests/test_recommend_ytmusic.py` (or extend the existing engine tests), with a fake `_YTMusicLike` that also covers `get_song_related` and `get_artist`:
-   - 3 song seeds each returning 25 tracks: the output contains tracks from all 3 (the F1 regression)
-   - a track produced by 2 seeds outranks single-seed tracks
-   - a weight-1.0 seed outranks a weight-0.4 seed at the same rank
-   - seed videoIds are never in the output
-   - an artist seed goes through `search(filter="artists")` and `get_artist`, and yields its top songs
-   - one seed raising an exception doesn't kill the others
-   - a missing `related` key skips `get_song_related`
-   - concurrency never exceeds 4 (track max in-flight inside the fake)
-2. Implement §5.4 in `ytmusic_engine.py`, extending the `_YTMusicLike` protocol with `get_song_related` and `get_artist`.
-3. Time a real `/recommend` call with 8 seeds over Tailscale. If it takes more than 6 s, add an in-memory TTL cache keyed by videoId or artist (marked `ponytail:`).
-- Commit: `feat(backend): RX6 ytmusic engine — concurrent multi-seed, related songs, artist seeds, consensus score`.
-
-### [x] RX7. Backend: curl smoke on the home server
-1. Rebuild and deploy (`docker compose up -d --build heerr-backend`), and confirm `heerr-migrate` applied `0016`.
-2. Call `POST /recommend` with 3 starred-song seeds and 1 artist seed, `limit: 20`. Check that the results include more than 8 distinct artists and nothing you've already requested.
-3. Call `POST /recommend/dismiss` with one result, then call `/recommend` again with the same seeds and confirm the dismissed song is gone and earlier results have moved down.
-4. Confirm `GET /recommend/health` is unchanged.
-5. Log the commands and their output in `backend/docs/CHANGELOG.md`. Per `/CLAUDE.md`, Android work starts only after this passes.
-
-### [x] RX7a. Backend: drop covers / alternate versions (added after RX7)
-The RX7 smoke showed radio tracks like "(Cover)", "(Live)", "(Acoustic)" and "(… Version)". The user chose to filter them, and kept `SHOWN_PENALTY` at 0.3.
-- `rerank.py` has a new `is_alt_version(title)`, applied with the exclusions so it covers every engine. These words match anywhere in the title: mashup, karaoke, slowed, reverb, lo-fi, sped up, nightcore. These match only inside `(…)` / `[…]` or after a ` - ` / ` – ` / ` | ` qualifier: cover, live, acoustic, remix, version, instrumental, unplugged, reprise.
-- Commit: `feat(backend): RX7a drop covers and alternate versions from recommendations`.
-
-### [x] RX8. Android: seeds, request size, owned-song filter
-Files: `android/app/lib/models/seed_track.dart`, `android/app/lib/providers/recommendations.dart`, `android/app/lib/services/backend_service.dart` (body serialisation only, if needed).
-1. `SeedTrack`: make `title` nullable and add `@Default(1.0) double weight`. Then run code generation:
+   - `test/models/mix_test.dart`: JSON round trips
+   - `test/services/backend_service_mix_test.dart`: the right paths and bodies
+   - `test/providers/mixes_provider_test.dart`:
+     - sends **all** seeds, not a sample
+     - drops owned songs via `hydrateLibraryMatches`
+     - `regenerate()` posts `variant+1`
+     - errors surface as `AsyncError`
+2. Extract `hydrateLibraryMatches` (For You behaviour unchanged, and `recommendations_provider_test.dart` stays green).
+3. Implement `lib/models/mix.dart` (freezed), the two `BackendService` methods and endpoint constants, and `lib/providers/mixes.dart`. Then run code generation from `android/app`:
    ```bash
-   cd android/app && dart run build_runner build --delete-conflicting-outputs
+   dart run build_runner build --delete-conflicting-outputs
    ```
-   Make sure `toJson` leaves out a null `title`, not `"title": null`. The backend would accept `null` too, since it's `str | None`.
-2. `seedForSong` ("Find similar") stays a song seed with weight 1.0.
-3. Update `buildSeedCollection` to take `recent` as well, emit artist seeds per §5.2, and dedupe artists while keeping the max weight.
-4. In `seedCollection`, add `service.getAlbumList(type: 'recent', size: 20)`.
-5. In the `Recommendations.build`, request `limit: 40` (rename `_kRecommendationsLimit` and add `_kRecommendationsShown = 20`). After `_hydrateLibraryMatches`, use `.where((r) => !r.inLibrary).take(20)`.
-6. Tests in `android/app/test/providers/recommendations_provider_test.dart`:
-   - frequent and recent albums produce artist seeds (no album-title seeds)
-   - an artist appearing in both gets weight 0.7
-   - starred songs come first
-   - owned results are filtered out and the list is capped at 20
-   - the Favourites fallback still works
-   Also update the `_StubRecs` users if their signatures change.
-7. Gate: `flutter analyze` and `flutter test` both pass.
-- Commit: `feat(flutter): RX8 artist seeds + weights, hide owned songs in For You`.
+- Commit: `feat(flutter): MX6 mix data layer`.
 
-### [ ] RX9. End-to-end smoke + version 5.7.2 + docs
-> 2026-11-07: version 5.7.2, docs and `backend/docs/CONTEXT.md` were done at the user's request **before** the on-device smoke (steps 1 and 3 done; step 2 not run). Tick RX9 once the Pixel smoke passes.
-1. Bump the version to **5.7.2** in all five places (5.7.0 shipped the backend half and 5.7.1 the RX7a cover filter, both 2026-11-07) (`/CLAUDE.md` §3): `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml`, and both ROADMAP status lines.
-2. Install on the Pixel 7:
-   ```bash
-   cd android/app && flutter run --release
-   ```
-   Open For You and pull to refresh twice. Check:
-   - no song you own appears
-   - more than 5 distinct artists
-   - the second refresh is mostly different from the first
-   - Find similar on a song still works
+### [ ] MX7. Android: `playPreviews` and the mix screen
+1. Tests first:
+   - `test/player/playback_actions_previews_test.dart`: maps N items to N preview `MediaItem`s, calls `playAll` with `startIndex`, and is blocked during a jam
+   - `test/screens/mixes/mix_screen_test.dart`:
+     - loading, error with Retry, and empty states
+     - "Made for <nickname>" vs "Popular … picks"
+     - Play all calls `playAll` from 0, and a row tap plays from that index
+     - the row download dispatches
+     - Regenerate calls the notifier
+2. Implement `playPreviews`, `MixScreen`, and the route `Routes.mix(id)` → `/mixes/:id` in `lib/router.dart`.
+- Commit: `feat(flutter): MX7 mix screen`.
+
+### [ ] MX8. Android: "Your Mixes" on Home
+1. Tests first:
+   - `test/screens/home/your_mixes_section_test.dart`: 8 tiles in a horizontal row; a tap pushes `/mixes/<id>`; hidden on error or an empty list
+   - `home_screen_test.dart`: the section sits below For You and above Recently Added (stub the provider in `_homeOverrides`)
+2. Implement `YourMixesSection`, with one gradient per vibe built from the theme colours, and insert it in `home_screen.dart`.
+- Commit: `feat(flutter): MX8 Your Mixes on Home`.
+
+### [ ] MX9. Android: save a mix as a playlist
+1. Extract `waitForLibrarySong(...)` from `downloadAndAddToPlaylist` (context-free; it returns a song id or null). The existing `download_to_playlist` tests stay green.
+2. Tests first, in `test/providers/mix_saver_test.dart`, with fake dispatcher, job status, library-match and playlist mutations:
+   - creates "<title> · <d MMM>"
+   - dispatches every song
+   - adds the resolved songs **in mix order**
+   - reports failed and timed-out counts
+   - progress updates as songs resolve
+   - a second save of the same mix while one is running is a no-op
+3. Add widget tests on the mix screen: the button shows "Saving x/y" and then a summary.
+4. Implement `MixSaver` (keep-alive, keyed by mix id) and wire up the button.
+- Commit: `feat(flutter): MX9 save mix as playlist`.
+
+### [ ] MX10. On-device smoke, then 5.8.0 and docs
+1. On the Pixel (`flutter run --release` from `android/app`):
+   - 8 tiles on Home
+   - Chill opens with songs you don't own, and Play all queues them
+   - Regenerate changes the list
+   - a row download works
+   - Save as playlist creates "Chill Mix · <date>" and fills it
+2. Bump the version to **5.8.0** in all five places (`/CLAUDE.md` §3).
 3. Update docs:
-   - `backend/docs/CONTEXT.md`: the recommendations bullet (engine pipeline, `rec_feedback`)
+   - `backend/docs/CONTEXT.md`: a mixes bullet plus the download throttle
    - both CHANGELOGs
-   - tick the RX boxes here and in both ROADMAPs
-- Commit: `chore: bump version to 5.7.2 (For You: artist seeds, hide owned songs)`.
+   - tick the boxes here and in both ROADMAPs
+- Commit: `chore: bump version to 5.8.0 (vibe mixes)`.
 
 ## 8. Risks
 
 | Risk | Mitigation |
 |---|---|
-| ytmusicapi is unofficial, so YouTube can change response shapes. | Parse defensively (skip items missing `videoId` / `artists`). RX4 records the real shapes. One failing seed doesn't fail the request. |
-| More YTM calls per refresh (about 16 instead of about 8) could hit rate limits or get slow. | Semaphore of 4, the client's 30-minute TTL, and an optional TTL cache (RX6 step 3). |
-| `findLibraryMatch` (search3, fuzzy) can miss an owned song with different metadata, so it leaks into For You. | Accepted for v1. The user's `jobs` exclusion on the backend catches anything downloaded through heerr. |
-| Filtering owned songs from 40 candidates leaves fewer than 20. | Raise `limit` to 50 (the schema cap) if it happens often. Decide during RX9. |
-| Demoting shown songs for 7 days can thin the feed for users with few seeds. | The demotion only multiplies the score; nothing is excluded except dismissed and requested songs. |
+| YTM renames a mood | Moods are looked up by title, a missing one returns 503 (tested), and the mix screen shows an error with Retry. |
+| Your artists don't appear in a mood's top 24 playlists | Fall back to `personalized: false` with "Popular … picks" in the UI. MX5 measures how often it happens before Android work starts. |
+| Save as playlist is slow (about 25 songs, 2 at a time) | Progress on the button, a keep-alive notifier, and the real time per song measured in MX5. |
+| A cold mix takes about 4.5 s | A spinner on the mix screen; the 24-hour cache makes repeats under 1 s. |
+| The download throttle slows ordinary single downloads during a burst | A queued job shows as `queued` (truthful), and `DOWNLOAD_CONCURRENCY` is tunable without a rebuild. |

@@ -3502,3 +3502,11 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 ## 2026-11-07 — v5.7.4: download buttons (Home For You cards, Now Playing previews)
 
 - Version bump `5.7.3` → `5.7.4` (`android/app/pubspec.yaml`). Ships the two entries above. Not smoke-tested on device; RX9 is still open.
+
+## 2026-11-07 — MX0: plan phase MX (vibe mixes), docs only
+
+- `/PLAN.md`: replaced the RX plan (in git history at `e9882b9:PLAN.md`; RX9, the on-device smoke, stays open in both ROADMAPs) with the phase MX plan (MX0–MX10). It records the live feasibility probe of YTM "Moods & moments", the design, assumptions and risks.
+- `backend/docs/DECISIONLOG.md`: two ADRs, "Vibe mixes from YTM Moods & moments, personalised by playlist affinity" and "Cap concurrent downloads (`DOWNLOAD_CONCURRENCY`, default 2)".
+- `android/docs/DECISIONLOG.md`: ADR "Vibe mixes on Android: Your Mixes shelf, mix screen, save-as-playlist".
+- `backend/docs/ROADMAP.md` (MX0–MX5) and `android/docs/ROADMAP.md` (MX0, MX6–MX10): new "Phase MX — Vibe mixes (v5.8.0)" sections.
+- No code changes, no version change.

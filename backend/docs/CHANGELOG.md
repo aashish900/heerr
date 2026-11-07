@@ -1296,3 +1296,11 @@ Response times are under the 6 s budget, so no cache is needed (RX6 `ponytail:` 
 ## 2026-11-07 — v5.7.4: version sync only
 
 - Version bump `5.7.3` → `5.7.4` (`backend/pyproject.toml`, `backend/app/main.py`) for the Android download-button release. No backend code changes and no redeploy needed: the buttons use the existing `POST /download`.
+
+## 2026-11-07 — MX0: plan phase MX (vibe mixes), docs only
+
+- `/PLAN.md`: replaced the RX plan (in git history at `e9882b9:PLAN.md`; RX9, the on-device smoke, stays open in both ROADMAPs) with the phase MX plan (MX0–MX10). It records the live feasibility probe of YTM "Moods & moments", the design, assumptions and risks.
+- `backend/docs/DECISIONLOG.md`: two ADRs, "Vibe mixes from YTM Moods & moments, personalised by playlist affinity" and "Cap concurrent downloads (`DOWNLOAD_CONCURRENCY`, default 2)".
+- `android/docs/DECISIONLOG.md`: ADR "Vibe mixes on Android: Your Mixes shelf, mix screen, save-as-playlist".
+- `backend/docs/ROADMAP.md` (MX0–MX5) and `android/docs/ROADMAP.md` (MX0, MX6–MX10): new "Phase MX — Vibe mixes (v5.8.0)" sections.
+- No code changes, no version change.

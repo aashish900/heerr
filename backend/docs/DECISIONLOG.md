@@ -614,3 +614,44 @@ The user also chose to keep `SHOWN_PENALTY = 0.3`, so a refresh still fully rota
 - Filter only in the YTMusic engine: Last.fm output would still leak covers, and there'd be two places to keep in sync.
 - Make it a per-user setting: no evidence anyone wants covers in For You (YAGNI).
 - Accepted trade-off: some legitimate versions are dropped, e.g. Bollywood "(Unplugged)" or "(Female Version)" releases.
+
+## 2026-11-07 — Vibe mixes from YTM "Moods & moments", personalised by playlist affinity
+
+**Context:** The user wants recommendations to generate playlists for moods and vibes (examples given: "Chill Mix", "Desi Beats", "Hollywood Howl"; heerr may pick its own names). User decisions:
+- a fixed set of about 8 vibes
+- an in-app mix screen plus "Save as playlist"
+- a Home "Your Mixes" shelf
+
+Feasibility was probed live on 2026-11-07 (ytmusicapi 1.12.1, unauthenticated). `get_mood_categories()` returns 12 moods and 38 genres in 0.96 s. `get_mood_playlists()` returns 310 curated playlists for Chill and 145 for Party, in 0.3–0.4 s. `get_playlist(limit=100)` returns about 100 tracks in about 0.5 s.
+
+**Decision:**
+- **Vibes:** 8 fixed vibes mapped to YTM "Moods & moments" titles: chill, feel-good, party, romance, heartbreak (Sad), workout, focus, sleep.
+- **Algorithm** (`app/services/recommenders/mixes.py`, `/PLAN.md` §5.2):
+  1. Build a taste profile (artist → max seed weight) from the client's **full** seed collection.
+  2. Take the first 24 mood playlists in YTM order and compute each one's affinity (the weighted share of tracks by taste artists).
+  3. Keep the top 8 by affinity and pick 4 of them, rotated by `variant`.
+  4. Score tracks by `(0.5 + affinity) / (1 + 0.02·pos)`, plus a taste bonus, summed across playlists.
+  5. Pass the result through the shared `rerank()`, with `per_artist = 3` and no "shown" demotion.
+
+  With zero overlap, fall back to YTM order and return `personalized: false`.
+- **Caching:** a 24-hour in-process TTL cache for categories, mood playlist lists and playlist tracks.
+- **Endpoints:** `GET /recommend/mixes` (a static list) and `POST /recommend/mixes/{id}` with `{seeds, limit ≤ 50, variant}`. Errors: 404 for an unknown vibe, 503 when the mood is missing upstream.
+
+**Why:** YTM already supplies both the mood labels and curated, region-appropriate track pools. The only missing piece is personalisation, which playlist affinity to the user's own artists provides cheaply. It reuses the RX `rerank()` (exclusions, cover filter, artist cap), so mixes respect dismissals and requested songs.
+
+**Alternatives considered:**
+- Filter the user's own recommendations by mood: not feasible. YTM exposes no per-track mood, Spotify audio-features is deprecated, and Last.fm tags need an API key plus a call per track.
+- Auto-pick vibes, or browse all 50 categories: rejected by the user in favour of a fixed set.
+- Redis or Postgres for the cache: unnecessary for one worker (`backend/CLAUDE.md`: no extra infra without evidence).
+
+## 2026-11-07 — Cap concurrent downloads (`DOWNLOAD_CONCURRENCY`, default 2)
+
+**Context:** While planning "Save as playlist" (about 25 songs per mix), it turned out `JobEnqueuer` schedules every `/download` as its own FastAPI background task with no limit (`app/services/workers.py`). A mix save would run about 25 spotDL subprocesses at once on the home server, risking YouTube rate-limiting and CPU starvation.
+
+**Decision:** A module-level `asyncio.Semaphore`, sized by `DOWNLOAD_CONCURRENCY` (Settings and `.env.example`, default 2), wraps the download step of `run_job` for songs and podcast episodes. A job moves `queued → running` only after it acquires a slot, so the Queue screen stays truthful.
+
+**Why:** It's the smallest change that bounds load for **every** burst of downloads, not just mixes, and it adds no queue infrastructure (Postgres jobs plus BackgroundTasks remain the substrate).
+
+**Alternatives considered:**
+- Client-side throttling in the mix saver: leaves the server unprotected against other bursts, like multi-select downloads or several family members at once.
+- A real job queue (Celery/RQ): ruled out by `backend/CLAUDE.md` until there's evidence it's needed.
