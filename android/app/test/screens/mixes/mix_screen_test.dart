@@ -14,6 +14,7 @@ import 'package:heerr/models/recommended_track.dart';
 import 'package:heerr/player/heerr_audio_handler.dart';
 import 'package:heerr/player/player_provider.dart';
 import 'package:heerr/providers/download.dart';
+import 'package:heerr/providers/mix_saver.dart';
 import 'package:heerr/providers/mixes.dart';
 import 'package:heerr/providers/profiles/profile_meta.dart';
 import 'package:heerr/router.dart' show Routes;
@@ -39,6 +40,23 @@ class _StubMix extends MixNotifier {
 
   @override
   Future<void> regenerate() async => regenerateCalls++;
+}
+
+class _StubSaver extends MixSaver {
+  _StubSaver([this._initial]);
+  final MixSaveState? _initial;
+  final List<(String, int)> saves = <(String, int)>[];
+
+  @override
+  MixSaveState? build(String mixId) => _initial;
+
+  @override
+  Future<void> save({
+    required String title,
+    required List<RecommendedTrack> tracks,
+  }) async {
+    saves.add((title, tracks.length));
+  }
 }
 
 class _StubMeta extends ProfileMetaNotifier {
@@ -88,10 +106,12 @@ Widget _wrap(
   String? nickname = 'Aashish',
   HeerrAudioHandler? handler,
   _RecordingDispatcher? dispatcher,
+  _StubSaver? saver,
 }) {
   return ProviderScope(
     overrides: <Override>[
       mixNotifierProvider('chill').overrideWith(() => stub),
+      mixSaverProvider('chill').overrideWith(() => saver ?? _StubSaver()),
       mixVibesProvider.overrideWith(
         (_) async => const <MixVibe>[MixVibe(id: 'chill', title: 'Chill Mix')],
       ),
@@ -266,5 +286,99 @@ void main() {
     await tester.tap(find.byTooltip('Regenerate mix'));
     await tester.pump();
     expect(stub.regenerateCalls, 1);
+  });
+
+  // --- MX9: Save as playlist ------------------------------------------------
+
+  testWidgets('Save as playlist hands the whole mix to the saver', (
+    WidgetTester tester,
+  ) async {
+    final _StubSaver saver = _StubSaver();
+    await tester.pumpWidget(
+      _wrap(_StubMix(() async => _mix(n: 4)), saver: saver),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Save as playlist'));
+    await tester.pump();
+    expect(saver.saves, <(String, int)>[('Chill Mix', 4)]);
+  });
+
+  testWidgets('while saving: "Saving x/y", disabled', (
+    WidgetTester tester,
+  ) async {
+    final _StubSaver saver = _StubSaver(
+      const MixSaveState(
+        playlistName: 'Chill Mix · 7 Nov',
+        total: 25,
+        resolved: 12,
+      ),
+    );
+    await tester.pumpWidget(_wrap(_StubMix(() async => _mix()), saver: saver));
+    // The saving spinner animates forever, so pump frames, don't settle.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Saving 12/25'), findsOneWidget);
+    await tester.tap(find.text('Saving 12/25'), warnIfMissed: false);
+    await tester.pump();
+    expect(saver.saves, isEmpty);
+  });
+
+  testWidgets('finished: summary with failures; button saves again', (
+    WidgetTester tester,
+  ) async {
+    final _StubSaver saver = _StubSaver(
+      const MixSaveState(
+        playlistName: 'Chill Mix · 7 Nov',
+        total: 25,
+        resolved: 25,
+        added: 23,
+        failed: 2,
+        done: true,
+      ),
+    );
+    await tester.pumpWidget(_wrap(_StubMix(() async => _mix()), saver: saver));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Saved 23 of 25 to "Chill Mix · 7 Nov" · 2 failed'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Save as playlist'));
+    await tester.pump();
+    expect(saver.saves, hasLength(1));
+  });
+
+  testWidgets('finished without failures: plain summary', (
+    WidgetTester tester,
+  ) async {
+    final _StubSaver saver = _StubSaver(
+      const MixSaveState(
+        playlistName: 'Chill Mix · 7 Nov',
+        total: 4,
+        resolved: 4,
+        added: 4,
+        done: true,
+      ),
+    );
+    await tester.pumpWidget(_wrap(_StubMix(() async => _mix()), saver: saver));
+    await tester.pumpAndSettle();
+    expect(find.text('Saved 4 songs to "Chill Mix · 7 Nov"'), findsOneWidget);
+  });
+
+  testWidgets('failed run shows its error', (WidgetTester tester) async {
+    final _StubSaver saver = _StubSaver(
+      const MixSaveState(
+        playlistName: 'Chill Mix · 7 Nov',
+        total: 4,
+        done: true,
+        error: "Couldn't create the playlist",
+      ),
+    );
+    await tester.pumpWidget(_wrap(_StubMix(() async => _mix()), saver: saver));
+    await tester.pumpAndSettle();
+    expect(find.text("Couldn't create the playlist"), findsOneWidget);
+    expect(find.text('Save as playlist'), findsOneWidget);
   });
 }

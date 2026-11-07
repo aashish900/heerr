@@ -3590,3 +3590,48 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
     - 8 distinct icons, an unknown-id fallback, and brand-colour-only gradients
   - `test/screens/home/home_screen_test.dart`: `_homeOverrides` stubs `mixVibesProvider` (empty by default). +1 test: the section's vertical position is between For You and Recently Added.
 - Gates: `flutter analyze` clean; `flutter test` 1248 → 1255 passed. Not run on device.
+
+## 2026-11-07 — MX9: save a vibe mix as a playlist
+
+- `lib/providers/download_to_playlist.dart`:
+  - Steps 2–3 of `downloadAndAddToPlaylist` (poll the backend job, then poll `search3` until Navidrome indexes the file) were extracted into a context-free `waitForLibrarySong({backend, library, response, title, artist, keepGoing, intervals, ceilings}) -> LibraryWait`.
+  - `LibraryWait` is `(outcome: LibraryWaitOutcome, songId)`, where the outcome is `found`, `failed`, `timedOut`, `notIndexed` or `cancelled`. The same transient-`ApiError` retry behaviour applies on both polls.
+  - `downloadAndAddToPlaylist` now calls it with `keepGoing: () => context.mounted` and maps the outcomes back to its original snackbars. The 3 existing tests stay green, and the unused `job_view` import was removed.
+- `lib/providers/mix_saver.dart` (new):
+  - `mixSaveTimingProvider` (poll intervals, ceilings and a clock, overridable).
+  - `MixSaveState` (`playlistName`, `total`, `resolved`, `added`, `failed`, `done`, `error`, plus `copyWith`).
+  - `MixSaver`, a keep-alive family keyed by mix id. `save(title, tracks)`:
+    - is a no-op while a run is in progress
+    - creates an empty Navidrome playlist named `"<title> · <d> <Mon>"` (no `intl` dependency, just a 12-entry month list)
+    - downloads and awaits every song with **3 pipelines at a time**; the backend itself runs 2 downloads
+    - updates `resolved` and `failed` as each song finishes
+    - calls `addSongs` once, **in mix order**, with the songs that made it
+  - Error states: "Couldn't create the playlist" (nothing downloaded), and "Downloaded, but couldn't add the songs to the playlist". A `ponytail:` note records that an app kill mid-save leaves a partial playlist.
+- `lib/screens/mixes/mix_screen.dart`:
+  - The header's Play all is now side by side with an outlined **Save as playlist** button. It shows "Saving x/y" with a spinner and is disabled while running; it's re-enabled once a run finishes.
+  - A summary line below the buttons: `Saved N songs to "<name>"`, `Saved A of T to "<name>" · F failed`, or the error in the error colour.
+- Tests:
+  - `test/providers/wait_for_library_song_test.dart` (new, 8):
+    - found after polling
+    - a terminal dispatch skips job polling
+    - a failed job never searches the library
+    - timedOut at the ceiling
+    - transient job-status errors keep polling
+    - notIndexed at the ceiling
+    - transient library errors keep polling
+    - `keepGoing` false gives cancelled
+  - `test/providers/mix_saver_test.dart` (new, 7):
+    - the `"Chill Mix · 7 Nov"` name, all songs dispatched, and songs added in mix order even when completion order differs
+    - failed and unindexed songs counted while the rest are still added
+    - progress counts 0 → 1 → 2 → 3
+    - at most 3 in flight
+    - a second save during a run is ignored
+    - a creation failure gives an error with nothing downloaded
+    - mixes are independent
+  - `test/screens/mixes/mix_screen_test.dart` (+5):
+    - the button hands the whole mix to the saver
+    - "Saving 12/25" is disabled
+    - the summary with failures, and saving again
+    - the plain summary
+    - the error is shown
+- Gates: `flutter analyze` clean; `flutter test` 1255 → 1275 passed. **Not run on device.** Real per-song download time and the 2-at-a-time cap are still unmeasured on the server (MX5 skipped `--downloads`), so MX10 measures them.

@@ -219,7 +219,7 @@ Backend first, TDD (`backend/CLAUDE.md`, `android/CLAUDE.md`):
 2. Implement `YourMixesSection`, with one gradient per vibe built from the theme colours, and insert it in `home_screen.dart`.
 - Commit: `feat(flutter): MX8 Your Mixes on Home`.
 
-### [ ] MX9. Android: save a mix as a playlist
+### [x] MX9. Android: save a mix as a playlist
 1. Extract `waitForLibrarySong(...)` from `downloadAndAddToPlaylist` (context-free; it returns a song id or null). The existing `download_to_playlist` tests stay green.
 2. Tests first, in `test/providers/mix_saver_test.dart`, with fake dispatcher, job status, library-match and playlist mutations:
    - creates "<title> · <d MMM>"

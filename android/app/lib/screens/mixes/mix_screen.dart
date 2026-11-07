@@ -8,6 +8,7 @@ import '../../models/mix.dart';
 import '../../models/recommended_track.dart';
 import '../../models/search_result_item.dart';
 import '../../player/playback_actions.dart';
+import '../../providers/mix_saver.dart';
 import '../../providers/mixes.dart';
 import '../../providers/profiles/profile_meta.dart';
 import '../home/your_mixes_section.dart' show vibeStyle;
@@ -149,11 +150,20 @@ class _MixList extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: () => _play(context, ref, 0),
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('Play all'),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () => _play(context, ref, 0),
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: const Text('Play all'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: _SaveButton(mix: mix)),
+                  ],
                 ),
+                _SaveSummary(mixId: mix.id),
               ],
             ),
           );
@@ -179,6 +189,70 @@ class _MixList extends ConsumerWidget {
           trailing: RecommendationDownloadButton(track: t),
         );
       },
+    );
+  }
+}
+
+/// "Save as playlist" (MX9): downloads every song and fills a new Navidrome
+/// playlist via [MixSaver]. Shows "Saving x/y" (disabled) while running; once
+/// a run finishes it's tappable again (e.g. after a regenerate).
+class _SaveButton extends ConsumerWidget {
+  const _SaveButton({required this.mix});
+
+  final MixResponse mix;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final MixSaveState? s = ref.watch(mixSaverProvider(mix.id));
+    final bool running = s != null && !s.done;
+    return OutlinedButton.icon(
+      onPressed: running
+          ? null
+          : () => unawaited(
+              ref
+                  .read(mixSaverProvider(mix.id).notifier)
+                  .save(title: mix.title, tracks: mix.results),
+            ),
+      icon: running
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.playlist_add),
+      label: Text(
+        running ? 'Saving ${s.resolved}/${s.total}' : 'Save as playlist',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+}
+
+/// The last finished save's outcome, under the buttons.
+class _SaveSummary extends ConsumerWidget {
+  const _SaveSummary({required this.mixId});
+
+  final String mixId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final MixSaveState? s = ref.watch(mixSaverProvider(mixId));
+    if (s == null || !s.done) return const SizedBox.shrink();
+    final ColorScheme cs = Theme.of(context).colorScheme;
+    final String text =
+        s.error ??
+        (s.failed > 0
+            ? 'Saved ${s.added} of ${s.total} to "${s.playlistName}" · ${s.failed} failed'
+            : 'Saved ${s.added} songs to "${s.playlistName}"');
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: s.error != null ? cs.error : cs.onSurfaceVariant,
+        ),
+      ),
     );
   }
 }

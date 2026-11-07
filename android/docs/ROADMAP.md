@@ -1074,7 +1074,7 @@ Working breakdown: `/PLAN.md` (MX0–MX10). Backend prereq: MX1–MX5 in `backen
 ### [x] MX8. Your Mixes on Home
 **Files:** `lib/screens/home/your_mixes_section.dart`, `lib/screens/home/home_screen.dart`. **Commit:** `feat(flutter): MX8 Your Mixes on Home`.
 
-### [ ] MX9. Save a mix as a playlist
+### [x] MX9. Save a mix as a playlist
 **Files:** `lib/providers/download_to_playlist.dart` (extract `waitForLibrarySong`), `lib/providers/mix_saver.dart`, mix screen. **Commit:** `feat(flutter): MX9 save mix as playlist`.
 
 ### [ ] MX10. On-device smoke + v5.8.0
