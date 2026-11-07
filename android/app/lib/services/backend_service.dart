@@ -13,6 +13,7 @@ import '../models/episode_feed_response.dart';
 import '../models/episode_list_response.dart';
 import '../models/episode_progress.dart';
 import '../models/jam.dart';
+import '../models/mix.dart';
 import '../models/job_view.dart';
 import '../models/podcast_channel.dart';
 import '../models/queue_response.dart';
@@ -69,6 +70,35 @@ class BackendService {
                 RecommendedTrack.fromJson(e as Map<String, dynamic>))
             .toList();
       },
+    );
+  }
+
+  /// `GET /recommend/mixes` → the vibes the backend can build mixes for.
+  Future<List<MixVibe>> mixVibes() {
+    return apiCall<List<MixVibe>>(
+      () => _dio.get<dynamic>(Endpoints.recommendMixes),
+      (dynamic data) => (data as List<dynamic>)
+          .map((dynamic e) => MixVibe.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  /// `POST /recommend/mixes/{id}` with `{seeds, limit, variant}` → the mix.
+  /// [variant] > 0 regenerates (rotates which mood playlists are used).
+  Future<MixResponse> mix(
+    String id, {
+    required List<SeedTrack> seeds,
+    required int limit,
+    required int variant,
+  }) {
+    final Map<String, dynamic> body = <String, dynamic>{
+      'seeds': seeds.map((SeedTrack s) => s.toJson()).toList(),
+      'limit': limit,
+      'variant': variant,
+    };
+    return apiCall<MixResponse>(
+      () => _dio.post<dynamic>(Endpoints.mix(id), data: body),
+      (dynamic data) => MixResponse.fromJson(data as Map<String, dynamic>),
     );
   }
 

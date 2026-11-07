@@ -184,7 +184,7 @@ Backend first, TDD (`backend/CLAUDE.md`, `android/CLAUDE.md`):
    - 5 rapid `POST /download`s: the queue shows at most 2 `running`. Record the time per song.
 3. Write the results to `backend/docs/CHANGELOG.md`. **If `personalized` is false for your seeds on most vibes, stop and revisit §5.2** (raise `CANDIDATE_PLAYLISTS`, or match related artists) before any Android work.
 
-### [ ] MX6. Android: mix data layer
+### [x] MX6. Android: mix data layer
 1. Tests first:
    - `test/models/mix_test.dart`: JSON round trips
    - `test/services/backend_service_mix_test.dart`: the right paths and bodies

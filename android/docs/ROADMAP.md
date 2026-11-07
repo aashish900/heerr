@@ -1065,7 +1065,7 @@ Working breakdown: `/PLAN.md` (MX0–MX10). Backend prereq: MX1–MX5 in `backen
 ### [x] MX0. ADRs + roadmap
 **Commit:** `docs: plan phase MX (vibe mixes)`.
 
-### [ ] MX6. Mix data layer
+### [x] MX6. Mix data layer
 **Files:** `lib/models/mix.dart`, `lib/services/backend_service.dart`, `lib/providers/mixes.dart`, `lib/providers/recommendations.dart` (extract `hydrateLibraryMatches`). **Commit:** `feat(flutter): MX6 mix data layer`.
 
 ### [ ] MX7. `playPreviews` + mix screen

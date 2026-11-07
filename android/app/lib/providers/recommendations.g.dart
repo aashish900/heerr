@@ -37,7 +37,7 @@ final seedCollectionProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef SeedCollectionRef = AutoDisposeFutureProviderRef<List<SeedTrack>>;
-String _$recommendationsHash() => r'97c8460c55a1c48c5eadc8fe3e4dd7a4cdb2a540';
+String _$recommendationsHash() => r'c3508df285dffdb4823f3d06d6bdece9e86c3474';
 
 /// See also [Recommendations].
 @ProviderFor(Recommendations)

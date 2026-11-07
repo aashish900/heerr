@@ -6,6 +6,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:heerr/api/api_error.dart';
+import 'package:heerr/models/mix.dart';
+import 'package:heerr/models/seed_track.dart';
 import 'package:heerr/services/backend_service.dart';
 
 // W1 (#41): container-free transport tests for the heerr-backend service,
@@ -492,4 +494,62 @@ void main() {
       expect(res.positionS, 90);
     });
   });
+
+  // --- MX6: vibe mixes ----------------------------------------------------
+
+  test('mixVibes: GET /recommend/mixes → list of MixVibe', () async {
+    final (BackendService svc, _FakeAdapter adapter) = _service(
+      (_) => _json(
+        '[{"id":"chill","title":"Chill Mix"},{"id":"party","title":"Party Mix"}]',
+        200,
+      ),
+    );
+    final List<MixVibe> vibes = await svc.mixVibes();
+    expect(adapter.lastRequest!.method, 'GET');
+    expect(adapter.lastRequest!.path, '/recommend/mixes');
+    expect(vibes.map((MixVibe v) => v.id).toList(), <String>['chill', 'party']);
+  });
+
+  test('mix: POST /recommend/mixes/{id} with seeds, limit, variant', () async {
+    final (BackendService svc, _FakeAdapter adapter) = _service(
+      (_) => _json(
+        '{"id":"chill","title":"Chill Mix","personalized":true,"results":['
+        '{"title":"Husn","artist":"Anuv Jain","source_url":"u1"}]}',
+        200,
+      ),
+    );
+    final MixResponse mix = await svc.mix(
+      'chill',
+      seeds: const <SeedTrack>[
+        SeedTrack(title: 'Co2', artist: 'Prateek Kuhad'),
+        SeedTrack(artist: 'Anuv Jain', weight: 0.7),
+      ],
+      limit: 50,
+      variant: 2,
+    );
+    final RequestOptions req = adapter.lastRequest!;
+    expect(req.method, 'POST');
+    expect(req.path, '/recommend/mixes/chill');
+    expect(req.data, <String, dynamic>{
+      'seeds': <Map<String, dynamic>>[
+        <String, dynamic>{'title': 'Co2', 'artist': 'Prateek Kuhad', 'weight': 1.0},
+        <String, dynamic>{'artist': 'Anuv Jain', 'weight': 0.7},
+      ],
+      'limit': 50,
+      'variant': 2,
+    });
+    expect(mix.personalized, isTrue);
+    expect(mix.results.single.title, 'Husn');
+  });
+
+  test('mix: 503 surfaces as ApiError', () async {
+    final (BackendService svc, _) = _service(
+      (_) => _json('{"detail":"YouTube Music mood Sad is unavailable"}', 503),
+    );
+    expect(
+      () => svc.mix('heartbreak', seeds: const <SeedTrack>[], limit: 50, variant: 0),
+      throwsA(isA<ApiError>()),
+    );
+  });
 }
+

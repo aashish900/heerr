@@ -160,6 +160,42 @@ Future<List<Song>> _fetchFavouriteSongs(SeedCollectionRef ref) async {
   return detail.entry;
 }
 
+/// Cross-reference each recommendation against the Subsonic library via
+/// `search3`, marking matches `inLibrary` (+ `subsonicSongId`, `coverArt`).
+/// Shared by the For You feed and the vibe mixes, which both drop owned songs.
+///
+/// Library-side failures are swallowed per result so one bad search3 doesn't
+/// kill the list — that row just stays `inLibrary=false`. Navidrome not
+/// configured → every row stays remote-only.
+Future<List<RecommendedTrack>> hydrateLibraryMatches(
+  Ref ref,
+  List<RecommendedTrack> base,
+) async {
+  final SubsonicLibraryService service;
+  try {
+    service = await ref.watch(subsonicLibraryServiceProvider.future);
+  } catch (_) {
+    return base;
+  }
+
+  Future<RecommendedTrack> resolveOne(RecommendedTrack r) async {
+    try {
+      final SubsonicSongMatch? match =
+          await service.findLibraryMatch('${r.artist} ${r.title}');
+      if (match == null) return r;
+      return r.copyWith(
+        inLibrary: true,
+        subsonicSongId: match.id,
+        coverArt: match.coverArt,
+      );
+    } catch (_) {
+      return r;
+    }
+  }
+
+  return Future.wait(base.map(resolveOne));
+}
+
 /// Number of seeds actually sent per `POST /recommend` request. Deliberately
 /// smaller than [_kMaxSeeds]: the backend is deterministic for a given seed
 /// set, so sampling a random subset per request is what makes a refresh
@@ -236,37 +272,9 @@ class Recommendations extends _$Recommendations {
     // search3 doesn't kill the whole list — the result just falls through as
     // inLibrary=false. For You recommends songs you don't own yet (RX8), so
     // owned matches are dropped.
-    final List<RecommendedTrack> hydrated = await _hydrateLibraryMatches(base);
+    final List<RecommendedTrack> hydrated =
+        await hydrateLibraryMatches(ref, base);
     return hydrated.where((RecommendedTrack r) => !r.inLibrary).toList();
-  }
-
-  Future<List<RecommendedTrack>> _hydrateLibraryMatches(
-    List<RecommendedTrack> base,
-  ) async {
-    final SubsonicLibraryService service;
-    try {
-      service = await ref.watch(subsonicLibraryServiceProvider.future);
-    } catch (_) {
-      // Navidrome not configured — every row stays remote-only.
-      return base;
-    }
-
-    Future<RecommendedTrack> resolveOne(RecommendedTrack r) async {
-      try {
-        final SubsonicSongMatch? match =
-            await service.findLibraryMatch('${r.artist} ${r.title}');
-        if (match == null) return r;
-        return r.copyWith(
-          inLibrary: true,
-          subsonicSongId: match.id,
-          coverArt: match.coverArt,
-        );
-      } catch (_) {
-        return r;
-      }
-    }
-
-    return Future.wait(base.map(resolveOne));
   }
 
   /// UI helper for pull-to-refresh. Invalidates self so seedCollection

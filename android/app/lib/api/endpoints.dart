@@ -23,6 +23,11 @@ class Endpoints {
   static const String recommend = '/recommend';
   static const String recommendHealth = '/recommend/health';
 
+  /// Phase MX vibe mixes: `GET` lists the vibes; `POST /recommend/mixes/{id}`
+  /// with `{seeds, limit, variant}` builds one (see [mix]).
+  static const String recommendMixes = '/recommend/mixes';
+  static String mix(String id) => '/recommend/mixes/${Uri.encodeComponent(id)}';
+
   /// Phase S (multi-user): backend J6 — `POST /auth/login`. Accepts
   /// `{username, password}`, validates them against Navidrome via the
   /// backend's IdP shim, and returns `{token, scopes, navidromeUrl,
