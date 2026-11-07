@@ -3465,3 +3465,7 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 
     New refresh test: the button sits right of "For You" on the same line and calls `refresh()`. The play test now taps Song 0, since Song 1 is in row 2, below the 600px test viewport.
 - Gates: `flutter analyze` clean; `flutter test` 1213 → 1217 passed. Not run on device.
+
+## 2026-11-07 — v5.7.3: For You shows all results, sideways Home shelf, refresh button
+
+- Version bump `5.7.2` → `5.7.3` (`android/app/pubspec.yaml`). Ships the entry above. Not smoke-tested on device; RX9 is still open.

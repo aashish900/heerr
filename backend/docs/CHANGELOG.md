@@ -1288,3 +1288,7 @@ Response times are under the 6 s budget, so no cache is needed (RX6 `ponytail:` 
 - Version bump `5.7.1` → `5.7.2` (`backend/pyproject.toml`, `backend/app/main.py`). The backend change is the `create_job_idempotent` race-loser fix (`2f144dc`, entry above). No schema or contract change: redeploying `heerr-backend` is enough.
 - `docs/CONTEXT.md`: new "Recommendations" architecture bullet (staleness rule: CONTEXT had no description of the recommendation pipeline).
 - `/PLAN.md` RX9: released at the user's request before the on-device smoke. The box stays unticked until the Pixel smoke passes.
+
+## 2026-11-07 — v5.7.3: version sync only
+
+- Version bump `5.7.2` → `5.7.3` (`backend/pyproject.toml`, `backend/app/main.py`) for the Android For You shelf/refresh release. No backend code changes and no redeploy needed: the 5.7.2 image serves the 5.7.3 app (requests use `limit: 50`, already within the schema cap).
