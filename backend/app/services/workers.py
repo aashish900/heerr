@@ -1,5 +1,7 @@
+import asyncio
 import functools
 import logging
+import weakref
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from uuid import UUID
@@ -26,8 +28,40 @@ PodcastDownloader = Callable[..., Awaitable[DownloadedEpisode]]
 
 _ERROR_MSG_MAX = 2000
 
+# One slot pool per event loop (tests run many loops; production has one).
+# ponytail: per-process cap — with N uvicorn workers the real limit is N x
+# DOWNLOAD_CONCURRENCY; move to a Postgres-backed claim if workers > 1.
+_slot_pools: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore] = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _download_slots() -> asyncio.Semaphore:
+    loop = asyncio.get_running_loop()
+    pool = _slot_pools.get(loop)
+    if pool is None:
+        pool = _slot_pools[loop] = asyncio.Semaphore(get_settings().download_concurrency)
+    return pool
+
 
 async def run_job(
+    job_id: UUID,
+    *,
+    sm: async_sessionmaker,
+    runner: SpotdlRunner,
+    output_dir: str,
+    slots: asyncio.Semaphore | None = None,
+) -> None:
+    """Run a song/album/playlist job once a download slot is free (MX1).
+
+    The job stays `queued` while it waits; [slots] defaults to the per-process
+    pool sized by `DOWNLOAD_CONCURRENCY`.
+    """
+    async with slots or _download_slots():
+        await _run_job(job_id, sm=sm, runner=runner, output_dir=output_dir)
+
+
+async def _run_job(
     job_id: UUID,
     *,
     sm: async_sessionmaker,
@@ -141,6 +175,19 @@ def get_enqueuer() -> JobEnqueuer:
 
 
 async def run_podcast_episode_job(
+    job_id: UUID,
+    *,
+    sm: async_sessionmaker,
+    downloader: PodcastDownloader,
+    output_dir: str,
+    slots: asyncio.Semaphore | None = None,
+) -> None:
+    """Run an episode-download job once a download slot is free (MX1)."""
+    async with slots or _download_slots():
+        await _run_podcast_episode_job(job_id, sm=sm, downloader=downloader, output_dir=output_dir)
+
+
+async def _run_podcast_episode_job(
     job_id: UUID,
     *,
     sm: async_sessionmaker,

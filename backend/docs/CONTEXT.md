@@ -52,7 +52,7 @@ A native mobile app where I search for songs (via YouTube Music) and, if found, 
 - Shared filesystem root at `/data`.
 
 ## heerr deployment shape
-- `/.env.example` — env template; populate as `.env` next to the arr-stack compose file (Postgres creds, `DATABASE_URL`, `MUSIC_OUTPUT_DIR`, `NAVIDROME_URL` — required for the Phase J multi-user login flow; optional `PREVIEW_ENABLED` / `PREVIEW_CACHE_TTL_S` for the Phase K preview proxy; optional `PODCAST_OUTPUT_DIR` for Phase P podcasts — discovery itself needs no key, see 2026-07-20 "Podcast discovery: Podcast Index -> iTunes Search" ADR). No Spotify credentials needed.
+- `/.env.example` — env template; populate as `.env` next to the arr-stack compose file (Postgres creds, `DATABASE_URL`, `MUSIC_OUTPUT_DIR`, `NAVIDROME_URL` — required for the Phase J multi-user login flow; optional `PREVIEW_ENABLED` / `PREVIEW_CACHE_TTL_S` for the Phase K preview proxy; optional `DOWNLOAD_CONCURRENCY` (default 2) caps simultaneous downloads, Phase MX1; optional `PODCAST_OUTPUT_DIR` for Phase P podcasts — discovery itself needs no key, see 2026-07-20 "Podcast discovery: Podcast Index -> iTunes Search" ADR). No Spotify credentials needed.
 - `/docker-compose.snippet.yml` — six services merged into arr-stack:
   - `heerr-postgres-init` (one-shot: chowns `/data/postgres` to UID 999).
   - `heerr-podcasts-init` (one-shot: chowns `/data/media/podcasts` to UID/GID 1000, the backend image's non-root user — added 2026-07-20 after a "Permission denied" bug report; unlike `/data/media/music`, nothing else on the host chowns this newer path).

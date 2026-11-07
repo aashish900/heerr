@@ -1,7 +1,7 @@
 from functools import lru_cache
 from urllib.parse import urlparse
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     # NOT music_output_dir — Navidrome does not watch this directory, so
     # episodes never get indexed as songs.
     podcast_output_dir: str = "/data/media/podcasts"
+
+    # Max downloads (spotDL songs + podcast episodes) running at once (MX1).
+    # Each one is a subprocess or HTTP fetch; unbounded bursts (saving a mix =
+    # ~25 songs) would starve the home server and invite YouTube rate limits.
+    download_concurrency: int = Field(default=2, ge=1)
 
     @field_validator("navidrome_url")
     @classmethod

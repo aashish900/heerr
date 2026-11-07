@@ -582,7 +582,7 @@ Working breakdown: `/PLAN.md` (MX0–MX10). Eight fixed vibe mixes built from Yo
 ### [x] MX0. ADRs + roadmap
 **Commit:** `docs: plan phase MX (vibe mixes)`.
 
-### [ ] MX1. Cap concurrent downloads
+### [x] MX1. Cap concurrent downloads
 **Files:** `app/services/workers.py`, `app/config.py`, `.env.example`, worker tests. **Commit:** `feat(backend): MX1 cap concurrent downloads (DOWNLOAD_CONCURRENCY=2)`.
 
 ### [ ] MX2. Mix scoring (pure functions)

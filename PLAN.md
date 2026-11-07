@@ -132,7 +132,7 @@ Backend first, TDD (`backend/CLAUDE.md`, `android/CLAUDE.md`):
 4. Add a changelog entry in both CHANGELOGs.
 - Commit: `docs: plan phase MX (vibe mixes)`.
 
-### [ ] MX1. Backend: cap concurrent downloads
+### [x] MX1. Backend: cap concurrent downloads
 1. Tests first, in `tests/test_workers.py` (or a new `tests/test_download_concurrency.py`), with a fake runner that blocks on an event:
    - 5 jobs enqueued with `DOWNLOAD_CONCURRENCY=2` never have more than 2 in the runner at once
    - jobs 3–5 stay `queued` until a slot frees up

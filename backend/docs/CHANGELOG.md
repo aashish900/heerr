@@ -1304,3 +1304,19 @@ Response times are under the 6 s budget, so no cache is needed (RX6 `ponytail:` 
 - `android/docs/DECISIONLOG.md`: ADR "Vibe mixes on Android: Your Mixes shelf, mix screen, save-as-playlist".
 - `backend/docs/ROADMAP.md` (MX0–MX5) and `android/docs/ROADMAP.md` (MX0, MX6–MX10): new "Phase MX — Vibe mixes (v5.8.0)" sections.
 - No code changes, no version change.
+
+## 2026-11-07 — MX1: cap concurrent downloads (`DOWNLOAD_CONCURRENCY`, default 2)
+
+- `app/config.py`: new `download_concurrency: int = Field(default=2, ge=1)`.
+- `app/services/workers.py`:
+  - `run_job` and `run_podcast_episode_job` now take an optional `slots: asyncio.Semaphore` and run their whole body (renamed `_run_job` / `_run_podcast_episode_job`, unchanged) inside `async with slots or _download_slots()`. A job waiting for a slot therefore stays `queued`; it only flips to `running` once it holds one.
+  - `_download_slots()` returns a per-event-loop semaphore (a `WeakKeyDictionary`, since tests use many loops) sized from settings. A `ponytail:` note says the cap is per process, so N uvicorn workers give N × the limit.
+  - `JobEnqueuer` / `PodcastJobEnqueuer` are unchanged and use the default pool.
+- `.env.example`: a "Download concurrency (Phase MX1)" section with `# DOWNLOAD_CONCURRENCY=2`. `backend/docs/CONTEXT.md` deployment env list updated (staleness rule).
+- `tests/test_download_concurrency.py` (new, 4 tests):
+  - with 5 song jobs and 2 slots, exactly 2 run while 3 stay `queued`; peak concurrency is 2 and all end `done`
+  - a failing download frees its slot (1 slot: the bad job ends `failed`, then the good one runs and ends `done`)
+  - an episode job waits as `queued`, without calling the downloader, while the only slot is held, then completes
+  - the setting defaults to 2, accepts 4, and rejects 0
+- Existing worker tests call `run_job` without `slots`, so they cover the default-pool path. All green.
+- Suite: 753 → 757 passed. mypy and ruff clean.
