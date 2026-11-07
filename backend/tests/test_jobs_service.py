@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import select, text
 
 from app.models import Download, Job, Token
+from app.services import jobs as jobs_service
 from app.services.jobs import (
     InvalidStateTransition,
     bump_attempt,
@@ -198,6 +199,50 @@ async def test_create_concurrent_inserts_dedupe_via_partial_unique_index(
     dedupe_flags = [r[1] for r in results]
     assert len(ids) == 1, "both creates should resolve to the same job id"
     assert dedupe_flags.count(False) == 1 and dedupe_flags.count(True) == 1
+
+
+async def test_create_race_loser_returns_existing_without_poisoning_session(
+    app_sm, token_id, system_admin_user_id, cleanup_jobs, monkeypatch
+):
+    """Deterministic race loser: the pre-check misses a job that another request
+    already committed, so the INSERT hits the partial unique index. The loser
+    must get (existing, True) and a usable session -- not PendingRollbackError
+    from re-flushing the rejected row (CI flake on 2026-11-07, run 42352469027).
+    """
+    uri = "https://www.youtube.com/watch?v=race-loser"
+    async with app_sm() as s:
+        winner, _ = await create_job_idempotent(
+            s,
+            source_url=uri,
+            source_type="song",
+            token_id=token_id,
+            user_id=system_admin_user_id,
+        )
+        await s.commit()
+        winner_id = winner.id
+
+    real_find = jobs_service.find_active_for_url
+    calls = {"n": 0}
+
+    async def find_misses_once(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return None  # the check-then-insert window
+        return await real_find(*args, **kwargs)
+
+    monkeypatch.setattr(jobs_service, "find_active_for_url", find_misses_once)
+
+    async with app_sm() as s:
+        job, deduped = await create_job_idempotent(
+            s,
+            source_url=uri,
+            source_type="song",
+            token_id=token_id,
+            user_id=system_admin_user_id,
+        )
+        await s.commit()  # session must still be usable
+
+    assert (job.id, deduped) == (winner_id, True)
 
 
 # ---- mark_running ---------------------------------------------------------

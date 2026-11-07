@@ -88,9 +88,13 @@ async def create_job_idempotent(
         user_id=user_id,
         episode_id=episode_id,
     )
-    session.add(job)
     try:
+        # add() must happen inside the savepoint: rolling it back then also
+        # expunges `job`. Added outside, the rejected row stays pending and the
+        # re-fetch below autoflushes it again, poisoning the whole transaction
+        # (PendingRollbackError) -- the race loser got a 500, not deduped=True.
         async with session.begin_nested():
+            session.add(job)
             await session.flush()
     except IntegrityError:
         existing = await find_active_for_url(session, source_url, user_id=user_id)

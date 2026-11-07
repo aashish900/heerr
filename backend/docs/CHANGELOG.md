@@ -1274,3 +1274,11 @@ Response times are under the 6 s budget, so no cache is needed (RX6 `ponytail:` 
 
 - Version bump `5.7.0` → `5.7.1` (`backend/pyproject.toml`, `backend/app/main.py`). Ships RX7a (entry above). No schema or contract change: redeploying `heerr-backend` is enough (no new migration).
 - Android RX8 now ships as **5.7.2** (`/PLAN.md` RX9 and `android/docs/ROADMAP.md` updated).
+
+## 2026-11-07 — fix: `create_job_idempotent` race loser poisoned its session (CI flake, run 42352469027)
+
+- **Symptom:** backend CI on `e05f9bf` (v5.7.1) failed 1/752. `tests/test_jobs_service.py::test_create_concurrent_inserts_dedupe_via_partial_unique_index` raised `PendingRollbackError … UniqueViolationError … jobs_active_user_source_url_idx`. This is pre-existing and unrelated to Phase RX. It's intermittent because it only fires when two creates overlap.
+- **Root cause** (`app/services/jobs.py`): `session.add(job)` ran *before* `async with session.begin_nested()`. When the race loser's flush hit the partial unique index, only the savepoint rolled back, and the rejected `job` stayed pending in the outer transaction. The `find_active_for_url` re-fetch then autoflushed it again, outside any savepoint, which failed the whole transaction. **Production impact:** two simultaneous `/download` requests for the same URL by the same user returned a 500 for the loser instead of `deduped=true`.
+- **Fix:** move `session.add(job)` inside the savepoint. Rolling back the savepoint now expunges the rejected row, and the re-fetch returns the winner. The same pattern in `app/api/v1/jam.py` (create session) already added inside the savepoint and is unaffected.
+- **Test:** new `test_create_race_loser_returns_existing_without_poisoning_session`. It deterministically forces the loser path: the winner is committed first, then `find_active_for_url` is patched to miss once, so the INSERT hits the index. It failed before the fix with the exact CI error and passes after. The timing-based concurrent test passed 5/5 repeated runs after the fix.
+- Suite: 752 → 753 passed. mypy and ruff clean.
