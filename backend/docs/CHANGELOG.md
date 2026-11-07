@@ -1227,3 +1227,9 @@ Design consequences, written into `/PLAN.md` §5.4:
   The RX5 "artist seed skipped" test was replaced by the real artist-seed tests, and the first test now asserts rank-decayed scores instead of `None`.
 - Live timing (dev Mac against YouTube Music, 5 song seeds + 3 artist seeds, `limit=40`, then `rerank` to 20): 2.53 s, 2.65 s, 3.29 s, 5.21 s and 5.91 s, plus one 11.43 s outlier on the first run. Each run gave 17–19 distinct artists out of 20, with 7 multi-seed (score > 1) tracks in the top 40. No cache added (a `ponytail:` note sits on `_CONCURRENCY`). RX7 re-measures on the server through the API.
 - Suite: 718 → 729 passed. mypy and ruff clean.
+
+## 2026-11-07 — v5.7.0: recommendations v2 (backend half of Phase RX)
+
+- Version bump `5.6.3` → `5.7.0` (`backend/pyproject.toml`, `backend/app/main.py`). Ships RX1–RX6 (entries above): consensus multi-seed YTMusic engine, per-user re-rank, migration `0016` (`rec_feedback`), and `POST /recommend/dismiss`.
+- Deploy: `heerr-migrate` must apply `0016`. The wire changes are additive, so the current Android client keeps working, and it gets the re-ranked feed immediately.
+- Release split decided at tag time: the backend ships now as 5.7.0 so RX7 can smoke it on the server, and the Android RX8 changes will ship as **5.7.1** (`/PLAN.md` RX9 updated).

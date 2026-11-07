@@ -244,8 +244,8 @@ Files: `android/app/lib/models/seed_track.dart`, `android/app/lib/providers/reco
 7. Gate: `flutter analyze` and `flutter test` both pass.
 - Commit: `feat(flutter): RX8 artist seeds + weights, hide owned songs in For You`.
 
-### [ ] RX9. End-to-end smoke + version 5.7.0 + docs
-1. Bump the version to **5.7.0** in all five places (`/CLAUDE.md` §3): `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml`, and both ROADMAP status lines.
+### [ ] RX9. End-to-end smoke + version 5.7.1 + docs
+1. Bump the version to **5.7.1** in all five places (5.7.0 shipped the backend half, 2026-11-07) (`/CLAUDE.md` §3): `backend/pyproject.toml`, `backend/app/main.py`, `android/app/pubspec.yaml`, and both ROADMAP status lines.
 2. Install on the Pixel 7:
    ```bash
    cd android/app && flutter run --release
@@ -259,7 +259,7 @@ Files: `android/app/lib/models/seed_track.dart`, `android/app/lib/providers/reco
    - `backend/docs/CONTEXT.md`: the recommendations bullet (engine pipeline, `rec_feedback`)
    - both CHANGELOGs
    - tick the RX boxes here and in both ROADMAPs
-- Commit: `chore: bump version to 5.7.0 (recommendations v2)`.
+- Commit: `chore: bump version to 5.7.1 (For You: artist seeds, hide owned songs)`.
 
 ## 8. Risks
 
