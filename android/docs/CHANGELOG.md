@@ -3510,3 +3510,7 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 - `android/docs/DECISIONLOG.md`: ADR "Vibe mixes on Android: Your Mixes shelf, mix screen, save-as-playlist".
 - `backend/docs/ROADMAP.md` (MX0–MX5) and `android/docs/ROADMAP.md` (MX0, MX6–MX10): new "Phase MX — Vibe mixes (v5.8.0)" sections.
 - No code changes, no version change.
+
+## 2026-11-07 — v5.7.5: version sync only
+
+- Version bump `5.7.4` → `5.7.5` (`android/app/pubspec.yaml`) for the backend Phase MX release (download cap + vibe-mix endpoints). No Android code changes; the mixes UI lands in MX6–MX9.

@@ -1394,3 +1394,8 @@ Response times are under the 6 s budget, so no cache is needed (RX6 `ponytail:` 
   - the user's done job and dismissed song excluded while a failed job stays
   - no shown rows written
 - Suite: 785 → 802 passed. mypy and ruff clean.
+
+## 2026-11-07 — v5.7.5: Phase MX backend (download cap + vibe mixes)
+
+- Version bump `5.7.4` → `5.7.5` (`backend/pyproject.toml`, `backend/app/main.py`). Ships MX1–MX4 (entries above). It's an intermediate release so the MX5 home-server smoke can run; `v5.8.0` stays reserved for Phase MX complete (MX10).
+- Deploy: redeploy `heerr-backend`; no new migration. Optional `.env`: `DOWNLOAD_CONCURRENCY` (default 2).
