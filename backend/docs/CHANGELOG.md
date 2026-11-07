@@ -1256,3 +1256,16 @@ Observations for later, not acted on:
 - Covers and alternate versions leak in from the **radio**, e.g. "(Cover)", "(Live)", "(Acoustic)", "(Em Beihold Version)". The related shelf is already filtered. A title-keyword filter in the engine would remove them if wanted.
 
 Response times are under the 6 s budget, so no cache is needed (RX6 `ponytail:` note stands). RX8 (Android) is unblocked.
+
+## 2026-11-07 — RX7a: drop covers and alternate versions from recommendations
+
+- `app/services/recommenders/rerank.py`: new `is_alt_version(title)`.
+  - `_ALT_ANYWHERE` (mashup, karaoke, slowed, reverb, lo-fi, sped up, nightcore) matches anywhere in the title.
+  - `_ALT_QUALIFIED` (cover, live, acoustic, remix, version, instrumental, unplugged, reprise) only matches inside `(…)` / `[…]` or after a ` - ` / ` – ` / ` — ` / ` | ` separator. The en and em dashes are written as `–` / `—` escapes; YouTube Music titles really use them.
+  - `rerank()` drops matching candidates alongside excluded URLs, so the filter applies to every engine.
+- `tests/test_rerank.py`: +24 tests.
+  - 14 titles detected: the four RX7 smoke titles, the RX4 "Live Cover" and mashup titles, slowed+reverb, lofi, remix, "- Acoustic Version", "– Live at …", instrumental, unplugged, sped up.
+  - 9 originals kept: "Live Forever", "Live While We're Young", "Cover Me Up", "(From …) (feat. …)", "(Movie: …)", "Yellow", "- Trending", and a dash qualifier without a keyword.
+  - 1 test that `rerank` drops an alternate version and keeps the original.
+- `SHOWN_PENALTY` stays 0.3 (user decision). Not yet released: ships with the next tag.
+- Suite: 729 → 752 passed. mypy and ruff clean.

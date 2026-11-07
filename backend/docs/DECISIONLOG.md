@@ -596,3 +596,21 @@ Sub-decisions locked across J1–J10:
 - Client-side dismiss list: lost on reinstall and not shared across the user's devices.
 
 **Reference:** `/PLAN.md` (phase RX). Android counterpart: `android/docs/DECISIONLOG.md`, same date.
+
+## 2026-11-07 — Recommendations: drop covers and alternate versions
+
+**Context:** The RX7 home-server smoke returned radio tracks that aren't new songs: "I Think They Call This Love (Cover)", "The Man Who Sold The World (Live)", "Kasoor (Acoustic)", "Until I Found You (Em Beihold Version)". The related shelf was already restricted to "You might also like" (RX4), but `get_watch_playlist` radio has no equivalent signal. The user's goal is new songs matching their taste.
+
+**Decision:** Add `is_alt_version(title)` to `rerank()`, applied alongside the URL exclusions, so every engine's output is filtered. It matches two groups of words, case-insensitive:
+- **Anywhere in the title:** words that don't occur in real titles (mashup, karaoke, slowed, reverb, lo-fi, sped up, nightcore).
+- **Only inside `(…)` / `[…]` or after a ` - ` / ` – ` / ` — ` / ` | ` separator:** ambiguous words (cover, live, acoustic, remix, version, instrumental, unplugged, reprise).
+
+The user also chose to keep `SHOWN_PENALTY = 0.3`, so a refresh still fully rotates the feed.
+
+**Why:** The title is the only signal ytmusicapi gives for "this is a version of another song". Restricting ambiguous words to qualifier positions keeps real titles like "Live Forever" and "Cover Me Up" (both covered by tests). Filtering in `rerank` rather than the engine means a single place to change, and Last.fm and ListenBrainz output get it too.
+
+**Alternatives considered:**
+- Match every keyword anywhere in the title: drops real songs ("Live Forever").
+- Filter only in the YTMusic engine: Last.fm output would still leak covers, and there'd be two places to keep in sync.
+- Make it a per-user setting: no evidence anyone wants covers in For You (YAGNI).
+- Accepted trade-off: some legitimate versions are dropped, e.g. Bollywood "(Unplugged)" or "(Female Version)" releases.

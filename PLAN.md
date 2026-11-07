@@ -223,6 +223,11 @@ Backend first, TDD (`backend/CLAUDE.md`). Run `poetry run pytest` green before a
 4. Confirm `GET /recommend/health` is unchanged.
 5. Log the commands and their output in `backend/docs/CHANGELOG.md`. Per `/CLAUDE.md`, Android work starts only after this passes.
 
+### [x] RX7a. Backend: drop covers / alternate versions (added after RX7)
+The RX7 smoke showed radio tracks like "(Cover)", "(Live)", "(Acoustic)" and "(… Version)". The user chose to filter them, and kept `SHOWN_PENALTY` at 0.3.
+- `rerank.py` has a new `is_alt_version(title)`, applied with the exclusions so it covers every engine. These words match anywhere in the title: mashup, karaoke, slowed, reverb, lo-fi, sped up, nightcore. These match only inside `(…)` / `[…]` or after a ` - ` / ` – ` / ` | ` qualifier: cover, live, acoustic, remix, version, instrumental, unplugged, reprise.
+- Commit: `feat(backend): RX7a drop covers and alternate versions from recommendations`.
+
 ### [ ] RX8. Android: seeds, request size, owned-song filter
 Files: `android/app/lib/models/seed_track.dart`, `android/app/lib/providers/recommendations.dart`, `android/app/lib/services/backend_service.dart` (body serialisation only, if needed).
 1. `SeedTrack`: make `title` nullable and add `@Default(1.0) double weight`. Then run code generation:
