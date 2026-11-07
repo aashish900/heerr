@@ -553,7 +553,7 @@ Working breakdown: `/PLAN.md` (RX0–RX9). Consensus multi-seed candidates, per-
 ### [x] RX0. ADRs + roadmap
 **Commit:** `docs: plan phase RX (recommendations v2)`.
 
-### [ ] RX1. `rerank()` pure function
+### [x] RX1. `rerank()` pure function
 **Files:** `app/services/recommenders/rerank.py`, `tests/test_rerank.py`. **Commit:** `feat(backend): RX1 rerank recommendations (exclude, demote, artist cap)`.
 
 ### [ ] RX2. `rec_feedback` schema

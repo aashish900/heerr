@@ -1143,3 +1143,9 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 - `android/docs/DECISIONLOG.md`: ADR "For You seeds: artist seeds from frequent/recent albums; owned songs filtered client-side".
 - `backend/docs/ROADMAP.md` (RX0–RX7) and `android/docs/ROADMAP.md` (RX0, RX8, RX9): new "Phase RX" sections.
 - No code changes, no version change.
+
+## 2026-11-07 — RX1: `rerank()` pure function for recommendations
+
+- `app/services/recommenders/rerank.py` (new): `rerank(candidates, *, excluded, recently_shown, limit, per_artist=2)`. It drops excluded URLs, multiplies the score of recently shown items by `SHOWN_PENALTY = 0.3`, uses positional fallback scores (`1/(1+0.1·i)`) when an engine returns none, sorts stably by score, and greedily keeps at most `PER_ARTIST = 2` tracks per case-insensitive artist up to `limit`. Not wired into any route yet (RX3).
+- `tests/test_rerank.py` (new): 10 tests covering empty input, score order, exclusion, demotion (including that demoted items aren't excluded), the case-insensitive artist cap, the limit, positional fallback, and demotion visible in the output score.
+- Suite: 682 → 692 passed.

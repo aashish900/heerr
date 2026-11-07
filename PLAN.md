@@ -155,7 +155,7 @@ Backend first, TDD (`backend/CLAUDE.md`). Run `poetry run pytest` green before a
 - `backend/docs/ROADMAP.md` and `android/docs/ROADMAP.md`: add "Phase RX — Better recommendations (v5.7.0)" with RX headings and a pointer to `/PLAN.md`.
 - Commit: `docs: plan phase RX (recommendations v2)`.
 
-### [ ] RX1. Backend: `rerank()` pure function
+### [x] RX1. Backend: `rerank()` pure function
 1. Write `tests/test_rerank.py` first. Cover:
    - excluded URLs are dropped
    - recently shown items are demoted below unshown items of equal score
