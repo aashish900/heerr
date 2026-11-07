@@ -233,6 +233,7 @@ Backend first, TDD (`backend/CLAUDE.md`, `android/CLAUDE.md`):
 - Commit: `feat(flutter): MX9 save mix as playlist`.
 
 ### [ ] MX10. On-device smoke, then 5.8.0 and docs
+> 2026-11-07: the 5.8.0 version bump and docs (including `backend/docs/CONTEXT.md`) were done at the user's request **before** the on-device smoke. Step 1 is still open; tick MX10 once the Pixel smoke passes. That smoke also gives the first real measurement of the server's 2-at-a-time download cap and the per-song download time.
 1. On the Pixel (`flutter run --release` from `android/app`):
    - 8 tiles on Home
    - Chill opens with songs you don't own, and Play all queues them

@@ -1415,3 +1415,9 @@ Deployed v5.7.5 and ran the smoke script (not committed) on the server against `
 - All `/PLAN.md` MX5 gates pass: cold < 6 s, warm < 1 s, personalised on the mixes checked, at most 3 per artist. **The Android work (MX6) is unblocked.**
 - Party's higher regenerate overlap (17/50) is an inference: its best-matching playlists are Bollywood dance lists that share hits. It's acceptable, but noted.
 - **Not exercised:** the `--downloads` part was skipped, so `DOWNLOAD_CONCURRENCY` is proven by unit tests (MX1) only, and the per-song download time behind the "Save as playlist" estimate is unmeasured. Carried to MX9/MX10.
+
+## 2026-11-07 — v5.8.0: Phase MX (vibe mixes) complete on the app side
+
+- Version bump `5.7.5` → `5.8.0` (`backend/pyproject.toml`, `backend/app/main.py`). No backend code changes since 5.7.5, so redeploying is optional and only updates the reported version.
+- `docs/CONTEXT.md`: new "Vibe mixes" architecture bullet (staleness rule).
+- `/PLAN.md` MX10: released at the user's request before the on-device smoke; it stays open.

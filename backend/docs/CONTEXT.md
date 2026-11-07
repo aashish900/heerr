@@ -30,6 +30,13 @@ A native mobile app where I search for songs (via YouTube Music) and, if found, 
   - caps each artist at 2 songs
 
   Per-user shown/dismissed state lives in `rec_feedback` (migration `0016`). `POST /recommend/dismiss` hides a song for good. "Owned" filtering happens client-side, because the backend can't query Navidrome as the user. The Android client requests 40 and shows 20 on the For You screen, and the first 6 in the Home For You grid. Design: `/PLAN.md` (phase RX).
+- **Vibe mixes (Phase MX, v5.7.5 backend / v5.8.0 app):** `GET /api/v1/recommend/mixes` lists 8 fixed vibes (chill, feel-good, party, romance, heartbreak = YTM "Sad", workout, focus, sleep). `POST /recommend/mixes/{id}` with `{seeds, limit ≤ 50, variant}` builds one:
+  1. Take the first 24 YouTube Music "Moods & moments" playlists for the mood.
+  2. Score each by affinity to the user's seed artists, and pick 4 of the best 8 (rotated by `variant`, i.e. regenerate).
+  3. Rank their tracks by position, playlist consensus and taste bonus.
+  4. Pass them through the shared `rerank()` (exclusions, cover filter, 3 per artist; no "shown" demotion).
+
+  It returns `personalized: false` when nothing overlaps. There's a 24-hour in-process cache (`app/services/recommenders/mixes.py`). The app shows a "Your Mixes" row on Home and a mix screen with Play all as previews, row downloads, and "Save as playlist" (downloads every song, waits for each to be indexed, then fills a new Navidrome playlist in mix order). Downloads are capped at `DOWNLOAD_CONCURRENCY` (default 2). Design: `/PLAN.md` (phase MX).
 - **Connectivity:** app reaches the backend over Tailscale (MagicDNS), no public exposure.
 
 ## Build order

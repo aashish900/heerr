@@ -3635,3 +3635,8 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
     - the plain summary
     - the error is shown
 - Gates: `flutter analyze` clean; `flutter test` 1255 → 1275 passed. **Not run on device.** Real per-song download time and the 2-at-a-time cap are still unmeasured on the server (MX5 skipped `--downloads`), so MX10 measures them.
+
+## 2026-11-07 — v5.8.0: vibe mixes (Phase MX)
+
+- Version bump `5.7.5` → `5.8.0` (`android/app/pubspec.yaml`). Ships MX6–MX9 (the mix data layer, mix screen, Your Mixes on Home, and save mix as playlist) plus the Now Playing `Playlist+` label (`70f06c0`).
+- **Not smoke-tested on device.** It was released at the user's request before MX10's Pixel check. `flutter analyze` was clean and `flutter test` passed 1275 at `6f88a28`.
