@@ -1335,3 +1335,35 @@ Response times are under the 6 s budget, so no cache is needed (RX6 `ponytail:` 
   - score: position decay and affinity scaling, the taste bonus counted once across playlists, multi-playlist consensus winning, a taste artist beating a stranger, output shape, malformed items skipped
 - Nothing calls these yet; MX3 adds fetching and caching.
 - Suite: 757 → 773 passed. mypy and ruff clean.
+
+## 2026-11-07 — MX3: YTM mood fetch + 24h cache (`MixBuilder`)
+
+- `app/services/recommenders/mixes.py`:
+  - **Vibes:** `Vibe` and `VIBES`, the 8 from `/PLAN.md` §5.1 in order. `heartbreak` maps to YTM "Sad".
+  - **Errors:** a new `MoodNotFound`.
+  - **`TTLCache`:** async get-or-load with an injectable `now`, 24-hour TTL. A `ponytail:` note says it's per process and unlocked, so a duplicate fetch on concurrent misses is harmless.
+  - **`MixBuilder.build(vibe_id, seeds, variant) -> MixResult(vibe_id, title, personalized, tracks)`:**
+    - An unknown id raises `KeyError`, which the route turns into a 404.
+    - The mood is looked up by title across all `get_mood_categories()` sections (raises `MoodNotFound` if absent). The first `CANDIDATE_PLAYLISTS=24` ids from `get_mood_playlists`, skipping entries without a `playlistId`, are fetched via `get_playlist(id, limit=100)` with `FETCH_CONCURRENCY=4` in flight, all through `asyncio.to_thread`.
+    - A failing playlist is logged, skipped, and **not cached** (it's retried next time).
+    - Results feed the MX2 `taste_profile` / `playlist_affinity` / `pick_playlists` / `score_tracks`.
+  - **Cache keys:** `("categories",)`, `("mood", params)`, `("playlist", id)`.
+- `tests/test_mixes_fetch.py` (new, 12 tests). The fake YTM client has the 2026-11-07 live shapes, call counters and an in-flight counter.
+  - the 8 vibes in order
+  - exactly the first 24 playlists fetched, with 1 < peak in-flight ≤ 4
+  - personalisation toward the seed artist; zero overlap gives `personalized=False` but still a mix
+  - `variant` changes the mix
+  - a missing mood raises `MoodNotFound`; an unknown vibe raises `KeyError`
+  - a failing playlist is skipped; id-less playlists are skipped
+  - a second build within the TTL (even with another variant) makes zero YTM calls; an expired TTL refetches everything
+  - a failed playlist is retried on the next build
+- **Live sanity check** (dev Mac, real YTM, 6 seeds: Arijit Singh, Prateek Kuhad, Radiohead songs; Anuv Jain, The Local Train, Lucky Ali artists):
+
+  | Mix | Cold | Warm | Personalised | Candidates | Top results |
+  |---|---|---|---|---|---|
+  | Chill | 6.11 s (incl. the first category fetch) | 0.004 s | yes | 360 | Anuv Jain, Arijit Singh, Prateek Kuhad |
+  | Party | 3.97 s | 0.003 s | yes | 243 | "Jhoome Jo Pathaan", "What Jhumka?" |
+  | Heartbreak | 2.86 s | 0.003 s | yes | 259 | "Husn", "Phir Bhi Tumko Chaahunga" |
+
+  Seed artists dominate the raw top. MX4's `rerank(per_artist=3)` and cover filter will diversify it, e.g. "Baarishein (Acoustic)" gets dropped.
+- Suite: 773 → 785 passed. mypy and ruff clean.

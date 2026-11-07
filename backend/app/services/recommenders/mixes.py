@@ -5,9 +5,18 @@ This module's scoring functions are pure (no I/O) so the rules are testable on
 their own; fetching + caching is layered on top (MX3).
 """
 
-from typing import Any
+import asyncio
+import logging
+import time
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from typing import Any, Protocol, cast
+
+from ytmusicapi import YTMusic
 
 from app.services.recommenders.base import RecommendedTrack, SeedTrack
+
+logger = logging.getLogger(__name__)
 
 # Candidate playlists considered per mood, in YTM's own order (MX3 fetches these).
 CANDIDATE_PLAYLISTS = 24
@@ -20,6 +29,37 @@ PER_ARTIST = 3
 DECAY = 0.02
 # Base playlist weight so a zero-affinity (fallback) playlist still ranks tracks.
 BASE = 0.5
+# Max ytmusicapi calls in flight while fetching a mood's playlists.
+FETCH_CONCURRENCY = 4
+# Tracks requested per playlist (YTM curated playlists hold ~100).
+PLAYLIST_TRACKS = 100
+# Mood catalogue + curated playlists change rarely; one fetch a day is plenty.
+CACHE_TTL_S = 24 * 3600
+
+
+@dataclass(frozen=True)
+class Vibe:
+    id: str
+    title: str
+    mood: str  # YTM "Moods & moments" category title it is built from
+
+
+VIBES: list[Vibe] = [
+    Vibe("chill", "Chill Mix", "Chill"),
+    Vibe("feel-good", "Feel Good Mix", "Feel good"),
+    Vibe("party", "Party Mix", "Party"),
+    Vibe("romance", "Romance Mix", "Romance"),
+    Vibe("heartbreak", "Heartbreak Mix", "Sad"),
+    Vibe("workout", "Workout Mix", "Workout"),
+    Vibe("focus", "Focus Mix", "Focus"),
+    Vibe("sleep", "Sleep Mix", "Sleep"),
+]
+_VIBES_BY_ID = {v.id: v for v in VIBES}
+
+
+class MoodNotFound(Exception):
+    """The vibe's YTM mood category is gone (renamed upstream / other locale)."""
+
 
 _Track = tuple[str, str, tuple[str, ...]]  # (videoId, title, artists)
 
@@ -117,3 +157,106 @@ def score_tracks(
         )
         for v in ranked
     ]
+
+
+# --- fetch + cache (MX3) ---------------------------------------------------
+
+
+class _YTMoodsLike(Protocol):
+    def get_mood_categories(self) -> dict: ...
+    def get_mood_playlists(self, params: str) -> list: ...
+    def get_playlist(self, playlistId: str, limit: int = 100) -> dict: ...
+
+
+class TTLCache:
+    """Async get-or-load with a per-entry expiry. `now` is injectable for tests.
+
+    ponytail: per-process dict, no locking — two concurrent misses both fetch
+    (harmless duplicate YTM call). Redis/shared cache only if workers > 1.
+    """
+
+    def __init__(self, ttl_s: float, now: Callable[[], float]) -> None:
+        self._ttl = ttl_s
+        self._now = now
+        self._data: dict[Any, tuple[float, Any]] = {}
+
+    async def get(self, key: Any, load: Callable[[], Awaitable[Any]]) -> Any:
+        hit = self._data.get(key)
+        if hit is not None and hit[0] > self._now():
+            return hit[1]
+        value = await load()
+        self._data[key] = (self._now() + self._ttl, value)
+        return value
+
+
+@dataclass(frozen=True)
+class MixResult:
+    vibe_id: str
+    title: str
+    personalized: bool
+    tracks: list[RecommendedTrack]  # ranked, before the per-user rerank
+
+
+class MixBuilder:
+    """Builds a vibe's mix: mood playlists from YTM (cached), scored by taste."""
+
+    def __init__(
+        self,
+        yt: _YTMoodsLike | None = None,
+        *,
+        now: Callable[[], float] = time.monotonic,
+        ttl_s: float = CACHE_TTL_S,
+    ) -> None:
+        self._yt: _YTMoodsLike = yt if yt is not None else cast(_YTMoodsLike, YTMusic())
+        self._cache = TTLCache(ttl_s, now)
+
+    async def build(self, vibe_id: str, seeds: list[SeedTrack], *, variant: int) -> MixResult:
+        vibe = _VIBES_BY_ID[vibe_id]  # KeyError → the route answers 404
+        params = await self._mood_params(vibe.mood)
+        playlist_ids = await self._mood_playlist_ids(params)
+
+        sem = asyncio.Semaphore(FETCH_CONCURRENCY)
+
+        async def tracks_of(pid: str) -> list[Any] | None:
+            async with sem:
+                return await self._playlist_tracks(pid)
+
+        fetched = await asyncio.gather(*(tracks_of(p) for p in playlist_ids))
+        playlists = {pid: t for pid, t in zip(playlist_ids, fetched, strict=True) if t is not None}
+
+        taste = taste_profile(seeds)
+        scored = [(pid, playlist_affinity(t, taste)) for pid, t in playlists.items()]
+        chosen, personalized = pick_playlists(scored, variant=variant)
+        tracks = score_tracks([(aff, playlists[pid]) for pid, aff in chosen], taste)
+        return MixResult(vibe.id, vibe.title, personalized, tracks)
+
+    async def _mood_params(self, mood: str) -> str:
+        cats = await self._cache.get(
+            ("categories",), lambda: asyncio.to_thread(self._yt.get_mood_categories)
+        )
+        for items in (cats or {}).values():
+            for item in items or []:
+                if isinstance(item, dict) and item.get("title") == mood and item.get("params"):
+                    return str(item["params"])
+        raise MoodNotFound(mood)
+
+    async def _mood_playlist_ids(self, params: str) -> list[str]:
+        items = await self._cache.get(
+            ("mood", params), lambda: asyncio.to_thread(self._yt.get_mood_playlists, params)
+        )
+        ids = [i["playlistId"] for i in items or [] if isinstance(i, dict) and i.get("playlistId")]
+        return ids[:CANDIDATE_PLAYLISTS]
+
+    async def _playlist_tracks(self, playlist_id: str) -> list[Any] | None:
+        """The playlist's track dicts, or None on failure (not cached: retried next time)."""
+        try:
+            page = await self._cache.get(
+                ("playlist", playlist_id),
+                lambda: asyncio.to_thread(
+                    self._yt.get_playlist, playlist_id, limit=PLAYLIST_TRACKS
+                ),
+            )
+        except Exception as exc:
+            logger.warning("ytmusic.get_playlist failed for %s: %s", playlist_id, exc)
+            return None
+        return list((page or {}).get("tracks") or [])

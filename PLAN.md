@@ -152,7 +152,7 @@ Backend first, TDD (`backend/CLAUDE.md`, `android/CLAUDE.md`):
 2. Implement these in `app/services/recommenders/mixes.py`, with constants `CANDIDATE_PLAYLISTS=24`, `POOL=8`, `PICK=4` and `PER_ARTIST=3`.
 - Commit: `feat(backend): MX2 mix scoring`.
 
-### [ ] MX3. Backend: YTM mood fetch + 24-hour cache
+### [x] MX3. Backend: YTM mood fetch + 24-hour cache
 1. Tests first, in `tests/test_mixes_fetch.py`. The fake YTM client gets `get_mood_categories`, `get_mood_playlists` and `get_playlist`, plus call counters and an in-flight counter.
    - a mood is found by title, and a missing one raises `MoodNotFound`
    - 24 candidates are fetched with at most 4 in flight
