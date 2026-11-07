@@ -594,7 +594,7 @@ Working breakdown: `/PLAN.md` (MX0–MX10). Eight fixed vibe mixes built from Yo
 ### [x] MX4. Mix endpoints
 **Files:** `app/api/v1/recommend.py`, `app/schemas/recommend.py`, `app/services/recommenders/history.py`, `tests/test_mixes_api.py`. **Commit:** `feat(backend): MX4 mix endpoints`.
 
-### [ ] MX5. Home-server smoke (docs only)
+### [x] MX5. Home-server smoke (docs only)
 Gate for Android MX6. If mixes aren't personalised for the owner's seeds on most vibes, revisit the scoring first.
 
 ---

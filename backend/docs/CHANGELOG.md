@@ -1399,3 +1399,19 @@ Response times are under the 6 s budget, so no cache is needed (RX6 `ponytail:` 
 
 - Version bump `5.7.4` → `5.7.5` (`backend/pyproject.toml`, `backend/app/main.py`). Ships MX1–MX4 (entries above). It's an intermediate release so the MX5 home-server smoke can run; `v5.8.0` stays reserved for Phase MX complete (MX10).
 - Deploy: redeploy `heerr-backend`; no new migration. Optional `.env`: `DOWNLOAD_CONCURRENCY` (default 2).
+
+## 2026-11-07 — MX5: home-server smoke of v5.7.5 (mixes passed; download cap not exercised)
+
+Deployed v5.7.5 and ran the smoke script (not committed) on the server against `http://localhost:8000/api/v1`, with a throwaway read-only `system-admin` token that was revoked on exit. Seeds: song seeds Tum Hi Ho / Arijit Singh, Co2 / Prateek Kuhad, High and Dry / Radiohead; artist seeds Anuv Jain 0.7, The Local Train 0.7, Lucky Ali 0.4. These are representative, not the owner's real starred list.
+
+| Check | Result |
+|---|---|
+| `GET /recommend/mixes` | 8 vibes, in order |
+| Chill: cold / warm / regen | 5.11 s / 0.021 s / 0.018 s. `personalized=True`, 50 results, 41 artists, max 3 per artist. v0 vs v1 overlap **1/50**. Top: Anuv Jain "Arz Kiya Hai", Arijit Singh "Gehra Hua", Prateek Kuhad "Oh Camille", Radiohead "How to Disappear Completely". |
+| Party | 4.24 s / 0.018 s / 0.019 s. `personalized=True`, 50 results, 39 artists, max 3 per artist. Overlap **17/50**. Top: "Jhoome Jo Pathaan", "What Jhumka?", "Shararat", "Ghungroo". |
+| Heartbreak | 3.00 s / 0.018 s / 0.015 s. `personalized=True`, 50 results, 37 artists, max 3 per artist. Overlap **1/50**. Top: "Husn", "Yeh Awarapan", "Phir Bhi Tumko Chaahunga", "Hamari Adhuri Kahani". |
+| Unknown vibe `polka` | 404 |
+
+- All `/PLAN.md` MX5 gates pass: cold < 6 s, warm < 1 s, personalised on the mixes checked, at most 3 per artist. **The Android work (MX6) is unblocked.**
+- Party's higher regenerate overlap (17/50) is an inference: its best-matching playlists are Bollywood dance lists that share hits. It's acceptable, but noted.
+- **Not exercised:** the `--downloads` part was skipped, so `DOWNLOAD_CONCURRENCY` is proven by unit tests (MX1) only, and the per-song download time behind the "Save as playlist" estimate is unmeasured. Carried to MX9/MX10.

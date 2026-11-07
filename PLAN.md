@@ -175,7 +175,7 @@ Backend first, TDD (`backend/CLAUDE.md`, `android/CLAUDE.md`):
 3. Implement the schemas (`MixRequest`, `MixResponse`, `MixVibeItem` in `app/schemas/recommend.py`), the routes, and a `get_mix_builder` dependency (a module-level singleton, so the cache survives between requests).
 - Commit: `feat(backend): MX4 mix endpoints`.
 
-### [ ] MX5. Backend: home-server smoke (docs only)
+### [x] MX5. Backend: home-server smoke (docs only)
 1. Tag a backend release, or build and deploy as you usually do, then run `docker compose pull heerr-backend && docker compose up -d heerr-backend`.
 2. Smoke script (throwaway read-only `system-admin` token, revoked on exit, like RX7):
    - `GET /recommend/mixes` returns 8 vibes
