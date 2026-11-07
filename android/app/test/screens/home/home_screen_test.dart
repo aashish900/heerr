@@ -12,6 +12,7 @@ import 'package:dio/dio.dart';
 import 'package:heerr/models/episode_feed_response.dart';
 import 'package:heerr/models/episode_with_channel.dart';
 import 'package:heerr/models/profile_meta.dart';
+import 'package:heerr/models/recommended_track.dart';
 import 'package:heerr/player/heerr_audio_handler.dart';
 import 'package:heerr/player/player_provider.dart';
 import 'package:heerr/models/subsonic/album.dart';
@@ -19,6 +20,8 @@ import 'package:heerr/models/subsonic/song.dart';
 import 'package:heerr/providers/downloaded_songs.dart';
 import 'package:heerr/providers/home/home_providers.dart';
 import 'package:heerr/providers/profiles/profile_meta.dart';
+import 'package:heerr/providers/recommendations.dart';
+import 'package:heerr/screens/home/for_you_section.dart';
 import 'package:heerr/screens/home/home_screen.dart';
 import 'package:heerr/screens/home/quick_access_row.dart';
 import 'package:heerr/screens/home/recently_added_section.dart';
@@ -78,11 +81,24 @@ Album _album(String id, String name, {String? artist}) {
 /// Baseline overrides: newest albums + a quiet downloads count. The player
 /// providers are deliberately NOT overridden — audioHandlerProvider throws
 /// by default, which exercises the hero card's hidden-when-unavailable path.
-List<Override> _homeOverrides({List<Album>? newest}) => <Override>[
-      homeNewestProvider.overrideWith(
-          (_) async => newest ?? <Album>[_album('al-1', 'A', artist: 'B')]),
-      downloadedSongsProvider.overrideWith((_) async => <Song>[]),
-    ];
+List<Override> _homeOverrides({
+  List<Album>? newest,
+  List<RecommendedTrack> recs = const <RecommendedTrack>[],
+}) => <Override>[
+  homeNewestProvider.overrideWith(
+    (_) async => newest ?? <Album>[_album('al-1', 'A', artist: 'B')],
+  ),
+  downloadedSongsProvider.overrideWith((_) async => <Song>[]),
+  recommendationsProvider.overrideWith(() => _StubRecs(recs)),
+];
+
+class _StubRecs extends Recommendations {
+  _StubRecs(this._recs);
+  final List<RecommendedTrack> _recs;
+
+  @override
+  Future<List<RecommendedTrack>> build() async => _recs;
+}
 
 class _StubMeta extends ProfileMetaNotifier {
   _StubMeta(this._nickname);
@@ -93,8 +109,9 @@ class _StubMeta extends ProfileMetaNotifier {
 }
 
 void main() {
-  testWidgets('AppBar shows the brand logo; greeting renders in the body',
-      (WidgetTester tester) async {
+  testWidgets('AppBar shows the brand logo; greeting renders in the body', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(_wrap(overrides: _homeOverrides()));
     await tester.pumpAndSettle();
 
@@ -105,43 +122,48 @@ void main() {
     expect(find.byTooltip('Queue'), findsOneWidget);
 
     // Greeting moved into the body.
-    final Finder greeting = find.byWidgetPredicate((Widget w) =>
-        w is Text &&
-        w.data != null &&
-        w.data!.startsWith('Good ') &&
-        !w.data!.contains('heerr'));
+    final Finder greeting = find.byWidgetPredicate(
+      (Widget w) =>
+          w is Text &&
+          w.data != null &&
+          w.data!.startsWith('Good ') &&
+          !w.data!.contains('heerr'),
+    );
     expect(greeting, findsOneWidget);
   });
 
-  testWidgets('Shuffle-all button sits beside the greeting and runs the action',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(_wrap(overrides: _homeOverrides()));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'Shuffle-all button sits beside the greeting and runs the action',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(overrides: _homeOverrides()));
+      await tester.pumpAndSettle();
 
-    final Finder button = find.byKey(const Key('home-shuffle-all-button'));
-    expect(button, findsOneWidget);
-    expect(find.byTooltip('Shuffle all'), findsOneWidget);
-    expect(find.text('Play All'), findsOneWidget);
-    // Shuffle glyph = the player's bundled SVG, not a Material icon.
-    expect(
-      find.descendant(of: button, matching: find.byType(SvgPicture)),
-      findsOneWidget,
-    );
-    // Same row as the greeting, to its right.
-    final Offset b = tester.getCenter(button);
-    final Offset g = tester.getCenter(find.byType(GreetingBlock));
-    expect(b.dx, greaterThan(g.dx));
-    expect((b.dy - g.dy).abs(), lessThan(60));
+      final Finder button = find.byKey(const Key('home-shuffle-all-button'));
+      expect(button, findsOneWidget);
+      expect(find.byTooltip('Shuffle all'), findsOneWidget);
+      expect(find.text('Play All'), findsOneWidget);
+      // Shuffle glyph = the player's bundled SVG, not a Material icon.
+      expect(
+        find.descendant(of: button, matching: find.byType(SvgPicture)),
+        findsOneWidget,
+      );
+      // Same row as the greeting, to its right.
+      final Offset b = tester.getCenter(button);
+      final Offset g = tester.getCenter(find.byType(GreetingBlock));
+      expect(b.dx, greaterThan(g.dx));
+      expect((b.dy - g.dy).abs(), lessThan(60));
 
-    // No Navidrome creds in the test container -> the real action bails with
-    // the creds-missing snackbar (proves the tap is wired, no stubs needed).
-    await tester.tap(button);
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Navidrome creds missing'), findsOneWidget);
-  });
+      // No Navidrome creds in the test container -> the real action bails with
+      // the creds-missing snackbar (proves the tap is wired, no stubs needed).
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Navidrome creds missing'), findsOneWidget);
+    },
+  );
 
-  testWidgets('JAM pill sits right of Play All and opens the jam screen',
-      (WidgetTester tester) async {
+  testWidgets('JAM pill sits right of Play All and opens the jam screen', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(_wrap(overrides: _homeOverrides()));
     await tester.pumpAndSettle();
 
@@ -149,8 +171,9 @@ void main() {
     expect(jam, findsOneWidget);
     expect(find.text('JAM'), findsOneWidget);
     final Offset j = tester.getCenter(jam);
-    final Offset p =
-        tester.getCenter(find.byKey(const Key('home-shuffle-all-button')));
+    final Offset p = tester.getCenter(
+      find.byKey(const Key('home-shuffle-all-button')),
+    );
     expect(j.dx, greaterThan(p.dx));
     expect((j.dy - p.dy).abs(), lessThan(1));
 
@@ -160,15 +183,20 @@ void main() {
   });
 
   for (final String? nick in <String?>['Aashish', null]) {
-    testWidgets('Play All pill fits a 360dp-wide phone (nickname: $nick)',
-        (WidgetTester tester) async {
+    testWidgets('Play All pill fits a 360dp-wide phone (nickname: $nick)', (
+      WidgetTester tester,
+    ) async {
       tester.view.physicalSize = const Size(360 * 3, 800 * 3);
       tester.view.devicePixelRatio = 3;
       addTearDown(tester.view.reset);
-      await tester.pumpWidget(_wrap(overrides: <Override>[
-        ..._homeOverrides(),
-        profileMetaNotifierProvider.overrideWith(() => _StubMeta(nick)),
-      ]));
+      await tester.pumpWidget(
+        _wrap(
+          overrides: <Override>[
+            ..._homeOverrides(),
+            profileMetaNotifierProvider.overrideWith(() => _StubMeta(nick)),
+          ],
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull); // no RenderFlex overflow
@@ -176,11 +204,63 @@ void main() {
     });
   }
 
-  testWidgets('body renders search bar, Quick Access and Recently Added',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(_wrap(overrides: _homeOverrides(newest: <Album>[
-      _album('al-1', 'Fresh Album', artist: 'Fresh Artist'),
-    ])));
+  testWidgets('For You grid sits between Quick Access and Recently Added', (
+    WidgetTester tester,
+  ) async {
+    // Tall viewport so the lazily-built ListView lays out every section.
+    tester.view.physicalSize = const Size(1170, 7200);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      _wrap(
+        overrides: _homeOverrides(
+          recs: <RecommendedTrack>[
+            const RecommendedTrack(
+              title: 'Rec Song',
+              artist: 'Rec Artist',
+              sourceUrl: 'https://music.youtube.com/watch?v=r1',
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Rec Song'), findsOneWidget);
+    final double quick = tester.getTopLeft(find.byType(QuickAccessRow)).dy;
+    final double forYou = tester.getTopLeft(find.byType(ForYouSection)).dy;
+    final double recent = tester
+        .getTopLeft(find.byType(RecentlyAddedSection))
+        .dy;
+    expect(
+      quick < forYou && forYou < recent,
+      isTrue,
+      reason: 'quick=$quick forYou=$forYou recent=$recent',
+    );
+  });
+
+  testWidgets('no recommendations → no For You grid on Home', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_wrap(overrides: _homeOverrides()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Made for you'), findsOneWidget); // Quick Access tile only
+    expect(find.byKey(const ValueKey<String>('for-you-card')), findsNothing);
+  });
+
+  testWidgets('body renders search bar, Quick Access and Recently Added', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        overrides: _homeOverrides(
+          newest: <Album>[
+            _album('al-1', 'Fresh Album', artist: 'Fresh Artist'),
+          ],
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Search your library + online'), findsOneWidget);
@@ -212,18 +292,27 @@ void main() {
         artist: 'Artist',
         duration: Duration(minutes: 3),
       );
-      await tester.pumpWidget(_wrap(overrides: <Override>[
-        ..._homeOverrides(newest: <Album>[
-          _album('al-1', 'Fresh Album', artist: 'Fresh Artist'),
-        ]),
-        playerSnapshotProvider.overrideWith(
-          (Ref<AsyncValue<PlayerSnapshot>> ref) =>
-              Stream<PlayerSnapshot>.value(PlayerSnapshot(
-            item: item,
-            state: PlaybackState(), // paused — restored-queue cold start
-          )),
+      await tester.pumpWidget(
+        _wrap(
+          overrides: <Override>[
+            ..._homeOverrides(
+              newest: <Album>[
+                _album('al-1', 'Fresh Album', artist: 'Fresh Artist'),
+              ],
+            ),
+            playerSnapshotProvider.overrideWith(
+              (Ref<AsyncValue<PlayerSnapshot>> ref) =>
+                  Stream<PlayerSnapshot>.value(
+                    PlayerSnapshot(
+                      item: item,
+                      state:
+                          PlaybackState(), // paused — restored-queue cold start
+                    ),
+                  ),
+            ),
+          ],
         ),
-      ]));
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('CONTINUE LISTENING'), findsOneWidget);
@@ -238,7 +327,8 @@ void main() {
     'empty newest + idle player → empty-state replaces Recently Added',
     (WidgetTester tester) async {
       await tester.pumpWidget(
-          _wrap(overrides: _homeOverrides(newest: <Album>[])));
+        _wrap(overrides: _homeOverrides(newest: <Album>[])),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Nothing here yet'), findsOneWidget);
@@ -249,60 +339,67 @@ void main() {
     },
   );
 
-  testWidgets(
-    'tapping a Recently Added row routes to /library/album/:id',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(overrides: _homeOverrides(newest: <Album>[
-        _album('r-7', 'Recent', artist: 'Ra'),
-      ])));
-      await tester.pumpAndSettle();
+  testWidgets('tapping a Recently Added row routes to /library/album/:id', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        overrides: _homeOverrides(
+          newest: <Album>[_album('r-7', 'Recent', artist: 'Ra')],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Recent'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Recent'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('album-r-7'), findsOneWidget);
-    },
-  );
+    expect(find.text('album-r-7'), findsOneWidget);
+  });
 
-  testWidgets(
-    'pull-to-refresh re-fetches the newest provider',
-    (WidgetTester tester) async {
-      int fetchCount = 0;
-      await tester.pumpWidget(_wrap(overrides: <Override>[
-        homeNewestProvider.overrideWith((_) async {
-          fetchCount += 1;
-          return <Album>[_album('al-1', 'A', artist: 'B')];
-        }),
-        downloadedSongsProvider.overrideWith((_) async => <Song>[]),
-      ]));
-      await tester.pumpAndSettle();
-      expect(fetchCount, 1);
+  testWidgets('pull-to-refresh re-fetches the newest provider', (
+    WidgetTester tester,
+  ) async {
+    int fetchCount = 0;
+    await tester.pumpWidget(
+      _wrap(
+        overrides: <Override>[
+          homeNewestProvider.overrideWith((_) async {
+            fetchCount += 1;
+            return <Album>[_album('al-1', 'A', artist: 'B')];
+          }),
+          downloadedSongsProvider.overrideWith((_) async => <Song>[]),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(fetchCount, 1);
 
-      final RefreshIndicator indicator =
-          tester.widget<RefreshIndicator>(find.byType(RefreshIndicator));
-      await indicator.onRefresh();
-      await tester.pumpAndSettle();
+    final RefreshIndicator indicator = tester.widget<RefreshIndicator>(
+      find.byType(RefreshIndicator),
+    );
+    await indicator.onRefresh();
+    await tester.pumpAndSettle();
 
-      expect(fetchCount, greaterThanOrEqualTo(2));
-    },
-  );
+    expect(fetchCount, greaterThanOrEqualTo(2));
+  });
 
-  testWidgets(
-    'tapping the Queue icon in the AppBar routes to /queue',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(overrides: _homeOverrides()));
-      await tester.pumpAndSettle();
+  testWidgets('tapping the Queue icon in the AppBar routes to /queue', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_wrap(overrides: _homeOverrides()));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('Queue'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Queue'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('Queue page'), findsOneWidget);
-    },
-  );
+    expect(find.text('Queue page'), findsOneWidget);
+  });
 
   group('Profile entry point + nickname greeting (#37)', () {
-    testWidgets('AppBar shows a profile avatar that routes to /profile',
-        (WidgetTester tester) async {
+    testWidgets('AppBar shows a profile avatar that routes to /profile', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(_wrap(overrides: _homeOverrides()));
       await tester.pumpAndSettle();
 
@@ -312,37 +409,54 @@ void main() {
       expect(find.text('Profile page'), findsOneWidget);
     });
 
-    testWidgets('greeting block shows two lines with the nickname',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(overrides: <Override>[
-        ..._homeOverrides(),
-        profileMetaNotifierProvider.overrideWith(() => _StubMeta('Al')),
-      ]));
+    testWidgets('greeting block shows two lines with the nickname', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          overrides: <Override>[
+            ..._homeOverrides(),
+            profileMetaNotifierProvider.overrideWith(() => _StubMeta('Al')),
+          ],
+        ),
+      );
       await tester.pumpAndSettle();
 
       // Line 1: "<greeting>," — line 2: "<nickname> <wave>".
-      final Finder line1 = find.byWidgetPredicate((Widget w) =>
-          w is Text &&
-          w.data != null &&
-          w.data!.startsWith('Good ') &&
-          w.data!.endsWith(','));
+      final Finder line1 = find.byWidgetPredicate(
+        (Widget w) =>
+            w is Text &&
+            w.data != null &&
+            w.data!.startsWith('Good ') &&
+            w.data!.endsWith(','),
+      );
       expect(line1, findsOneWidget);
       expect(find.text('Al \u{1F44B}'), findsOneWidget);
     });
 
-    testWidgets('greeting block is a single plain line without a nickname',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(_wrap(overrides: <Override>[
-        ..._homeOverrides(),
-        profileMetaNotifierProvider.overrideWith(() => _StubMeta(null)),
-      ]));
+    testWidgets('greeting block is a single plain line without a nickname', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          overrides: <Override>[
+            ..._homeOverrides(),
+            profileMetaNotifierProvider.overrideWith(() => _StubMeta(null)),
+          ],
+        ),
+      );
       await tester.pumpAndSettle();
 
-      final Finder greeting = find.byWidgetPredicate((Widget w) =>
-          w is Text &&
-          w.data != null &&
-          <String>['Good morning', 'Good afternoon', 'Good evening']
-              .contains(w.data));
+      final Finder greeting = find.byWidgetPredicate(
+        (Widget w) =>
+            w is Text &&
+            w.data != null &&
+            <String>[
+              'Good morning',
+              'Good afternoon',
+              'Good evening',
+            ].contains(w.data),
+      );
       expect(greeting, findsOneWidget);
       expect(find.textContaining('\u{1F44B}'), findsNothing);
     });
@@ -350,15 +464,16 @@ void main() {
 
   group('Network error state (#45)', () {
     List<Override> failing({void Function()? onFetch}) => <Override>[
-          homeNewestProvider.overrideWith((_) async {
-            onFetch?.call();
-            throw const SocketException('no network');
-          }),
-          downloadedSongsProvider.overrideWith((_) async => <Song>[]),
-        ];
+      homeNewestProvider.overrideWith((_) async {
+        onFetch?.call();
+        throw const SocketException('no network');
+      }),
+      downloadedSongsProvider.overrideWith((_) async => <Song>[]),
+    ];
 
-    testWidgets("newest fails → 'Can't reach server' shown",
-        (WidgetTester tester) async {
+    testWidgets("newest fails → 'Can't reach server' shown", (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(_wrap(overrides: failing()));
       await tester.pumpAndSettle();
 
@@ -367,11 +482,13 @@ void main() {
       expect(find.byKey(const Key('home-retry-button')), findsOneWidget);
     });
 
-    testWidgets('tapping Retry re-fetches the provider',
-        (WidgetTester tester) async {
+    testWidgets('tapping Retry re-fetches the provider', (
+      WidgetTester tester,
+    ) async {
       int fetchCount = 0;
       await tester.pumpWidget(
-          _wrap(overrides: failing(onFetch: () => fetchCount++)));
+        _wrap(overrides: failing(onFetch: () => fetchCount++)),
+      );
       await tester.pumpAndSettle();
       expect(fetchCount, 1);
 
@@ -381,8 +498,9 @@ void main() {
       expect(fetchCount, greaterThanOrEqualTo(2));
     });
 
-    testWidgets('error state is scrollable (RefreshIndicator still works)',
-        (WidgetTester tester) async {
+    testWidgets('error state is scrollable (RefreshIndicator still works)', (
+      WidgetTester tester,
+    ) async {
       await tester.pumpWidget(_wrap(overrides: failing()));
       await tester.pumpAndSettle();
 
@@ -395,85 +513,100 @@ void main() {
 
   group('PR3 podcasts content (#53)', () {
     testWidgets(
-        'switching to Podcasts renders Continue Listening + Latest Episodes',
-        (WidgetTester tester) async {
-      final _StubPodcastBackend backend = _StubPodcastBackend(
-        inProgress: const EpisodeFeedResponse(
-          episodes: <EpisodeWithChannel>[
-            EpisodeWithChannel(
-              id: 'e1',
-              channelId: 'c1',
-              channelTitle: 'Show A',
-              guid: 'g1',
-              title: 'In Progress Episode',
-              enclosureUrl: 'https://a.com/e1.mp3',
-              downloaded: false,
-              positionS: 30,
-              played: false,
-            ),
+      'switching to Podcasts renders Continue Listening + Latest Episodes',
+      (WidgetTester tester) async {
+        final _StubPodcastBackend backend = _StubPodcastBackend(
+          inProgress: const EpisodeFeedResponse(
+            episodes: <EpisodeWithChannel>[
+              EpisodeWithChannel(
+                id: 'e1',
+                channelId: 'c1',
+                channelTitle: 'Show A',
+                guid: 'g1',
+                title: 'In Progress Episode',
+                enclosureUrl: 'https://a.com/e1.mp3',
+                downloaded: false,
+                positionS: 30,
+                played: false,
+              ),
+            ],
+            total: 1,
+          ),
+          latest: const EpisodeFeedResponse(
+            episodes: <EpisodeWithChannel>[
+              EpisodeWithChannel(
+                id: 'e2',
+                channelId: 'c2',
+                channelTitle: 'Show B',
+                guid: 'g2',
+                title: 'Latest Episode',
+                enclosureUrl: 'https://b.com/e2.mp3',
+                downloaded: false,
+                positionS: 0,
+                played: false,
+              ),
+            ],
+            total: 1,
+          ),
+        );
+        await tester.pumpWidget(
+          _wrap(
+            overrides: <Override>[
+              ..._homeOverrides(),
+              backendServiceProvider.overrideWith((_) async => backend),
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Podcasts'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Continue Listening'), findsOneWidget);
+        expect(find.text('In Progress Episode'), findsOneWidget);
+        expect(find.text('Latest Episodes'), findsOneWidget);
+        expect(find.text('Latest Episode'), findsOneWidget);
+      },
+    );
+
+    testWidgets('idling on Music never calls the podcast feed backend', (
+      WidgetTester tester,
+    ) async {
+      final _StubPodcastBackend backend = _StubPodcastBackend();
+      await tester.pumpWidget(
+        _wrap(
+          overrides: <Override>[
+            ..._homeOverrides(),
+            backendServiceProvider.overrideWith((_) async => backend),
           ],
-          total: 1,
-        ),
-        latest: const EpisodeFeedResponse(
-          episodes: <EpisodeWithChannel>[
-            EpisodeWithChannel(
-              id: 'e2',
-              channelId: 'c2',
-              channelTitle: 'Show B',
-              guid: 'g2',
-              title: 'Latest Episode',
-              enclosureUrl: 'https://b.com/e2.mp3',
-              downloaded: false,
-              positionS: 0,
-              played: false,
-            ),
-          ],
-          total: 1,
         ),
       );
-      await tester.pumpWidget(_wrap(overrides: <Override>[
-        ..._homeOverrides(),
-        backendServiceProvider.overrideWith((_) async => backend),
-      ]));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Podcasts'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Continue Listening'), findsOneWidget);
-      expect(find.text('In Progress Episode'), findsOneWidget);
-      expect(find.text('Latest Episodes'), findsOneWidget);
-      expect(find.text('Latest Episode'), findsOneWidget);
-    });
-
-    testWidgets('idling on Music never calls the podcast feed backend',
-        (WidgetTester tester) async {
-      final _StubPodcastBackend backend = _StubPodcastBackend();
-      await tester.pumpWidget(_wrap(overrides: <Override>[
-        ..._homeOverrides(),
-        backendServiceProvider.overrideWith((_) async => backend),
-      ]));
       await tester.pumpAndSettle();
 
       expect(backend.filtersRequested, isEmpty);
     });
 
-    testWidgets(
-        'no subscriptions → empty state with a Discover button that '
+    testWidgets('no subscriptions → empty state with a Discover button that '
         'pushes Discover', (WidgetTester tester) async {
       final _StubPodcastBackend backend = _StubPodcastBackend();
-      await tester.pumpWidget(_wrap(overrides: <Override>[
-        ..._homeOverrides(),
-        backendServiceProvider.overrideWith((_) async => backend),
-      ]));
+      await tester.pumpWidget(
+        _wrap(
+          overrides: <Override>[
+            ..._homeOverrides(),
+            backendServiceProvider.overrideWith((_) async => backend),
+          ],
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Podcasts'));
       await tester.pumpAndSettle();
 
       expect(find.text('No episodes yet'), findsOneWidget);
-      expect(find.byKey(const Key('home-podcasts-discover-action')),
-          findsOneWidget);
+      expect(
+        find.byKey(const Key('home-podcasts-discover-action')),
+        findsOneWidget,
+      );
 
       await tester.tap(find.byKey(const Key('home-podcasts-discover-action')));
       await tester.pumpAndSettle();
@@ -485,8 +618,14 @@ void main() {
 
 class _StubPodcastBackend extends BackendService {
   _StubPodcastBackend({
-    this.inProgress = const EpisodeFeedResponse(episodes: <EpisodeWithChannel>[], total: 0),
-    this.latest = const EpisodeFeedResponse(episodes: <EpisodeWithChannel>[], total: 0),
+    this.inProgress = const EpisodeFeedResponse(
+      episodes: <EpisodeWithChannel>[],
+      total: 0,
+    ),
+    this.latest = const EpisodeFeedResponse(
+      episodes: <EpisodeWithChannel>[],
+      total: 0,
+    ),
   }) : super(Dio());
 
   final EpisodeFeedResponse inProgress;

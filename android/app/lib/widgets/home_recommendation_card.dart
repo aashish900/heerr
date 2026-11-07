@@ -74,7 +74,7 @@ class HomeRecommendationCard extends ConsumerWidget {
             borderRadius: BorderRadius.circular(4),
             child: Stack(
               children: <Widget>[
-                _CoverArt(
+                RecommendationCoverArt(
                   track: track,
                   size: width,
                   fallbackColor: cs.surfaceContainerHighest,
@@ -175,14 +175,16 @@ class _OverlayAction extends StatelessWidget {
   }
 }
 
-/// Three-way cover resolution for a recommendation card:
+/// Three-way cover resolution for a recommendation card (also used by the
+/// Home For You grid, `screens/home/for_you_section.dart`):
 /// 1. Navidrome `coverArt` id present (in-library hit or Discover/random) →
 ///    use the cached [LibraryCoverArt] widget (disk + per-server cache).
 /// 2. Backend-provided `coverUrl` present → load it via `Image.network`.
 ///    No auth, falls back to the placeholder on error (e.g. offline).
 /// 3. Otherwise → solid colour swatch with a music-note icon.
-class _CoverArt extends StatelessWidget {
-  const _CoverArt({
+class RecommendationCoverArt extends StatelessWidget {
+  const RecommendationCoverArt({
+    super.key,
     required this.track,
     required this.size,
     required this.fallbackColor,

@@ -16,6 +16,7 @@ import '../../widgets/branded_header.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/gradient_tab_indicator.dart';
 import 'continue_listening_card.dart';
+import 'for_you_section.dart';
 import 'home_podcasts_body.dart';
 import 'quick_access_row.dart';
 import 'recently_added_section.dart';
@@ -32,14 +33,15 @@ export '../../widgets/branded_header.dart' show greetingForHour;
 ///   - AppBar: brand logo + Queue shortcut + profile avatar.
 ///   - Music/Podcasts content switch.
 ///   - Music: search affordance, greeting block, "Continue Listening" hero
-///     card, Quick Access row, "Recently Added" list — all unchanged from
-///     the pre-PR3 layout, just relocated under this switch's Music tab.
+///     card, Quick Access row, "For You" grid (backend recommendations,
+///     hidden when there are none), "Recently Added" list.
 ///   - Podcasts: "Continue Listening" carousel + "Latest Episodes" list
 ///     (`screens/home/home_podcasts_body.dart`), both cross-subscription
 ///     feeds from backend Phase PA.
 ///
 /// The pre-redesign sections (recently-played grid, "Jump back in",
-/// "Most played", "Picked for you") were removed — DECISIONLOG 2026-07-11.
+/// "Most played", "Picked for you") were removed — DECISIONLOG 2026-07-11;
+/// recommendations returned as the "For You" grid (heerr-home-for-you.html).
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -214,6 +216,8 @@ class _HomeBodyState extends ConsumerState<_HomeBody> {
         const _GreetingRow(),
         const ContinueListeningCard(),
         const QuickAccessRow(),
+        // Hidden until the recommendations feed has results.
+        const ForYouSection(),
         if (libraryEmpty && playerIdle)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),

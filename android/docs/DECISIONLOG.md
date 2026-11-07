@@ -1520,3 +1520,21 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - Filter owned songs on the backend: it has no per-user Navidrome credentials.
 
 **Reference:** `/PLAN.md` (phase RX). Backend counterpart: `backend/docs/DECISIONLOG.md`, same date.
+
+## 2026-11-07 — Home "For You" grid: 6 cards, preview-stream play, hidden unless results
+
+**Context:** The user asked for a "For You" section on Home between Quick Access and Recently Added, built to `heerr-home-for-you.html`: a 3-column grid of song cards (square art, 40px play button at the art's bottom-right, title and artist ellipsised, `#1C1C1C` card with a 1px `#2E2E2E` border and 14px radius), loaded from the recommendations API and hidden when it returns none. Home had no recommendations section since "Picked for you" was removed on 2026-07-11. Since RX8, every recommendation is a song the user does **not** own.
+
+**Decision:**
+- New `lib/screens/home/for_you_section.dart` (`ForYouSection`). It reads the existing keep-alive `recommendationsProvider`, the same feed as the For You screen, refreshed on resume by `lifecycle_coordinator.dart` with a 30-minute TTL. It shows the first **6** results, as in the design. "See all" goes to `Routes.libraryRecommendations`. The header reads "Made for <nickname>" (or "Made for you").
+- **Hidden** (zero height) on first load, on error and when the feed is empty. Home never shows a spinner or error here. On refresh, `valueOrNull` keeps the previous grid.
+- **Play** (the button and the card tap) streams the song through the backend preview proxy via the existing `playPreview`. The `RecommendedTrack` maps 1:1 onto a `SearchResultItem`. There's no library play path, because results are never owned after RX8. Downloading stays on the full For You screen.
+- Colours come from `heerrDarkTheme()`: `surfaceContainerHigh` (#1C1C1C) for the card, `outline` (#2E2E2E) for the border, `onSurfaceVariant` (#B0B0B0) for the secondary text, and `heerrMagenta` for the play button and "See all".
+- Cover art reuses the For You screen's three-way resolution (Navidrome cover, then backend `cover_url`, then a placeholder). That widget is now public as `RecommendationCoverArt` in `widgets/home_recommendation_card.dart`.
+
+**Why:** It reuses the feed, the cover resolution and the preview player that already exist. There's no new provider, endpoint or player path. Hiding on error keeps a backend or YouTube Music hiccup from putting an error block in the middle of Home.
+
+**Alternatives considered:**
+- Card tap opens a details sheet: no such sheet exists, and the design shows the card itself as the play affordance.
+- A Download button on each card: not in the design, and it would crowd a 95px art tile. "See all" reaches the full screen, which still has Download.
+- `GridView(shrinkWrap)` inside Home's `ListView`: a `Wrap` with `LayoutBuilder`-computed widths is simpler and lays out the same 3 columns.

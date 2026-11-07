@@ -3416,3 +3416,27 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
   - `test/models/seed_track_test.dart` (new): song seed JSON, and an artist seed JSON with no `title` key.
 - `lib/providers/jam_host.g.dart` was regenerated with a new hash by `build_runner` (stale from Phase JM, unrelated). Reverted to keep this change in scope.
 - Gates: `flutter analyze` clean; `flutter test` 1189 → 1201 passed.
+
+## 2026-11-07 — Home "For You" grid (between Quick Access and Recently Added)
+
+- `lib/screens/home/for_you_section.dart` (new): `ForYouSection`.
+  - **Header:** "Made for <nickname>" (fallback "Made for you"), then "For You", then a "See all" `TextButton` (magenta) that pushes `Routes.libraryRecommendations`.
+  - **Grid:** a `Wrap` of up to 6 `_ForYouCard`s in 3 equal columns (16px page gutters, 10px gaps, widths from `LayoutBuilder`).
+  - **Card:** `Material` in `cs.surfaceContainerHigh` with a `RoundedRectangleBorder(radius 14, side cs.outline)` and 8px padding. Square art in a 10px-radius clip, with a 40px `heerrMagenta` circular play button (shadow `0 4 12` black 45%) positioned 6px from the art's bottom-right. Below it, the title (13px w500) and artist (12px `onSurfaceVariant`), both `maxLines: 1` with an ellipsis.
+  - **Play:** the play button and the card tap call `playPreview` with a `SearchResultItem` built from the `RecommendedTrack`.
+  - **Visibility:** hidden while there's no data, on error, and when the feed is empty.
+- `lib/screens/home/home_screen.dart`: `const ForYouSection()` inserted after `QuickAccessRow`, before Recently Added (and before the empty-library state). Doc comment updated.
+- `lib/widgets/home_recommendation_card.dart`: the private `_CoverArt` became the public `RecommendationCoverArt` (gained `super.key`) so the Home grid reuses the cover resolution. Behaviour unchanged.
+- Tests:
+  - `test/screens/home/for_you_section_test.dart` (new, 10 tests):
+    - hidden on empty and on error
+    - "Made for Aashish" header and the "Made for you" fallback
+    - See all navigates to the For You screen
+    - at most 6 cards, in a 3-column equal-width grid with 16px gutters and 10px gaps
+    - card fill, border width and colour, and radius
+    - square art with a 40×40 play button in its bottom-right, inset 4–10px
+    - single-line ellipsis on title and artist
+    - play sends a preview `MediaItem` (`extras.preview == true`, correct `sourceUrl`) to the audio handler
+  - `test/screens/home/home_screen_test.dart`: `_homeOverrides` stubs `recommendationsProvider`, defaulting to empty. +2 tests: the grid's vertical position is between Quick Access and Recently Added, and there's no grid when there are no recommendations.
+- Gates: `flutter analyze` clean; `flutter test` 1201 → 1213 passed.
+- Design reference `heerr-home-for-you.html` (repo root, untracked) was left as is.
