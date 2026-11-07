@@ -20,6 +20,7 @@ def rerank(
 
     Drops `excluded` URLs, demotes `recently_shown` ones, then picks greedily
     by score with at most `per_artist` tracks per (case-insensitive) artist.
+    Duplicate URLs keep their best-scored copy.
     A missing score (engines without one) falls back to input position.
     """
     # ponytail: song-level only; add artist-level dislike if dismissals cluster by artist.
@@ -37,11 +38,15 @@ def rerank(
 
     out: list[RecommendedTrack] = []
     per: dict[str, int] = {}
+    seen: set[str] = set()
     for t in scored:
+        if t.source_url in seen:
+            continue
         key = t.artist.strip().lower()
         if per.get(key, 0) >= per_artist:
             continue
         per[key] = per.get(key, 0) + 1
+        seen.add(t.source_url)
         out.append(t)
         if len(out) >= limit:
             break

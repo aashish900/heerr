@@ -35,3 +35,9 @@ class RecommendHealthResponse(BaseModel):
     engine: str
     status: str  # "ok" | "degraded"
     fallback_active: bool
+
+
+class DismissRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_url: str = Field(..., min_length=1)

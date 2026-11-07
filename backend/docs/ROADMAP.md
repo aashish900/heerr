@@ -559,7 +559,7 @@ Working breakdown: `/PLAN.md` (RX0–RX9). Consensus multi-seed candidates, per-
 ### [x] RX2. `rec_feedback` schema
 **Files:** `alembic/versions/0016_rec_feedback.py`, `app/models/rec_feedback.py`. **Commit:** `feat(backend): RX2 rec_feedback table (migration 0016)`.
 
-### [ ] RX3. Per-user re-rank in `/recommend` + `/recommend/dismiss`
+### [x] RX3. Per-user re-rank in `/recommend` + `/recommend/dismiss`
 **Files:** `app/api/v1/recommend.py`, `app/schemas/recommend.py`, `tests/test_recommend.py`. **Commit:** `feat(backend): RX3 per-user recommend re-rank + /recommend/dismiss`.
 
 ### [ ] RX4. ytmusicapi shape spike (no feature code)

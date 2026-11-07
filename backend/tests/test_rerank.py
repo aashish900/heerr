@@ -80,3 +80,9 @@ def test_missing_score_demoted_when_shown():
 def test_output_scores_reflect_demotion():
     out = _go([_t("a", "X", 1.0)], shown=["a"])
     assert out[0].score == 0.3
+
+
+def test_duplicate_urls_kept_once():
+    out = _go([_t("a", "X", 0.5), _t("a", "X", 0.9), _t("b", "Y", 0.1)])
+    assert _urls(out) == ["a", "b"]
+    assert out[0].score == 0.9

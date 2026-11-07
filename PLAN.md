@@ -172,7 +172,7 @@ Backend first, TDD (`backend/CLAUDE.md`). Run `poetry run pytest` green before a
 3. Gate: `alembic upgrade head` and `alembic downgrade -1` both run clean against the dev Postgres.
 - Commit: `feat(backend): RX2 rec_feedback table (migration 0016)`.
 
-### [ ] RX3. Backend: route wiring + dismiss endpoint
+### [x] RX3. Backend: route wiring + dismiss endpoint
 1. Add tests to `tests/test_recommend.py`, reusing `FakeEngine` and testcontainers Postgres:
    - `/recommend` excludes the user's job URLs
    - another user's jobs are **not** excluded

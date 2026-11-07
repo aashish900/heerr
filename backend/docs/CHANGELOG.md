@@ -1156,3 +1156,18 @@ See `backend/docs/DECISIONLOG.md` 2026-07-20 for the *why* (Navidrome has no ser
 - `app/models/rec_feedback.py` (new): `RecFeedback` ORM model mirroring the migration, exported from `app/models/__init__.py`.
 - `tests/test_migration_0016.py` (new): defaults, one row per (user, url), the same URL allowed for different users, cascade on user delete, FK rejection of an unknown user, and downgrade to 0015 followed by upgrade back to head.
 - Gate: the migration tests run `alembic downgrade`/`upgrade` against real Postgres (testcontainers), and `test_models_match_schema` checks ORM/schema parity. Suite: 692 → 698 passed. Not yet run against the home-server DB; `heerr-migrate` applies it on the RX7 deploy.
+
+## 2026-11-07 — RX3: per-user re-rank in `/recommend` + `POST /recommend/dismiss`
+
+- `app/api/v1/recommend.py`:
+  - **`POST /recommend`:** now uses the token's `user_id` and a DB session. It asks the engine for `min(limit*2, 100)` candidates and looks up this user's history for those URLs only. The history query treats URLs as excluded if the user has a non-failed `jobs` row or a dismissed `rec_feedback` row, and as recently shown if `last_shown_at` is within 7 days. Results go through `rerank()`, and the returned URLs are then upserted as shown (`shown_count + 1`, `last_shown_at = now()`). Response shape unchanged.
+  - **`POST /recommend/dismiss {source_url}`:** new. `read` scope, returns 204, idempotent upsert of `dismissed_at = now()` scoped to the caller.
+- `app/schemas/recommend.py`: `DismissRequest` (`extra="forbid"`, `source_url` min length 1).
+- `app/services/recommenders/rerank.py`: duplicate URLs in the candidate list are now kept once, at their best score. Found during RX3, since a fallback chain can repeat a URL.
+- `tests/test_recommend.py`: 9 new tests:
+  - `/recommend`: over-fetch size; exclusion of the caller's done/queued jobs while failed jobs stay; other users' jobs are not excluded; shown rows recorded, then demoted on the next call.
+  - `/recommend/dismiss`: 401 without a token; 422 on an empty or missing URL; idempotent 204 that hides the song; affects only the caller; works for a URL that was never shown.
+
+  The existing stub test now expects the engine limit to be 20 (2 × 10). `tests/test_rerank.py`: +1 duplicate-URL test.
+- Known ceiling: exclusion matches `source_url` exactly. Recommendation and search URLs share the `https://music.youtube.com/watch?v=<id>` form, so a job created from a different URL form (`www.youtube.com`, extra query params) wouldn't match. Accepted for now.
+- Suite: 698 → 708 passed. mypy and ruff clean.
