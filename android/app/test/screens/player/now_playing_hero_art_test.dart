@@ -9,6 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:heerr/api/subsonic_client.dart';
+import 'package:heerr/models/download_response.dart';
+import 'package:heerr/models/enums.dart';
 import 'package:heerr/models/job_view.dart';
 import 'package:heerr/models/queue_response.dart';
 import 'package:heerr/offline/offline_manifest.dart';
@@ -16,6 +18,7 @@ import 'package:heerr/offline/offline_marker.dart';
 import 'package:heerr/offline/offline_paths.dart';
 import 'package:heerr/player/heerr_audio_handler.dart';
 import 'package:heerr/player/player_provider.dart';
+import 'package:heerr/providers/download.dart';
 import 'package:heerr/providers/queue.dart';
 import 'package:heerr/providers/server_creds.dart';
 import 'package:heerr/screens/player/now_playing_screen.dart';
@@ -87,36 +90,68 @@ PlayerSnapshot _snap(MediaItem item) =>
     PlayerSnapshot(item: item, state: PlaybackState(playing: true));
 
 MediaItem _songItem({String subsonicId = 'song-1'}) => MediaItem(
-      id: 'http://stream/$subsonicId',
-      title: 'Track A',
-      artist: 'Artist A',
-      extras: <String, dynamic>{'subsonicId': subsonicId},
-    );
+  id: 'http://stream/$subsonicId',
+  title: 'Track A',
+  artist: 'Artist A',
+  extras: <String, dynamic>{'subsonicId': subsonicId},
+);
 
-MediaItem _previewItem() => const MediaItem(
-      id: 'https://music.youtube.com/watch?v=x',
-      title: 'Preview Track',
-      artist: 'Artist P',
-      extras: <String, dynamic>{'preview': true},
+const String _previewSourceUrl = 'https://music.youtube.com/watch?v=x';
+
+/// Mirrors `searchResultToMediaItem`: id = the /preview/stream URL, the
+/// YouTube Music URL rides in `extras.sourceUrl`.
+MediaItem _previewItem({String? sourceUrl = _previewSourceUrl}) => MediaItem(
+  id: 'http://x:8000/api/v1/preview/stream?url=x&token=t',
+  title: 'Preview Track',
+  artist: 'Artist P',
+  extras: <String, dynamic>{
+    'preview': true,
+    'sourceUrl': ?sourceUrl,
+  },
+);
+
+/// Records `POST /download` dispatches; [hold] keeps the URL in flight.
+class _RecordingDispatcher extends DownloadDispatcher {
+  _RecordingDispatcher({this.hold = false});
+  final bool hold;
+  final List<(String, String, String?)> calls = <(String, String, String?)>[];
+
+  @override
+  Set<String> build() => const <String>{};
+
+  @override
+  Future<DownloadResponse> dispatch(
+    String sourceUrl, {
+    required String sourceType,
+    String? displayName,
+  }) async {
+    calls.add((sourceUrl, sourceType, displayName));
+    state = <String>{...state, sourceUrl};
+    if (!hold) state = <String>{...state}..remove(sourceUrl);
+    return const DownloadResponse(
+      jobId: 'job-1',
+      state: JobState.queued,
+      deduped: false,
     );
+  }
+}
 
 Widget _wrap({
   required MediaItem item,
   OfflineManifest manifest = const OfflineManifest(),
   _MockOfflineMarker? marker,
+  _RecordingDispatcher? dispatcher,
 }) {
   return ProviderScope(
     overrides: <Override>[
       offlinePathsProvider.overrideWith(
         (OfflinePathsRef ref) async => _NullOfflinePaths(),
       ),
-      subsonicDioClientProvider.overrideWith(
-        (Ref<AsyncValue<Dio>> ref) async {
-          final Dio dio = Dio(BaseOptions(baseUrl: 'http://navi.test'));
-          dio.httpClientAdapter = _NoopAdapter();
-          return dio;
-        },
-      ),
+      subsonicDioClientProvider.overrideWith((Ref<AsyncValue<Dio>> ref) async {
+        final Dio dio = Dio(BaseOptions(baseUrl: 'http://navi.test'));
+        dio.httpClientAdapter = _NoopAdapter();
+        return dio;
+      }),
       lyricsServiceProvider.overrideWith((LyricsServiceRef ref) async {
         final Dio subsonic = await ref.watch(subsonicDioClientProvider.future);
         final Dio lrcLib = Dio(BaseOptions(baseUrl: 'http://navi.test'));
@@ -139,6 +174,8 @@ Widget _wrap({
         (OfflineManifestRef ref) async => manifest,
       ),
       if (marker != null) offlineMarkerProvider.overrideWith(() => marker),
+      if (dispatcher != null)
+        downloadDispatcherProvider.overrideWith(() => dispatcher),
       serverCredsProvider.overrideWith(
         (Ref<ServerCreds> ref) => (
           navidromeBaseUrl: 'http://navi.test',
@@ -163,35 +200,40 @@ void main() {
     waveformSeekBarAnimateEnabled = true;
   });
 
-  testWidgets('no manifest entry → outlined download icon; tap shows explainer',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(_wrap(item: _songItem()));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'no manifest entry → outlined download icon; tap shows explainer',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(_wrap(item: _songItem()));
+      await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.download_outlined), findsOneWidget);
-    await tester.tap(find.byKey(const Key('now-playing-hero-download')));
-    await tester.pumpAndSettle();
-    expect(
-      find.text(
-        "Download this song's album or playlist to make it "
-        'available offline.',
-      ),
-      findsOneWidget,
-    );
-  });
+      expect(find.byIcon(Icons.download_outlined), findsOneWidget);
+      await tester.tap(find.byKey(const Key('now-playing-hero-download')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          "Download this song's album or playlist to make it "
+          'available offline.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
-  testWidgets('ready entry → filled magenta icon; tap deletes the local copy',
-      (WidgetTester tester) async {
+  testWidgets('ready entry → filled magenta icon; tap deletes the local copy', (
+    WidgetTester tester,
+  ) async {
     final _MockOfflineMarker marker = _MockOfflineMarker();
-    await tester.pumpWidget(_wrap(
-      item: _songItem(subsonicId: 'song-1'),
-      manifest: const OfflineManifest(
-        songs: <String, OfflineSongEntry>{
-          'song-1': OfflineSongEntry(state: OfflineSongState.ready),
-        },
+    await tester.pumpWidget(
+      _wrap(
+        item: _songItem(subsonicId: 'song-1'),
+        manifest: const OfflineManifest(
+          songs: <String, OfflineSongEntry>{
+            'song-1': OfflineSongEntry(state: OfflineSongState.ready),
+          },
+        ),
+        marker: marker,
       ),
-      marker: marker,
-    ));
+    );
     await tester.pumpAndSettle();
 
     final Icon icon = tester.widget<Icon>(find.byIcon(Icons.download_done));
@@ -203,16 +245,19 @@ void main() {
     expect(find.text('Removed from downloads'), findsOneWidget);
   });
 
-  testWidgets('downloading entry → progress spinner, no button',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(_wrap(
-      item: _songItem(subsonicId: 'song-1'),
-      manifest: const OfflineManifest(
-        songs: <String, OfflineSongEntry>{
-          'song-1': OfflineSongEntry(state: OfflineSongState.downloading),
-        },
+  testWidgets('downloading entry → progress spinner, no button', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        item: _songItem(subsonicId: 'song-1'),
+        manifest: const OfflineManifest(
+          songs: <String, OfflineSongEntry>{
+            'song-1': OfflineSongEntry(state: OfflineSongState.downloading),
+          },
+        ),
       ),
-    ));
+    );
     // Bounded pump, not pumpAndSettle — the indeterminate spinner never
     // settles (that's the point of it while genuinely downloading).
     for (int i = 0; i < 5; i++) {
@@ -223,34 +268,40 @@ void main() {
     expect(find.byKey(const Key('now-playing-hero-download')), findsNothing);
   });
 
-  testWidgets('queued entry → disabled schedule glyph',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(_wrap(
-      item: _songItem(subsonicId: 'song-1'),
-      manifest: const OfflineManifest(
-        songs: <String, OfflineSongEntry>{
-          'song-1': OfflineSongEntry(state: OfflineSongState.queued),
-        },
+  testWidgets('queued entry → disabled schedule glyph', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        item: _songItem(subsonicId: 'song-1'),
+        manifest: const OfflineManifest(
+          songs: <String, OfflineSongEntry>{
+            'song-1': OfflineSongEntry(state: OfflineSongState.queued),
+          },
+        ),
       ),
-    ));
+    );
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.schedule), findsOneWidget);
   });
 
-  testWidgets('failed entry → red error glyph with the error tooltip',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(_wrap(
-      item: _songItem(subsonicId: 'song-1'),
-      manifest: const OfflineManifest(
-        songs: <String, OfflineSongEntry>{
-          'song-1': OfflineSongEntry(
-            state: OfflineSongState.failed,
-            lastError: 'disk full',
-          ),
-        },
+  testWidgets('failed entry → red error glyph with the error tooltip', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        item: _songItem(subsonicId: 'song-1'),
+        manifest: const OfflineManifest(
+          songs: <String, OfflineSongEntry>{
+            'song-1': OfflineSongEntry(
+              state: OfflineSongState.failed,
+              lastError: 'disk full',
+            ),
+          },
+        ),
       ),
-    ));
+    );
     await tester.pumpAndSettle();
 
     final Icon icon = tester.widget<Icon>(find.byIcon(Icons.error_outline));
@@ -262,22 +313,77 @@ void main() {
     expect(find.text('disk full'), findsOneWidget);
   });
 
-  testWidgets('preview item (no song) → no download button at all',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(_wrap(item: _previewItem()));
+  const Key previewKey = Key('now-playing-hero-preview-download');
+
+  testWidgets(
+    'preview → download-to-library button instead of the offline button; '
+    'tap queues the song via POST /download',
+    (WidgetTester tester) async {
+      final _RecordingDispatcher dispatcher = _RecordingDispatcher();
+      await tester.pumpWidget(
+        _wrap(item: _previewItem(), dispatcher: dispatcher),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('now-playing-hero-download')), findsNothing);
+      expect(find.byKey(previewKey), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(previewKey),
+          matching: find.byIcon(Icons.download_outlined),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(previewKey));
+      await tester.pump();
+
+      expect(dispatcher.calls, <(String, String, String?)>[
+        (_previewSourceUrl, 'song', 'Preview Track'),
+      ]);
+      expect(find.text('Queued "Preview Track"'), findsOneWidget);
+    },
+  );
+
+  testWidgets('preview download in flight → spinner, no button', (
+    WidgetTester tester,
+  ) async {
+    final _RecordingDispatcher dispatcher = _RecordingDispatcher(hold: true);
+    await tester.pumpWidget(
+      _wrap(item: _previewItem(), dispatcher: dispatcher),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(previewKey));
+    await tester.pump();
+
+    expect(find.byKey(previewKey), findsNothing);
+    expect(
+      find.byKey(const Key('now-playing-hero-preview-downloading')),
+      findsOneWidget,
+    );
+    expect(dispatcher.calls, hasLength(1));
+  });
+
+  testWidgets('preview without a sourceUrl → no download button at all', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_wrap(item: _previewItem(sourceUrl: null)));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('now-playing-hero-download')), findsNothing);
-    expect(find.byIcon(Icons.download_outlined), findsNothing);
+    expect(find.byKey(previewKey), findsNothing);
   });
 
-  testWidgets('hero art container has 28dp rounded corners',
-      (WidgetTester tester) async {
+  testWidgets('hero art container has 28dp rounded corners', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(_wrap(item: _songItem()));
     await tester.pumpAndSettle();
 
-    final Iterable<Container> containers =
-        tester.widgetList<Container>(find.byType(Container));
+    final Iterable<Container> containers = tester.widgetList<Container>(
+      find.byType(Container),
+    );
     final bool hasHeroRadius = containers.any((Container c) {
       final BoxDecoration? d = c.decoration as BoxDecoration?;
       final BorderRadius? r = d?.borderRadius as BorderRadius?;

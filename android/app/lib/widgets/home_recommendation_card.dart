@@ -12,6 +12,35 @@ import 'download_icon.dart';
 import 'error_snackbar.dart';
 import 'library_cover_art.dart';
 
+/// Queue [track] for download (`POST /download`) and confirm with a snackbar;
+/// API errors surface via [showApiError]. Shared by the For You screen's card
+/// and the Home For You shelf so both download the same way.
+Future<void> downloadRecommendation(
+  BuildContext context,
+  WidgetRef ref,
+  RecommendedTrack track,
+) async {
+  try {
+    await ref
+        .read(downloadDispatcherProvider.notifier)
+        .dispatch(
+          track.sourceUrl,
+          sourceType: 'song',
+          displayName: track.title,
+        );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: kSnackBarDuration,
+        content: Text('Queued "${track.title}"'),
+      ),
+    );
+  } on ApiError catch (e) {
+    if (!context.mounted) return;
+    showApiError(context, e, action: 'download');
+  }
+}
+
 /// Vertical card used in the Home "Picked for you" / "Discover" section.
 ///
 /// Square colour-swatch placeholder on top, title + artist below, then a
@@ -29,26 +58,6 @@ class HomeRecommendationCard extends ConsumerWidget {
   final RecommendedTrack track;
   final double width;
 
-  Future<void> _onDownload(BuildContext context, WidgetRef ref) async {
-    try {
-      await ref.read(downloadDispatcherProvider.notifier).dispatch(
-            track.sourceUrl,
-            sourceType: 'song',
-            displayName: track.title,
-          );
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: kSnackBarDuration,
-          content: Text('Queued "${track.title}"'),
-        ),
-      );
-    } on ApiError catch (e) {
-      if (!context.mounted) return;
-      showApiError(context, e, action: 'download');
-    }
-  }
-
   Future<void> _onPlay(BuildContext context, WidgetRef ref) async {
     final String? id = track.subsonicSongId;
     if (id == null) return;
@@ -61,9 +70,13 @@ class HomeRecommendationCard extends ConsumerWidget {
     final TextTheme tt = Theme.of(context).textTheme;
     final ColorScheme cs = Theme.of(context).colorScheme;
     final bool isPlayable = track.inLibrary && track.subsonicSongId != null;
-    final bool inFlight = !isPlayable &&
-        ref.watch(downloadDispatcherProvider
-            .select((Set<String> s) => s.contains(track.sourceUrl)));
+    final bool inFlight =
+        !isPlayable &&
+        ref.watch(
+          downloadDispatcherProvider.select(
+            (Set<String> s) => s.contains(track.sourceUrl),
+          ),
+        );
 
     return SizedBox(
       width: width,
@@ -89,8 +102,11 @@ class HomeRecommendationCard extends ConsumerWidget {
                         key: const Key('rec-play'),
                         tooltip: 'Play',
                         onPressed: () => unawaited(_onPlay(context, ref)),
-                        child: const Icon(Icons.play_arrow,
-                            size: 26, color: Colors.white),
+                        child: const Icon(
+                          Icons.play_arrow,
+                          size: 26,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   )
@@ -103,7 +119,9 @@ class HomeRecommendationCard extends ConsumerWidget {
                       tooltip: 'Download',
                       onPressed: inFlight
                           ? null
-                          : () => unawaited(_onDownload(context, ref)),
+                          : () => unawaited(
+                              downloadRecommendation(context, ref, track),
+                            ),
                       child: inFlight
                           ? const SizedBox(
                               width: 16,
@@ -165,10 +183,7 @@ class _OverlayAction extends StatelessWidget {
         onTap: onPressed,
         child: Tooltip(
           message: tooltip,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: child,
-          ),
+          child: Padding(padding: const EdgeInsets.all(8), child: child),
         ),
       ),
     );
@@ -201,11 +216,7 @@ class RecommendationCoverArt extends StatelessWidget {
       width: size,
       height: size,
       color: fallbackColor,
-      child: Icon(
-        Icons.music_note,
-        size: 40,
-        color: fallbackIconColor,
-      ),
+      child: Icon(Icons.music_note, size: 40, color: fallbackIconColor),
     );
   }
 
@@ -213,11 +224,7 @@ class RecommendationCoverArt extends StatelessWidget {
   Widget build(BuildContext context) {
     final String? cover = track.coverArt;
     if (cover != null && cover.isNotEmpty) {
-      return LibraryCoverArt(
-        coverArtId: cover,
-        size: size,
-        borderRadius: 0,
-      );
+      return LibraryCoverArt(coverArtId: cover, size: size, borderRadius: 0);
     }
     final String? coverUrl = track.coverUrl;
     if (coverUrl != null && coverUrl.isNotEmpty) {

@@ -5,10 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:heerr/models/download_response.dart';
+import 'package:heerr/models/enums.dart';
 import 'package:heerr/models/profile_meta.dart';
 import 'package:heerr/models/recommended_track.dart';
 import 'package:heerr/player/heerr_audio_handler.dart';
 import 'package:heerr/player/player_provider.dart';
+import 'package:heerr/providers/download.dart';
 import 'package:heerr/providers/profiles/profile_meta.dart';
 import 'package:heerr/providers/recommendations.dart';
 import 'package:heerr/screens/home/for_you_section.dart';
@@ -17,6 +20,33 @@ import 'package:heerr/theme.dart';
 import '../../support/cred_test_support.dart';
 
 class _MockHandler extends Mock implements HeerrAudioHandler {}
+
+/// Records dispatches; [hold] keeps a download "in flight" (state keeps the
+/// URL) so the busy spinner can be asserted.
+class _RecordingDispatcher extends DownloadDispatcher {
+  _RecordingDispatcher({this.hold = false});
+  final bool hold;
+  final List<(String, String, String?)> calls = <(String, String, String?)>[];
+
+  @override
+  Set<String> build() => const <String>{};
+
+  @override
+  Future<DownloadResponse> dispatch(
+    String sourceUrl, {
+    required String sourceType,
+    String? displayName,
+  }) async {
+    calls.add((sourceUrl, sourceType, displayName));
+    state = <String>{...state, sourceUrl};
+    if (!hold) state = <String>{...state}..remove(sourceUrl);
+    return const DownloadResponse(
+      jobId: 'job-1',
+      state: JobState.queued,
+      deduped: false,
+    );
+  }
+}
 
 class _StubRecs extends Recommendations {
   _StubRecs(this._load);
@@ -52,6 +82,7 @@ Widget _wrap({
   String? nickname,
   HeerrAudioHandler? handler,
   _StubRecs? stub,
+  _RecordingDispatcher? dispatcher,
 }) {
   final GoRouter router = GoRouter(
     routes: <RouteBase>[
@@ -72,6 +103,8 @@ Widget _wrap({
       profileMetaNotifierProvider.overrideWith(() => _StubMeta(nickname)),
       activeProfileOverride(),
       if (handler != null) audioHandlerProvider.overrideWithValue(handler),
+      if (dispatcher != null)
+        downloadDispatcherProvider.overrideWith(() => dispatcher),
     ],
     child: MaterialApp.router(theme: heerrDarkTheme(), routerConfig: router),
   );
@@ -306,5 +339,76 @@ void main() {
     expect(item.artist, 'Artist 0');
     expect(item.extras?['preview'], isTrue);
     expect(item.extras?['sourceUrl'], 'https://music.youtube.com/watch?v=v0');
+  });
+
+  testWidgets('32px download button at the art bottom-left, clear of Play', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_wrap(recs: () async => _tracks(1)));
+    await tester.pumpAndSettle();
+
+    final Rect art = tester.getRect(
+      find.descendant(
+        of: _cards().first,
+        matching: find.byKey(const ValueKey<String>('for-you-art')),
+      ),
+    );
+    final Rect dl = tester.getRect(find.byTooltip('Download Song 0'));
+    final Rect play = tester.getRect(find.byTooltip('Play Song 0'));
+
+    expect(dl.width, 32);
+    expect(dl.height, 32);
+    expect(dl.left - art.left, 6);
+    expect(art.bottom - dl.bottom, 6);
+    expect(dl.overlaps(play), isFalse);
+  });
+
+  testWidgets('download queues the song via POST /download and confirms', (
+    WidgetTester tester,
+  ) async {
+    final _RecordingDispatcher dispatcher = _RecordingDispatcher();
+    final _MockHandler handler = _MockHandler();
+    await tester.pumpWidget(
+      _wrap(
+        recs: () async => _tracks(2),
+        dispatcher: dispatcher,
+        handler: handler,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Download Song 0'));
+    await tester.pump();
+
+    expect(dispatcher.calls, <(String, String, String?)>[
+      ('https://music.youtube.com/watch?v=v0', 'song', 'Song 0'),
+    ]);
+    expect(find.text('Queued "Song 0"'), findsOneWidget);
+    // The download tap must not also start playback (card tap = play).
+    verifyNever(() => handler.playSong(any()));
+  });
+
+  testWidgets('while queueing: spinner, and re-taps do not dispatch again', (
+    WidgetTester tester,
+  ) async {
+    final _RecordingDispatcher dispatcher = _RecordingDispatcher(hold: true);
+    await tester.pumpWidget(
+      _wrap(recs: () async => _tracks(1), dispatcher: dispatcher),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Download Song 0'));
+    await tester.pump();
+    expect(
+      find.descendant(
+        of: find.byTooltip('Download Song 0'),
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byTooltip('Download Song 0'));
+    await tester.pump();
+    expect(dispatcher.calls, hasLength(1));
   });
 }

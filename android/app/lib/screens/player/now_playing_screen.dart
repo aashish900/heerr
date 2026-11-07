@@ -35,6 +35,10 @@ import '../../widgets/glass_icon_button.dart';
 import '../../widgets/gradient_icon.dart';
 import '../../widgets/now_playing_background.dart';
 import '../../widgets/preview_badge.dart';
+import '../../models/recommended_track.dart';
+import '../../providers/download.dart';
+import '../../widgets/home_recommendation_card.dart'
+    show downloadRecommendation;
 import '../../widgets/waveform_seek_bar.dart';
 
 part 'now_playing_lyrics.dart';
@@ -350,6 +354,11 @@ class _Body extends ConsumerWidget {
     final Song? currentSong = !isPreviewMediaItem(item)
         ? songFromMediaItem(item)
         : null;
+    // A preview isn't in the library yet: its on-art button downloads it to
+    // the server (POST /download) instead of the per-song offline toggle.
+    final String? previewSourceUrl = isPreviewMediaItem(item)
+        ? (item.extras?['sourceUrl'] as String?)
+        : null;
     final Duration? sleepRemaining = ref.watch(sleepTimerNotifierProvider);
 
     return SingleChildScrollView(
@@ -361,6 +370,13 @@ class _Body extends ConsumerWidget {
             artUri: item.artUri,
             tintColor: tintColor,
             song: currentSong,
+            previewDownload: previewSourceUrl == null
+                ? null
+                : RecommendedTrack(
+                    title: item.title,
+                    artist: item.artist ?? '',
+                    sourceUrl: previewSourceUrl,
+                  ),
             onSwipeUp: () => _ExpandedLyricsSheet.show(context, tintColor),
           ),
           Padding(
@@ -482,10 +498,9 @@ class _PodcastBody extends ConsumerWidget {
               children: <Widget>[
                 Text(
                   item.title,
-                  style: Theme.of(context)
-                      .textTheme
-                      .headlineMedium
-                      ?.copyWith(fontWeight: FontWeight.w800),
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -523,19 +538,25 @@ class _PodcastBody extends ConsumerWidget {
 /// glow blended from the palette [tintColor] (never recolours the artwork
 /// itself — only the surrounding glow, matching the Home hero / MiniPlayer
 /// adaptive-theming rule), a slow floating breathe, and a floating on-art
-/// download-state button for [song] (hidden for preview items, where
-/// [song] is null).
+/// download-state button: the offline toggle for a library [song], or — for a
+/// preview, where [song] is null — a download-to-library button
+/// ([previewDownload]). Neither for a preview without a source URL.
 class _HeroArt extends StatefulWidget {
   const _HeroArt({
     required this.artUri,
     required this.tintColor,
     required this.song,
+    this.previewDownload,
     this.onSwipeUp,
   });
 
   final Uri? artUri;
   final Color? tintColor;
   final Song? song;
+
+  /// The playing preview, shaped as a recommendation so the shared
+  /// [downloadRecommendation] can queue it. Null unless previewing.
+  final RecommendedTrack? previewDownload;
 
   /// NOWPLAYING.md NP10 — swiping up on the art opens the lyrics takeover.
   /// A discrete "swipe triggers the existing expanded sheet" gesture,
@@ -667,12 +688,55 @@ class _HeroArtState extends State<_HeroArt>
                     top: 12,
                     right: 12,
                     child: _HeroArtDownloadButton(song: widget.song!),
+                  )
+                else if (widget.previewDownload != null)
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: _HeroArtPreviewDownloadButton(
+                      track: widget.previewDownload!,
+                    ),
                   ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// On-art download for a playing preview: queues the song into the library
+/// via the same [downloadRecommendation] as the Home For You card (snackbar
+/// `Queued "<title>"`). Spinner while the request is in flight.
+class _HeroArtPreviewDownloadButton extends ConsumerWidget {
+  const _HeroArtPreviewDownloadButton({required this.track});
+
+  final RecommendedTrack track;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bool inFlight = ref.watch(
+      downloadDispatcherProvider.select(
+        (Set<String> s) => s.contains(track.sourceUrl),
+      ),
+    );
+    if (inFlight) {
+      return const Padding(
+        key: Key('now-playing-hero-preview-downloading'),
+        padding: EdgeInsets.all(8),
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+        ),
+      );
+    }
+    return GlassIconButton(
+      key: const Key('now-playing-hero-preview-download'),
+      icon: Icons.download_outlined,
+      tooltip: 'Download to library',
+      onPressed: () => downloadRecommendation(context, ref, track),
     );
   }
 }

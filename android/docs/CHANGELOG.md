@@ -3469,3 +3469,32 @@ Closes out Phase PC (podcasts, #53). See `DECISIONLOG.md` 2026-07-20 "PC5: podca
 ## 2026-11-07 — v5.7.3: For You shows all results, sideways Home shelf, refresh button
 
 - Version bump `5.7.2` → `5.7.3` (`android/app/pubspec.yaml`). Ships the entry above. Not smoke-tested on device; RX9 is still open.
+
+## 2026-11-07 — Home For You: download button on every card
+
+- `lib/widgets/home_recommendation_card.dart`: the card's private `_onDownload` was extracted to a public top-level `downloadRecommendation(context, ref, track)` (dispatch `POST /download`, then the `Queued "<title>"` snackbar, with `showApiError` on `ApiError`). `HomeRecommendationCard` calls it. Behaviour unchanged.
+- `lib/screens/home/for_you_section.dart`: new `_DownloadButton` (`ConsumerWidget`), `Positioned(left: 6, bottom: 6)` on the art.
+  - **Look:** 32×32 `Material` circle in black 55% with `DownloadIcon(filled: false, size: 18)`; tooltip `Download <title>`.
+  - **While queueing:** shows a 14px white spinner and is non-interactive while `downloadDispatcherProvider` holds the URL.
+  - There's a `ponytail:` note on the ≥ 370dp width needed for both discs to clear each other. The class doc comment was updated.
+- `test/screens/home/for_you_section_test.dart`: +3 tests, using a `_RecordingDispatcher` with an optional `hold` to keep the URL in flight:
+  - a 32px disc 6px in from the art's bottom-left that doesn't overlap Play
+  - a tap dispatches `(sourceUrl, 'song', title)`, shows `Queued "Song 0"` and never calls `playSong`
+  - the in-flight spinner appears and a re-tap doesn't dispatch again
+- Gates: `flutter analyze` clean; `flutter test` 1217 → 1220 passed. Not run on device.
+
+## 2026-11-07 — Now Playing: download button for previews
+
+- `lib/screens/player/now_playing_screen.dart`:
+  - `previewSourceUrl` is read from `item.extras['sourceUrl']` when `isPreviewMediaItem(item)`.
+  - `_HeroArt` takes a new optional `previewDownload` (a `RecommendedTrack` with the title, artist or `''`, and `sourceUrl`). When `song` is null and `previewDownload` is set, the top-right on-art slot renders the new `_HeroArtPreviewDownloadButton`:
+    - **idle:** `GlassIconButton` keyed `now-playing-hero-preview-download`, `download_outlined`, tooltip "Download to library", calling `downloadRecommendation`
+    - **in flight:** a 24px white spinner keyed `now-playing-hero-preview-downloading`
+  - Library songs keep `_HeroArtDownloadButton` (the offline toggle). New imports: `recommended_track.dart`, `providers/download.dart`, `downloadRecommendation`.
+- `test/screens/player/now_playing_hero_art_test.dart`:
+  - `_previewItem` now mirrors `searchResultToMediaItem` (id = the preview-stream URL, `extras.sourceUrl`). There's a new `_RecordingDispatcher` with `hold`.
+  - The "preview → no download button at all" test was replaced by 3 tests:
+    - a preview shows the library-download button (not the offline one), and a tap dispatches `(sourceUrl, 'song', 'Preview Track')` and shows `Queued "Preview Track"`
+    - in flight shows the spinner and no button
+    - a preview without `sourceUrl` shows no button
+- Gates: `flutter analyze` clean; `flutter test` 1220 → 1222 passed. Not run on device.

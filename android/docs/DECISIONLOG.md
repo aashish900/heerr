@@ -1555,3 +1555,31 @@ Append-only ADR log for the Android app. Newest at the bottom. One entry per *de
 - A lazily-built horizontal `GridView`: it needs a fixed height, i.e. computing text line heights. The eager `Row` holds at most 50 small cards, which is cheap.
 - Row-major paging (3×2 pages): reads oddly when scrolled mid-page.
 - Asking the backend for more than 50: would need a schema change, and 50 candidates, after over-fetch to 100 and the owned filter, already fills several screens of the shelf.
+
+## 2026-11-07 — Home For You cards get a download button (bottom-left of the art)
+
+**Context:** A song played from the Home For You shelf streams as a preview, and the only way to download it was via "See all" → the For You screen. The user asked for a download button on the bottom-left of every Home For You card. This reverses the "no Download button on the Home cards" alternative in the Home grid ADR above.
+
+**Decision:**
+- Each card's art gets a **32px** translucent dark disc (black 55%, white `DownloadIcon`) at `left: 6, bottom: 6`, matching the For You screen's download chip. The 40px magenta play disc stays at the bottom-right.
+- A tap calls `downloadRecommendation`, the For You screen card's former `_onDownload`, now a shared top-level function in `widgets/home_recommendation_card.dart`. That's `downloadDispatcherProvider.dispatch(sourceUrl, sourceType: 'song', displayName: title)`, then the `Queued "<title>"` snackbar, with `showApiError` on failure.
+- While the URL is in the dispatcher's in-flight set, the disc shows a spinner and ignores taps. The download tap doesn't start playback.
+
+**Why:** It's one download path for both surfaces, with no duplicated dispatch or snackbar code. The button is 32px rather than 40px because two 40px discs plus insets (92px) don't fit the ~96px art on a 412dp Pixel 7 next to the 3-column + peek layout. 32 + 40 + 2×6 = 84px fits on screens ≥ 370dp, with a `ponytail:` note for narrower ones.
+
+**Alternatives considered:**
+- 40px download disc: overlaps Play on most phones.
+- Download from Now Playing for preview items: a broader change the user didn't ask for. The card button covers the reported flow.
+- Long-press menu: undiscoverable, and the user asked for a visible button.
+
+## 2026-11-07 — Now Playing: download-to-library button for previews
+
+**Context:** The user wants to download a song while it's playing as a preview: from the Home For You shelf, the For You screen, or online search, since all three play through the backend preview proxy. Now Playing's on-art button (NOWPLAYING.md §2.4) is the per-song *offline* toggle for library songs, and it was deliberately hidden for previews, which have no Subsonic id.
+
+**Decision:** For a preview whose `MediaItem.extras['sourceUrl']` is set (always true via `searchResultToMediaItem`), the same top-right on-art slot shows a `GlassIconButton` (`Icons.download_outlined`, tooltip "Download to library"). A tap calls the shared `downloadRecommendation`, which is `POST /download`, then `Queued "<title>"`, with `showApiError` on failure. While the dispatcher holds the URL, a white 24px spinner replaces the button. Library songs keep the offline toggle unchanged. A preview without `sourceUrl` shows nothing, as before.
+
+**Why:** It's one slot with one meaning per state: library song means offline copy, preview means fetch into the library. It reuses the For You card's download path, so all three surfaces queue identically. It applies to *every* preview, not just For You, because they share one `MediaItem` shape.
+
+**Alternatives considered:**
+- A separate button elsewhere (title row or action pill): two download icons on one screen with different meanings would be confusing.
+- Download from the mini-player too: not asked for. Now Playing is one tap away.
