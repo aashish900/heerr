@@ -1190,3 +1190,13 @@ Design consequences, written into `/PLAN.md` §5.4:
 - Merge and dedupe radio + related **within each seed** before consensus scoring. One track ("Sunn Raha Hai") appeared in both lists for the same seed.
 - Radio order varies between calls: the 2nd track differed between the Mac and server runs. This gives free variety on refresh.
 - Budget: about 2–3 calls per song seed and 2 per artist seed, about 0.3–1.2 s each, so 8 seeds at concurrency 4 should take about 3–5 s. No cache for now (RX6 re-measures).
+
+## 2026-11-07 — RX5: artist seeds + seed weights in `/recommend`
+
+- `app/schemas/recommend.py`: `RecommendSeed.title` is now optional (`None` means an artist seed; an empty string still gives 422), and there's a new `weight: float = 1.0` (`ge=0, le=1`). The change is additive, so old clients that send only `{title, artist}` validate unchanged.
+- `app/services/recommenders/base.py`: the `SeedTrack` dataclass now has `title: str | None` and `weight: float = 1.0`.
+- `app/api/v1/recommend.py`: passes `weight` through to the engine.
+- `app/services/recommenders/lastfm_engine.py`: an artist seed skips `track.getSimilar` and uses only `artist.getTopTracks`, and seed dedupe keys on `(artist, "")` for artist seeds. Last.fm still ignores `weight`, since it's outside the RX scope.
+- `app/services/recommenders/ytmusic_engine.py`: artist seeds are **skipped** for now. Before this, an artist seed would have been searched as the song "<artist> None", which the new test exposed. RX6 resolves them via `get_artist`.
+- Tests: +7 in `test_recommend.py`: artist seed accepted and passed through with its weight, explicit `title: null` accepted, old payload defaults to weight 1.0, and a 422 for each of weight > 1, weight < 0, empty title, and missing artist. +2 in `test_lastfm_engine.py` and +1 in `test_ytmusic_engine.py`.
+- Suite: 708 → 718 passed. mypy and ruff clean.

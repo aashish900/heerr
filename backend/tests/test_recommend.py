@@ -481,3 +481,51 @@ async def test_dismiss_unrelated_url_without_prior_show(client, app_sm, rx_user)
     )
     assert resp.status_code == 204
     assert (await _feedback(app_sm, uid))[_yt("never-shown")] == (0, False, True)
+
+
+# --- RX5: artist seeds + seed weights --------------------------------------
+
+
+async def _post_seeds(client, raw: str, seeds: list[dict]):
+    return await client.post(
+        "/api/v1/recommend",
+        json={"seeds": seeds, "limit": 5},
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+
+
+async def test_artist_seed_without_title_accepted(client, rx_user, fake_engine):
+    _, raw, _ = rx_user
+    resp = await _post_seeds(client, raw, [{"artist": "Prateek Kuhad", "weight": 0.7}])
+    assert resp.status_code == 200, resp.text
+    seed = fake_engine.last_seeds[0]
+    assert (seed.title, seed.artist, seed.weight) == (None, "Prateek Kuhad", 0.7)
+
+
+async def test_explicit_null_title_is_artist_seed(client, rx_user, fake_engine):
+    _, raw, _ = rx_user
+    resp = await _post_seeds(client, raw, [{"title": None, "artist": "A"}])
+    assert resp.status_code == 200, resp.text
+    assert fake_engine.last_seeds[0].title is None
+
+
+async def test_old_client_seed_defaults_weight_to_one(client, rx_user, fake_engine):
+    _, raw, _ = rx_user
+    resp = await _post_seeds(client, raw, [{"title": "Song", "artist": "A"}])
+    assert resp.status_code == 200
+    seed = fake_engine.last_seeds[0]
+    assert (seed.title, seed.weight) == ("Song", 1.0)
+
+
+@pytest.mark.parametrize(
+    "seed",
+    [
+        {"artist": "A", "weight": 1.5},
+        {"artist": "A", "weight": -0.1},
+        {"title": "", "artist": "A"},
+        {"title": "Song"},
+    ],
+)
+async def test_invalid_seed_returns_422(client, rx_user, seed):
+    _, raw, _ = rx_user
+    assert (await _post_seeds(client, raw, [seed])).status_code == 422

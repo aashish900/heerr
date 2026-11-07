@@ -298,3 +298,28 @@ def test_factory_lastfm_username_threaded_through(monkeypatch: pytest.MonkeyPatc
     engine = build_recommendation_engine()
     assert isinstance(engine, LastFMEngine)
     assert engine._username == "aashish"
+
+
+async def test_artist_seed_uses_only_artist_top_tracks(client, resolver):
+    client.artist_top_responses["Prateek Kuhad"] = [_top("Co2", "Prateek Kuhad")]
+    resolver.map = {("Prateek Kuhad", "Co2"): _yt_url("CO2")}
+    engine = _engine(client, resolver)
+
+    results = await engine.recommend([SeedTrack(title=None, artist="Prateek Kuhad")], limit=20)
+
+    assert client.track_similar_calls == []
+    assert client.artist_top_calls == [("Prateek Kuhad", 10)]
+    assert [r.title for r in results] == ["Co2"]
+
+
+async def test_artist_seed_and_song_seed_same_artist_both_kept(client, resolver):
+    client.track_similar_responses[("A1", "T1")] = [_similar("Sim", "S", "0.5")]
+    resolver.map = {("S", "Sim"): _yt_url("SIM")}
+    engine = _engine(client, resolver)
+
+    await engine.recommend(
+        [SeedTrack(title="T1", artist="A1"), SeedTrack(title=None, artist="A1")], limit=20
+    )
+
+    assert client.track_similar_calls == [("A1", "T1", 20)]
+    assert len(client.artist_top_calls) == 2

@@ -4,9 +4,10 @@ from typing import Protocol
 
 @dataclass(frozen=True)
 class SeedTrack:
-    title: str
+    title: str | None  # None ⇒ artist seed
     artist: str
     source_url: str | None = None
+    weight: float = 1.0
 
 
 @dataclass(frozen=True)

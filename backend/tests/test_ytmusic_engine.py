@@ -280,3 +280,14 @@ def test_factory_unknown_name_raises(monkeypatch: pytest.MonkeyPatch):
 
     with pytest.raises(RuntimeError, match="nope-engine"):
         build_recommendation_engine()
+
+
+async def test_artist_seed_never_searched_as_song():
+    # RX5: artist seeds are skipped until the RX6 rewrite resolves them via get_artist.
+    yt = FakeYTMusic()
+    engine = YTMusicEngine(yt=yt)
+
+    results = await engine.recommend([SeedTrack(title=None, artist="Prateek Kuhad")], limit=20)
+
+    assert yt.search_calls == []
+    assert results == []

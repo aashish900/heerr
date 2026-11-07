@@ -192,7 +192,7 @@ Backend first, TDD (`backend/CLAUDE.md`). Run `poetry run pytest` green before a
 2. Record the real response shapes, which keys hold `videoId` / `artists`, and the timings in `backend/docs/CHANGELOG.md`.
 3. If any call fails unauthenticated, stop and revise §5.4 before RX5.
 
-### [ ] RX5. Backend: schema — artist seeds + weights
+### [x] RX5. Backend: schema — artist seeds + weights
 1. Tests first:
    - a payload without `weight` or `title` validates as an artist seed
    - an old-client payload (title + artist only) is unchanged

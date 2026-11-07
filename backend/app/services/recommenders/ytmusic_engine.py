@@ -63,6 +63,8 @@ class YTMusicEngine:
         for seed in seeds:
             if len(out) >= limit:
                 break
+            if seed.title is None:  # artist seeds land with the RX6 rewrite
+                continue
             video_id = _video_id_from_url(seed.source_url)
             if video_id is None:
                 video_id = await self._resolve_via_search(seed)

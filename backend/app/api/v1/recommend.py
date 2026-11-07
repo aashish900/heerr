@@ -82,7 +82,10 @@ async def recommend(
     tok: Token = Depends(require_scope("read")),
     session: AsyncSession = Depends(get_session),
 ) -> RecommendResponse:
-    seeds = [SeedTrack(title=s.title, artist=s.artist, source_url=s.source_url) for s in req.seeds]
+    seeds = [
+        SeedTrack(title=s.title, artist=s.artist, source_url=s.source_url, weight=s.weight)
+        for s in req.seeds
+    ]
     candidates = await engine.recommend(seeds, min(req.limit * _OVERFETCH, _OVERFETCH_CAP))
     # Dedupe by URL before the DB round-trip (engines in a fallback chain may repeat).
     urls = list(dict.fromkeys(c.source_url for c in candidates))

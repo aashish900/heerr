@@ -4,9 +4,11 @@ from pydantic import BaseModel, ConfigDict, Field
 class RecommendSeed(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    title: str = Field(..., min_length=1)
+    # None ⇒ artist seed ("more like this artist"); RX5.
+    title: str | None = Field(default=None, min_length=1)
     artist: str = Field(..., min_length=1)
     source_url: str | None = None
+    weight: float = Field(default=1.0, ge=0.0, le=1.0)
 
 
 class RecommendRequest(BaseModel):

@@ -565,7 +565,7 @@ Working breakdown: `/PLAN.md` (RX0–RX9). Consensus multi-seed candidates, per-
 ### [x] RX4. ytmusicapi shape spike (no feature code)
 Verify `get_song_related`, `search(filter="artists")`, `get_artist` unauthenticated on the server; record shapes + timings in CHANGELOG.
 
-### [ ] RX5. Artist seeds + seed weights
+### [x] RX5. Artist seeds + seed weights
 **Files:** `app/schemas/recommend.py`, `app/services/recommenders/base.py`, `lastfm_engine.py`, `listenbrainz_engine.py`, tests. **Commit:** `feat(backend): RX5 artist seeds + seed weights in /recommend`.
 
 ### [ ] RX6. YTMusic engine rewrite

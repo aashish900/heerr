@@ -159,7 +159,7 @@ class LastFMEngine:
         seen_seeds: set[tuple[str, str]] = set()
         unique_seeds: list[SeedTrack] = []
         for s in all_seeds:
-            key = _seed_key(s.artist, s.title)
+            key = _seed_key(s.artist, s.title or "")
             if key in seen_seeds:
                 continue
             seen_seeds.add(key)
@@ -199,6 +199,8 @@ class LastFMEngine:
 
     async def _fetch_for_seed(self, seed: SeedTrack) -> list[tuple[str, str, float]]:
         async def _similar() -> list[dict]:
+            if seed.title is None:  # artist seed: top tracks only
+                return []
             try:
                 return await self._client.track_get_similar(
                     seed.artist, seed.title, _TRACK_SIMILAR_LIMIT
